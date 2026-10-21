@@ -266,5 +266,16 @@
   "We’re checking your editor access. Reconnect if this does not finish.": "Đang kiểm tra quyền biên tập. Hãy kết nối lại nếu quá trình chưa hoàn tất.",
   "Offline": "Ngoại tuyến",
   "Reconnecting…": "Đang kết nối lại…",
-  "Connection needs attention": "Cần kiểm tra kết nối"
+  "Connection needs attention": "Cần kiểm tra kết nối",
+  "Customers": "Khách hàng",
+  "Every customer deserves a little care.": "Mỗi khách hàng đều xứng đáng được chăm sóc.",
+  "Choose a confirmed viewing time before scheduling.": "Hãy chọn thời gian xem nhà đã thống nhất trước khi xác nhận lịch.",
+  "The customer cancelled this viewing request.": "Khách hàng đã hủy yêu cầu xem nhà này.",
+  "Confirmed viewing time · Hanoi (GMT+7)": "Thời gian xem nhà đã xác nhận · Hà Nội (GMT+7)",
+  "Update for the customer": "Cập nhật cho khách hàng",
+  "Visible in the customer’s account. Keep internal details in the notes below.": "Hiển thị trong tài khoản khách hàng. Hãy giữ thông tin nội bộ ở phần ghi chú bên dưới.",
+  "Agree on a time with the customer before scheduling. Confirmed times and customer updates appear in their account. No email is sent; contact guests directly.": "Thống nhất thời gian với khách hàng trước khi lên lịch. Lịch xác nhận và cập nhật sẽ hiển thị trong tài khoản. Hệ thống không gửi email; hãy liên hệ trực tiếp với khách chưa đăng nhập.",
+  "Password updated. You can now sign in to your account.": "Mật khẩu đã được cập nhật. Bạn có thể đăng nhập vào tài khoản.",
+  "Please sign in again before sending this request.": "Vui lòng đăng nhập lại trước khi gửi yêu cầu.",
+  "Couldn’t verify your account. Reconnect before sending this request.": "Không thể xác minh tài khoản. Vui lòng kết nối lại trước khi gửi yêu cầu."
 }

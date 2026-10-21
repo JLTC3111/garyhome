@@ -11,9 +11,9 @@ export function backendConfig() {
     key: runtime.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "",
   };
 }
-export function publicSupabase() {
+export function publicSupabase(accessToken?: string) {
   const { url, key } = backendConfig();
-  return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (input, init) => fetchWithDeadline(input, init, 10000) } }) : null;
+  return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}), fetch: (input, init) => fetchWithDeadline(input, init, 10000) } }) : null;
 }
 export async function loadContent(): Promise<{ content: Content; configured: boolean; error: boolean }> {
   const db = publicSupabase();

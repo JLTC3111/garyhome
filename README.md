@@ -11,11 +11,11 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
-Website: http://127.0.0.1:3000 · Team login: http://127.0.0.1:3000/login · CMS: http://127.0.0.1:3000/admin
+Website: http://127.0.0.1:3000 · Customer account: http://127.0.0.1:3000/account · Staff Studio: http://127.0.0.1:3000/admin
 
-Use **Team login** in the desktop header or mobile navigation menu. `/login` opens the CMS sign-in page at `/admin`. The email/password form appears immediately while the secure connection initializes; an authenticated editor opens the studio directly.
+Use **Sign in / My account** in the desktop header or mobile menu for the customer dashboard. `/login` also opens `/account`. Staff can use **Team login** in the footer or `/admin`; authenticated staff also see **Studio** in navigation. Customers never receive Studio permissions by signing up.
 
-Without Supabase configuration, the website uses 16 imported reference listings. Their photos are stored locally. The CMS has an explicitly labelled browser preview: edits and enquiries are saved in browser storage, and no request is sent to Gary Home. Saved homes and language preference also stay on the visitor’s device.
+Without Supabase configuration, the website uses 16 imported reference listings. Their photos are stored locally. The CMS has an explicitly labelled browser preview: edits and enquiries are saved in browser storage, and no request is sent to Gary Home. Guest saved homes and language preference stay on the visitor’s device. Signed-in saved homes use Supabase; importing an existing browser shortlist is an explicit customer action.
 
 ## Connect the authorized Supabase project
 
@@ -23,16 +23,32 @@ The application is connected to project `duyiihsmaqfgwezmsnjs` through the ignor
 
 1. Select or create the dedicated Gary Home project after confirming its organization and any cost.
 2. Apply `supabase/migrations/20261021152453_gary_home_cms.sql` to that project. This creates listings, neighbourhoods, settings, team membership, enquiries, and the `property-media` Storage bucket.
-3. Apply `supabase/seed.sql`. It imports the reference listings, four neighbourhoods, and initial site content. It uses `ON CONFLICT DO NOTHING` to preserve existing CMS edits.
+3. Apply `supabase/migrations/20261021201948_customer_portal.sql`, then `supabase/seed.sql`. It imports the reference listings, four neighbourhoods, and initial site content. It uses `ON CONFLICT DO NOTHING` to preserve existing CMS edits.
 
-   For manual initial setup through Supabase SQL Editor, `supabase/setup.sql` combines steps 2 and 3 in a single file. Select the intended dedicated project before running it. Auth user creation and membership provisioning remain separate steps below.
+   For manual initial setup through Supabase SQL Editor, `supabase/setup.sql` combines both migrations and the seed in a single file. For an already configured CMS, run only the new customer portal migration, not the full setup file. Select the intended dedicated project before running it. Auth user creation and membership provisioning remain separate steps below.
 4. Copy `.env.example` to `.env`, and fill in `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from the selected project. These are the only credentials the application needs. **Never add a service-role or secret key to frontend configuration.** For Sites hosting, set the same two values in the Site’s runtime environment.
 5. Create or invite the actual CMS user through Supabase Auth. A Supabase dashboard login is separate from this application’s Auth user. No account password needs to be shared with the agent.
 6. For the supplied owner email, run `supabase/owner.sql` in SQL Editor after creating and confirming `skycastle3@protonmail.com` in Authentication > Users. It checks that the confirmed user exists before granting access. For other owners or CLI operation, use `scripts/bootstrap-owner.sql` (psql variable `owner_email`). User-editable metadata is never used for authorization.
-7. Set the Auth Site URL and allow the exact `/auth/reset` redirect for each deployed origin. Configure email delivery for password resets if required. The public website does not provide account registration.
+7. Set the Auth Site URL and allow the exact `/auth/reset` redirect for each deployed origin. Configure email delivery for password resets if required. Enable email/password sign-ups and email confirmation for customer registration. Allow the exact `/account` signup-confirmation redirect as well as `/auth/reset` for each deployed origin. Registration stores no team membership; provision staff separately using the owner SQL above.
 8. Run the project’s security/performance advisors and verify a real editor login, upload, published edit, and enquiry against the selected project.
 
 The app automatically switches from preview to live mode when both configuration values are present. Public forms store enquiries in the CMS inbox; they do **not** send email notifications. Staff contact visitors directly and update status/notes. Viewing dates are requests until confirmed by the team.
+
+## Customer portal and staff CRM
+
+For an existing Gary Home project, run **`supabase/migrations/20261021201948_customer_portal.sql`** in that project's SQL Editor. The current management connector still sees the unrelated JLTC3111 project, so it cannot apply this migration to `duyiihsmaqfgwezmsnjs` or run that project's advisors. No additional `.env` values or secret keys are required. Live activation is pending the project owner's migration step and Auth redirect configuration.
+
+At `/account`, customers can register, sign in, request a password reset, save a shortlist across devices, track enquiries and viewing requests, read team updates, cancel their own active viewing requests, and maintain contact details, budget, neighbourhood and move-in preferences. Viewing requests and contact forms sent while signed in use a verified session and database-owned identity. Guest submissions remain private; an email match never automatically claims historical guest messages. Customers can explicitly import up to 100 published homes saved in the current browser.
+
+In **Studio → Customers**, staff can search customer profiles, enquiry contacts and manually added contacts; filter stages; maintain private notes and follow-up dates; see follow-ups due; view customer preferences; and open a customer's enquiry history. Profiles appear after the customer saves their details; enquiry contacts appear when they submit. Customer records in the browser CMS preview last only for the current visit and are labelled accordingly.
+
+In an enquiry editor, staff can save status, a confirmed viewing time and a customer-visible update together with internal notes in one transaction. Times use Hanoi (GMT+7). The customer must agree a time before staff mark it scheduled. This publishes the appointment in the customer's account; it does not send an email, book a calendar event or reserve a property. Contact guests directly.
+
+Database policies isolate profiles, enquiries and saved homes by `auth.uid()`. Team membership remains owner-managed. Internal notes live in staff-only tables; legacy enquiry notes are preserved but their original column no longer has client SELECT access. The application uses an explicit safe enquiry field list. Customers may cancel an active viewing but cannot change its status, confirmation time, reply, ownership or private notes. The staff save RPC uses invoker security and RLS.
+
+Customer requests use the same bounded session recovery as Studio. Account changes invalidate reads and writes, clear private results and replace account-specific forms. Same-account profile drafts survive token refresh, offline/online recovery, language switches and reauthentication while the account page stays mounted. Explicit sign-out clears them. A late save preserves newer edits, and uncertain writes are not automatically replayed.
+
+Auth and permissions follow [Supabase sign-up](https://supabase.com/docs/reference/javascript/auth-signup), [row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security), and [column-level privileges](https://supabase.com/docs/guides/database/postgres/column-level-security).
 
 ## CMS
 

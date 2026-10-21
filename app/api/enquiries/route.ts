@@ -15,8 +15,17 @@ export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) return Response.json({ error: "Invalid origin." }, { status: 403 });
   if (Number(request.headers.get("content-length") || 0) > 16000) return Response.json({ error: "Request too large." }, { status: 413 });
-  const db = publicSupabase();
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.match(/^Bearer (\S+)$/i)?.[1];
+  if (authorization && !token) return Response.json({ error: "Please sign in again before sending this request." }, { status: 401 });
+  const db = publicSupabase(token);
   if (!db) return Response.json({ error: "Online requests are not connected yet. Please call or email the team." }, { status: 503 });
+  if (token) {
+    try {
+      const { data, error } = await db.auth.getUser(token);
+      if (error || !data.user) return Response.json({ error: "Please sign in again before sending this request." }, { status: 401 });
+    } catch { return Response.json({ error: "Couldn’t verify your account. Reconnect before sending this request." }, { status: 503 }); }
+  }
   let input: unknown;
   try { const body = await request.text(); if (body.length > 16000) throw new Error(); input = JSON.parse(body); }
   catch { return Response.json({ error: "Invalid request." }, { status: 400 }); }
@@ -30,7 +39,8 @@ export async function POST(request: Request) {
   const recent = (requests.get(ip) || []).filter(t => now - t < 600000);
   if (recent.length >= 5) return Response.json({ error: "Please wait a few minutes before sending another request." }, { status: 429 });
   requests.set(ip, [...recent, now]);
-  const { website: _honeypot, ...record } = parsed.data;
+  const record = parsed.data;
+  delete record.website;
   const { error } = await db.from("enquiries").insert(record);
   if (error) return Response.json({ error: "We couldn’t save your request. Please try again or contact the team directly." }, { status: 500 });
   return Response.json({ ok: true }, { status: 201 });

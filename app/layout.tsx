@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./portal.css";
 import { loadContent } from "@/lib/server";
 import { SiteProvider } from "@/components/site-context";
 import { Header, Footer } from "@/components/site-shell";

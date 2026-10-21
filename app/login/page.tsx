@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Team login",
+  title: "Sign in",
   robots: { index: false, follow: false },
 };
 
 export default function LoginPage() {
-  redirect("/admin");
+  redirect("/account");
 }

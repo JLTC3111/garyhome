@@ -25,5 +25,18 @@ export type Enquiry = {
   kind: "viewing" | "general" | "landlord"; consent: boolean;
   status: "new" | "contacted" | "scheduled" | "closed";
   notes: string; created_at: string;
+  user_id?: string | null; appointment_at?: string | null;
+  customer_update?: string; cancelled_at?: string | null;
+};
+export type CustomerEnquiry = Omit<Enquiry, "notes">;
+export type CustomerProfile = {
+  user_id: string; full_name: string; email: string; phone: string;
+  preferred_district: string | null; budget_min: number | null; budget_max: number | null;
+  move_in_date: string | null; preferences: string; updated_at: string;
+};
+export type CustomerRecord = {
+  customer_key: string; user_id: string | null; name: string; email: string; phone: string;
+  stage: "new" | "contacted" | "viewing" | "tenant" | "closed";
+  follow_up_on: string | null; notes: string; updated_at: string;
 };
 export type Content = { properties: Property[]; neighbourhoods: Neighbourhood[]; settings: Settings };

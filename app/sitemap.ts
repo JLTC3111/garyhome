@@ -1,0 +1,2 @@
+import { loadContent } from "@/lib/server";
+export default async function sitemap(){const {content}=await loadContent();const base="https://gary-home-hanoi.lsd99999999.chatgpt.site";return ["","/homes","/neighbourhoods","/about","/contact"].map(path=>({url:base+path})).concat(content.properties.filter(p=>p.status==="published"&&!["sold","rented"].includes(p.availability)).map(p=>({url:base+"/homes/"+p.slug})));}

@@ -1,0 +1,55 @@
+{
+  "neighbourhoods": [
+    {
+      "slug": "tay-ho",
+      "name": "Tây Hồ",
+      "tagline_en": "Lakeside living, at your pace.",
+      "tagline_vi": "An yên bên hồ, theo nhịp của bạn.",
+      "description_en": "Morning walks by West Lake. Coffee on a quiet side street. Discover homes in one of Hanoi’s best-known lakeside neighbourhoods.",
+      "description_vi": "Dạo bộ bên Hồ Tây mỗi sáng, thưởng thức cà phê trong những con ngõ yên tĩnh. Khám phá không gian sống bên hồ giữa lòng Hà Nội.",
+      "image": "/images/area-tay-ho.jpg",
+      "sort_order": 0
+    },
+    {
+      "slug": "ba-dinh",
+      "name": "Ba Đình",
+      "tagline_en": "The city’s history. Your new story.",
+      "tagline_vi": "Nét xưa của phố. Câu chuyện mới của bạn.",
+      "description_en": "Tree-lined streets, familiar local markets, and the city’s historic heart. Explore apartments around Đào Tấn, Kim Mã, and Đội Cấn.",
+      "description_vi": "Những con phố rợp bóng cây, khu chợ thân quen và trái tim lịch sử của thành phố. Khám phá căn hộ quanh Đào Tấn, Kim Mã và Đội Cấn.",
+      "image": "/images/area-ba-dinh.jpg",
+      "sort_order": 1
+    },
+    {
+      "slug": "long-bien",
+      "name": "Long Biên",
+      "tagline_en": "A little more space to breathe.",
+      "tagline_vi": "Thêm không gian để tận hưởng.",
+      "description_en": "Across the Red River, discover a different rhythm of Hanoi. Explore homes in Ngọc Thụy and the surrounding residential neighbourhoods.",
+      "description_vi": "Bên kia sông Hồng là một nhịp sống Hà Nội khác. Khám phá nhà ở tại Ngọc Thụy và các khu dân cư lân cận.",
+      "image": "/images/area-long-bien.jpg",
+      "sort_order": 2
+    },
+    {
+      "slug": "bac-tu-liem",
+      "name": "Bắc Từ Liêm",
+      "tagline_en": "A fresh start, within reach.",
+      "tagline_vi": "Khởi đầu mới, trong tầm tay.",
+      "description_en": "Find your own corner of western Hanoi, with studios and apartments to suit a range of budgets.",
+      "description_vi": "Tìm góc riêng của bạn tại phía Tây Hà Nội với các căn studio và căn hộ phù hợp nhiều mức ngân sách.",
+      "image": "/images/area-bac-tu-liem.jpg",
+      "sort_order": 3
+    }
+  ],
+  "settings": {
+    "id": "main",
+    "hero_title_en": "Find a place.\nFeel at home.",
+    "hero_title_vi": "Tìm một nơi.\nGọi là nhà.",
+    "hero_text_en": "Thoughtfully chosen homes. A team that knows Hanoi. Let’s find the place that feels like you.",
+    "hero_text_vi": "Những ngôi nhà được chọn lọc. Đội ngũ am hiểu Hà Nội. Cùng tìm nơi thuộc về bạn.",
+    "hero_image": "/images/hero.jpg",
+    "contact_email": "info@garyhome.vn",
+    "contact_phone": "+84 356 175 046",
+    "contact_address": "Eurowindow Tower, 27 Trần Duy Hưng, Cầu Giấy, Hà Nội, Vietnam"
+  }
+}

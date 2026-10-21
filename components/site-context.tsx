@@ -1,0 +1,190 @@
+"use client";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { Content, Enquiry, Language } from "@/lib/types";
+import { studioText } from "@/lib/studio-i18n";
+import { browserClient } from "@/lib/browser-client";
+import { installRecoveryEvents } from "@/lib/recovery-events";
+import { fetchWithDeadline, request } from "@/lib/requests";
+import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/session-recovery";
+
+type Update<T> = T | ((previous: T) => T);
+type SiteContext = {
+  content: Content; setContent: (content: Update<Content>) => void;
+  language: Language; setLanguage: (l: Language) => void; t: (en: string, vi: string) => string;
+  saved: string[]; toggleSaved: (id: string) => void;
+  compare: string[]; toggleCompare: (id: string) => void;
+  configured: boolean; backendError: boolean; client: SupabaseClient | null; ready: boolean;
+  user: User | null; editor: boolean; demo: boolean; enterDemo: () => void; exitDemo: () => void;
+  sessionPhase: SessionPhase; reconnect: () => Promise<void>;
+  editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>) => Promise<T>;
+  enquiries: Enquiry[]; setEnquiries: (list: Update<Enquiry[]>) => void; refresh: () => Promise<void>;
+  notice: (message: string) => void;
+};
+const Context = createContext<SiteContext | null>(null);
+export function SiteProvider({ children, initial }: { children: ReactNode; initial: { content: Content; configured: boolean; error: boolean } }) {
+  const [content, updateContent] = useState(initial.content);
+  const [language, updateLanguage] = useState<Language>("en");
+  const [saved, setSaved] = useState<string[]>([]);
+  const [compare, setCompare] = useState<string[]>([]);
+  const [client, setClient] = useState<SupabaseClient | null>(null);
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [editor, setEditor] = useState(false);
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("checking");
+  const [demo, setDemo] = useState(false);
+  const [enquiries, updateEnquiries] = useState<Enquiry[]>([]);
+  const [toast, setToast] = useState("");
+  const clientRef = useRef<SupabaseClient | null>(null);
+  const sessionRef = useRef<SessionRecovery | null>(null);
+  const snapshotRef = useRef<SessionState>({ user: null, editor: false, phase: "checking", generation: 0 });
+  const initialRef = useRef(initial.content); initialRef.current = initial.content;
+  const version = useRef(0);
+  const connectRef = useRef<() => Promise<void>>(async () => {});
+  const refreshFlight = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+
+  const refresh = useCallback(async () => {
+    const db = clientRef.current, state = sessionRef.current?.state;
+    if (!db || !state?.user || !state.editor) throw new Error("Sign in with an editor account to continue.");
+    const generation = state.generation, startedVersion = version.current;
+    if (refreshFlight.current?.generation === generation) return refreshFlight.current.promise;
+    const promise = (async () => {
+      const [p, n, s, e] = await request(signal => Promise.all([
+        db.from("properties").select("*").order("sort_order").abortSignal(signal),
+        db.from("neighbourhoods").select("*").order("sort_order").abortSignal(signal),
+        db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
+        db.from("enquiries").select("*").order("created_at", { ascending: false }).abortSignal(signal),
+      ]));
+      const current = sessionRef.current?.state;
+      if (current?.generation !== generation || !current.editor || current.user?.id !== state.user?.id) return;
+      if (p.error || n.error || s.error || e.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
+      // A slow background read must not overwrite a save that completed meanwhile.
+      if (startedVersion !== version.current) return;
+      updateContent({ properties: p.data, neighbourhoods: n.data, settings: s.data } as Content);
+      updateEnquiries(e.data as Enquiry[]);
+    })();
+    refreshFlight.current = { generation, promise };
+    try { await promise; } finally { if (refreshFlight.current?.promise === promise) refreshFlight.current = null; }
+  }, []);
+
+  const reconnect = useCallback(async () => {
+    if (!sessionRef.current) { await connectRef.current(); return; }
+    if (await sessionRef.current.recover()) {
+      try { await refresh(); } catch (error) { setToast(error instanceof Error ? error.message : "Couldn’t load CMS data. Check your connection and editor permissions."); }
+    }
+  }, [refresh]);
+
+  const editorTask = useCallback(async <T,>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>): Promise<T> => {
+    if (!sessionRef.current) await connectRef.current();
+    const recovery = sessionRef.current, db = clientRef.current;
+    if (!recovery || !db || !await recovery.recover()) throw new Error("Reconnect and verify your editor access before saving. Your edits are still here.");
+    const { generation, user } = recovery.state;
+    const result = await request(signal => operation(db, signal));
+    if (recovery.state.generation !== generation || recovery.state.user?.id !== user?.id || !recovery.state.editor) {
+      throw new Error("Your account changed during this request. Check the current data before continuing.");
+    }
+    return result;
+  }, []);
+
+  useEffect(() => {
+    try { updateLanguage(localStorage.getItem("gary-language") === "vi" ? "vi" : "en"); } catch { /* Optional browser storage. */ }
+    try {
+      setSaved(JSON.parse(localStorage.getItem("gary-saved") || "[]"));
+      if (!initial.configured) {
+        updateEnquiries(JSON.parse(localStorage.getItem("gary-preview-enquiries") || "[]"));
+        if (localStorage.getItem("gary-preview-enabled") === "true") {
+          const stored = localStorage.getItem("gary-preview-content"); if (stored) updateContent(JSON.parse(stored));
+          setDemo(true);
+        }
+      }
+    } catch { /* Optional browser storage. */ }
+    let active = true, unsubscribe: (() => void) | undefined;
+    let connecting: Promise<void> | null = null;
+    const connect = (): Promise<void> => {
+      if (connecting) return connecting;
+      const task = (async () => {
+        try {
+          if (!navigator.onLine) { setSessionPhase("offline"); return; }
+          setSessionPhase("checking");
+          const response = await fetchWithDeadline("/api/config", { cache: "no-store" }, 10000);
+          if (!response.ok) throw new Error("Configuration unavailable");
+          const config = await response.json() as { configured: boolean; url: string; publishableKey: string };
+          if (!active) return;
+          if (!config.configured) { setSessionPhase("ready"); return; }
+          const db = browserClient(config.url, config.publishableKey);
+          clientRef.current = db; setClient(db);
+          const recovery = new SessionRecovery({
+            getSession: () => db.auth.getSession(),
+            getRole: async (id, signal) => {
+              const { data, error } = await db.from("team_members").select("role").eq("user_id", id).abortSignal(signal).maybeSingle();
+              if (error) throw error;
+              return data?.role ?? null;
+            },
+            online: () => navigator.onLine,
+            onChange: next => {
+              if (!active) return;
+              const previous = snapshotRef.current; snapshotRef.current = next;
+              setUser(next.user); setEditor(next.editor); setSessionPhase(next.phase);
+              if (next.phase !== "checking" && next.phase !== "recovering") setReady(true);
+              if (previous.user && (next.user?.id !== previous.user.id || previous.editor && !next.editor && next.phase === "ready")) {
+                version.current++; updateEnquiries([]); updateContent(initialRef.current);
+              }
+            },
+          });
+          sessionRef.current = recovery;
+          // Subscribe before the first read. Keep this callback synchronous.
+          const { data } = db.auth.onAuthStateChange((_event, session) => { recovery.observe(session); });
+          unsubscribe = () => data.subscription.unsubscribe();
+          await recovery.recover();
+        } catch { if (active) setSessionPhase(navigator.onLine ? "error" : "offline"); }
+        finally { if (active) setReady(true); }
+      })();
+      connecting = task;
+      void task.finally(() => { if (connecting === task) connecting = null; });
+      return task;
+    };
+    connectRef.current = connect;
+    const offline = () => { if (sessionRef.current) sessionRef.current.offline(); else setSessionPhase("offline"); };
+    const removeRecoveryEvents = installRecoveryEvents(reconnect, offline);
+    void connect();
+    return () => {
+      active = false; unsubscribe?.(); sessionRef.current?.stop(); sessionRef.current = null; clientRef.current = null;
+      removeRecoveryEvents();
+    };
+  }, [initial.configured, reconnect]);
+
+  useEffect(() => {
+    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") updateLanguage(event.newValue === "vi" ? "vi" : "en"); };
+    window.addEventListener("storage", syncLanguage); return () => window.removeEventListener("storage", syncLanguage);
+  }, []);
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
+  useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 4500); return () => clearTimeout(timer); }, [toast]);
+  const setContent = useCallback((next: Update<Content>) => {
+    version.current++;
+    updateContent(previous => {
+      const value = typeof next === "function" ? next(previous) : next;
+      if (demo) { try { localStorage.setItem("gary-preview-content", JSON.stringify(value)); } catch { setToast("Browser storage is full. Changes are only kept for this session."); } }
+      return value;
+    });
+  }, [demo]);
+  function setEnquiries(next: Update<Enquiry[]>) {
+    version.current++;
+    updateEnquiries(previous => {
+      const value = typeof next === "function" ? next(previous) : next;
+      if (!initial.configured) { try { localStorage.setItem("gary-preview-enquiries", JSON.stringify(value)); } catch { setToast("Browser storage is unavailable."); } }
+      return value;
+    });
+  }
+  function toggleSaved(id: string) { setSaved(previous => { const next = previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id]; try { localStorage.setItem("gary-saved", JSON.stringify(next)); } catch { setToast("Saved for this visit. Browser storage is unavailable."); } return next; }); }
+  function toggleCompare(id: string) { setCompare(previous => previous.includes(id) ? previous.filter(x => x !== id) : previous.length < 3 ? [...previous, id] : (setToast(language === "en" ? "Compare up to 3 homes at a time." : "So sánh tối đa 3 căn hộ."), previous)); }
+  function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
+  function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
+  const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); try { localStorage.setItem("gary-language", l); } catch { /* optional */ } }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, compare, toggleCompare, configured: initial.configured, backendError: initial.error, client, ready, user, editor, sessionPhase, reconnect, editorTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+    {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
+    {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
+    {initial.error && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)}</div>}
+    {children}{toast && <div className="toast" role="status">{studioText(toast, language)}<button aria-label={studioText("Dismiss notification", language)} onClick={() => setToast("")}>×</button></div>}
+  </Context.Provider>;
+}
+export function useSite() { const context = useContext(Context); if (!context) throw new Error("SiteProvider is required"); return context; }

@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./portal.css";
+import "./interactions.css";
+import "./portal-access.css";
 import { loadContent } from "@/lib/server";
 import { SiteProvider } from "@/components/site-context";
+import { InteractionProvider } from "@/components/interaction-provider";
 import { Header, Footer } from "@/components/site-shell";
 
 export const metadata: Metadata = {
@@ -23,7 +26,7 @@ export default async function RootLayout({
   const initial = await loadContent();
   return (
     <html lang="en">
-      <body><SiteProvider initial={initial}><a className="skip-link" href="#main-content">Skip to content</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></body>
+      <body><InteractionProvider><SiteProvider initial={initial}><a className="skip-link" href="#main-content">Skip to content</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></InteractionProvider></body>
     </html>
   );
 }

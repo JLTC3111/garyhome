@@ -2,6 +2,8 @@
 
 A redesigned Hanoi property website and Supabase CMS, based on https://garyhome.vn/en/ and the supplied screenshots.
 
+UI enhancements use adapted React Bits, Magic UI, and Motion Primitives components. See [the integration notes](docs/ui-components.md) for placements, accessibility choices, and source links, and [third-party notices](THIRD_PARTY_NOTICES.md) for licenses.
+
 ## Run locally
 
 Requires Node 22.13+ (Node 24 is recommended for the TypeScript search tests).
@@ -13,7 +15,7 @@ npm run dev -- --host 127.0.0.1 --port 3000
 
 Website: http://127.0.0.1:3000 · Customer account: http://127.0.0.1:3000/account · Staff Studio: http://127.0.0.1:3000/admin
 
-Use **Sign in / My account** in the desktop header or mobile menu for the customer dashboard. `/login` also opens `/account`. Staff can use **Team login** in the footer or `/admin`; authenticated staff also see **Studio** in navigation. Customers never receive Studio permissions by signing up.
+Use **Customer login / Customer account** in the header or mobile menu for `/account`. **Staff login / Staff Studio** opens `/admin`; the footer also identifies both portals. `/login` offers an explicit choice between customer and staff access. The customer portal uses personal email registration; the staff portal explains invitation-only company access. Both login pages include a portal switcher. Customers never receive Studio permissions by signing up.
 
 Without Supabase configuration, the website uses 16 imported reference listings. Their photos are stored locally. The CMS has an explicitly labelled browser preview: edits and enquiries are saved in browser storage, and no request is sent to Gary Home. Guest saved homes and language preference stay on the visitor’s device. Signed-in saved homes use Supabase; importing an existing browser shortlist is an explicit customer action.
 
@@ -36,15 +38,15 @@ The app automatically switches from preview to live mode when both configuration
 
 ## Customer sign-in and company staff accounts
 
-Customers can sign in with Google or Facebook once those providers are configured in Supabase, or register and sign in with a personal email and password. Each social option follows its own provider's availability. Apple sign-in is removed from the customer login and signup screens. Staff sign in at `/admin` using company accounts explicitly assigned by an owner or administrator. A company address or social login alone grants no staff permissions. The allowed staff domains are `@garyhome.com` and `@icue.vn`. The existing owner account is preserved.
+Customers register and sign in with a personal email and password at `/account`. Email signup requires mailbox confirmation. Staff sign in at `/admin` using company accounts explicitly assigned by an owner or administrator. A company address alone grants no staff permissions. The allowed staff domains are `@garyhome.com` and `@icue.vn`. The existing owner account is preserved.
 
-For the existing Gary Home project, apply `supabase/migrations/20261022042327_customer_social_auth_staff_access.sql` after the earlier migrations. **Studio → Team access** lets owners/admins create invitations, assign roles to existing company accounts, and disable access. New invitations require a server-only `SUPABASE_SECRET_KEY`; customer access and existing-account assignments use the publishable key and RLS. Google/Facebook credentials are configured in Supabase, not in frontend environment variables. Keep Apple disabled in Supabase. Facebook uses the existing OAuth callback and needs no additional SQL. The privacy page explains social login and provides data-deletion request instructions at `/privacy#data-deletion`.
+For the existing Gary Home project, apply `supabase/migrations/20261022042327_customer_social_auth_staff_access.sql` after the earlier migrations. This existing migration contains the staff access rules and retains its applied filename. **Studio → Team access** lets owners/admins create invitations, assign roles to existing company accounts, and disable access. New invitations require a server-only `SUPABASE_SECRET_KEY`; customer access and existing-account assignments use the publishable key and RLS. The privacy page provides data-deletion request instructions at `/privacy#data-deletion`.
 
-See **[the authentication setup guide](docs/auth-setup.md)** for the exact project, company domains, redirect URLs, step-by-step Google and Facebook setup, secret handling, and live verification steps. Rebuild fresh-project SQL with `node scripts/build-setup.mjs` after adding a migration.
+See **[the authentication setup guide](docs/auth-setup.md)** for the exact project, company domains, email confirmation and recovery redirects, staff invitations, secret handling, and live verification steps. Rebuild fresh-project SQL with `node scripts/build-setup.mjs` after adding a migration.
 
 ## Customer portal and staff CRM
 
-For an existing Gary Home project, run **`supabase/migrations/20261021201948_customer_portal.sql`** in that project's SQL Editor. The current management connector still sees the unrelated JLTC3111 project, so it cannot apply this migration to `duyiihsmaqfgwezmsnjs` or run that project's advisors. This customer portal migration needs no secret key. The later staff invitation feature has separate server-key requirements in [the auth guide](docs/auth-setup.md). Live activation requires applying the migrations and configuring Auth redirects in the correct project.
+The customer schema is defined in **`supabase/migrations/20261021201948_customer_portal.sql`**. On an existing CMS, apply it once in the intended project's SQL Editor. Before applying it, run the read-only [customer portal diagnostic](supabase/diagnostics/customer-portal.sql). After setup, `missing_tables` and `missing_columns` should both be empty, with both function checks `true`. Do not rerun the customer migration if its tables already exist, and do not run the full setup file over an existing database. This migration needs no app secret key. Staff invitations have separate server-key requirements in [the auth guide](docs/auth-setup.md).
 
 At `/account`, customers can register, sign in, request a password reset, save a shortlist across devices, track enquiries and viewing requests, read team updates, cancel their own active viewing requests, and maintain contact details, budget, neighbourhood and move-in preferences. Viewing requests and contact forms sent while signed in use a verified session and database-owned identity. Guest submissions remain private; an email match never automatically claims historical guest messages. Customers can explicitly import up to 100 published homes saved in the current browser.
 

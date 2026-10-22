@@ -340,5 +340,21 @@
   "Reconnect before updating your password.": "Kết nối lại trước khi cập nhật mật khẩu.",
   "This link has expired. Request a new email link before continuing.": "Liên kết đã hết hạn. Hãy yêu cầu liên kết email mới trước khi tiếp tục.",
   "Couldn’t update the password. Check the password requirements and try again.": "Không thể cập nhật mật khẩu. Hãy kiểm tra yêu cầu mật khẩu và thử lại.",
-  "Couldn’t update your password.": "Không thể cập nhật mật khẩu."
+  "Couldn’t update your password.": "Không thể cập nhật mật khẩu.",
+  "Staff portal.": "Cổng nhân viên.",
+  "Gary Home Studio.": "Gary Home Studio.",
+  "For the Gary Home team: manage listings, customers, viewings and site content.": "Dành cho đội ngũ Gary Home: quản lý tin đăng, khách hàng, lịch xem nhà và nội dung.",
+  "STAFF ACCESS · BY INVITATION": "NHÂN VIÊN · CẦN ĐƯỢC CẤP QUYỀN",
+  "Staff sign in.": "Nhân viên đăng nhập.",
+  "Reset staff password.": "Đặt lại mật khẩu nhân viên.",
+  "Use your assigned @garyhome.com or @icue.vn email. Existing owner accounts are also supported.": "Dùng email @garyhome.com hoặc @icue.vn được cấp. Tài khoản chủ sở hữu hiện tại vẫn được hỗ trợ.",
+  "Staff account access": "Truy cập tài khoản nhân viên",
+  "Sign in as staff": "Đăng nhập nhân viên",
+  "Open customer portal": "Mở cổng khách hàng",
+  "Sign out and use a staff account": "Đăng xuất và dùng tài khoản nhân viên",
+  "Staff accounts are created or assigned by an owner or administrator. Contact your administrator to request access.": "Tài khoản nhân viên do chủ sở hữu hoặc quản trị viên tạo hoặc cấp quyền. Liên hệ quản trị viên để được hỗ trợ truy cập.",
+  "Looking for a home?": "Bạn đang tìm nhà?",
+  "Customer sign in and registration": "Khách hàng đăng nhập và đăng ký",
+  "STAFF PORTAL": "CỔNG NHÂN VIÊN",
+  "Staff workspace": "Không gian nhân viên"
 }

@@ -4,8 +4,10 @@ import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import { ArrowRight, ArrowUpRight, CalendarDays, Check, Heart, LayoutDashboard, LoaderCircle, LogOut, MessageSquare, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { useSite } from "./site-context";
+import { AnimatedBackground } from "./motion-primitives/animated-background";
+import { NumberTicker } from "./magicui/number-ticker";
+import { PortalSwitcher } from "./portal-access";
 import { PropertyCard } from "./property-card";
-import { SocialSignIn } from "./social-sign-in";
 import { request } from "@/lib/requests";
 import { appointmentLabel, customerError, ENQUIRY_FIELDS, enquiryLabel } from "@/lib/customer-data";
 import type { CustomerEnquiry, CustomerProfile } from "@/lib/types";
@@ -31,10 +33,17 @@ function CustomerAuth() {
   const { t, client, ready, configured, reconnect, content, language } = useSite();
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState("");
+  const confirmPassword = useRef<HTMLInputElement>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!client || busy) return;
-    const form = new FormData(event.currentTarget), email = String(form.get("email")).trim();
-    setBusy(true); setError(""); setMessage("");
+    const form = new FormData(event.currentTarget), email = String(form.get("email")).trim(), password = String(form.get("password") ?? "");
+    setError(""); setMessage("");
+    if (mode === "signup" && password !== String(form.get("confirm_password") ?? "")) {
+      setError(t("The passwords don’t match.", "Mật khẩu không khớp."));
+      confirmPassword.current?.focus();
+      return;
+    }
+    setBusy(true);
     try {
       if (mode === "reset") {
         const { error } = await request(() => client.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/auth/reset" }));
@@ -42,7 +51,7 @@ function CustomerAuth() {
         setMessage(t("If an account exists, a password reset link has been requested. Check your inbox.", "Nếu tài khoản tồn tại, liên kết đặt lại mật khẩu sẽ được gửi. Hãy kiểm tra hộp thư."));
       } else if (mode === "signup") {
         const { data, error } = await request(() => client.auth.signUp({
-          email, password: String(form.get("password")),
+          email, password,
           options: { data: { full_name: String(form.get("full_name")).trim() }, emailRedirectTo: window.location.origin + "/account" },
         }));
         if (error) throw error;
@@ -62,20 +71,21 @@ function CustomerAuth() {
   }
   function changeMode(next: typeof mode) { setMode(next); setError(""); setMessage(""); }
   return <section className="container account-entry">
-    <div className="account-welcome"><div className="eyebrow">{t("MY GARY HOME", "GARY HOME CỦA BẠN")}</div><h1>{t("Your next chapter,", "Chương mới của bạn,")}<br/><em>{t("a little closer.", "đang đến gần hơn.")}</em></h1>
-      <p>{t("Keep the places you love and the people helping you find home, together in one place.", "Lưu những ngôi nhà bạn yêu thích và kết nối với đội ngũ đồng hành, ngay tại một nơi.")}</p>
+    <PortalSwitcher active="customer"/>
+    <div className="account-welcome"><div className="eyebrow">{t("CUSTOMER PORTAL", "CỔNG KHÁCH HÀNG")}</div><h1>{t("Your home search,", "Hành trình tìm nhà,")}<br/><em>{t("all in one place.", "ngay tại một nơi.")}</em></h1>
+      <p>{t("For customers looking for a home. Use your personal email to save a shortlist, follow viewing requests and keep in touch with the team.", "Dành cho khách hàng tìm nhà. Dùng email cá nhân để lưu nhà yêu thích, theo dõi yêu cầu xem nhà và trao đổi cùng đội ngũ.")}</p>
       <div className="account-benefits"><span><Heart size={19}/>{t("Your shortlist, on every device", "Nhà đã lưu trên mọi thiết bị")}</span><span><CalendarDays size={19}/>{t("Viewing requests and confirmed times", "Yêu cầu xem nhà và lịch đã xác nhận")}</span><span><MessageSquare size={19}/>{t("Conversations with the Gary team", "Trao đổi cùng đội ngũ Gary")}</span></div>
       <div className="account-welcome-photo"><img src="/images/hero.jpg" width="640" height="300" loading="lazy" alt={t("A welcoming home in Hanoi", "Một tổ ấm tại Hà Nội")}/><span>{t("A place to begin again.", "Nơi bắt đầu chương mới.")}</span></div>
     </div>
-    <div className="account-auth-card"><span className="account-auth-icon"><UserRound size={25}/></span><div className="eyebrow">{t("YOUR PLACE AT GARY HOME", "GÓC RIÊNG TẠI GARY HOME")}</div>
-      <h2>{mode === "signup" ? t("Make yourself at home.", "Chào mừng bạn đến nhà.") : mode === "reset" ? t("Let’s get you back in.", "Lấy lại quyền truy cập.") : t("Welcome back.", "Chào mừng trở lại.")}</h2>
+    <div className="account-auth-card"><span className="account-auth-icon"><UserRound size={25}/></span><div className="eyebrow">{t("PERSONAL ACCOUNT", "TÀI KHOẢN CÁ NHÂN")}</div>
+      <h2>{mode === "signup" ? t("Create a customer account.", "Tạo tài khoản khách hàng.") : mode === "reset" ? t("Reset customer password.", "Đặt lại mật khẩu khách hàng.") : t("Customer sign in.", "Khách hàng đăng nhập.")}</h2>
       <p>{mode === "signup" ? t("Create your customer account. It only takes a moment.", "Tạo tài khoản khách hàng chỉ trong giây lát.") : mode === "reset" ? t("We’ll send a link to reset your password.", "Chúng tôi sẽ gửi liên kết đặt lại mật khẩu.") : t("Sign in to pick up where you left off.", "Đăng nhập để tiếp tục hành trình tìm nhà.")}</p>
       {!configured ? <div className="form-info">{t("Customer accounts are not connected yet. You can still browse homes and contact the team.", "Tài khoản khách hàng chưa được kết nối. Bạn vẫn có thể tìm nhà và liên hệ đội ngũ.")}<Link className="text-link" href="/contact">{t("Contact the team", "Liên hệ đội ngũ")}<ArrowRight size={15}/></Link></div>
-        : <form className="enquiry-form" onSubmit={submit}>
-          {mode !== "reset" && <SocialSignIn busy={busy} setBusy={setBusy} onError={setError}/>}
+        : <form className="enquiry-form" aria-label={t("Customer account access", "Truy cập tài khoản khách hàng")} onSubmit={submit}>
           {mode === "signup" && <label>{t("Your name", "Họ và tên")}<input name="full_name" required minLength={2} maxLength={120} autoComplete="name"/></label>}
-          <label>{t("Email address", "Địa chỉ email")}<input name="email" type="email" required maxLength={254} autoComplete="email"/></label>
+          <label>{t("Personal email address", "Địa chỉ email cá nhân")}<input name="email" type="email" required maxLength={254} autoComplete="email"/></label>
           {mode !== "reset" && <label>{t("Password", "Mật khẩu")}<input name="password" type="password" required minLength={mode === "signup" ? 12 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"}/>{mode === "signup" && <small>{t("Use at least 12 characters.", "Sử dụng ít nhất 12 ký tự.")}</small>}</label>}
+          {mode === "signup" && <label>{t("Confirm password", "Xác nhận mật khẩu")}<input ref={confirmPassword} name="confirm_password" type="password" required minLength={12} autoComplete="new-password"/></label>}
           {mode === "signup" && <label className="consent-label"><input name="consent" type="checkbox" required/><span>{t("I agree to the", "Tôi đồng ý với")} <Link href="/privacy" target="_blank">{t("privacy policy", "chính sách bảo mật")}</Link>.</span></label>}
           {message && <div className="form-info" role="status"><Check size={17}/>{message}</div>}
           {error && <div className="form-error" role="alert">{error}</div>}
@@ -85,7 +95,7 @@ function CustomerAuth() {
         </form>}
       <div className="account-help"><ShieldCheck size={16}/><p>{t("Your account is personal. Your details are shared only with the Gary Home team.", "Tài khoản dành riêng cho bạn. Thông tin chỉ được chia sẻ với đội ngũ Gary Home.")}</p></div>
       <a className="text-link" href={`mailto:${content.settings.contact_email}`}>{t("Need a hand? We’re here.", "Cần hỗ trợ? Chúng tôi luôn ở đây.")}<ArrowUpRight size={15}/></a>
-      <Link className="account-team-link" href="/admin">{t("Gary Home team? Open Studio", "Đội ngũ Gary Home? Mở Studio")}</Link>
+      <Link className="account-team-link portal-other-link" href="/admin"><ShieldCheck size={19}/><span><strong>{t("Are you a staff member?", "Bạn là nhân viên Gary Home?")}</strong><small>{t("Use staff login with your assigned company account", "Đăng nhập nhân viên bằng tài khoản công ty được cấp")}</small></span><ArrowUpRight size={17}/></Link>
     </div>
   </section>;
 }
@@ -102,6 +112,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState("");
   const sequence = useRef(0), version = useRef(0), active = useRef(true);
+  const refreshFlight = useRef(false);
   const identity = useRef(currentUser?.id), locale = useRef(language);
   useEffect(() => { identity.current = currentUser?.id; locale.current = language; }, [currentUser?.id, language]);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -120,6 +131,21 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
     } catch (error) { if (active.current && read === sequence.current && identity.current === user.id) setError(customerError(error, locale.current)); }
     finally { if (active.current && read === sequence.current) setLoading(false); }
   }, [client, user.id]);
+  async function refreshAccount() {
+    if (refreshFlight.current) return;
+    refreshFlight.current = true; setLoading(true);
+    try {
+      await reconnect();
+      // A fast recovery may finish in the same React update and leave the phase
+      // unchanged. Explicitly re-read customer data after a manual refresh.
+      await load();
+    } catch (error) {
+      if (active.current && identity.current === user.id) setError(customerError(error, locale.current));
+    } finally {
+      refreshFlight.current = false;
+      if (active.current && identity.current === user.id) setLoading(false);
+    }
+  }
   useEffect(() => {
     let cancelled = false;
     if (sessionPhase === "ready") queueMicrotask(() => { if (!cancelled) void load(); });
@@ -178,18 +204,19 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   const upcoming = viewings.filter(e => !e.cancelled_at && e.status !== "closed" && (!e.appointment_at || new Date(e.appointment_at).getTime() > now));
   const firstName = (profile?.full_name || defaultProfile.full_name).split(" ")[0];
   return <section className="container account-page">
-    <div className="account-heading"><div><div className="eyebrow">{t("MY GARY HOME", "GARY HOME CỦA BẠN")}</div><h1>{firstName ? t(`Hello, ${firstName}.`, `Xin chào, ${firstName}.`) : t("A little closer to home.", "Gần hơn với tổ ấm.")}</h1><p>{t("Your places. Your plans. Your people.", "Ngôi nhà của bạn. Kế hoạch của bạn. Đội ngũ đồng hành.")}</p></div><Link href="/homes" className="button button-outline">{t("Keep exploring", "Tiếp tục tìm nhà")}<ArrowUpRight size={17}/></Link></div>
+    <PortalSwitcher active="customer"/>
+    <div className="account-heading"><div><div className="eyebrow">{t("CUSTOMER PORTAL", "CỔNG KHÁCH HÀNG")}</div><h1>{firstName ? t(`Hello, ${firstName}.`, `Xin chào, ${firstName}.`) : t("A little closer to home.", "Gần hơn với tổ ấm.")}</h1><p>{t("Your saved homes, enquiries and viewing plans.", "Nhà đã lưu, yêu cầu và kế hoạch xem nhà của bạn.")}</p></div><Link href="/homes" className="button button-outline">{t("Keep exploring", "Tiếp tục tìm nhà")}<ArrowUpRight size={17}/></Link></div>
     <div className="account-layout"><aside className="account-sidebar"><div className="account-person"><span className="avatar">{(firstName || user.email || "G")[0].toUpperCase()}</span><div><strong>{profile?.full_name || defaultProfile.full_name || t("Your account", "Tài khoản của bạn")}</strong><small>{user.email}</small></div></div>
-      <nav aria-label={t("Customer account", "Tài khoản khách hàng")}>{tabs.map(([id, label, Icon]) => <button key={id} className={tab === id ? "selected" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}><Icon size={18}/>{label}{id === "saved" && savedReady && <span>{saved.length}</span>}</button>)}</nav>
-      <div className="account-sidebar-bottom">{editor && <Link href="/admin"><ShieldCheck size={16}/>{t("Open Studio", "Mở Studio")}<ArrowUpRight size={14}/></Link>}<button onClick={() => void signOut()} disabled={!!busy}><LogOut size={16}/>{t("Sign out", "Đăng xuất")}</button></div>
+      <nav aria-label={t("Customer account", "Tài khoản khách hàng")}><AnimatedBackground activeValue={tab}>{tabs.map(([id, label, Icon]) => <button key={id} data-id={id} className={tab === id ? "selected" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}><Icon size={18}/>{label}{id === "saved" && savedReady && <span>{saved.length}</span>}</button>)}</AnimatedBackground></nav>
+      <div className="account-sidebar-bottom">{editor && <Link href="/admin"><ShieldCheck size={16}/>{t("Open staff Studio", "Mở Studio nhân viên")}<ArrowUpRight size={14}/></Link>}<button onClick={() => void signOut()} disabled={!!busy}><LogOut size={16}/>{t("Sign out", "Đăng xuất")}</button></div>
     </aside><div className="account-main">
-      <div className="account-section-heading"><div><div className="eyebrow">{t("A SPACE OF YOUR OWN", "KHÔNG GIAN RIÊNG CỦA BẠN")}</div><h2>{tabs.find(([id]) => id === tab)?.[1]}</h2></div><button className="text-link" disabled={loading || !!busy} onClick={() => void reconnect()}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button></div>
+      <div className="account-section-heading"><div><div className="eyebrow">{t("A SPACE OF YOUR OWN", "KHÔNG GIAN RIÊNG CỦA BẠN")}</div><h2>{tabs.find(([id]) => id === tab)?.[1]}</h2></div><button className="text-link" disabled={loading || !!busy} onClick={() => void refreshAccount()}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button></div>
       {error && <div className="form-error" role="alert">{error}</div>}
       {savedError && tab === "saved" && <div className="form-error" role="alert">{savedError}</div>}
       {tab === "saved" && <div className="account-import"><p>{t("Saved homes before signing in on this browser? Bring them with you.", "Bạn đã lưu nhà trên trình duyệt trước khi đăng nhập? Hãy thêm vào tài khoản.")}</p><button type="button" className="text-link" disabled={!!busy || !savedReady} onClick={() => void importShortlist()}>{busy === "import" ? t("Importing…", "Đang nhập…") : t("Import browser shortlist", "Nhập danh sách trên trình duyệt")}<ArrowRight size={15}/></button></div>}
       {!loaded && loading && <div className="account-loading" role="status"><LoaderCircle size={20} className="spin"/>{t("Bringing your plans together…", "Đang tải kế hoạch của bạn…")}</div>}
       {tab === "overview" && <>
-        <div className="account-stats">{[[Heart, savedReady ? saved.length : "—", t("Homes you love", "Nhà bạn yêu thích"), "saved"], [CalendarDays, loaded ? upcoming.length : "—", t("Viewing plans", "Kế hoạch xem nhà"), "viewings"], [MessageSquare, loaded ? enquiries.length : "—", t("Conversations", "Cuộc trao đổi"), "enquiries"]].map(([Icon, count, label, target]) => { const Symbol = Icon as typeof Heart; return <button key={String(target)} onClick={() => setTab(target as AccountTab)}><Symbol size={21}/><strong>{String(count)}</strong><span>{String(label)}<ArrowUpRight size={15}/></span></button>; })}</div>
+        <div className="account-stats">{[[Heart, savedReady ? saved.length : "—", t("Homes you love", "Nhà bạn yêu thích"), "saved"], [CalendarDays, loaded ? upcoming.length : "—", t("Viewing plans", "Kế hoạch xem nhà"), "viewings"], [MessageSquare, loaded ? enquiries.length : "—", t("Conversations", "Cuộc trao đổi"), "enquiries"]].map(([Icon, count, label, target]) => { const Symbol = Icon as typeof Heart; return <button key={String(target)} onClick={() => setTab(target as AccountTab)}><Symbol size={21}/><strong>{typeof count === "number" ? <NumberTicker value={count}/> : String(count)}</strong><span>{String(label)}<ArrowUpRight size={15}/></span></button>; })}</div>
         <div className="account-plan-card"><div><div className="eyebrow">{t("YOUR NEXT MOVE", "BƯỚC TIẾP THEO")}</div><h3>{t("A viewing is a good beginning.", "Một buổi xem nhà, một khởi đầu tốt.")}</h3><p>{t("Find a place that feels right, request a date, and we’ll arrange the details with you.", "Chọn ngôi nhà phù hợp, gửi ngày bạn muốn xem và chúng tôi sẽ cùng bạn sắp xếp chi tiết.")}</p><Link className="text-link" href="/homes">{t("Find a home to visit", "Tìm nhà để ghé thăm")}<ArrowRight size={16}/></Link></div><CalendarDays size={66} strokeWidth={1}/></div>
         {upcoming.length > 0 && <div className="account-preview"><h3>{t("On your horizon", "Kế hoạch sắp tới")}</h3><EnquiryCards rows={upcoming.slice(0, 2)} busy={busy} cancel={cancelViewing}/></div>}
         {!profile && loaded && <div className="account-profile-nudge"><UserRound size={22}/><div><strong>{t("Tell us a little about your plans.", "Chia sẻ thêm về kế hoạch của bạn.")}</strong><p>{t("A budget, a neighbourhood, a move-in date. We’ll help you find the right fit.", "Ngân sách, khu vực, ngày chuyển vào. Chúng tôi sẽ giúp bạn tìm ngôi nhà phù hợp.")}</p></div><button className="text-link" onClick={() => setTab("profile")}>{t("Add my details", "Thêm thông tin")}<ArrowRight size={15}/></button></div>}

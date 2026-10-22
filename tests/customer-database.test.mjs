@@ -30,7 +30,19 @@ test('customer portal permissions in real Postgres', async t => {
     insert into public.neighbourhoods(slug,name,image) values ('tay-ho','Tây Hồ','/area.jpg');
     insert into public.properties(id,slug,title_en,title_vi,district_slug,address,images,status) values ('${property}','test-home','Home','Nhà','tay-ho','Hanoi',array['/home.jpg'],'published');
     insert into public.enquiries(name,email,message,consent,notes) values ('Legacy guest','alice@example.invalid','A historical guest message.',true,'A private legacy note');`);
+  const diagnostic = await readFile(new URL('../supabase/diagnostics/customer-portal.sql', import.meta.url), 'utf8');
+  const before = (await db.query(diagnostic)).rows;
+  assert.equal(before.length, 1);
+  assert.deepEqual(before[0].missing_tables, ['customer_profiles','customer_records','enquiry_notes','saved_homes']);
+  assert.equal(before[0].missing_columns.length, 16);
+  assert.equal(before[0].staff_access_helper_exists, true);
+  assert.equal(before[0].staff_enquiry_update_exists, false);
   await db.exec(await readFile(new URL('../supabase/migrations/20261021201948_customer_portal.sql', import.meta.url), 'utf8'));
+  await t.test('the customer migration resolves every diagnostic item', async () => {
+    const { rows } = await db.query(diagnostic);
+    assert.equal(rows.length, 1);
+    assert.deepEqual(rows[0], { missing_tables: [], missing_columns: [], staff_access_helper_exists: true, staff_enquiry_update_exists: true });
+  });
   let aliceEnquiry;
 
   await t.test('customers can edit only their own profile and cannot promote themselves', async () => {

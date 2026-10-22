@@ -1,106 +1,83 @@
-# Customer sign-in and staff accounts
+# Customer email sign-in and staff accounts
 
-The app separates customer identity from staff permissions. Customers use `/account` with Google, Facebook, or a personal email and password. Apple is removed from the customer login and signup screens, including when Supabase reports that provider as enabled. Email signup requires mailbox confirmation in the current project. OAuth creates a customer account when necessary; it never grants a team role. Staff use `/admin` with an explicitly assigned company account. The original confirmed owner account remains available for administration.
+Customers register and sign in with a personal email and password at `/account`. Email signup requires mailbox confirmation. Staff use `/admin` with a company account explicitly assigned by an owner or administrator. Registering with a company address does not grant Studio access. The existing confirmed owner account remains available for administration.
 
-## Activate in the Gary Home project
+`/login` is a portal chooser. The public header and footer label customer and staff access separately. Each login page has a portal switcher and a link to the other login; switching portals does not change the current session or grant staff access. Password recovery returns confirmed staff to Studio and customers to their account.
 
-Use project **`duyiihsmaqfgwezmsnjs`**, not the unrelated project visible through the current management connector.
+## Configure the Gary Home project
 
-1. Ensure the CMS and customer portal migrations are already applied. For an existing project, run **`supabase/migrations/20261022042327_customer_social_auth_staff_access.sql`** in its SQL Editor. Do not run the full setup file over an existing database. Fresh projects can use `supabase/setup.sql`, then `supabase/owner.sql` after creating and confirming the actual owner user.
-2. The allowed staff email domains are **`@garyhome.com` and `@icue.vn`**. If the allowed company domains change, update the `public.staff_settings.email_domains` array as the database owner. Non-owner staff outside the configured domains lose Studio access immediately. Existing owner assignments are preserved, including the bootstrap owner's personal email.
-3. Set the Auth Site URL to the actual production origin. Allow these exact redirect URLs for each deployed or local origin:
+Use project **`duyiihsmaqfgwezmsnjs`**. Confirm the project ID before editing its configuration.
 
-   - `/account` — email signup confirmation.
-   - `/auth/callback` — Google and Facebook return here.
-   - `/auth/reset` — password recovery.
-   - `/auth/invite` — invited staff set their own password.
-
-   For the current preview, the origins may include `http://127.0.0.1:3000` and `http://localhost:3000`. Add only origins you actually use. Production redirects must use the production HTTPS origin.
-4. Keep email/password signup and email confirmation enabled. Configure a production email sender/SMTP for customer confirmations, staff invitations, and password recovery. Keep the normal Supabase confirmation URL in the email templates; the browser SDK consumes the authenticated redirect. These browser flows use the SDK's implicit redirect handling rather than server cookie sessions.
-5. For **new staff invitations only**, add `SUPABASE_SECRET_KEY` to the ignored `.env` file (and the production Worker's runtime secrets). Restart the local development server after changing it. This is a Supabase secret key, not the publishable key. The legacy server-only `SUPABASE_SERVICE_ROLE_KEY` is also supported. Never put either value in a `NEXT_PUBLIC_`/`VITE_` variable or share it in chat. Customer login and assigning an existing company account do not require the server secret. `/api/config` exposes only the project URL and publishable key.
-
-Project links: [SQL Editor](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/sql/new), [Auth providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers), [redirect URLs](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration).
-
-## Google: step-by-step initialization
-
-A regular Google account and a free Google Cloud project are sufficient for this login integration. Google does not require a paid developer membership. The website uses the hosted Supabase project even when its frontend runs on your computer; use the hosted callback below throughout this setup.
-
-1. Open [Google Cloud Console](https://console.cloud.google.com/), use the project selector, and select **New Project** if needed. Name the project **Gary Home** and select it after creation. Use an account the business will retain access to.
-2. Open [Google Auth Platform](https://console.cloud.google.com/auth/overview) in that project. Select **Get started** if prompted. Set the app name to **Gary Home**, choose a monitored support email, set the audience to **External** so personal Google accounts can sign in, and provide the developer contact email. Complete Google's setup form.
-3. Under **Google Auth Platform → Data Access**, select **Add or remove scopes**. Include only these basic identity scopes, then save:
+1. Ensure the CMS and customer portal migrations are applied. For an existing project, apply the existing [staff access migration](../supabase/migrations/20261022042327_customer_social_auth_staff_access.sql) after the earlier migrations. Its applied filename is retained; its SQL defines staff domains, membership and role management. Fresh projects can use `supabase/setup.sql`, then `supabase/owner.sql` after creating and confirming the owner user. Do not run the full setup file over an existing database.
+2. In [Authentication → Sign In / Providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers), enable **Email**, email/password signup and email confirmation. Keep other sign-in methods disabled. Hosted settings are managed in the dashboard; changing the repository's local configuration does not update the hosted project.
+3. Configure production email delivery/SMTP for confirmations, password recovery and staff invitations. Keep the normal Supabase confirmation URL in the email templates. The browser SDK consumes the authenticated email redirect.
+4. In [URL Configuration](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration), set **Site URL** to the website origin currently in use. The local preview uses `http://127.0.0.1:3000`; production uses the actual deployed HTTPS origin.
+5. Add these exact local **Redirect URLs** for the origins you use:
 
    ```text
-   openid
-   https://www.googleapis.com/auth/userinfo.email
-   https://www.googleapis.com/auth/userinfo.profile
+   http://127.0.0.1:3000/account
+   http://127.0.0.1:3000/auth/reset
+   http://127.0.0.1:3000/auth/invite
+   http://localhost:3000/account
+   http://localhost:3000/auth/reset
+   http://localhost:3000/auth/invite
    ```
 
-   No Gmail, Drive, Calendar, or other data permissions are needed for customer login.
-4. Under **Audience**, add the Google account you will use for initial testing under **Test users** if that section is available. Keep the audience **External**. Before opening sign-in to all customers, use **Publish app** / **In production** and complete any verification Google requests. Publishing status and brand verification are separate; publishing does not automatically verify the displayed name or logo.
-5. Under **Clients**, choose **Create client** and select **Web application**. Name it **Gary Home Web**. Set these fields:
+   At deployment, add the same three paths under the actual production HTTPS origin. The routes handle signup confirmation, password recovery and staff password setup respectively. Remove obsolete application redirect entries from the hosted allow list.
+6. Set the app's existing `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the ignored `.env` file and the production runtime. For new staff invitations, also set the server-only `SUPABASE_SECRET_KEY`. The legacy `SUPABASE_SERVICE_ROLE_KEY` is supported as a server-only fallback. Never prefix a secret with `NEXT_PUBLIC_` or `VITE_`, commit it, or share it in chat. Restart the development server after environment changes.
 
-   | Field | Value |
-   | --- | --- |
-   | Authorized JavaScript origins | `http://127.0.0.1:3000` and `http://localhost:3000`, as separate entries if you use both |
-   | Authorized redirect URIs | `https://duyiihsmaqfgwezmsnjs.supabase.co/auth/v1/callback` |
+Hosting audience and platform access controls are separate from these application accounts.
 
-   Add the actual production HTTPS origin when the site is deployed. An origin has no path; the Google redirect URI must contain the exact Supabase callback path. This web client is for human customer sign-in, not an AI agent workflow.
-6. Click **Create**. Copy the **Client ID** and the full **Client Secret** immediately into a secure credential store. Google only displays the full secret when it is created. If it is lost, create a replacement secret rather than using the masked value. Keep the downloaded credential JSON out of the repository and chat.
-7. Open the [Gary Home Supabase Auth providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers), select **Google**, turn **Enable Sign in with Google** on, and enter that web Client ID and Client Secret. Save. Keep nonce validation enabled. No Google credential needs to be added to the app's `.env` file.
-8. Open [Supabase URL Configuration](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration). Set **Site URL** to the origin you currently use, such as `http://127.0.0.1:3000` for this preview. Add these exact **Redirect URLs** if you use both local origins:
+## Customer accounts
 
-   ```text
-   http://127.0.0.1:3000/auth/callback
-   http://localhost:3000/auth/callback
-   ```
+- Open `/account` and choose **Create an account**.
+- Enter a name, personal email and password of at least 12 characters. Re-enter the same password in **Confirm password** and agree to the privacy policy.
+- Follow the mailbox confirmation link, then sign in with email and password.
+- Use **Forgot password?** to request a reset link. Complete password recovery at `/auth/reset` using the link from the email.
+- Customers can save homes, manage their details, see their enquiries and viewing requests, and read team updates. Customer registration creates no staff membership.
 
-   Keep the existing `/account`, `/auth/reset`, and `/auth/invite` redirects. At deployment, set Site URL to the actual production HTTPS origin and add that origin's `/auth/callback` URL.
-9. Reload [customer login](http://127.0.0.1:3000/account). **Continue with Google** becomes available after the app reads the enabled provider. Complete Google sign-in and confirm that you return to **My account**. Verify the user under **Supabase → Authentication → Users**. Also check cancellation and returning to the sign-in page. Google authentication does not grant Studio access.
+Auth sessions stay in the browser and use the SDK's automatic refresh. Email-link handling remains enabled for confirmation, recovery and invitation flows. Password setup is bound to the email link's intended account; changing accounts cannot redirect that password write to another user.
 
-The two callback URLs serve different steps: Google returns to the hosted Supabase `/auth/v1/callback`, then Supabase returns to the website's `/auth/callback`. A `redirect_uri_mismatch` from Google means the former does not exactly match the OAuth client's redirect list. Returning to the wrong website origin means the Supabase Site URL or redirect allow list needs checking. A disabled Google button means provider availability could not be confirmed; email remains available.
+## Company staff and owner access
 
-References: [Google Auth Platform setup](https://support.google.com/cloud/answer/15544987), [OAuth client creation and secret handling](https://support.google.com/cloud/answer/15549257), [Supabase Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google), [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
+Allowed company email domains are **`@garyhome.com` and `@icue.vn`**. The existing bootstrap owner is preserved. If company domains change, update `public.staff_settings.email_domains` as the database owner and verify staff access afterwards.
 
-## Facebook: step-by-step initialization
-
-1. Open [Meta for Developers](https://developers.facebook.com/apps/), create a **Gary Home** app, and select the **Facebook Login / Authentication and Account Creation** use case for customer sign-in.
-2. Under **Facebook Login → Settings**, add this exact **Valid OAuth Redirect URI** and save:
-
-   ```text
-   https://duyiihsmaqfgwezmsnjs.supabase.co/auth/v1/callback
-   ```
-
-3. In the authentication use case, enable **public_profile** and **email**. Supabase needs the customer's confirmed Facebook email; the app requests `email` explicitly.
-4. Copy **Settings → Basic → App ID / App Secret** into [Supabase Auth providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers) → **Facebook**, enable it, and save. Keep the secret out of chat, GitHub, and frontend `.env` variables.
-5. Reuse the website `/auth/callback` allow list from Google step 8. No new SQL or app environment variables are required.
-6. In Development mode, test with an accepted app administrator/developer/tester. Before public use, configure the actual HTTPS domain, public privacy URL (`/privacy`), and data-deletion instructions URL (`/privacy#data-deletion`), complete Meta's required review/verification, and switch to **Live**.
-7. Reload `/account`, test **Continue with Facebook**, cancellation, and returning to **My account**. Email remains available if Facebook cannot return an email.
-
-Reference: [Supabase Facebook setup](https://supabase.com/docs/guides/auth/social-login/auth-facebook). Google and Facebook availability are checked separately; Apple remains absent.
-
-## Apple: disabled for this release
-
-Apple sign-in is removed from the login and signup interface at the owner's request. The customer UI initiates only Google or Facebook OAuth, even if an Apple provider flag is enabled in Supabase. Keep the Apple provider disabled in Supabase. Enabling Apple later requires restoring the UI as well as completing Apple's developer account and provider configuration.
-
-## Manage staff in Studio
-
-An owner or administrator opens **Studio → Team access**. Enter the full name, exact company email, and role:
+An owner or administrator opens **Studio → Team access** and enters the staff member's full name, exact company email and role.
 
 | Role | Access |
 | --- | --- |
-| Owner | Studio, customer management, staff management, appoint/change administrators. Existing bootstrap owner preserved. |
-| Administrator | Studio, customer management, create/assign/disable staff. Cannot edit owners, other admins, or their own access. |
-| Staff | Properties, media, site content, neighbourhoods, and customer management. No staff management. |
-| Customer | Own details, saved homes, enquiries, and viewings. No Studio access. |
+| Owner | Studio, customers and staff management; can appoint administrators. |
+| Administrator | Studio, customers, staff invitations and assignments; cannot edit owners, other administrators or their own access. |
+| Staff | Properties, media, site content, neighbourhoods and customers. No staff management. |
+| Customer | Their own details, saved homes, enquiries and viewings. No Studio access. |
 
-For a new email, the server sends an Auth invitation; the recipient confirms the mailbox and chooses their own password at `/auth/invite`. Until mailbox confirmation, the assignment cannot access Studio. For an existing company Auth account, the role is assigned without sending another invitation. Its owner can use their existing password or the staff password-reset flow to set one. No account passwords are chosen or revealed to the administrator.
+For a new email, the server sends an Auth invitation. The recipient confirms their company mailbox and chooses a password at `/auth/invite`. The administrator never chooses or sees that password. Confirmation is required before the assignment can access Studio.
 
-Disable access to revoke Studio permissions without deleting the person's Auth identity or customer records. Database policies check the current verified Auth email, an exact allowed company domain, and active membership on every protected operation. A valid old JWT, email-only signup, social login, or user-editable metadata cannot restore revoked privileges. Owner accounts and the acting administrator's own account are protected. Team listings use cursor pagination.
+For an existing company Auth account, the role is assigned without another invitation. The account owner uses their existing password or the staff password-reset flow. Assigning an existing account does not require the server invitation secret.
 
-Auth invitations and database assignments are separate services. If delivery succeeds but permission assignment fails, the UI reports that partial outcome. The invited account has no new staff role; refresh the directory before retrying. Timed-out writes are never automatically replayed.
+Use **Disable access** to revoke an ordinary staff assignment without deleting their Auth identity or customer data. Database policies check the current confirmed email, exact allowed domain and active membership. Authorization uses server-managed membership; user-editable profile metadata cannot grant a staff role. Owners and the acting administrator's own account are protected.
 
-## Verify activation
+Auth invitations and permission assignment are separate operations. If delivery succeeds but assignment fails, the UI reports the partial result. Refresh the directory before retrying. Timed-out writes are never automatically replayed.
 
-Run the target project's Security Advisor after applying the migration. Then verify real Google and Facebook logins, confirmed personal email signup/login, staff invitation/password setup, and staff revocation in a browser. Confirm that customer accounts cannot open Studio or read another customer's records. Test Google/Facebook cancellation and email links in the production domain as well as the preview. Confirm that Apple is absent from both customer login and signup screens in English and Vietnamese.
+## Verify the setup
 
-Local tests cover the actual SDK public reads, Auth password identity binding, real Postgres policies in PGlite, API authorization, protected roles, invite partial failures, callback destinations, bilingual React forms, and recovery after inactivity. They do not replace provider-console configuration, real email delivery, or live end-to-end OAuth testing.
+- [ ] Register with a personal email, follow the confirmation email and sign in.
+- [ ] Confirm registration does not grant Studio access or another customer's data.
+- [ ] Sign out and sign in again; reload the account page.
+- [ ] Request a password reset and complete it from the email link.
+- [ ] Invite an eligible company address, confirm it and set a staff password.
+- [ ] Assign an existing company account and verify its role permissions.
+- [ ] Disable an ordinary staff assignment and confirm Studio access is revoked.
+- [ ] Confirm the existing owner can still administer the site.
+- [ ] Check English/Vietnamese forms and recovery after inactivity.
+- [ ] Repeat confirmation, reset and invitation links on the production domain.
+
+Run the target project's Security Advisor when applying database migrations. Local tests cover password identity binding, Postgres policies, API authorization, staff roles, invitation failures, bilingual forms and recovery after inactivity. They do not replace real email delivery and browser verification.
+
+## Diagnose an unavailable customer portal
+
+If the account shows “The customer portal is not available yet,” run the read-only [customer portal diagnostic](../supabase/diagnostics/customer-portal.sql) in the target project's SQL Editor. It returns a single row with missing tables, missing columns and the staff function checks. Empty `missing_tables` and `missing_columns` arrays mean those schema items exist; both function flags should be `true`. This diagnostic reads schema metadata only.
+
+The customer schema is defined by [the customer portal migration](../supabase/migrations/20261021201948_customer_portal.sql). Apply it only when its four new tables and enquiry columns are absent. If only some items are missing, inspect the result before preparing a targeted repair: the migration is transactional but is not designed to be rerun on an already-created schema. Do not rerun `setup.sql` on an existing project.
+
+References: [Supabase password authentication](https://supabase.com/docs/guides/auth/passwords), [email templates](https://supabase.com/docs/guides/auth/auth-email-templates), [redirect URL configuration](https://supabase.com/docs/guides/auth/redirect-urls).

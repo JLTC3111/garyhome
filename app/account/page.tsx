@@ -1,7 +1,7 @@
 import { AccountPage } from "@/components/account-page";
 
 export const metadata = {
-  title: "My Gary Home",
+  title: "Customer Portal",
   robots: { index: false, follow: false },
 };
 

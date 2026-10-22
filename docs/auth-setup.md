@@ -1,6 +1,6 @@
 # Customer sign-in and staff accounts
 
-The app separates customer identity from staff permissions. Customers use `/account` with Google or a personal email and password. Apple is removed from the customer login and signup screens, including when Supabase reports that provider as enabled. Email signup requires mailbox confirmation in the current project. OAuth creates a customer account when necessary; it never grants a team role. Staff use `/admin` with an explicitly assigned company account. The original confirmed owner account remains available for administration.
+The app separates customer identity from staff permissions. Customers use `/account` with Google, Facebook, or a personal email and password. Apple is removed from the customer login and signup screens, including when Supabase reports that provider as enabled. Email signup requires mailbox confirmation in the current project. OAuth creates a customer account when necessary; it never grants a team role. Staff use `/admin` with an explicitly assigned company account. The original confirmed owner account remains available for administration.
 
 ## Activate in the Gary Home project
 
@@ -11,7 +11,7 @@ Use project **`duyiihsmaqfgwezmsnjs`**, not the unrelated project visible throug
 3. Set the Auth Site URL to the actual production origin. Allow these exact redirect URLs for each deployed or local origin:
 
    - `/account` — email signup confirmation.
-   - `/auth/callback` — Google returns here.
+   - `/auth/callback` — Google and Facebook return here.
    - `/auth/reset` — password recovery.
    - `/auth/invite` — invited staff set their own password.
 
@@ -61,9 +61,26 @@ The two callback URLs serve different steps: Google returns to the hosted Supaba
 
 References: [Google Auth Platform setup](https://support.google.com/cloud/answer/15544987), [OAuth client creation and secret handling](https://support.google.com/cloud/answer/15549257), [Supabase Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google), [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
 
+## Facebook: step-by-step initialization
+
+1. Open [Meta for Developers](https://developers.facebook.com/apps/), create a **Gary Home** app, and select the **Facebook Login / Authentication and Account Creation** use case for customer sign-in.
+2. Under **Facebook Login → Settings**, add this exact **Valid OAuth Redirect URI** and save:
+
+   ```text
+   https://duyiihsmaqfgwezmsnjs.supabase.co/auth/v1/callback
+   ```
+
+3. In the authentication use case, enable **public_profile** and **email**. Supabase needs the customer's confirmed Facebook email; the app requests `email` explicitly.
+4. Copy **Settings → Basic → App ID / App Secret** into [Supabase Auth providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers) → **Facebook**, enable it, and save. Keep the secret out of chat, GitHub, and frontend `.env` variables.
+5. Reuse the website `/auth/callback` allow list from Google step 8. No new SQL or app environment variables are required.
+6. In Development mode, test with an accepted app administrator/developer/tester. Before public use, configure the actual HTTPS domain, public privacy URL (`/privacy`), and data-deletion instructions URL (`/privacy#data-deletion`), complete Meta's required review/verification, and switch to **Live**.
+7. Reload `/account`, test **Continue with Facebook**, cancellation, and returning to **My account**. Email remains available if Facebook cannot return an email.
+
+Reference: [Supabase Facebook setup](https://supabase.com/docs/guides/auth/social-login/auth-facebook). Google and Facebook availability are checked separately; Apple remains absent.
+
 ## Apple: disabled for this release
 
-Apple sign-in is removed from the login and signup interface at the owner's request. The customer UI initiates only Google OAuth, even if an Apple provider flag is enabled in Supabase. Keep the Apple provider disabled in Supabase. Enabling Apple later requires restoring the UI as well as completing Apple's developer account and provider configuration.
+Apple sign-in is removed from the login and signup interface at the owner's request. The customer UI initiates only Google or Facebook OAuth, even if an Apple provider flag is enabled in Supabase. Keep the Apple provider disabled in Supabase. Enabling Apple later requires restoring the UI as well as completing Apple's developer account and provider configuration.
 
 ## Manage staff in Studio
 
@@ -84,6 +101,6 @@ Auth invitations and database assignments are separate services. If delivery suc
 
 ## Verify activation
 
-Run the target project's Security Advisor after applying the migration. Then verify a real Google login, confirmed personal email signup/login, staff invitation/password setup, and staff revocation in a browser. Confirm that customer accounts cannot open Studio or read another customer's records. Test Google cancellation and email links in the production domain as well as the preview. Confirm that Apple is absent from both customer login and signup screens in English and Vietnamese.
+Run the target project's Security Advisor after applying the migration. Then verify real Google and Facebook logins, confirmed personal email signup/login, staff invitation/password setup, and staff revocation in a browser. Confirm that customer accounts cannot open Studio or read another customer's records. Test Google/Facebook cancellation and email links in the production domain as well as the preview. Confirm that Apple is absent from both customer login and signup screens in English and Vietnamese.
 
 Local tests cover the actual SDK public reads, Auth password identity binding, real Postgres policies in PGlite, API authorization, protected roles, invite partial failures, callback destinations, bilingual React forms, and recovery after inactivity. They do not replace provider-console configuration, real email delivery, or live end-to-end OAuth testing.

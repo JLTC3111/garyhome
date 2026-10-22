@@ -16,6 +16,18 @@ export function publicSupabase(accessToken?: string) {
   const { url, key } = backendConfig();
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}), fetch: (input, init) => fetchWithDeadline(input, init, 10000) } }) : null;
 }
+// This key is used only by server routes after verifying the caller's current
+// owner/admin membership. It is never returned by /api/config.
+export function staffAdminClient() {
+  const runtime = env as unknown as Record<string, string | undefined>;
+  const secret = runtime.SUPABASE_SECRET_KEY || process.env.SUPABASE_SECRET_KEY
+    || runtime.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url } = backendConfig();
+  return url && secret ? createClient(url, secret, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: (input, init) => fetchWithDeadline(input, init, 10000) },
+  }) : null;
+}
 export async function loadContent(): Promise<{ content: Content; configured: boolean; error: boolean }> {
   const db = publicSupabase();
   if (!db) return { content: seed, configured: false, error: false };

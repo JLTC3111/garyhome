@@ -9,6 +9,7 @@ import { installRecoveryEvents } from "@/lib/recovery-events";
 import { fetchWithDeadline, request } from "@/lib/requests";
 import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/session-recovery";
 import { customerError, ENQUIRY_FIELDS } from "@/lib/customer-data";
+import type { StaffRole } from "@/lib/staff";
 
 type Update<T> = T | ((previous: T) => T);
 type SiteContext = {
@@ -19,7 +20,7 @@ type SiteContext = {
   importSaved: () => Promise<number>;
   compare: string[]; toggleCompare: (id: string) => void;
   configured: boolean; backendError: boolean; client: SupabaseClient | null; ready: boolean;
-  user: User | null; editor: boolean; demo: boolean; enterDemo: () => void; exitDemo: () => void;
+  user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
   sessionPhase: SessionPhase; reconnect: () => Promise<void>;
   editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
@@ -43,13 +44,14 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [editor, setEditor] = useState(false);
+  const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("checking");
   const [demo, setDemo] = useState(false);
   const [enquiries, updateEnquiries] = useState<Enquiry[]>([]);
   const [toast, setToast] = useState("");
   const clientRef = useRef<SupabaseClient | null>(null);
   const sessionRef = useRef<SessionRecovery | null>(null);
-  const snapshotRef = useRef<SessionState>({ user: null, editor: false, phase: "checking", generation: 0 });
+  const snapshotRef = useRef<SessionState>({ user: null, editor: false, role: null, phase: "checking", generation: 0 });
   const initialRef = useRef(initial.content);
   useEffect(() => { initialRef.current = initial.content; }, [initial.content]);
   const version = useRef(0);
@@ -210,7 +212,7 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
             onChange: next => {
               if (!active) return;
               const previous = snapshotRef.current; snapshotRef.current = next;
-              setUser(next.user); setEditor(next.editor); setSessionPhase(next.phase);
+              setUser(next.user); setEditor(next.editor); setStaffRole(next.role); setSessionPhase(next.phase);
               if (previous.user?.id !== next.user?.id) {
                 savedVersion.current++; setSavedAccount(null); setSavedError(""); setPendingSaved([]);
                 if (next.user) setSaved([]);
@@ -316,7 +318,7 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); try { localStorage.setItem("gary-language", l); } catch { /* optional */ } }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); try { localStorage.setItem("gary-language", l); } catch { /* optional */ } }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

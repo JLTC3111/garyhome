@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { ArrowRight, ArrowUpRight, CalendarDays, Check, Heart, LayoutDashboard, LoaderCircle, LogOut, MessageSquare, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { useSite } from "./site-context";
 import { PropertyCard } from "./property-card";
+import { SocialSignIn } from "./social-sign-in";
 import { request } from "@/lib/requests";
 import { appointmentLabel, customerError, ENQUIRY_FIELDS, enquiryLabel } from "@/lib/customer-data";
 import type { CustomerEnquiry, CustomerProfile } from "@/lib/types";
@@ -71,6 +72,7 @@ function CustomerAuth() {
       <p>{mode === "signup" ? t("Create your customer account. It only takes a moment.", "Tạo tài khoản khách hàng chỉ trong giây lát.") : mode === "reset" ? t("We’ll send a link to reset your password.", "Chúng tôi sẽ gửi liên kết đặt lại mật khẩu.") : t("Sign in to pick up where you left off.", "Đăng nhập để tiếp tục hành trình tìm nhà.")}</p>
       {!configured ? <div className="form-info">{t("Customer accounts are not connected yet. You can still browse homes and contact the team.", "Tài khoản khách hàng chưa được kết nối. Bạn vẫn có thể tìm nhà và liên hệ đội ngũ.")}<Link className="text-link" href="/contact">{t("Contact the team", "Liên hệ đội ngũ")}<ArrowRight size={15}/></Link></div>
         : <form className="enquiry-form" onSubmit={submit}>
+          {mode !== "reset" && <SocialSignIn busy={busy} setBusy={setBusy} onError={setError}/>}
           {mode === "signup" && <label>{t("Your name", "Họ và tên")}<input name="full_name" required minLength={2} maxLength={120} autoComplete="name"/></label>}
           <label>{t("Email address", "Địa chỉ email")}<input name="email" type="email" required maxLength={254} autoComplete="email"/></label>
           {mode !== "reset" && <label>{t("Password", "Mật khẩu")}<input name="password" type="password" required minLength={mode === "signup" ? 12 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"}/>{mode === "signup" && <small>{t("Use at least 12 characters.", "Sử dụng ít nhất 12 ký tự.")}</small>}</label>}

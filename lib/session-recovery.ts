@@ -1,8 +1,9 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { request } from "./requests.ts";
+import { isStaffRole, type StaffRole } from "./staff.ts";
 
 export type SessionPhase = "checking" | "ready" | "recovering" | "offline" | "error";
-export type SessionState = { user: User | null; editor: boolean; phase: SessionPhase; generation: number };
+export type SessionState = { user: User | null; editor: boolean; role: StaffRole | null; phase: SessionPhase; generation: number };
 type Dependencies = {
   getSession: () => PromiseLike<{ data: { session: Session | null }; error: unknown }>;
   getRole: (userId: string, signal: AbortSignal) => PromiseLike<string | null>;
@@ -12,7 +13,7 @@ type Dependencies = {
 };
 
 export class SessionRecovery {
-  state: SessionState = { user: null, editor: false, phase: "checking", generation: 0 };
+  state: SessionState = { user: null, editor: false, role: null, phase: "checking", generation: 0 };
   private stopped = false;
   private recovery: Promise<boolean> | null = null;
   private role: { generation: number; promise: Promise<boolean> } | null = null;
@@ -34,11 +35,11 @@ export class SessionRecovery {
       clearTimeout(this.scheduled);
       this.recovery = null;
       this.role = null;
-      this.publish({ user: null, editor: false, phase: "ready", generation: this.state.generation + 1 });
+      this.publish({ user: null, editor: false, role: null, phase: "ready", generation: this.state.generation + 1 });
       return;
     }
     const changed = session.user.id !== this.state.user?.id;
-    this.publish({ user: session.user, ...(changed ? { editor: false, phase: "recovering", generation: this.state.generation + 1 } : {}) });
+    this.publish({ user: session.user, ...(changed ? { editor: false, role: null, phase: "recovering", generation: this.state.generation + 1 } : {}) });
     clearTimeout(this.scheduled);
     this.scheduled = setTimeout(() => { void this.checkRole(); }, 0);
   }
@@ -54,8 +55,8 @@ export class SessionRecovery {
       try {
         const role = await request(signal => this.deps.getRole(user.id, signal), this.deps.timeoutMs ?? 12000);
         if (this.stopped || this.state.generation !== generation) return false;
-        const editor = role === "owner" || role === "editor";
-        this.publish({ editor, phase: "ready" });
+        const editor = isStaffRole(role);
+        this.publish({ editor, role: editor ? role : null, phase: "ready" });
         return editor;
       } catch {
         if (!this.stopped && this.state.generation === generation) this.publish({ phase: this.deps.online() ? "error" : "offline" });

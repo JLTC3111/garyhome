@@ -23,11 +23,27 @@ async function harness(t, options={}){
  const setGlobal=(key,value)=>{descriptors.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,writable:true,configurable:true});};
  const browser=new EventTarget(),page=Object.assign(new EventTarget(),{visibilityState:'visible',documentElement:{lang:'en'},body:{style:{overflow:''}}});
  const network={onLine:!options.offline},stored=new Map();
+ const redirects=[],router={replace:url=>redirects.push(url)};
+ browser.location=Object.assign(new URL(options.url??'https://gary.example/account'),{assign:url=>redirects.push(url)});
  setGlobal('IS_REACT_ACT_ENVIRONMENT',true);setGlobal('window',browser);setGlobal('document',page);setGlobal('navigator',network);
  setGlobal('localStorage',{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)});
- setGlobal('fetch',async()=>Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'}));
+ setGlobal('FormData',class{constructor(form){this.form=form;}get(key){return this.form.fields?.[key]??null;}});
+ setGlobal('fetch',async(input,init)=>{
+  if(String(input).startsWith('/api/auth/options'))return Response.json({available:true,google:!!options.providers,apple:!!options.providers});
+  if(String(input).startsWith('/api/admin/team')){
+   const method=init?.method??'GET';backend.teamCalls.push({method,input:init?.body?JSON.parse(init.body):null});
+   if(method==='GET'){
+    if(backend.teamPending)await backend.teamPending.promise;
+    return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn'],invitationsEnabled:true});
+   }
+   if(method==='POST'){const data=JSON.parse(init.body);backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});return Response.json({invited:true});}
+   return Response.json({user_id:'changed-staff'});
+  }
+  if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return Response.json({});}
+  return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
+ });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
- const backend={role:options.customer||options.guest?null:'owner',roleError:false,pending:new Map(),writes:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending};
+ const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,pending:new Map(),writes:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
   const filters={},query={};
   query.eq=(key,value)=>{filters[key]=value;return query;};
@@ -42,7 +58,13 @@ async function harness(t, options={}){
   return query;
  }};
  const client={
-  auth:{getSession:async()=>backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null}),onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};}},
+  auth:{getSession:async()=>backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null}),onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};},
+   initialize:async()=>({error:options.callbackError?new Error('Provider rejected'):null}),
+   signInWithOAuth:async input=>{backend.authCalls.push({method:'oauth',input});return {data:{url:'https://unit-test.invalid/auth/v1/authorize'},error:backend.oauthError?new Error('Unavailable'):null};},
+   signUp:async input=>{backend.authCalls.push({method:'signup',input});return {data:{session:null},error:null};},
+   signInWithPassword:async input=>{backend.authCalls.push({method:'password',input});session=authSession('customer');callback?.('SIGNED_IN',session);return {data:{session},error:null};},
+   resetPasswordForEmail:async(...input)=>{backend.authCalls.push({method:'reset',input});return {error:null};},
+  },
   storage:{from:()=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}})})},
   from(table){
    let writing=false,payload,single=false;const filters={};const query={};
@@ -71,7 +93,7 @@ async function harness(t, options={}){
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
-   if(id==='next/navigation')return {usePathname:()=>options.customer?'/account':'/admin'};
+   if(id==='next/navigation')return {usePathname:()=>options.customer?'/account':'/admin',useRouter:()=>router};
    if(id==='@/lib/browser-client')return {browserClient:()=>client,publicBrowserClient:()=>publicClient};
    if(id.startsWith('.')||id.startsWith('@/')){
     const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);
@@ -84,14 +106,14 @@ async function harness(t, options={}){
   return loaded.exports;
  }
  const {SiteProvider,useSite}=load(path.join(base,'components/site-context.tsx'));
- const Page=options.customer?load(path.join(base,'components/account-page.tsx')).AccountPage:load(path.join(base,'components/admin-page.tsx')).AdminPage;
+ const Page=options.page==='callback'?load(path.join(base,'components/auth-callback.tsx')).AuthCallback:options.page==='password'||options.page==='invite'?load(path.join(base,'components/password-reset.tsx')).PasswordReset:options.customer?load(path.join(base,'components/account-page.tsx')).AccountPage:load(path.join(base,'components/admin-page.tsx')).AdminPage;
  let site,renderer;
  function Probe(){site=useSite();return null;}
  t.after(async()=>{
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page))));await delay(10);});
+ await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page,{invitation:options.page==='invite'}))));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
  const emit=async(next)=>{await act(async()=>{session=next;callback?.(next?'TOKEN_REFRESHED':'SIGNED_OUT',next);await delay(5);});};
@@ -99,8 +121,92 @@ async function harness(t, options={}){
   await act(async()=>{renderer.root.findByProps({'aria-label':'Site settings'}).props.onClick();});
   await act(async()=>{renderer.root.findAllByType('textarea')[0].props.onChange({target:{value}});});
  };
- return {renderer,backend,network,browser,page,emit,editSettings,get site(){return site;}};
+ return {renderer,backend,network,browser,page,emit,editSettings,redirects,get site(){return site;}};
 }
+
+test('customer Google and Apple sign-in use the fixed customer callback and preserve the provider choice',async t=>{
+ const h=await harness(t,{customer:true,guest:true,providers:true});
+ const button=label=>h.renderer.root.findAllByType('button').find(node=>node.children.includes(label));
+ await act(async()=>{button('Continue with Google').props.onClick();await delay(5);});
+ assert.equal(h.backend.authCalls[0].input.provider,'google');assert.equal(h.backend.authCalls[0].input.options.redirectTo,'https://gary.example/auth/callback');
+ assert.equal(h.backend.authCalls[0].input.options.queryParams.prompt,'select_account');
+ const restored=new Event('pageshow');Object.defineProperty(restored,'persisted',{value:true});
+ await act(async()=>{h.browser.dispatchEvent(restored);});
+ await act(async()=>{button('Continue with Apple').props.onClick();await delay(5);});
+ assert.equal(h.backend.authCalls[1].input.provider,'apple');assert.equal(h.backend.calls.length,0);
+});
+
+test('disabled social providers stay unavailable while personal email signup confirms the mailbox without staff access',async t=>{
+ const h=await harness(t,{customer:true,guest:true});
+ const button=label=>h.renderer.root.findAllByType('button').find(node=>node.children.includes(label));
+ assert.equal(button('Continue with Google').props.disabled,true);assert.equal(button('Continue with Apple').props.disabled,true);
+ await act(async()=>{button('Create an account').props.onClick();});
+ await act(async()=>{await h.renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields:{email:' personal@gmail.com ',password:'A long personal password',full_name:'New Customer',consent:'on'}}});});
+ const signup=h.backend.authCalls[0];assert.equal(signup.method,'signup');assert.equal(signup.input.email,'personal@gmail.com');
+ assert.deepEqual(signup.input.options.data,{full_name:'New Customer'});assert.equal(h.site.user,null);assert.equal(h.site.staffRole,null);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Check your inbox to confirm your email/);
+});
+
+test('personal email password login opens the customer account and never grants staff membership',async t=>{
+ const h=await harness(t,{customer:true,guest:true});
+ await act(async()=>{await h.renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields:{email:'personal@gmail.com',password:'A long personal password'}}});await delay(5);});
+ assert.equal(h.backend.authCalls[0].method,'password');assert.equal(h.site.user.id,'customer');assert.equal(h.site.editor,false);assert.equal(h.site.staffRole,null);
+});
+
+test('failed social redirects release the form and display the selected language',async t=>{
+ const h=await harness(t,{customer:true,guest:true,providers:true});h.backend.oauthError=true;
+ await act(async()=>{h.site.setLanguage('vi');});
+ const google=()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Tiếp tục với Google'));
+ await act(async()=>{google().props.onClick();await delay(5);});
+ assert.equal(google().props.disabled,false);assert.match(JSON.stringify(h.renderer.toJSON()),/Không thể mở phương thức đăng nhập/);
+});
+
+test('OAuth callbacks ignore external redirect parameters and complete only at the customer account',async t=>{
+ const h=await harness(t,{customer:true,page:'callback',url:'https://gary.example/auth/callback?next=https://evil.invalid'});
+ await act(async()=>{await delay(5);});assert.deepEqual(h.redirects,['/account']);
+});
+
+test('cancelled OAuth callbacks offer sign-in again without redirecting an old session',async t=>{
+ const h=await harness(t,{customer:true,page:'callback',callbackError:true,url:'https://gary.example/auth/callback?error=access_denied'});
+ assert.deepEqual(h.redirects,[]);assert.match(JSON.stringify(h.renderer.toJSON()),/couldn’t complete sign-in/);
+});
+
+test('password setup requires the matching email link and rejects an account switch',async t=>{
+ const token='header.'+Buffer.from(JSON.stringify({sub:'customer'})).toString('base64url')+'.signature';
+ const h=await harness(t,{customer:true,page:'invite',url:'https://gary.example/auth/invite#type=invite&access_token='+token});
+ assert.equal(h.renderer.root.findAllByType('form').length,1);
+ await h.emit(authSession('other-account'));
+ assert.equal(h.renderer.root.findAllByType('form').length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/account changed/);
+ assert.equal(h.backend.passwordCalls.length,0);
+});
+
+test('opening staff password setup without an invitation cannot change an existing session password',async t=>{
+ const h=await harness(t,{customer:true,page:'invite'});
+ assert.equal(h.renderer.root.findAllByType('form').length,0);assert.equal(h.backend.passwordCalls.length,0);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Open the staff invitation link/);
+});
+
+test('owner team invitations preserve their draft through language changes and idle recovery',async t=>{
+ const h=await harness(t);
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
+ await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'New Colleague'}});});
+ await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'new@garyhome.com'}});h.site.setLanguage('vi');});
+ await h.emit(authSession('owner'));
+ await h.emit(null);await h.emit(authSession('owner'));
+ assert.equal(form().findByProps({name:'full_name'}).props.value,'New Colleague');assert.equal(form().findByProps({name:'email'}).props.value,'new@garyhome.com');
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const create=h.backend.teamCalls.find(call=>call.method==='POST');assert.equal(create.input.email,'new@garyhome.com');assert.equal(create.input.role,'editor');
+ assert.match(JSON.stringify(h.renderer.toJSON()),/New Colleague/);
+ assert.ok(h.backend.teamCalls.length<10,'Directory reads must not loop through session recovery');
+});
+
+test('staff roles can use Studio without seeing owner/admin team management',async t=>{
+ const h=await harness(t,{role:'editor'});
+ assert.equal(h.site.editor,true);assert.equal(h.site.staffRole,'editor');
+ assert.equal(h.renderer.root.findAllByProps({'aria-label':'Team access'}).length,0);
+ assert.equal(h.backend.teamCalls.length,0);
+});
 
 test('unsaved settings survive token refresh, offline/online recovery, and same-user reauthentication',async t=>{
  const h=await harness(t);await h.editSettings('Unsaved after a long idle');

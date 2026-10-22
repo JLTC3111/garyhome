@@ -19,12 +19,12 @@ begin
 end;
 $$;
 
-insert into public.team_members (user_id, role)
-select id, 'owner'
+insert into public.team_members (user_id, email, role, bootstrap_owner)
+select id, lower(email), 'owner', true
 from auth.users
 where lower(email) = 'skycastle3@protonmail.com'
   and email_confirmed_at is not null
-on conflict (user_id) do update set role = excluded.role;
+on conflict (user_id) do update set role = excluded.role, email = excluded.email, bootstrap_owner = true;
 
 commit;
 

@@ -36,11 +36,11 @@ The app automatically switches from preview to live mode when both configuration
 
 ## Customer sign-in and company staff accounts
 
-Customers can sign in with Google or Apple once those providers are configured in Supabase, or register and sign in with a personal email and password. Staff sign in at `/admin` using company accounts explicitly assigned by an owner or administrator. A company address or social login alone grants no staff permissions. The allowed staff domains are `@garyhome.com` and `@icue.vn`. The existing owner account is preserved.
+Customers can sign in with Google once that provider is configured in Supabase, or register and sign in with a personal email and password. Apple sign-in is removed from the customer login and signup screens. Staff sign in at `/admin` using company accounts explicitly assigned by an owner or administrator. A company address or social login alone grants no staff permissions. The allowed staff domains are `@garyhome.com` and `@icue.vn`. The existing owner account is preserved.
 
-For the existing Gary Home project, apply `supabase/migrations/20261022042327_customer_social_auth_staff_access.sql` after the earlier migrations. **Studio → Team access** lets owners/admins create invitations, assign roles to existing company accounts, and disable access. New invitations require a server-only `SUPABASE_SECRET_KEY`; customer access and existing-account assignments use the publishable key and RLS. Google/Apple credentials are configured in Supabase, not in frontend environment variables. Both providers were disabled when checked.
+For the existing Gary Home project, apply `supabase/migrations/20261022042327_customer_social_auth_staff_access.sql` after the earlier migrations. **Studio → Team access** lets owners/admins create invitations, assign roles to existing company accounts, and disable access. New invitations require a server-only `SUPABASE_SECRET_KEY`; customer access and existing-account assignments use the publishable key and RLS. Google credentials are configured in Supabase, not in frontend environment variables. Keep Apple disabled in Supabase; the app offers only Google and personal email authentication to customers.
 
-See **[the authentication setup guide](docs/auth-setup.md)** for the exact project, company domain, redirect URLs, Google/Apple setup, secret handling, and live verification steps. Rebuild fresh-project SQL with `node scripts/build-setup.mjs` after adding a migration.
+See **[the authentication setup guide](docs/auth-setup.md)** for the exact project, company domains, redirect URLs, step-by-step Google setup, secret handling, and live verification steps. Rebuild fresh-project SQL with `node scripts/build-setup.mjs` after adding a migration.
 
 ## Customer portal and staff CRM
 

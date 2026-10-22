@@ -124,23 +124,27 @@ async function harness(t, options={}){
  return {renderer,backend,network,browser,page,emit,editSettings,redirects,get site(){return site;}};
 }
 
-test('customer Google and Apple sign-in use the fixed customer callback and preserve the provider choice',async t=>{
+test('customer sign-in offers Google without Apple and recovers after returning from OAuth',async t=>{
  const h=await harness(t,{customer:true,guest:true,providers:true});
  const button=label=>h.renderer.root.findAllByType('button').find(node=>node.children.includes(label));
+ assert.equal(button('Continue with Apple'),undefined);
+ assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Google sign-in is currently unavailable/);
  await act(async()=>{button('Continue with Google').props.onClick();await delay(5);});
  assert.equal(h.backend.authCalls[0].input.provider,'google');assert.equal(h.backend.authCalls[0].input.options.redirectTo,'https://gary.example/auth/callback');
  assert.equal(h.backend.authCalls[0].input.options.queryParams.prompt,'select_account');
  const restored=new Event('pageshow');Object.defineProperty(restored,'persisted',{value:true});
  await act(async()=>{h.browser.dispatchEvent(restored);});
- await act(async()=>{button('Continue with Apple').props.onClick();await delay(5);});
- assert.equal(h.backend.authCalls[1].input.provider,'apple');assert.equal(h.backend.calls.length,0);
+ assert.equal(button('Continue with Google').props.disabled,false);
+ await act(async()=>{button('Continue with Google').props.onClick();await delay(5);});
+ assert.equal(h.backend.authCalls[1].input.provider,'google');assert.equal(h.backend.calls.length,0);
 });
 
 test('disabled social providers stay unavailable while personal email signup confirms the mailbox without staff access',async t=>{
  const h=await harness(t,{customer:true,guest:true});
  const button=label=>h.renderer.root.findAllByType('button').find(node=>node.children.includes(label));
- assert.equal(button('Continue with Google').props.disabled,true);assert.equal(button('Continue with Apple').props.disabled,true);
+ assert.equal(button('Continue with Google').props.disabled,true);assert.equal(button('Continue with Apple'),undefined);
  await act(async()=>{button('Create an account').props.onClick();});
+ assert.equal(button('Continue with Apple'),undefined);
  await act(async()=>{await h.renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields:{email:' personal@gmail.com ',password:'A long personal password',full_name:'New Customer',consent:'on'}}});});
  const signup=h.backend.authCalls[0];assert.equal(signup.method,'signup');assert.equal(signup.input.email,'personal@gmail.com');
  assert.deepEqual(signup.input.options.data,{full_name:'New Customer'});assert.equal(h.site.user,null);assert.equal(h.site.staffRole,null);

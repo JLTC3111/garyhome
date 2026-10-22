@@ -1,6 +1,6 @@
 # Customer sign-in and staff accounts
 
-The app separates customer identity from staff permissions. Customers use `/account` with Google, Apple, or a personal email and password. Email signup requires mailbox confirmation in the current project. OAuth creates a customer account when necessary; it never grants a team role. Staff use `/admin` with an explicitly assigned company account. The original confirmed owner account remains available for administration.
+The app separates customer identity from staff permissions. Customers use `/account` with Google or a personal email and password. Apple is removed from the customer login and signup screens, including when Supabase reports that provider as enabled. Email signup requires mailbox confirmation in the current project. OAuth creates a customer account when necessary; it never grants a team role. Staff use `/admin` with an explicitly assigned company account. The original confirmed owner account remains available for administration.
 
 ## Activate in the Gary Home project
 
@@ -11,7 +11,7 @@ Use project **`duyiihsmaqfgwezmsnjs`**, not the unrelated project visible throug
 3. Set the Auth Site URL to the actual production origin. Allow these exact redirect URLs for each deployed or local origin:
 
    - `/account` — email signup confirmation.
-   - `/auth/callback` — Google and Apple return here.
+   - `/auth/callback` — Google returns here.
    - `/auth/reset` — password recovery.
    - `/auth/invite` — invited staff set their own password.
 
@@ -21,25 +21,49 @@ Use project **`duyiihsmaqfgwezmsnjs`**, not the unrelated project visible throug
 
 Project links: [SQL Editor](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/sql/new), [Auth providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers), [redirect URLs](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration).
 
-## Google
+## Google: step-by-step initialization
 
-Create a Web application OAuth client in the Google Cloud project for this business. Configure the consent screen for external customers, including personal Google accounts. Register the Supabase callback URI:
+A regular Google account and a free Google Cloud project are sufficient for this login integration. Google does not require a paid developer membership. The website uses the hosted Supabase project even when its frontend runs on your computer; use the hosted callback below throughout this setup.
 
-```text
-https://duyiihsmaqfgwezmsnjs.supabase.co/auth/v1/callback
-```
+1. Open [Google Cloud Console](https://console.cloud.google.com/), use the project selector, and select **New Project** if needed. Name the project **Gary Home** and select it after creation. Use an account the business will retain access to.
+2. Open [Google Auth Platform](https://console.cloud.google.com/auth/overview) in that project. Select **Get started** if prompted. Set the app name to **Gary Home**, choose a monitored support email, set the audience to **External** so personal Google accounts can sign in, and provide the developer contact email. Complete Google's setup form.
+3. Under **Google Auth Platform → Data Access**, select **Add or remove scopes**. Include only these basic identity scopes, then save:
 
-Enter the Google Client ID and Client Secret in Supabase's Google provider settings and enable the provider. Provider secrets belong in Supabase, not the app's public environment. The app checks the actual enabled status and enables its button when the provider is ready. Reload `/account` after changing provider settings.
+   ```text
+   openid
+   https://www.googleapis.com/auth/userinfo.email
+   https://www.googleapis.com/auth/userinfo.profile
+   ```
 
-Follow [Supabase's Google setup guide](https://supabase.com/docs/guides/auth/social-login/auth-google).
+   No Gmail, Drive, Calendar, or other data permissions are needed for customer login.
+4. Under **Audience**, add the Google account you will use for initial testing under **Test users** if that section is available. Keep the audience **External**. Before opening sign-in to all customers, use **Publish app** / **In production** and complete any verification Google requests. Publishing status and brand verification are separate; publishing does not automatically verify the displayed name or logo.
+5. Under **Clients**, choose **Create client** and select **Web application**. Name it **Gary Home Web**. Set these fields:
 
-## Apple
+   | Field | Value |
+   | --- | --- |
+   | Authorized JavaScript origins | `http://127.0.0.1:3000` and `http://localhost:3000`, as separate entries if you use both |
+   | Authorized redirect URIs | `https://duyiihsmaqfgwezmsnjs.supabase.co/auth/v1/callback` |
 
-Use the business's Apple Developer account to configure an App ID with Sign in with Apple, a web Services ID, website domains, and the same Supabase HTTPS callback URI above. Set the Services ID as the first Client ID in Supabase's Apple provider configuration, supply the generated Apple client secret, and enable the provider.
+   Add the actual production HTTPS origin when the site is deployed. An origin has no path; the Google redirect URI must contain the exact Supabase callback path. This web client is for human customer sign-in, not an AI agent workflow.
+6. Click **Create**. Copy the **Client ID** and the full **Client Secret** immediately into a secure credential store. Google only displays the full secret when it is created. If it is lost, create a replacement secret rather than using the masked value. Keep the downloaded credential JSON out of the repository and chat.
+7. Open the [Gary Home Supabase Auth providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers), select **Google**, turn **Enable Sign in with Google** on, and enter that web Client ID and Client Secret. Save. Keep nonce validation enabled. No Google credential needs to be added to the app's `.env` file.
+8. Open [Supabase URL Configuration](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration). Set **Site URL** to the origin you currently use, such as `http://127.0.0.1:3000` for this preview. Add these exact **Redirect URLs** if you use both local origins:
 
-Apple's web OAuth secret expires and must be rotated at least every six months. Keep the `.p8` signing key in the business's secure credential store. Apple may supply a private relay email and may omit the full name; customers can complete their details in My account.
+   ```text
+   http://127.0.0.1:3000/auth/callback
+   http://localhost:3000/auth/callback
+   ```
 
-Follow [Supabase's Apple setup guide](https://supabase.com/docs/guides/auth/social-login/auth-apple). Google and Apple were both disabled during the initial implementation check; no provider credentials were available to the agent.
+   Keep the existing `/account`, `/auth/reset`, and `/auth/invite` redirects. At deployment, set Site URL to the actual production HTTPS origin and add that origin's `/auth/callback` URL.
+9. Reload [customer login](http://127.0.0.1:3000/account). **Continue with Google** becomes available after the app reads the enabled provider. Complete Google sign-in and confirm that you return to **My account**. Verify the user under **Supabase → Authentication → Users**. Also check cancellation and returning to the sign-in page. Google authentication does not grant Studio access.
+
+The two callback URLs serve different steps: Google returns to the hosted Supabase `/auth/v1/callback`, then Supabase returns to the website's `/auth/callback`. A `redirect_uri_mismatch` from Google means the former does not exactly match the OAuth client's redirect list. Returning to the wrong website origin means the Supabase Site URL or redirect allow list needs checking. A disabled Google button means provider availability could not be confirmed; email remains available.
+
+References: [Google Auth Platform setup](https://support.google.com/cloud/answer/15544987), [OAuth client creation and secret handling](https://support.google.com/cloud/answer/15549257), [Supabase Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google), [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
+
+## Apple: disabled for this release
+
+Apple sign-in is removed from the login and signup interface at the owner's request. The customer UI initiates only Google OAuth, even if an Apple provider flag is enabled in Supabase. Keep the Apple provider disabled in Supabase. Enabling Apple later requires restoring the UI as well as completing Apple's developer account and provider configuration.
 
 ## Manage staff in Studio
 
@@ -60,6 +84,6 @@ Auth invitations and database assignments are separate services. If delivery suc
 
 ## Verify activation
 
-Run the target project's Security Advisor after applying the migration. Then verify a real Google login, Apple login, confirmed personal email signup/login, staff invitation/password setup, and staff revocation in a browser. Confirm that customer accounts cannot open Studio or read another customer's records. Test Google/Apple cancellation and email links in the production domain as well as the preview.
+Run the target project's Security Advisor after applying the migration. Then verify a real Google login, confirmed personal email signup/login, staff invitation/password setup, and staff revocation in a browser. Confirm that customer accounts cannot open Studio or read another customer's records. Test Google cancellation and email links in the production domain as well as the preview. Confirm that Apple is absent from both customer login and signup screens in English and Vietnamese.
 
 Local tests cover the actual SDK public reads, Auth password identity binding, real Postgres policies in PGlite, API authorization, protected roles, invite partial failures, callback destinations, bilingual React forms, and recovery after inactivity. They do not replace provider-console configuration, real email delivery, or live end-to-end OAuth testing.

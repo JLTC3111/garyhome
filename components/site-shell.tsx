@@ -2,13 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Heart, LogIn, Menu, X, Phone, MapPin, Search, UserRound, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Heart, Menu, X, Phone, MapPin, Search, UserRound, ShieldCheck } from "lucide-react";
 import { useSite } from "./site-context";
 import { LanguageSwitcher } from "./language-switcher";
 import { AnimatedBackground } from "./motion-primitives/animated-background";
 
 export function Brand({ light = false }: { light?: boolean }) {
-  return <Link className={`brand ${light ? "brand-light" : ""}`} href="/" aria-label="Gary Home homepage"><svg viewBox="0 0 46 46" fill="none" aria-hidden="true"><path d="M7 36h32M11 36V19l6-4 6 4v17m-10-21 4-6 4 6M25 36V14l7-5 7 5v22M28 10l4-6 4 6M29 36v-8a3 3 0 0 1 6 0v8M15 26h4m10-7h6M6 21v15m35-15v15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="m8 12 1-3 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z" fill="currentColor"/></svg><span>garyhome<span className="brand-dot">.</span><small>YOUR PLACE IN HANOI</small></span></Link>;
+  const { t, language } = useSite();
+  return <Link className={`brand ${light ? "brand-light" : ""}`} href="/" aria-label={t("Gary Home homepage", "Trang chủ Gary Home")}><svg viewBox="0 0 46 46" fill="none" aria-hidden="true"><path d="M7 36h32M11 36V19l6-4 6 4v17m-10-21 4-6 4 6M25 36V14l7-5 7 5v22M28 10l4-6 4 6M29 36v-8a3 3 0 0 1 6 0v8M15 26h4m10-7h6M6 21v15m35-15v15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="m8 12 1-3 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z" fill="currentColor"/></svg><span>garyhome<span className="brand-dot">.</span><small className="brand-tagline" lang={language}>{t("YOUR PLACE IN HANOI", "TỔ ẤM CỦA BẠN TẠI HÀ NỘI")}</small></span></Link>;
 }
 export function Header() {
   const { t, saved, editor, user } = useSite();
@@ -33,17 +34,29 @@ export function Header() {
   if (path.startsWith("/admin")) return null;
   const links = [["/homes", t("Find a home", "Tìm nhà")], ["/neighbourhoods", t("Neighbourhoods", "Khu vực")], ["/about", t("The Gary way", "Về Gary Home")]];
   return <>
-    <div className="top-strip"><div className="container"><span>{t("A home in Hanoi. A team by your side.", "Ngôi nhà tại Hà Nội. Đội ngũ luôn bên bạn.")}</span><div className="top-strip-actions"><a className="top-strip-phone" href="tel:+84356175046"><Phone size={11}/><span>+84 356 175 046</span></a><Link href="/admin" className="staff-login-link"><ShieldCheck size={13}/>{editor ? t("Staff Studio", "Studio nhân viên") : t("Staff login", "Nhân viên đăng nhập")}</Link></div></div></div>
-    <header className="site-header" ref={headerRef}><div className="container header-inner">
-      <Brand/>
-      <nav id="site-navigation" className={open ? "main-nav nav-open" : "main-nav"} aria-label={t("Main navigation", "Điều hướng chính")}>
-        {links.map(([href, label]) => <Link key={href} href={href} className={path.startsWith(href) ? "active" : ""} aria-current={path.startsWith(href) ? "page" : undefined} onClick={() => setOpen(false)}>{label}</Link>)}
-        <Link className="customer-login" href="/account" onClick={() => setOpen(false)}><LogIn size={15}/>{user ? t("Customer account", "Tài khoản khách hàng") : t("Customer login", "Khách hàng đăng nhập")}</Link>
-        <Link className="mobile-staff-login" href="/admin" onClick={() => setOpen(false)}><ShieldCheck size={16}/>{editor ? t("Staff Studio", "Studio nhân viên") : t("Staff login", "Nhân viên đăng nhập")}</Link>
-        <Link className="mobile-contact" href="/contact" onClick={() => setOpen(false)}>{t("Contact", "Liên hệ")}</Link>
-      </nav>
-      <div className="header-actions"><LanguageSwitcher/><Link href="/saved" className="saved-link" aria-label={t(`Saved homes (${saved.length})`, `Nhà đã lưu (${saved.length})`)}><Heart size={19}/><span className="saved-count">{saved.length}</span></Link><Link href="/contact" className="button button-small header-contact">{t("Let’s talk", "Liên hệ")}<ArrowUpRight size={16}/></Link><button ref={menuRef} type="button" className="mobile-menu icon-button" onClick={() => setOpen(!open)} aria-label={open ? t("Close menu", "Đóng menu") : t("Open menu", "Mở menu")} aria-expanded={open} aria-controls="site-navigation">{open ? <X/> : <Menu/>}</button></div>
-    </div></header>
+    <header className="site-header" ref={headerRef}>
+      <div className="top-strip"><div className="container">
+        <span className="top-strip-message">{t("A home in Hanoi. A team by your side.", "Ngôi nhà tại Hà Nội. Đội ngũ luôn bên bạn.")}</span>
+        <div className="top-strip-actions">
+          <a className="top-strip-phone" href="tel:+84356175046"><Phone size={14}/><span>+84 356 175 046</span></a>
+          <Link href="/account" className="customer-login-link" onClick={() => setOpen(false)}><UserRound size={11}/>{user ? t("Customer account", "Tài khoản khách hàng") : t("Customer login", "Khách hàng đăng nhập")}</Link>
+          <Link href="/admin" className="staff-login-link" onClick={() => setOpen(false)}><ShieldCheck size={11}/>{editor ? t("Staff Studio", "Studio nhân viên") : t("Staff login", "Nhân viên đăng nhập")}</Link>
+        </div>
+      </div></div>
+      <div className="header-nav"><div className="container header-inner">
+        <Brand/>
+        <nav id="site-navigation" className={open ? "main-nav nav-open" : "main-nav"} aria-label={t("Main navigation", "Điều hướng chính")}>
+          {links.map(([href, label]) => <Link key={href} href={href} className={path.startsWith(href) ? "active" : ""} aria-current={path.startsWith(href) ? "page" : undefined} onClick={() => setOpen(false)}>{label}</Link>)}
+          <Link className="mobile-contact" href="/contact" onClick={() => setOpen(false)}>{t("Contact", "Liên hệ")}</Link>
+        </nav>
+        <div className="header-actions">
+          <LanguageSwitcher/>
+          {user && <Link href="/saved" className="saved-link" aria-label={t(`Saved homes (${saved.length})`, `Nhà đã lưu (${saved.length})`)}><Heart size={19}/><span className="saved-count">{saved.length}</span></Link>}
+          <Link href="/contact" className="button button-small header-contact">{t("Contact", "Liên hệ")}<ArrowUpRight size={16}/></Link>
+          <button ref={menuRef} type="button" className="mobile-menu icon-button" onClick={() => setOpen(!open)} aria-label={open ? t("Close menu", "Đóng menu") : t("Open menu", "Mở menu")} aria-expanded={open} aria-controls="site-navigation">{open ? <X/> : <Menu/>}</button>
+        </div>
+      </div></div>
+    </header>
     <nav className="mobile-bottom-nav" aria-label={t("Quick navigation", "Điều hướng nhanh")}>
       <AnimatedBackground activeValue={path.startsWith("/homes") ? "/homes" : path.startsWith("/saved") ? "/saved" : path.startsWith("/account") ? "/account" : ""}>
         {[["/homes", t("Find a home", "Tìm nhà"), Search], ["/saved", t("Saved homes", "Nhà đã lưu"), Heart], ["/account", t("Customer", "Khách hàng"), UserRound]].map(([href, label, Icon]) => {

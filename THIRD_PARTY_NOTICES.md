@@ -2,7 +2,7 @@
 
 This application includes adapted components from the following projects. Existing dependency licenses remain with their respective packages.
 
-## React Bits — Spotlight Card
+## React Bits — Spotlight Card and Tech Text
 
 Source: https://github.com/DavidHDev/react-bits
 

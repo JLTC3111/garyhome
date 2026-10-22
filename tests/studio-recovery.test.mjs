@@ -22,8 +22,12 @@ async function harness(t, options={}){
  const descriptors=new Map();
  const setGlobal=(key,value)=>{descriptors.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,writable:true,configurable:true});};
  const browser=new EventTarget(),page=Object.assign(new EventTarget(),{visibilityState:'visible',documentElement:{lang:'en'},body:{style:{overflow:''}}});
- const network={onLine:!options.offline},stored=new Map();
+ const network={onLine:!options.offline,userAgent:'Node.js',platform:'',maxTouchPoints:0},stored=new Map();
  browser.location=new URL(options.url??'https://gary.example/account');
+ // Headless controls inspect DOM constructors even when test-renderer refs are null.
+ class TestElement {} class TestHTMLElement extends TestElement {}
+ Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement});
+ setGlobal('Element',TestElement);setGlobal('HTMLElement',TestHTMLElement);
  setGlobal('IS_REACT_ACT_ENVIRONMENT',true);setGlobal('window',browser);setGlobal('document',page);setGlobal('navigator',network);
  setGlobal('localStorage',{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)});
  setGlobal('FormData',class{constructor(form){this.form=form;}get(key){return this.form.fields?.[key]??null;}});
@@ -177,13 +181,26 @@ test('a customer opening staff login receives a customer return link without sta
 
 test('public navigation labels customer and staff entry separately on the portal chooser',async t=>{
  const h=await harness(t,{guest:true,page:'header',path:'/login'});
- const customer=h.renderer.root.findAllByType('a').find(node=>node.props.className==='customer-login');
+ const customer=h.renderer.root.findAllByType('a').find(node=>node.props.className==='customer-login-link');
  const staff=h.renderer.root.findAllByType('a').find(node=>node.props.className==='staff-login-link');
  assert.equal(customer.props.href,'/account');assert.ok(customer.children.includes('Customer login'));
  assert.equal(staff.props.href,'/admin');assert.ok(staff.children.includes('Staff login'));
+ const portalLinks=h.renderer.root.findByProps({className:'top-strip-actions'}).findAllByType('a');
+ assert.ok(portalLinks.includes(customer));assert.ok(portalLinks.includes(staff));
+ assert.equal(h.renderer.root.findByProps({id:'site-navigation'}).findAllByType('a').some(node=>node.props.href==='/account'),false);
+ assert.ok(h.renderer.root.findAllByType('a').find(node=>node.props.className==='button button-small header-contact').children.includes('Contact'));
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'YOUR PLACE IN HANOI');
+ const savedLinks=()=>h.renderer.root.findAllByType('a').filter(node=>node.props.className==='saved-link');
+ assert.equal(savedLinks().length,0);
  assert.equal(h.renderer.root.findByProps({className:'mobile-bottom-nav'}).findAllByProps({'aria-current':'page'}).length,0);
  await act(async()=>{h.site.setLanguage('vi');});
  assert.ok(customer.children.includes('Khách hàng đăng nhập'));assert.ok(staff.children.includes('Nhân viên đăng nhập'));
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'TỔ ẤM CỦA BẠN TẠI HÀ NỘI');
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).props.lang,'vi');
+ assert.equal(h.renderer.root.findAllByType('a').find(node=>node.props['aria-label']==='Trang chủ Gary Home').props.href,'/');
+ await h.emit(authSession('customer'));
+ assert.equal(savedLinks().length,1);assert.equal(savedLinks()[0].props.href,'/saved');
+ await h.emit(null);assert.equal(savedLinks().length,0);
 });
 
 test('customer schema errors stay visible until a successful refresh loads real data',async t=>{

@@ -3,6 +3,7 @@ import "./globals.css";
 import "./portal.css";
 import "./interactions.css";
 import "./portal-access.css";
+import "./select.css";
 import { loadContent } from "@/lib/server";
 import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";

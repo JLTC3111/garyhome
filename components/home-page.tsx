@@ -11,6 +11,7 @@ import { BlurFade } from "./magicui/blur-fade";
 import { NumberTicker } from "./magicui/number-ticker";
 import { AnimatedBackground } from "./motion-primitives/animated-background";
 import { SpotlightCard } from "./react-bits/spotlight-card";
+import TechText from "./react-bits/tech-text";
 import { filterProperties } from "@/lib/property-search";
 
 export function HomePage() {
@@ -36,9 +37,29 @@ export function HomePage() {
       <div className="container hero-grid">
         <div className="hero-copy">
           <div className="eyebrow"><span/>{t("GOOD PLACES. BETTER BEGINNINGS.", "MỘT NƠI TỐT. KHỞI ĐẦU ĐẸP.")}</div>
-          <h1>{heading[0]}<br/><em>{heading[1] || ""}</em></h1>
+          <h1 className="hero-headline">{heading.flatMap((line, index) => [index > 0 ? "\n" : null, <TechText
+            key={index}
+            text={line}
+            className={index > 0 ? "hero-headline-accent" : ""}
+            style={{ fontStyle: index > 0 ? "italic" : "normal" }}
+            fontWeight={600}
+            fontSize={150}
+            align="left"
+            reveal="letter"
+            dashLength={4}
+            dashGap={2}
+            specks={15}
+            intro="none"
+            introDuration={2}
+            clickKick
+            guides={false}
+            sweep={false}
+            labels={false}
+            draggable={false}
+            fitToText
+          />])}</h1>
           <p>{language === "en" ? content.settings.hero_text_en : content.settings.hero_text_vi}</p>
-          <div className="hero-location"><MapPin size={17}/>{t("Rooted in Hanoi. Here for you.", "Am hiểu Hà Nội. Đồng hành cùng bạn.")}</div>
+          <div className="hero-location"><MapPin size={17}/>{t("Rooted in Hanoi. Here for you.", "Am Hiểu Hà Nội. Đồng Hành Cùng Bạn.")}</div>
           <div className="hero-collection">
             <span className="collection-avatars" aria-hidden="true">{published.slice(0, 3).map(p => <img key={p.id} src={p.images[0] || "/images/hero.jpg"} alt="" width="36" height="36"/>)}</span>
             <span><strong><NumberTicker value={published.length}/></strong> {t("homes to discover", "căn nhà để khám phá")}<small>{t("Your next chapter, thoughtfully chosen.", "Chọn tổ ấm cho chương mới của bạn.")}</small></span>

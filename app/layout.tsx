@@ -8,6 +8,9 @@ import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";
 import { Header, Footer } from "@/components/site-shell";
 
+// Read CMS content at request time so publishing edits does not need a rebuild.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://gary-home-hanoi.lsd99999999.chatgpt.site"),
   title: { default: "Gary Home — Find your place in Hanoi", template: "%s | Gary Home" },

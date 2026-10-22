@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
-function endpoint({ validToken = true } = {}) {
+function endpoint({ validToken = true, vercel = false } = {}) {
   const calls = { tokens: [], verified: [], records: [] };
   const client = {
     auth: { getUser: async token => { calls.verified.push(token); return validToken ? { data: { user: { id: 'verified-customer' } }, error: null } : { data: { user: null }, error: new Error('Invalid token') }; } },
@@ -15,7 +15,7 @@ function endpoint({ validToken = true } = {}) {
   const source = fs.readFileSync(new URL('../app/api/enquiries/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   const module = { exports: {} };
-  vm.runInThisContext('(function(exports,require,module){' + compiled + '\n})')(module.exports, id => id === '@/lib/server' ? { publicSupabase: token => { calls.tokens.push(token); return client; } } : require(id), module);
+  vm.runInThisContext('(function(exports,require,module,process){' + compiled + '\n})')(module.exports, id => id === '@/lib/server' ? { publicSupabase: token => { calls.tokens.push(token); return client; } } : require(id), module, { env: { VERCEL: vercel ? '1' : undefined } });
   const send = (overrides = {}, headers = {}) => module.exports.POST(new Request('https://gary.example/api/enquiries', {
     method: 'POST', headers: { 'Content-Type': 'application/json', origin: 'https://gary.example', ...headers },
     body: JSON.stringify({ name: 'A Customer', email: 'customer@example.invalid', message: 'Please help me find a home.', consent: true, ...overrides }),
@@ -57,4 +57,15 @@ test('both guest and authenticated enquiries retain input validation and request
   for (let i = 0; i < 5; i++) assert.equal((await send({}, { authorization: 'Bearer customer-token' })).status, 201);
   assert.equal((await send({}, { authorization: 'Bearer customer-token' })).status, 429);
   assert.equal(calls.records.length, 5);
+});
+
+test('Vercel and Cloudflare rate limits isolate visitors using the host-owned IP header', async () => {
+  for (const vercel of [false, true]) {
+    const { send } = endpoint({ vercel });
+    const trusted = vercel ? 'x-forwarded-for' : 'cf-connecting-ip';
+    const untrusted = vercel ? 'cf-connecting-ip' : 'x-forwarded-for';
+    for (let i = 0; i < 5; i++) assert.equal((await send({}, { [trusted]: '192.0.2.1', [untrusted]: `198.51.100.${i}` })).status, 201);
+    assert.equal((await send({}, { [trusted]: '192.0.2.1', [untrusted]: '203.0.113.1' })).status, 429);
+    assert.equal((await send({}, { [trusted]: '192.0.2.2', [untrusted]: '203.0.113.1' })).status, 201);
+  }
 });

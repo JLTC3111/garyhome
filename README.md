@@ -100,6 +100,8 @@ Browser QA requires the session’s computer-use permissions. That permission wa
 
 ## Source and hosting
 
+For Vercel, follow [the deployment guide](docs/vercel-deployment.md). The tracked `vercel.json` selects Next.js and `npm run build:vercel`, which creates the required `.next/routes-manifest.json`. Leave Vercel's Output Directory override disabled. `npm run build` produces the separate Sites/Vinext output in `dist/`.
+
 Source is in this `gary-home` subdirectory of `Desktop/gary_home_website`. The Sites identity is in `.openai/hosting.json`; preserve its `project_id`. The application uses the supplied Vinext/React/Cloudflare Workers integration. No D1/R2 database is used. Supabase serves the shared backend.
 
 An owner-private Site was registered, but source synchronization could not complete because the source helper could not resolve its repository host under the current network restrictions. It is not a verified hosted deployment. Reuse the registered Site identity when publishing becomes available.

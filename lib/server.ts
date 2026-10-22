@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { runtimeEnv } from "./runtime-env";
 import { createClient } from "@supabase/supabase-js";
 import { seed } from "./seed";
 import type { Content } from "./types";
@@ -6,7 +6,7 @@ import { fetchWithDeadline } from "./requests";
 import { ContentReadError, readPublishedContent } from "./public-content";
 
 export function backendConfig() {
-  const runtime = env as unknown as Record<string, string | undefined>;
+  const runtime = runtimeEnv as unknown as Record<string, string | undefined>;
   return {
     url: runtime.SUPABASE_URL || process.env.SUPABASE_URL || "",
     key: runtime.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "",
@@ -19,7 +19,7 @@ export function publicSupabase(accessToken?: string) {
 // This key is used only by server routes after verifying the caller's current
 // owner/admin membership. It is never returned by /api/config.
 export function staffAdminClient() {
-  const runtime = env as unknown as Record<string, string | undefined>;
+  const runtime = runtimeEnv as unknown as Record<string, string | undefined>;
   const secret = runtime.SUPABASE_SECRET_KEY || process.env.SUPABASE_SECRET_KEY
     || runtime.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const { url } = backendConfig();

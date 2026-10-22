@@ -9,7 +9,7 @@ const enquiry = z.object({
   kind: z.enum(["viewing", "general", "landlord"]).default("general"), consent: z.literal(true),
   website: z.string().max(0).optional(),
 });
-// Best-effort abuse protection per Worker instance, in addition to database validation.
+// Best-effort abuse protection per server instance, in addition to database validation.
 const requests = new Map<string, number[]>();
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
@@ -33,7 +33,11 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "Please check your name, email, message, and consent." }, { status: 400 });
   const date = parsed.data.preferred_date;
   if (date && (date < new Date().toISOString().slice(0, 10) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) return Response.json({ error: "Choose a valid future viewing date." }, { status: 400 });
-  const ip = request.headers.get("cf-connecting-ip") || "local";
+  // Use the hosting platform's trusted header. On Vercel, a client-supplied
+  // Cloudflare header must not choose the rate-limit bucket.
+  const ip = (process.env.VERCEL === "1"
+    ? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    : request.headers.get("cf-connecting-ip")) || "local";
   const now = Date.now();
   for (const [key, times] of requests) if (times.every(t => now - t > 600000)) requests.delete(key);
   const recent = (requests.get(ip) || []).filter(t => now - t < 600000);

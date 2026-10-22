@@ -22,12 +22,25 @@ async function harness(t, options={}){
  const descriptors=new Map();
  const setGlobal=(key,value)=>{descriptors.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,writable:true,configurable:true});};
  const browser=new EventTarget(),page=Object.assign(new EventTarget(),{visibilityState:'visible',documentElement:{lang:'en'},body:{style:{overflow:''}}});
- const network={onLine:true},stored=new Map();
+ const network={onLine:!options.offline},stored=new Map();
  setGlobal('IS_REACT_ACT_ENVIRONMENT',true);setGlobal('window',browser);setGlobal('document',page);setGlobal('navigator',network);
  setGlobal('localStorage',{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)});
  setGlobal('fetch',async()=>Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'}));
- let session=authSession(options.customer?'customer':'owner'),callback;
- const backend={role:options.customer?null:'owner',roleError:false,pending:new Map(),writes:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[]};
+ let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
+ const backend={role:options.customer||options.guest?null:'owner',roleError:false,pending:new Map(),writes:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending};
+ const publicClient={from(table){
+  const filters={},query={};
+  query.eq=(key,value)=>{filters[key]=value;return query;};
+  for(const method of ['select','order','abortSignal','single'])query[method]=()=>query;
+  query.then=(resolve,reject)=>(async()=>{
+   backend.publicCalls.push({table,filters});
+   if(backend.publicPending)await backend.publicPending.promise;
+   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:backend.publicRows[table]);
+   if(table==='properties')data=data.filter(row=>row.status===filters.status);
+   return backend.publicError?{data:null,error:{code:'',message:'Temporary network failure'},status:0}:{data,error:null,status:200};
+  })().then(resolve,reject);
+  return query;
+ }};
  const client={
   auth:{getSession:async()=>backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null}),onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};}},
   storage:{from:()=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}})})},
@@ -54,12 +67,12 @@ async function harness(t, options={}){
  function load(file){
   if(modules.has(file))return modules.get(file).exports;
   if(file.endsWith('.json'))return JSON.parse(fs.readFileSync(file,'utf8'));
-  const module={exports:{}};modules.set(file,module);
+  const loaded={exports:{}};modules.set(file,loaded);
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
    if(id==='next/navigation')return {usePathname:()=>options.customer?'/account':'/admin'};
-   if(id==='@/lib/browser-client')return {browserClient:()=>client};
+   if(id==='@/lib/browser-client')return {browserClient:()=>client,publicBrowserClient:()=>publicClient};
    if(id.startsWith('.')||id.startsWith('@/')){
     const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);
     const resolved=[target,target+'.tsx',target+'.ts',target+'.json'].find(x=>fs.existsSync(x)&&fs.statSync(x).isFile());
@@ -67,8 +80,8 @@ async function harness(t, options={}){
    }
    return require(id);
   }
-  vm.runInThisContext('(function(exports,require,module,__filename,__dirname){'+source+'\n})',{filename:file})(module.exports,dependency,module,file,path.dirname(file));
-  return module.exports;
+  vm.runInThisContext('(function(exports,require,module,__filename,__dirname){'+source+'\n})',{filename:file})(loaded.exports,dependency,loaded,file,path.dirname(file));
+  return loaded.exports;
  }
  const {SiteProvider,useSite}=load(path.join(base,'components/site-context.tsx'));
  const Page=options.customer?load(path.join(base,'components/account-page.tsx')).AccountPage:load(path.join(base,'components/admin-page.tsx')).AdminPage;
@@ -78,9 +91,9 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:false}},React.createElement(React.Fragment,null,React.createElement(Probe),React.createElement(Page))));await delay(10);});
+ await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page))));await delay(10);});
  await act(async()=>{await delay(5);});
- assert.equal(site.editor,!options.customer);
+ assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
  const emit=async(next)=>{await act(async()=>{session=next;callback?.(next?'TOKEN_REFRESHED':'SIGNED_OUT',next);await delay(5);});};
  const editSettings=async(value)=>{
   await act(async()=>{renderer.root.findByProps({'aria-label':'Site settings'}).props.onClick();});
@@ -100,6 +113,75 @@ test('unsaved settings survive token refresh, offline/online recovery, and same-
  await h.emit(null);assert.equal(h.site.editor,false);assert.equal(h.renderer.root.findAllByType('textarea').length,0);
  await h.emit(authSession('owner'));
  assert.equal(h.renderer.root.findAllByType('textarea')[0].props.value,'Unsaved after a long idle');
+});
+
+test('a failed server reload automatically recovers public listings and clears the warning for guests',async t=>{
+ const live=structuredClone(fixture);live.settings.hero_title_en='Live content recovered after reload';
+ const h=await harness(t,{guest:true,publicOnly:true,initialError:true,publicContent:live});
+ assert.equal(h.site.backendError,false);
+ assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);
+ assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
+ assert.equal(h.backend.publicCalls.length,3);
+ assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='properties').filters,{status:'published'});
+ assert.equal(h.site.user,null);
+});
+
+test('failed public recovery keeps a translated warning and coalesces retries until live data arrives',async t=>{
+ const h=await harness(t,{guest:true,publicOnly:true,initialError:true,publicError:true});
+ assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,3);
+ await act(async()=>{h.site.setLanguage('vi');});
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Không thể cập nhật tin đăng/);
+ const retry=h.renderer.root.findAllByType('button').find(button=>button.children.includes('Thử lại'));
+ assert.ok(retry);assert.equal(retry.props.disabled,false);
+ const gate=deferred();h.backend.publicPending=gate;h.backend.publicError=false;
+ let first,second;
+ await act(async()=>{retry.props.onClick();first=h.site.reconnect();second=h.site.reconnect();await delay(5);});
+ assert.equal(h.backend.publicCalls.length,6);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Đang cập nhật tin đăng/);
+ gate.resolve();await act(async()=>{await Promise.all([first,second]);await delay(5);});
+ assert.equal(h.site.backendError,false);assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
+});
+
+test('an offline reload waits for the online event before recovering public content',async t=>{
+ const h=await harness(t,{guest:true,publicOnly:true,initialError:true,offline:true});
+ assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,0);
+ await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(10);});
+ assert.equal(h.backend.publicCalls.length,3);assert.equal(h.site.backendError,false);
+});
+
+test('Studio refresh clears the fallback warning and a late public read cannot replace drafts or unsaved edits',async t=>{
+ const gate=deferred(),h=await harness(t,{initialError:true,publicPending:gate});
+ assert.equal(h.site.backendError,false);
+ const draft={...structuredClone(fixture.properties[0]),id:'staff-only-draft',status:'draft'};
+ h.backend.rows.properties=[draft,...structuredClone(fixture.properties)];
+ await act(async()=>{await h.site.refresh();});
+ await h.editSettings('Unsaved settings during public recovery');
+ gate.resolve();await act(async()=>{await delay(5);});
+ assert.ok(h.site.content.properties.some(property=>property.id===draft.id));
+ assert.equal(h.renderer.root.findAllByType('textarea')[0].props.value,'Unsaved settings during public recovery');
+ await h.emit(null);
+ assert.ok(!h.site.content.properties.some(property=>property.id===draft.id));
+});
+
+test('sign-out uses recovered public content instead of restoring the original reference data',async t=>{
+ const live=structuredClone(fixture);live.settings.hero_title_en='Latest public home page';
+ const h=await harness(t,{customer:true,publicOnly:true,initialError:true,publicContent:live});
+ assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);
+ await h.emit(null);
+ assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);assert.equal(h.site.backendError,false);
+});
+
+test('healthy public reloads and session recovery do not make redundant content requests',async t=>{
+ const h=await harness(t,{guest:true,publicOnly:true});
+ await act(async()=>{await h.site.reconnect();});
+ assert.equal(h.backend.publicCalls.length,0);assert.equal(h.site.backendError,false);
+});
+
+test('public listing recovery does not wait for a stalled login session',async t=>{
+ const gate=deferred(),h=await harness(t,{customer:true,publicOnly:true,initialError:true,authPending:gate});
+ assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,3);
+ gate.resolve({data:{session:authSession('customer')},error:null});
+ await act(async()=>{await delay(5);});assert.equal(h.site.sessionPhase,'ready');
 });
 
 test('transient permission checks keep forms mounted, while another account cannot inherit a draft',async t=>{

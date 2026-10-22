@@ -3,7 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { Content, Enquiry, Language } from "@/lib/types";
 import { studioText } from "@/lib/studio-i18n";
-import { browserClient } from "@/lib/browser-client";
+import { browserClient, publicBrowserClient } from "@/lib/browser-client";
+import { readPublishedContent } from "@/lib/public-content";
 import { installRecoveryEvents } from "@/lib/recovery-events";
 import { fetchWithDeadline, request } from "@/lib/requests";
 import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/session-recovery";
@@ -28,6 +29,8 @@ type SiteContext = {
 const Context = createContext<SiteContext | null>(null);
 export function SiteProvider({ children, initial }: { children: ReactNode; initial: { content: Content; configured: boolean; error: boolean } }) {
   const [content, updateContent] = useState(initial.content);
+  const [backendError, setBackendError] = useState(initial.error);
+  const [contentRecovering, setContentRecovering] = useState(false);
   const [language, updateLanguage] = useState<Language>("en");
   const [saved, setSaved] = useState<string[]>([]);
   const [savedAccount, setSavedAccount] = useState<string | null>(null);
@@ -52,7 +55,41 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
   const version = useRef(0);
   const connectRef = useRef<() => Promise<void>>(async () => {});
   const refreshFlight = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+  const publicClientRef = useRef<SupabaseClient | null>(null);
+  const publicContentNeeded = useRef(initial.error);
+  const publicContentEpoch = useRef(0);
+  const publicContentFlight = useRef<{ promise: Promise<void>; controller: AbortController } | null>(null);
   const activeUserId = user?.id;
+
+  const recoverPublicContent = useCallback(async () => {
+    const db = publicClientRef.current;
+    if (!publicContentNeeded.current || !db || !navigator.onLine) return;
+    if (publicContentFlight.current) return publicContentFlight.current.promise;
+    const epoch = publicContentEpoch.current, startedVersion = version.current;
+    const controller = new AbortController();
+    setContentRecovering(true);
+    const promise = (async () => {
+      try {
+        const live = await readPublishedContent(db, controller.signal);
+        if (epoch !== publicContentEpoch.current || controller.signal.aborted || !publicContentNeeded.current || startedVersion !== version.current) return;
+        initialRef.current = live;
+        publicContentNeeded.current = false;
+        setBackendError(false);
+        // Public recovery must not replace the Studio's full listing set or a
+        // local save that completed while the anonymous read was pending.
+        if (!snapshotRef.current.editor) updateContent(live);
+      } catch {
+        // Keep the warning truthful and let Retry/online/focus recover it later.
+      }
+    })();
+    publicContentFlight.current = { promise, controller };
+    try { await promise; } finally {
+      if (publicContentFlight.current?.promise === promise) {
+        publicContentFlight.current = null;
+        if (epoch === publicContentEpoch.current) setContentRecovering(false);
+      }
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     const db = clientRef.current, state = sessionRef.current?.state;
@@ -72,6 +109,9 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
       // A slow background read must not overwrite a save that completed meanwhile.
       if (startedVersion !== version.current) return;
       updateContent({ properties: p.data, neighbourhoods: n.data, settings: s.data } as Content);
+      initialRef.current = { properties: p.data.filter(row => row.status === "published"), neighbourhoods: n.data, settings: s.data } as Content;
+      publicContentNeeded.current = false;
+      setBackendError(false);
       updateEnquiries(e.data.map(row => {
         const { enquiry_notes, ...enquiry } = row;
         const privateNotes = enquiry_notes as unknown as { notes: string } | { notes: string }[] | null;
@@ -83,11 +123,13 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
   }, []);
 
   const reconnect = useCallback(async () => {
-    if (!sessionRef.current) { await connectRef.current(); return; }
+    if (!sessionRef.current) { await connectRef.current(); await recoverPublicContent(); return; }
+    const publicRecovery = recoverPublicContent();
     if (await sessionRef.current.recover()) {
       try { await refresh(); } catch (error) { setToast(error instanceof Error ? error.message : "Couldn’t load CMS data. Check your connection and editor permissions."); }
     }
-  }, [refresh]);
+    await publicRecovery;
+  }, [refresh, recoverPublicContent]);
 
   const editorTask = useCallback(async <T,>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>): Promise<T> => {
     const expectedGeneration = snapshotRef.current.generation;
@@ -123,6 +165,7 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
 
   useEffect(() => {
     let active = true, unsubscribe: (() => void) | undefined;
+    const contentEpoch = publicContentEpoch.current;
     let connecting: Promise<void> | null = null;
     queueMicrotask(() => {
     if (!active) return;
@@ -150,6 +193,10 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
           const config = await response.json() as { configured: boolean; url: string; publishableKey: string };
           if (!active) return;
           if (!config.configured) { setSessionPhase("ready"); return; }
+          if (publicContentNeeded.current) {
+            publicClientRef.current = publicBrowserClient(config.url, config.publishableKey);
+            void recoverPublicContent();
+          }
           const db = browserClient(config.url, config.publishableKey);
           clientRef.current = db; setClient(db);
           const recovery = new SessionRecovery({
@@ -193,9 +240,10 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
     void connect();
     return () => {
       active = false; unsubscribe?.(); sessionRef.current?.stop(); sessionRef.current = null; clientRef.current = null;
+      publicContentEpoch.current = contentEpoch + 1; publicContentFlight.current?.controller.abort(); publicContentFlight.current = null; publicClientRef.current = null;
       removeRecoveryEvents();
     };
-  }, [initial.configured, reconnect]);
+  }, [initial.configured, reconnect, recoverPublicContent]);
 
   useEffect(() => {
     if (!client || !user || sessionPhase !== "ready") return;
@@ -268,10 +316,10 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); try { localStorage.setItem("gary-language", l); } catch { /* optional */ } }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError: initial.error, client, ready, user, editor, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); try { localStorage.setItem("gary-language", l); } catch { /* optional */ } }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
-    {initial.error && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)}</div>}
+    {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}
     {children}{toast && <div className="toast" role="status">{studioText(toast, language)}<button aria-label={studioText("Dismiss notification", language)} onClick={() => setToast("")}>×</button></div>}
   </Context.Provider>;
 }

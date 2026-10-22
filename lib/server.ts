@@ -2,7 +2,8 @@ import { env } from "cloudflare:workers";
 import { createClient } from "@supabase/supabase-js";
 import { seed } from "./seed";
 import type { Content } from "./types";
-import { fetchWithDeadline, request } from "./requests";
+import { fetchWithDeadline } from "./requests";
+import { ContentReadError, readPublishedContent } from "./public-content";
 
 export function backendConfig() {
   const runtime = env as unknown as Record<string, string | undefined>;
@@ -19,14 +20,12 @@ export async function loadContent(): Promise<{ content: Content; configured: boo
   const db = publicSupabase();
   if (!db) return { content: seed, configured: false, error: false };
   try {
-    const [properties, neighbourhoods, settings] = await request(signal => Promise.all([
-      db.from("properties").select("*").eq("status", "published").order("sort_order").abortSignal(signal),
-      db.from("neighbourhoods").select("*").order("sort_order").abortSignal(signal),
-      db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
-    ]), 12000);
-    if (properties.error || neighbourhoods.error || settings.error) throw new Error("Content unavailable");
-    return { content: { properties: properties.data, neighbourhoods: neighbourhoods.data, settings: settings.data } as Content, configured: true, error: false };
-  } catch {
+    return { content: await readPublishedContent(db), configured: true, error: false };
+  } catch (error) {
+    // Log identifiers only: SDK error details can contain URLs and credentials.
+    console.warn("[Gary Home] Public content unavailable", error instanceof ContentReadError
+      ? { resource: error.resource, status: error.status, code: error.code }
+      : { type: error instanceof Error ? error.name : "UnknownError" });
     return { content: seed, configured: true, error: true };
   }
 }

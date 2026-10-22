@@ -277,5 +277,7 @@
   "Agree on a time with the customer before scheduling. Confirmed times and customer updates appear in their account. No email is sent; contact guests directly.": "Thống nhất thời gian với khách hàng trước khi lên lịch. Lịch xác nhận và cập nhật sẽ hiển thị trong tài khoản. Hệ thống không gửi email; hãy liên hệ trực tiếp với khách chưa đăng nhập.",
   "Password updated. You can now sign in to your account.": "Mật khẩu đã được cập nhật. Bạn có thể đăng nhập vào tài khoản.",
   "Please sign in again before sending this request.": "Vui lòng đăng nhập lại trước khi gửi yêu cầu.",
-  "Couldn’t verify your account. Reconnect before sending this request.": "Không thể xác minh tài khoản. Vui lòng kết nối lại trước khi gửi yêu cầu."
+  "Couldn’t verify your account. Reconnect before sending this request.": "Không thể xác minh tài khoản. Vui lòng kết nối lại trước khi gửi yêu cầu.",
+  "Refreshing listings…": "Đang cập nhật tin đăng…",
+  "Retry": "Thử lại"
 }

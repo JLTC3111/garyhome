@@ -46,4 +46,5 @@
 
 .session-banner{position:sticky;top:0;z-index:110;display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 20px;background:#f3e6c9;border-bottom:1px solid #dccb9f;font-size:11px;color:#55482d;line-height:1.6}
 .session-banner button{text-decoration:underline;font-weight:600;flex-shrink:0;padding:4px}
+.service-banner button{text-decoration:underline;font-weight:600;margin-left:8px;padding:4px}
 @media(max-width:680px){.session-banner{font-size:10px;gap:10px;padding:9px 15px}}

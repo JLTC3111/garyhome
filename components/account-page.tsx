@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import { ArrowRight, ArrowUpRight, CalendarDays, Check, Heart, LayoutDashboard, LoaderCircle, LogOut, MessageSquare, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
+import { SubmissionHistory } from "./submission-history";
 import { useSite } from "./site-context";
 import { AnimatedBackground } from "./motion-primitives/animated-background";
 import { NumberTicker } from "./magicui/number-ticker";
@@ -13,7 +14,7 @@ import { request } from "@/lib/requests";
 import { appointmentLabel, customerError, ENQUIRY_FIELDS, enquiryLabel } from "@/lib/customer-data";
 import type { CustomerEnquiry, CustomerProfile } from "@/lib/types";
 
-type AccountTab = "overview" | "saved" | "enquiries" | "viewings" | "profile";
+type AccountTab = "overview" | "saved" | "enquiries" | "viewings" | "profile" | "submissions";
 type Draft = { userId: string; value: CustomerProfile } | null;
 
 export function AccountPage() {
@@ -199,7 +200,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
     catch (error) { if (active.current) setError(customerError(error, language)); }
     finally { if (active.current) setBusy(""); }
   }
-  const tabs: [AccountTab, string, typeof Heart][] = [["overview", t("Overview", "Tổng quan"), LayoutDashboard], ["saved", t("Saved homes", "Nhà đã lưu"), Heart], ["enquiries", t("My enquiries", "Yêu cầu của tôi"), MessageSquare], ["viewings", t("My viewings", "Lịch xem nhà"), CalendarDays], ["profile", t("My details", "Thông tin của tôi"), UserRound]];
+  const tabs: [AccountTab, string, typeof Heart][] = [["overview", t("Overview", "Tổng quan"), LayoutDashboard], ["saved", t("Saved homes", "Nhà đã lưu"), Heart], ["enquiries", t("My enquiries", "Yêu cầu của tôi"), MessageSquare], ["viewings", t("My viewings", "Lịch xem nhà"), CalendarDays], ["profile", t("My details", "Thông tin của tôi"), UserRound], ["submissions", t("Feedback & help", "Phản hồi & hỗ trợ"), MessageSquare]];
   const savedHomes = content.properties.filter(p => saved.includes(p.id) && p.status === "published");
   const viewings = enquiries.filter(e => e.kind === "viewing");
   const upcoming = viewings.filter(e => !e.cancelled_at && e.status !== "closed" && (!e.appointment_at || new Date(e.appointment_at).getTime() > now));
@@ -214,6 +215,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
       <div className="account-section-heading"><div><div className="eyebrow">{t("A SPACE OF YOUR OWN", "KHÔNG GIAN RIÊNG CỦA BẠN")}</div><h2>{tabs.find(([id]) => id === tab)?.[1]}</h2></div><button className="text-link" disabled={loading || !!busy} onClick={() => void refreshAccount()}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button></div>
       {error && <div className="form-error" role="alert">{error}</div>}
       {savedError && tab === "saved" && <div className="form-error" role="alert">{savedError}</div>}
+      {tab === "submissions" && <SubmissionHistory/>}
       {tab === "saved" && <div className="account-import"><p>{t("Saved homes before signing in on this browser? Bring them with you.", "Bạn đã lưu nhà trên trình duyệt trước khi đăng nhập? Hãy thêm vào tài khoản.")}</p><button type="button" className="text-link" disabled={!!busy || !savedReady} onClick={() => void importShortlist()}>{busy === "import" ? t("Importing…", "Đang nhập…") : t("Import browser shortlist", "Nhập danh sách trên trình duyệt")}<ArrowRight size={15}/></button></div>}
       {!loaded && loading && <div className="account-loading" role="status"><LoaderCircle size={20} className="spin"/>{t("Bringing your plans together…", "Đang tải kế hoạch của bạn…")}</div>}
       {tab === "overview" && <>

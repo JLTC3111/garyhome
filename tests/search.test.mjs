@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filterProperties, readFilters } from '../lib/property-search.ts';
-import { propertyTitle, listingCode } from '../lib/rentals.ts';
+import { propertyTitle, listingCode, amenityLabel } from '../lib/rentals.ts';
 const home={id:'one',title_en:'A home in Tay Ho',title_vi:'Căn hộ Tây Hồ',address:'Tô Ngọc Vân',district_slug:'tay-ho',property_type:'Apartment',amenities:['Balcony'],status:'published',availability:'on_request',listing_type:'rent',price:600,bedrooms:2,featured:false,sort_order:0,created_at:'2026-10-21'};
 test('Vietnamese search works with and without diacritics',()=>{for(const q of ['tay ho','TÂY HỒ','to ngoc van'])assert.equal(filterProperties([home],{q}).length,1);});
 test('combined filters apply together and exclude unpriced homes within a budget',()=>{const homes=[home,{...home,id:'two',price:null},{...home,id:'three',district_slug:'ba-dinh'}];assert.deepEqual(filterProperties(homes,{district:'tay-ho',max:'600',beds:'2',amenity:'Balcony'}).map(x=>x.id),['one']);});
@@ -39,4 +39,10 @@ test('generated titles use recorded facts and confirmed features without inventi
  assert.doesNotMatch(propertyTitle({...p,property_type:'Office & Restaurant',bedrooms:0},'en'),/studio|bedroom/);
  assert.doesNotMatch(propertyTitle({...p,property_type:'Studio',bedrooms:0},'en'),/studio studio/i);
  assert.equal(listingCode({id:'full-real-uuid'}),'full-real-uuid');
+});
+test('requirements match legacy amenity spellings without inventing facilities or weakening all-selected matching',()=>{
+ const homes=[{...home,id:'matching',amenities:['Pet-friendly','Gym','BBQ','Outdoor Shower','Lakeview']},{...home,id:'partial',amenities:['Pet friendly','Gym']}];
+ assert.deepEqual(filterProperties(homes,{amenity:'Pet,Gym,Barbecue,Outdoor shower,Lake view'}).map(p=>p.id),['matching']);
+ assert.equal(filterProperties(homes,{amenity:'Sauna'}).length,0);
+ assert.equal(amenityLabel('Barbeque','vi'),'BBQ / Khu nướng');assert.equal(amenityLabel('Outdoor Shower','vi'),'Vòi tắm ngoài trời');
 });

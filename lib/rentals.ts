@@ -8,8 +8,12 @@ export const AMENITIES: Record<string, readonly [string, string]> = {
   Curtains:["Curtains","Rèm cửa"], TV:["TV","TV"], "Cable TV":["Cable TV","Truyền hình cáp"], Refrigerator:["Refrigerator","Tủ lạnh"],
   "Wi-Fi":["Wi-Fi","Wi-Fi"], "Pet friendly":["Pet friendly","Cho phép thú cưng"], Gym:["Gym","Phòng tập"], Sauna:["Sauna","Phòng xông hơi"],
   Parking:["Parking","Chỗ đỗ xe"], Elevator:["Elevator","Thang máy"], "Swimming pool":["Swimming pool","Bể bơi"],
+  Barbecue:["BBQ / Barbecue","BBQ / Khu nướng"], "Outdoor shower":["Outdoor shower","Vòi tắm ngoài trời"],
 };
-export function amenityLabel(value: string, language: Language) { return AMENITIES[value]?.[language === "vi" ? 1 : 0] ?? value; }
+const amenityKey=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]/g,"");
+const amenityAliases:Record<string,string>={pet:"Pet friendly",pets:"Pet friendly",petfriendly:"Pet friendly",bbq:"Barbecue",barbeque:"Barbecue",lakeview:"Lake view",outdoorshower:"Outdoor shower",wifi:"Wi-Fi",airconditioning:"Air conditioning",kitchenware:"Equipped kitchen",windowcoverings:"Curtains",tivi:"TV",tvcable:"Cable TV",laundry:"Washing machine"};
+export function canonicalAmenity(value:string){return amenityAliases[amenityKey(value)]||Object.keys(AMENITIES).find(key=>amenityKey(key)===amenityKey(value))||value.trim();}
+export function amenityLabel(value: string, language: Language) { return AMENITIES[canonicalAmenity(value)]?.[language === "vi" ? 1 : 0] ?? value; }
 export function typeLabel(value: string, language: Language) {
   const labels:Record<string,readonly[string,string]>={Apartment:["Apartment","Căn hộ"],Studio:["Studio apartment","Căn hộ studio"],"House & Villa":["Villa / Duplex","Biệt thự / Duplex"],"Villa/Duplex":["Villa / Duplex","Biệt thự / Duplex"],"Office & Restaurant":["Office & Restaurant","Văn phòng & Nhà hàng"],Vinhomes:["Vinhomes","Vinhomes"]};
   return labels[value]?.[language === "vi" ? 1 : 0] ?? value;

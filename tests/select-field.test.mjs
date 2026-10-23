@@ -109,3 +109,13 @@ test('language and price-period changes preserve rental search choices without d
   assert.equal(values().period,'night');assert.equal(values().district,'tay-ho');assert.equal(values().type,'Apartment');assert.equal(values().max,'600');
   assert.ok(!('term' in values()));assert.ok(!JSON.stringify(renderer.toJSON()).includes('Thuê dài hạn'));
 });
+test('the requirements disclosure opens from its three-dot trigger, closes with Escape and retains mounted field choices',async t=>{
+ language='en';const renderer=await harness(t,React.createElement(SearchForm,{initial:{amenity:'Pet-friendly,BBQ',beds:'2'}}));
+ const trigger=()=>renderer.root.findAllByType('button').find(n=>n.props['aria-controls']?.endsWith('-panel'));
+ assert.equal(trigger().props['aria-expanded'],true);
+ const checked=renderer.root.findAllByType('input').filter(n=>n.props.name==='amenity'&&n.props.defaultChecked).map(n=>n.props.value);
+ assert.deepEqual(checked,['Pet friendly','Barbecue']);
+ let prevented=false;await act(async()=>renderer.root.findByProps({className:'rental-advanced'}).props.onKeyDown({key:'Escape',preventDefault(){prevented=true;}}));
+ assert.equal(prevented,true);assert.equal(trigger().props['aria-expanded'],false);assert.equal(renderer.root.findAllByType('input').filter(n=>n.props.name==='amenity').length,21);
+ await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
+});

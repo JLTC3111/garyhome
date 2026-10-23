@@ -94,7 +94,7 @@ async function harness(t, options={}){
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
-   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin')};
+   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useRouter:()=>({back(){},push(){}})};
    if(id==='@/lib/browser-client')return {browserClient:()=>client,publicBrowserClient:()=>publicClient};
    if(id.startsWith('.')||id.startsWith('@/')){
     const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);

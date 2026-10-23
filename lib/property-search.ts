@@ -1,6 +1,6 @@
 import type { Property } from "./types";
 import { newestFirst } from "./property-order.ts";
-import { isPublicRental, listingCode } from "./rentals.ts";
+import { canonicalAmenity, isPublicRental, listingCode } from "./rentals.ts";
 export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; beds?: string; baths?: string; amenity?: string; listing?: string; period?: string; id?: string; sort?: string };
 export function normalize(value: string) { return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g,"d"); }
 export function readFilters(params:Pick<URLSearchParams,"entries"|"getAll">):Filters {
@@ -9,7 +9,7 @@ export function readFilters(params:Pick<URLSearchParams,"entries"|"getAll">):Fil
 }
 export function filterProperties(properties: Property[], filters: Filters): Property[] {
   const terms=normalize(filters.q||"").trim().split(/\s+/).filter(Boolean);
-  const requested=(filters.amenity||"").split(",").filter(Boolean);
+  const requested=(filters.amenity||"").split(",").filter(Boolean).map(canonicalAmenity);
   const found=properties.filter(p=>{
     if(!isPublicRental(p))return false;
     const haystack=normalize([p.title_en,p.title_vi,p.address,p.district_slug,p.property_type,listingCode(p),...p.amenities].join(" "));
@@ -22,7 +22,7 @@ export function filterProperties(properties: Property[], filters: Filters): Prop
       (!filters.max||(p.price!==null&&p.price<=Number(filters.max))) &&
       (!filters.beds||(filters.beds==="0"?p.bedrooms===0:p.bedrooms>=Number(filters.beds))) &&
       (!filters.baths||(p.bathrooms!==null&&p.bathrooms>=Number(filters.baths))) &&
-      requested.every(a=>p.amenities.includes(a)) &&
+      requested.every(a=>p.amenities.some(value=>canonicalAmenity(value)===a)) &&
       (!filters.period||(p.price_period||"month")===filters.period) &&
       (!id||code===id||code===`GH-${id}`||p.id.toUpperCase()===id) &&
       (!filters.listing||filters.listing==="rent");

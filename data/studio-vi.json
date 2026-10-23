@@ -191,7 +191,6 @@
   "Public location / street": "Địa chỉ / đường phố công khai",
   "Listing type": "Loại giao dịch",
   "For rent": "Cho thuê",
-  "For sale": "Mua bán",
   "Price · USD": "Giá · USD",
   "Blank means price on request": "Để trống nếu cần liên hệ để biết giá",
   "Bedrooms": "Phòng ngủ",
@@ -356,5 +355,15 @@
   "Looking for a home?": "Bạn đang tìm nhà?",
   "Customer sign in and registration": "Khách hàng đăng nhập và đăng ký",
   "STAFF PORTAL": "CỔNG NHÂN VIÊN",
-  "Staff workspace": "Không gian nhân viên"
+  "Staff workspace": "Không gian nhân viên",
+  "Authors & activities": "Tác giả & hoạt động",
+  "Overview · English": "Tổng quan · Tiếng Anh",
+  "Overview · Vietnamese": "Tổng quan · Tiếng Việt",
+  "This website publishes rentals only.": "Trang web này chỉ đăng bất động sản cho thuê.",
+  "Your cart can hold up to 12 properties.": "Giỏ xem nhà chứa tối đa 12 bất động sản.",
+  "Choose a single property or a viewing cart.": "Chọn một bất động sản hoặc giỏ xem nhà.",
+  "Search an ID, title or address…": "Tìm mã tin, tiêu đề hoặc địa chỉ…",
+  "/ night": "/ đêm",
+  "/ week": "/ tuần",
+  "Drafts and archived listings stay out of search. Rented homes are also hidden from results. No photo is deleted from storage when removed from a listing.": "Bản nháp, tin đã lưu trữ và nhà đã cho thuê không hiển thị trong kết quả. Xóa ảnh khỏi tin không xóa tệp trong kho lưu trữ."
 }

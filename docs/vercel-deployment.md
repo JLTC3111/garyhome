@@ -24,6 +24,7 @@ In **Project Settings → Environment Variables**, add the values from your igno
 | `SUPABASE_URL` | Gary Home's project URL: `https://duyiihsmaqfgwezmsnjs.supabase.co` |
 | `SUPABASE_PUBLISHABLE_KEY` | Public browsing, customer sign-in and RLS-protected requests |
 | `SUPABASE_SECRET_KEY` | Server-only staff invitations, after owner/admin authorization |
+| `SITE_URL` (optional) | Canonical HTTPS production origin for metadata, sitemap and robots. Defaults to Vercel’s production project URL on Vercel, or the existing Sites origin elsewhere. |
 
 Do not upload `.env` to GitHub or prefix the secret with `NEXT_PUBLIC_` or `VITE_`. Redeploy after changing environment variables.
 

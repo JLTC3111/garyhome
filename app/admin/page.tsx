@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/seo";
 import { AdminPage } from "@/components/admin-page";
-export const metadata={title:"Staff Portal · Gary Home Studio",robots:{index:false,follow:false}};
+export async function generateMetadata(){return pageMetadata("/admin",true);}
 export default function Page(){return <AdminPage/>;}

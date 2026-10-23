@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/seo";
 import { AboutPage } from "@/components/content-pages";
-export const metadata={title:"The Gary way"};
+export async function generateMetadata(){return pageMetadata("/about",false);}
 export default function Page(){return <AboutPage/>;}

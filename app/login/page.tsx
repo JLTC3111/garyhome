@@ -1,9 +1,7 @@
+import { pageMetadata } from "@/lib/seo";
 import { PortalAccess } from "@/components/portal-access";
 
-export const metadata = {
-  title: "Choose your login portal",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(){return pageMetadata("/login",true);}
 
 export default function LoginPage() {
   return <PortalAccess/>;

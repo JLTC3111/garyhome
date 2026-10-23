@@ -1,1 +1,2 @@
-export default function robots(){return {rules:{userAgent:"*",allow:"/",disallow:["/account","/admin","/login","/auth/","/api/"]},sitemap:"https://gary-home-hanoi.lsd99999999.chatgpt.site/sitemap.xml"};}
+import { siteUrl } from "@/lib/seo";
+export default function robots(){return {rules:{userAgent:"*",allow:"/",disallow:["/account","/admin","/login","/cart","/saved","/auth/","/api/"]},sitemap:siteUrl()+"/sitemap.xml"};}

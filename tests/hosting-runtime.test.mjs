@@ -11,7 +11,7 @@ function runtime(platform, values = {}, nodeFallback = {}) {
   const process = { env: platform === 'node' ? values : nodeFallback };
   function load(relative) {
     if (modules.has(relative)) return modules.get(relative).exports;
-    const module = { exports: {} }; modules.set(relative, module);
+    const loadedModule = { exports: {} }; modules.set(relative, loadedModule);
     const source = ts.transpileModule(fs.readFileSync(path.join(base, relative), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
     const dependency = id => {
       if (id === 'cloudflare:workers') return { env: values };
@@ -23,8 +23,8 @@ function runtime(platform, values = {}, nodeFallback = {}) {
       if (id === './public-content') return { ContentReadError: class extends Error {} };
       throw new Error('Unexpected runtime dependency: ' + id);
     };
-    vm.runInNewContext('(function(exports,require,module,process){' + source + '\n})', { Response, console }, { filename: relative })(module.exports, dependency, module, process);
-    return module.exports;
+    vm.runInNewContext('(function(exports,require,module,process){' + source + '\n})', { Response, console }, { filename: relative })(loadedModule.exports, dependency, loadedModule, process);
+    return loadedModule.exports;
   }
   return { server: load('lib/server.ts'), config: load('app/api/config/route.ts'), calls };
 }

@@ -17,25 +17,25 @@ Object.defineProperty(globalThis, 'document', { value: {}, configurable: true })
 const { Select } = require('@base-ui/react/select');
 if (initialDocument) Object.defineProperty(globalThis, 'document', initialDocument); else delete globalThis.document;
 let language = 'en';
-const site = { content: { neighbourhoods: [{ slug: 'tay-ho', name: 'Tây Hồ' }, { slug: 'ba-dinh', name: 'Ba Đình' }] },
+const site = { content: { properties:[], neighbourhoods: [{ slug: 'tay-ho', name: 'Tây Hồ' }, { slug: 'ba-dinh', name: 'Ba Đình' }] },
   t: (en, vi) => language === 'en' ? en : vi };
 const modules = new Map();
 function load(file) {
   if (modules.has(file)) return modules.get(file).exports;
-  const module = { exports: {} }; modules.set(file, module);
+  const loadedModule = { exports: {} }; modules.set(file, loadedModule);
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
   function dependency(id) {
     if (id === './site-context') return { useSite: () => ({ ...site, language }) };
-    if (id.startsWith('.')) {
-      const target = path.resolve(path.dirname(file), id);
-      return load([target + '.tsx', target + '.ts'].find(fs.existsSync));
+    if (id.startsWith('.') || id.startsWith('@/')) {
+      const target = id.startsWith('@/') ? path.join(root,id.slice(2)) : path.resolve(path.dirname(file), id);
+      return load([target,target + '.tsx', target + '.ts'].find(file=>fs.existsSync(file)&&fs.statSync(file).isFile()));
     }
     return require(id);
   }
-  vm.runInThisContext('(function(exports,require,module){' + code + '\n})', { filename: file })(module.exports, dependency, module);
-  return module.exports;
+  vm.runInThisContext('(function(exports,require,module){' + code + '\n})', { filename: file })(loadedModule.exports, dependency, loadedModule);
+  return loadedModule.exports;
 }
 const { SelectField } = load(path.join(root, 'components/select-field.tsx'));
 const { SearchForm } = load(path.join(root, 'components/search-form.tsx'));
@@ -98,17 +98,15 @@ test('controlled selections and translated labels preserve the customer draft an
   assert.equal(select().props.items.find(item => item.value === 'disabled').disabled, true);
 });
 
-test('rent/buy resets only the incompatible budget and language changes preserve the other search choices', async t => {
-  const initial = { district: 'tay-ho', type: 'Studio', listing: 'rent', max: '600' };
+test('short/long rental selection and language changes preserve the other search choices', async t => {
+  const initial = { district: 'tay-ho', type: 'Apartment', term: 'short', max: '600' };
   const renderer = await harness(t, React.createElement(SearchForm, { initial }));
-  const values = () => Object.fromEntries(renderer.root.findAllByType('input').filter(node => node.props.name).map(node => [node.props.name, node.props.value]));
-  assert.deepEqual(values(), { listing: 'rent', district: 'tay-ho', type: 'Studio', max: '600' });
-  await act(async () => renderer.root.findAllByType('button').find(node => node.props['data-id'] === 'sale').props.onClick());
-  assert.deepEqual(values(), { listing: 'sale', district: 'tay-ho', type: 'Studio', max: '' });
+  const values = () => Object.fromEntries(renderer.root.findAllByType('input').filter(node => node.props.name && node.props.type!=='checkbox').map(node => [node.props.name, node.props.value ?? node.props.defaultValue]));
+  assert.equal(values().term,'short');assert.equal(values().max,'600');assert.equal(values().district,'tay-ho');
+  await act(async () => renderer.root.findAllByType('button').find(node => node.props['data-id'] === 'long').props.onClick());
+  assert.equal(values().term,'long');assert.equal(values().max,'600');
   language = 'vi';
   await act(async () => renderer.update(React.createElement(SearchForm, { initial })));
-  assert.deepEqual(values(), { listing: 'sale', district: 'tay-ho', type: 'Studio', max: '' });
-  const budget=renderer.root.findAllByType(Select.Root).find(node=>node.props.name==='max');
-  assert.equal(budget.props.items[0].label,'Mọi mức ngân sách');
-  assert.ok(JSON.stringify(renderer.toJSON()).includes('Mọi mức ngân sách'));
+  assert.equal(values().term,'long');assert.equal(values().district,'tay-ho');assert.equal(values().type,'Apartment');
+  assert.ok(JSON.stringify(renderer.toJSON()).includes('Thuê dài hạn'));
 });

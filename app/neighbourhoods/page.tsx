@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/seo";
 import { NeighbourhoodsPage } from "@/components/content-pages";
-export const metadata={title:"Find your kind of Hanoi"};
+export async function generateMetadata(){return pageMetadata("/neighbourhoods",false);}
 export default function Page(){return <NeighbourhoodsPage/>;}

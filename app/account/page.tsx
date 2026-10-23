@@ -1,8 +1,6 @@
+import { pageMetadata } from "@/lib/seo";
 import { AccountPage } from "@/components/account-page";
 
-export const metadata = {
-  title: "Customer Portal",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(){return pageMetadata("/account",true);}
 
 export default function Page() { return <AccountPage/>; }

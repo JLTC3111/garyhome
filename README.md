@@ -111,3 +111,5 @@ Update reference seed data through `data/properties.json` and `data/site-content
 Photos and font attribution are documented at `/credits`. Self-hosted fonts include their SIL Open Font License files in `public/fonts/`. Neighbourhood images are Wikimedia Commons photographs of Hanoi, with attribution and license links. The original site’s testimonials and partner endorsements were not reproduced as new claims.
 
 The enquiry endpoint validates input, enforces same-origin submissions, uses a honeypot, and applies a best-effort per-Worker request limit. Public direct database insert permissions are intentionally narrow; database constraints and RLS protect private data. For high-volume public operation, add persistent edge rate limiting or CAPTCHA to control distributed spam.
+
+The rental-only redesign, live data limits, Studio author/activity setup and verification results are recorded in [the rental audit](docs/rental-redesign-audit.md).

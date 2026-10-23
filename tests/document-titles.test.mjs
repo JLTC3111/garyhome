@@ -12,12 +12,12 @@ import ts from 'typescript';
 const base = path.resolve(import.meta.dirname, '..');
 const require = createRequire(import.meta.url);
 const modules = new Map();
-const property = { slug: 'home-by-the-lake', title_en: 'A home by the lake', title_vi: 'Tổ ấm bên hồ', status: 'published', availability: 'available' };
+const property = { id:'test-home',listing_type:'rent',property_type:'Apartment',bedrooms:2,bathrooms:1,area_sqm:80,address:'Tây Hồ',district_slug:'tay-ho',amenities:['Balcony'], slug: 'home-by-the-lake', title_en: 'A home by the lake', title_vi: 'Tổ ấm bên hồ', status: 'published', availability: 'available' };
 let pathname = '/account';
 let site = { language: 'en', content: { properties: [property] } };
 function load(file) {
   if (modules.has(file)) return modules.get(file).exports;
-  const module = { exports: {} }; modules.set(file, module);
+  const loadedModule = { exports: {} }; modules.set(file, loadedModule);
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
@@ -25,17 +25,18 @@ function load(file) {
     if (id === 'next/navigation') return { usePathname: () => pathname };
     if (id === './site-context') return { useSite: () => site };
     if (id.startsWith('@/')) return load(path.join(base, id.slice(2) + '.ts'));
+    if (id.startsWith('.')) return load(path.resolve(path.dirname(file),id));
     return require(id);
   }
-  vm.runInThisContext('(function(exports,require,module){' + source + '\n})', { filename: file })(module.exports, dependency, module);
-  return module.exports;
+  vm.runInThisContext('(function(exports,require,module){' + source + '\n})', { filename: file })(loadedModule.exports, dependency, loadedModule);
+  return loadedModule.exports;
 }
 const { documentTitle } = load(path.join(base, 'lib/document-titles.ts'));
 const { DocumentTitle } = load(path.join(base, 'components/document-title.tsx'));
 
 test('every public, customer and staff route has a title in the selected language', () => {
   const cases = [
-    ['/homes', 'Explore Hanoi homes', 'Khám phá nhà tại Hà Nội'],
+    ['/homes', 'Hanoi rental properties', 'Bất động sản cho thuê Hà Nội'],
     ['/saved', 'Your saved homes', 'Nhà đã lưu'],
     ['/neighbourhoods', 'Find your kind of Hanoi', 'Tìm khu phố dành cho bạn'],
     ['/about', 'The Gary way', 'Về Gary Home'],
@@ -52,18 +53,18 @@ test('every public, customer and staff route has a title in the selected languag
     assert.equal(documentTitle(route, 'en', []), `${en} | Gary Home`);
     assert.equal(documentTitle(route + '/', 'vi', []), `${vi} | Gary Home`);
   }
-  assert.equal(documentTitle('/', 'en', []), 'Gary Home — Find your place in Hanoi');
-  assert.equal(documentTitle('/', 'vi', []), 'Gary Home — Tìm tổ ấm tại Hà Nội');
+  assert.equal(documentTitle('/', 'en', []), 'Serviced apartments in Hanoi for rent | Gary Home');
+  assert.equal(documentTitle('/', 'vi', []), 'Căn hộ dịch vụ cho thuê tại Hà Nội | Gary Home');
   assert.equal(documentTitle('/unknown', 'vi', []), 'Không tìm thấy trang | Gary Home');
   assert.equal(documentTitle(null, 'vi', []), null);
 });
 
 test('property titles use current CMS translations and never expose unavailable or private listings', () => {
   const route = '/homes/home-by-the-lake';
-  assert.equal(documentTitle(route, 'en', [property]), 'A home by the lake | Gary Home');
-  assert.equal(documentTitle(route, 'vi', [property]), 'Tổ ấm bên hồ | Gary Home');
-  assert.equal(documentTitle(route, 'vi', [{ ...property, title_vi: '  ' }]), 'A home by the lake | Gary Home');
-  assert.equal(documentTitle(route, 'vi', [{ ...property, title_vi: 'Một\nkhởi đầu mới' }]), 'Một khởi đầu mới | Gary Home');
+  assert.equal(documentTitle(route, 'en', [property]), '2-bedroom apartment for rent in Tây Hồ · 80 m² · Balcony | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [property]), 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [{ ...property, title_vi: '  ' }]), 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [{ ...property, bedrooms: 3 }]), 'Căn hộ 3 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
   for (const change of [{ status: 'draft' }, { status: 'archived' }, { availability: 'rented' }, { availability: 'sold' }]) {
     assert.equal(documentTitle(route, 'vi', [{ ...property, ...change }]), 'Không tìm thấy căn nhà | Gary Home');
   }
@@ -125,9 +126,9 @@ test('language, navigation and CMS changes update the tab without remounting a c
   pathname = '/admin'; await h.redraw();
   assert.equal(h.page.title, 'Cổng nhân viên · Gary Home Studio | Gary Home');
   pathname = '/homes/home-by-the-lake'; await h.redraw();
-  assert.equal(h.page.title, 'Tổ ấm bên hồ | Gary Home');
-  site = { ...site, content: { properties: [{ ...property, title_vi: 'Căn hộ vừa cập nhật' }] } }; await h.redraw();
-  assert.equal(h.page.title, 'Căn hộ vừa cập nhật | Gary Home');
+  assert.equal(h.page.title, 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
+  site = { ...site, content: { properties: [{ ...property, bedrooms: 3 }] } }; await h.redraw();
+  assert.equal(h.page.title, 'Căn hộ 3 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
   assert.equal(h.renderer.root.findByType('input').props.value, 'Unsaved viewing notes');
   assert.equal(h.mounts, 1);
   assert.equal(h.observers.filter(observer => !observer.disconnected).length, 1);

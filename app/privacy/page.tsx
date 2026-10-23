@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/seo";
 import { PrivacyPage } from "@/components/content-pages";
-export const metadata={title:"Privacy"};
+export async function generateMetadata(){return pageMetadata("/privacy",false);}
 export default function Page(){return <PrivacyPage/>;}

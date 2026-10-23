@@ -11,7 +11,7 @@ import ts from 'typescript';
 
 const base=path.resolve(import.meta.dirname,'..');
 const require=createRequire(path.join(base,'package.json'));
-const fixture={...JSON.parse(fs.readFileSync(path.join(base,'data/site-content.json'),'utf8')),properties:JSON.parse(fs.readFileSync(path.join(base,'data/properties.json'),'utf8'))};
+const fixture={...JSON.parse(fs.readFileSync(path.join(base,'data/site-content.json'),'utf8')),properties:JSON.parse(fs.readFileSync(path.join(base,'data/properties.json'),'utf8')),authors:[],activities:[]};
 const user=id=>({id,email:`${id}@example.invalid`,aud:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'});
 const authSession=id=>({user:user(id),access_token:'test-token',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer'});
 const deferred=()=>{let resolve;const promise=new Promise(yes=>{resolve=yes;});return {promise,resolve};};
@@ -48,12 +48,12 @@ async function harness(t, options={}){
  const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
   const filters={},query={};
-  query.eq=(key,value)=>{filters[key]=value;return query;};
+  query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
   for(const method of ['select','order','abortSignal','single'])query[method]=()=>query;
   query.then=(resolve,reject)=>(async()=>{
    backend.publicCalls.push({table,filters});
    if(backend.publicPending)await backend.publicPending.promise;
-   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:backend.publicRows[table]);
+   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:backend.publicRows[table]);
    if(table==='properties')data=data.filter(row=>row.status===filters.status);
    return backend.publicError?{data:null,error:{code:'',message:'Temporary network failure'},status:0}:{data,error:null,status:200};
   })().then(resolve,reject);
@@ -107,6 +107,7 @@ async function harness(t, options={}){
   return loaded.exports;
  }
  const {SiteProvider,useSite}=load(path.join(base,'components/site-context.tsx'));
+ const {CartProvider}=load(path.join(base,'components/cart-context.tsx'));
  const Page=options.page==='password'||options.page==='invite'?load(path.join(base,'components/password-reset.tsx')).PasswordReset
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
@@ -118,7 +119,7 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page,{invitation:options.page==='invite'}))));await delay(10);});
+ await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(CartProvider,null,React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page,{invitation:options.page==='invite'})))));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
  const emit=async(next)=>{await act(async()=>{session=next;callback?.(next?'TOKEN_REFRESHED':'SIGNED_OUT',next);await delay(5);});};
@@ -179,28 +180,22 @@ test('a customer opening staff login receives a customer return link without sta
  assert.match(JSON.stringify(h.renderer.toJSON()),/Mở cổng khách hàng/);
 });
 
-test('public navigation labels customer and staff entry separately on the portal chooser',async t=>{
+test('public navigation keeps favourites, customer and staff entry together and translates the brand',async t=>{
  const h=await harness(t,{guest:true,page:'header',path:'/login'});
- const customer=h.renderer.root.findAllByType('a').find(node=>node.props.className==='customer-login-link');
- const staff=h.renderer.root.findAllByType('a').find(node=>node.props.className==='staff-login-link');
- assert.equal(customer.props.href,'/account');assert.ok(customer.children.includes('Customer login'));
- assert.equal(staff.props.href,'/admin');assert.ok(staff.children.includes('Staff login'));
- const portalLinks=h.renderer.root.findByProps({className:'top-strip-actions'}).findAllByType('a');
- assert.ok(portalLinks.includes(customer));assert.ok(portalLinks.includes(staff));
- assert.equal(h.renderer.root.findByProps({id:'site-navigation'}).findAllByType('a').some(node=>node.props.href==='/account'),false);
- assert.ok(h.renderer.root.findAllByType('a').find(node=>node.props.className==='button button-small header-contact').children.includes('Contact'));
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'YOUR PLACE IN HANOI');
- const savedLinks=()=>h.renderer.root.findAllByType('a').filter(node=>node.props.className==='saved-link');
- assert.equal(savedLinks().length,0);
- assert.equal(h.renderer.root.findByProps({className:'mobile-bottom-nav'}).findAllByProps({'aria-current':'page'}).length,0);
- await act(async()=>{h.site.setLanguage('vi');});
- assert.ok(customer.children.includes('Khách hàng đăng nhập'));assert.ok(staff.children.includes('Nhân viên đăng nhập'));
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'TỔ ẤM CỦA BẠN TẠI HÀ NỘI');
+ const band=h.renderer.root.findByProps({className:'top-strip-actions'});
+ const customer=band.findAllByType('a').find(node=>node.props.className==='customer-login-link');
+ const staff=band.findAllByType('a').find(node=>node.props.className==='staff-login-link');
+ assert.equal(customer.props.href,'/account');assert.equal(customer.props['aria-label'],'Customer login');
+ assert.equal(staff.props.href,'/admin');assert.equal(staff.props['aria-label'],'Staff login');
+ const favourites=()=>band.findAllByType('button').find(node=>node.props.className==='favourites-trigger');
+ assert.equal(favourites().props['aria-expanded'],false);
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(customer.props['aria-label'],'Khách hàng đăng nhập');assert.equal(staff.props['aria-label'],'Nhân viên đăng nhập');
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');
  assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).props.lang,'vi');
- assert.equal(h.renderer.root.findAllByType('a').find(node=>node.props['aria-label']==='Trang chủ Gary Home').props.href,'/');
- await h.emit(authSession('customer'));
- assert.equal(savedLinks().length,1);assert.equal(savedLinks()[0].props.href,'/saved');
- await h.emit(null);assert.equal(savedLinks().length,0);
+ await h.emit(authSession('customer'));assert.equal(customer.props['aria-label'],'Tài khoản khách hàng');
+ await h.emit(null);assert.equal(customer.props['aria-label'],'Khách hàng đăng nhập');
 });
 
 test('customer schema errors stay visible until a successful refresh loads real data',async t=>{
@@ -330,14 +325,14 @@ test('a failed server reload automatically recovers public listings and clears t
  assert.equal(h.site.backendError,false);
  assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);
  assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
- assert.equal(h.backend.publicCalls.length,3);
- assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='properties').filters,{status:'published'});
+ assert.equal(h.backend.publicCalls.length,5);
+ assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='properties').filters,{status:'published',listing_type:'rent',availability:['available','on_request']});
  assert.equal(h.site.user,null);
 });
 
 test('failed public recovery keeps a translated warning and coalesces retries until live data arrives',async t=>{
  const h=await harness(t,{guest:true,publicOnly:true,initialError:true,publicError:true});
- assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,3);
+ assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,5);
  await act(async()=>{h.site.setLanguage('vi');});
  assert.match(JSON.stringify(h.renderer.toJSON()),/Không thể cập nhật tin đăng/);
  const retry=h.renderer.root.findAllByType('button').find(button=>button.children.includes('Thử lại'));
@@ -345,7 +340,7 @@ test('failed public recovery keeps a translated warning and coalesces retries un
  const gate=deferred();h.backend.publicPending=gate;h.backend.publicError=false;
  let first,second;
  await act(async()=>{retry.props.onClick();first=h.site.reconnect();second=h.site.reconnect();await delay(5);});
- assert.equal(h.backend.publicCalls.length,6);
+ assert.equal(h.backend.publicCalls.length,10);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Đang cập nhật tin đăng/);
  gate.resolve();await act(async()=>{await Promise.all([first,second]);await delay(5);});
  assert.equal(h.site.backendError,false);assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
@@ -355,7 +350,7 @@ test('an offline reload waits for the online event before recovering public cont
  const h=await harness(t,{guest:true,publicOnly:true,initialError:true,offline:true});
  assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,0);
  await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(10);});
- assert.equal(h.backend.publicCalls.length,3);assert.equal(h.site.backendError,false);
+ assert.equal(h.backend.publicCalls.length,5);assert.equal(h.site.backendError,false);
 });
 
 test('Studio refresh clears the fallback warning and a late public read cannot replace drafts or unsaved edits',async t=>{
@@ -388,7 +383,7 @@ test('healthy public reloads and session recovery do not make redundant content 
 
 test('public listing recovery does not wait for a stalled login session',async t=>{
  const gate=deferred(),h=await harness(t,{customer:true,publicOnly:true,initialError:true,authPending:gate});
- assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,3);
+ assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,5);
  gate.resolve({data:{session:authSession('customer')},error:null});
  await act(async()=>{await delay(5);});assert.equal(h.site.sessionPhase,'ready');
 });

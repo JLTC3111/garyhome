@@ -16,7 +16,7 @@ export function LanguageSwitcher({ light = false }: { light?: boolean }) {
       title={t("Switch to Tiếng Việt", "Chuyển sang tiếng Anh")}
     >
       <Globe2 size={14} aria-hidden="true" />
-      {language.toUpperCase()}
+      {language === "vi" ? "VN" : "EN"}
     </button>
   );
 }

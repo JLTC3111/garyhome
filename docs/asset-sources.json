@@ -1,0 +1,111 @@
+{
+  "checked_on": "2026-10-23",
+  "official_home": "https://garyhome.vn/en/",
+  "contact": {
+    "email": "info@garyhome.vn",
+    "phones": [
+      "+84 356 175 046",
+      "+84 977 654 134"
+    ],
+    "address": "Eurowindow Tower, 27 Trần Duy Hưng, Cầu Giấy, Hà Nội, Vietnam",
+    "source": "https://garyhome.vn/en/"
+  },
+  "homepage_activity_images": [
+    "https://garyhome.vn/wp-content/uploads/2026/06/z7492597927255_24cea9054d12e6f3fc97a8e7e054e88d-scaled-1.jpg",
+    "https://garyhome.vn/wp-content/uploads/2026/06/z7492597855442_14c4fcb97fd1c8d97e5c160986c39156.jpg",
+    "https://garyhome.vn/wp-content/uploads/2026/06/z6422320127186_6a07e56449ed0ecb165edad56a33141a.jpg",
+    "https://garyhome.vn/wp-content/uploads/2026/06/z6422320132669_33241c0251191f90fe399966364335e5.jpg",
+    "https://garyhome.vn/wp-content/uploads/2026/06/z6422318845001_604fa1aca917a232a8d02361bcb592a0.jpg",
+    "https://garyhome.vn/wp-content/uploads/2026/06/z6422320121310_a3216eb6ce353db34a1ea562a2042a20.jpg"
+  ],
+  "activity_caveat": "All six official photos occur in the Feedback tab (444ad6d-tab-content-0). Your Trusted Agency and Gary Agency Team tabs contain no images or text in current HTML. These are photographs, not written review screenshots; no individual identities or feedback text is verified.",
+  "downloaded_activities": [
+    {
+      "source": "https://garyhome.vn/wp-content/uploads/2026/06/z7492597927255_24cea9054d12e6f3fc97a8e7e054e88d-scaled-1.jpg",
+      "download_url": "https://www.garyhome.vn/wp-content/uploads/2026/06/z7492597927255_24cea9054d12e6f3fc97a8e7e054e88d-scaled-1.jpg",
+      "dimensions": [
+        2560,
+        1920
+      ],
+      "bytes": 756222,
+      "sha256": "cd2926b9fc96c458eedb83d0d2032d9308b62a47428a27d9f8b27a28f5f21e8e",
+      "source_category": "Feedback",
+      "source_panel_id": "444ad6d-tab-content-0",
+      "local_path": "public/images/activities/feedback-1.jpg"
+    },
+    {
+      "source": "https://garyhome.vn/wp-content/uploads/2026/06/z7492597855442_14c4fcb97fd1c8d97e5c160986c39156.jpg",
+      "download_url": "https://www.garyhome.vn/wp-content/uploads/2026/06/z7492597855442_14c4fcb97fd1c8d97e5c160986c39156.jpg",
+      "dimensions": [
+        2560,
+        1794
+      ],
+      "bytes": 715923,
+      "sha256": "57622a2f12c97e3f303c915b1466f656378c5a47f409f54096df1a928b0c6835",
+      "source_category": "Feedback",
+      "source_panel_id": "444ad6d-tab-content-0",
+      "local_path": "public/images/activities/feedback-2.jpg"
+    },
+    {
+      "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422320127186_6a07e56449ed0ecb165edad56a33141a.jpg",
+      "download_url": "https://www.garyhome.vn/wp-content/uploads/2026/06/z6422320127186_6a07e56449ed0ecb165edad56a33141a.jpg",
+      "dimensions": [
+        1148,
+        861
+      ],
+      "bytes": 290626,
+      "sha256": "e68f4d317ee6e31f118980295706c9380984ee1eb851b8f005f7bb81aac47ba5",
+      "source_category": "Feedback",
+      "source_panel_id": "444ad6d-tab-content-0",
+      "local_path": "public/images/activities/feedback-3.jpg"
+    },
+    {
+      "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422320132669_33241c0251191f90fe399966364335e5.jpg",
+      "download_url": "https://www.garyhome.vn/wp-content/uploads/2026/06/z6422320132669_33241c0251191f90fe399966364335e5.jpg",
+      "dimensions": [
+        1280,
+        854
+      ],
+      "bytes": 117700,
+      "sha256": "2565313b4802782c47def4376a823a071e3eb6be050454fd4cf30bbb2649fc09",
+      "source_category": "Feedback",
+      "source_panel_id": "444ad6d-tab-content-0",
+      "local_path": "public/images/activities/feedback-4.jpg"
+    },
+    {
+      "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422318845001_604fa1aca917a232a8d02361bcb592a0.jpg",
+      "download_url": "https://www.garyhome.vn/wp-content/uploads/2026/06/z6422318845001_604fa1aca917a232a8d02361bcb592a0.jpg",
+      "dimensions": [
+        1280,
+        960
+      ],
+      "bytes": 299505,
+      "sha256": "75ee75edcd49f11330d5e9035bb675ec09ef81f70dff978e049090715e26bfb1",
+      "source_category": "Feedback",
+      "source_panel_id": "444ad6d-tab-content-0",
+      "local_path": "public/images/activities/feedback-5.jpg"
+    },
+    {
+      "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422320121310_a3216eb6ce353db34a1ea562a2042a20.jpg",
+      "download_url": "https://www.garyhome.vn/wp-content/uploads/2026/06/z6422320121310_a3216eb6ce353db34a1ea562a2042a20.jpg",
+      "dimensions": [
+        1280,
+        960
+      ],
+      "bytes": 146935,
+      "sha256": "bac60b33d6b22b1513676cc5e7d3287cdaf6d74f7cca22331be8c0bb8e442bef",
+      "source_category": "Feedback",
+      "source_panel_id": "444ad6d-tab-content-0",
+      "local_path": "public/images/activities/feedback-6.jpg"
+    }
+  ],
+  "logo": {
+    "source": "https://garyhome.vn/wp-content/uploads/2020/03/LOGO-2.png",
+    "local_path": "public/images/brand/gary-home-logo.png",
+    "dimensions": [
+      1266,
+      370
+    ],
+    "unmodified": true
+  }
+}

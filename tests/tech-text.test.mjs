@@ -13,17 +13,17 @@ const require = createRequire(import.meta.url);
 const cache = new Map();
 function load(file) {
   if (cache.has(file)) return cache.get(file).exports;
-  const module = { exports: {} };
-  cache.set(file, module);
+  const loadedModule = { exports: {} };
+  cache.set(file, loadedModule);
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
   vm.runInThisContext('(function(exports,require,module){' + code + '\n})', { filename: file })(
-    module.exports,
+    loadedModule.exports,
     id => id.startsWith('.') ? load(path.resolve(path.dirname(file), id + '.ts')) : require(id),
-    module,
+    loadedModule,
   );
-  return module.exports;
+  return loadedModule.exports;
 }
 const TechText = load(new URL('../components/react-bits/tech-text.tsx', import.meta.url).pathname).default;
 

@@ -1,6 +1,12 @@
 export type Language = "en" | "vi";
 export type Property = {
   id: string; slug: string; title_en: string; title_vi: string;
+  listing_code?: string; author_id?: string | null;
+  price_period?: "month" | "week" | "night";
+  rental_term?: "short" | "long" | "both" | "on_request";
+  overview_en?: string; overview_vi?: string;
+  location_en?: string; location_vi?: string;
+  furnishings_en?: string; furnishings_vi?: string; seo_features?: string[];
   description_en: string; description_vi: string; district_slug: string;
   address: string; price: number | null; currency: string;
   listing_type: "rent" | "sale"; property_type: string;
@@ -18,6 +24,7 @@ export type Settings = {
   id: string; hero_title_en: string; hero_title_vi: string;
   hero_text_en: string; hero_text_vi: string; hero_image: string;
   contact_email: string; contact_phone: string; contact_address: string;
+  whatsapp_phone?: string; zalo_phone?: string;
 };
 export type Enquiry = {
   id: string; property_id: string | null; name: string; email: string;
@@ -39,4 +46,14 @@ export type CustomerRecord = {
   stage: "new" | "contacted" | "viewing" | "tenant" | "closed";
   follow_up_on: string | null; notes: string; updated_at: string;
 };
-export type Content = { properties: Property[]; neighbourhoods: Neighbourhood[]; settings: Settings };
+export type ListingAuthor = {
+  id: string; slug: string; display_name: string; bio_en: string; bio_vi: string;
+  portrait_url: string; phone: string; whatsapp_phone: string; zalo_phone: string; email: string;
+  is_placeholder: boolean; published: boolean; sort_order: number; updated_at: string;
+};
+export type SiteActivity = {
+  id: string; category: "customers" | "feedback" | "team"; media_kind: "photo" | "screenshot";
+  caption_en: string; caption_vi: string; image_url: string; source_url: string;
+  published: boolean; sort_order: number; updated_at: string;
+};
+export type Content = { properties: Property[]; neighbourhoods: Neighbourhood[]; settings: Settings; authors?: ListingAuthor[]; activities?: SiteActivity[] };

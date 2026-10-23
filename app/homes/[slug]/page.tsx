@@ -1,11 +1,8 @@
 import { notFound } from "next/navigation";
-import { loadContent } from "@/lib/server";
+import { cookies } from "next/headers";
+import { languageValue } from "@/lib/language";
+import { loadPageContent,propertyMetadata,propertyStructuredData } from "@/lib/seo";
+import { isPublicRental } from "@/lib/rentals";
 import { PropertyDetail } from "@/components/property-detail";
-export async function generateMetadata({ params }: { params: Promise<{slug:string}> }) {
-  const {slug}=await params;const {content}=await loadContent();const p=content.properties.find(p=>p.slug===slug);
-  return {title:p?.title_en||"Home not found",description:p?.description_en,openGraph:p?{images:[{url:p.images[0]}]}:undefined};
-}
-export default async function Page({params}:{params:Promise<{slug:string}>}) {
-  const {slug}=await params;
-  return <PropertyDetail slug={slug}/>;
-}
+export async function generateMetadata({params}:{params:Promise<{slug:string}>}){return propertyMetadata((await params).slug);}
+export default async function Page({params}:{params:Promise<{slug:string}>}){const {slug}=await params,{content}=await loadPageContent(),language=languageValue((await cookies()).get("gary-language")?.value),p=content.properties.find(p=>p.slug===slug&&isPublicRental(p));if(!p)notFound();return <>{p&&<script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(propertyStructuredData(p,language,content.neighbourhoods.find(n=>n.slug===p.district_slug)?.name)).replace(/</g,"\\u003c")}}/>}<PropertyDetail slug={slug}/></>;}

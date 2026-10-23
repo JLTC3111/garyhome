@@ -76,7 +76,8 @@ test('CMS schema and row-level permissions in an isolated Postgres engine', asyn
     await t.test('the source listings and neighbourhoods can be seeded without overwriting CMS edits',async()=>{
       await as('postgres');const seed=await readFile(new URL('../supabase/seed.sql',import.meta.url),'utf8');
       await db.exec(seed);await db.exec(seed);
-      assert.equal((await db.query('select count(*)::int as total from public.properties')).rows[0].total,18);
+      const sources=JSON.parse(await readFile(new URL('../data/properties.json',import.meta.url),'utf8'));
+      assert.equal((await db.query('select count(*)::int as total from public.properties')).rows[0].total,sources.length+2);
       assert.equal((await db.query('select count(*)::int as total from public.neighbourhoods')).rows[0].total,4);
     });
   }

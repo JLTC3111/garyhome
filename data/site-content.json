@@ -43,13 +43,15 @@
   ],
   "settings": {
     "id": "main",
-    "hero_title_en": "Find a place.\nFeel at home.",
-    "hero_title_vi": "Tìm một nơi.\nGọi là nhà.",
-    "hero_text_en": "Thoughtfully chosen homes. A team that knows Hanoi. Let’s find the place that feels like you.",
-    "hero_text_vi": "Những ngôi nhà được chọn lọc. Đội ngũ am hiểu Hà Nội. Cùng tìm nơi thuộc về bạn.",
     "hero_image": "/images/hero.jpg",
+    "zalo_phone": "+84356175046",
+    "hero_text_en": "Explore apartments, villas, offices and Vinhomes rentals. Compare real property details and arrange a viewing with Gary Home.",
+    "hero_text_vi": "Khám phá căn hộ, biệt thự, văn phòng và nhà cho thuê tại Vinhomes. Xem thông tin thực tế và đặt lịch xem nhà cùng Gary Home.",
     "contact_email": "info@garyhome.vn",
     "contact_phone": "+84 356 175 046",
+    "hero_title_en": "SERVICED APARTMENTS IN HANOI FOR RENT | GARY HOME",
+    "hero_title_vi": "CĂN HỘ DỊCH VỤ CHO THUÊ TẠI HÀ NỘI | GARY HOME",
+    "whatsapp_phone": "+84356175046",
     "contact_address": "Eurowindow Tower, 27 Trần Duy Hưng, Cầu Giấy, Hà Nội, Vietnam"
   }
 }

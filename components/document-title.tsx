@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 import { documentTitle } from "@/lib/document-titles";
 import { useSite } from "./site-context";
@@ -8,9 +8,9 @@ import { useSite } from "./site-context";
 export function DocumentTitle() {
   const pathname = usePathname();
   const { language, content } = useSite();
-  const title = documentTitle(pathname, language, content.properties);
+  const title = documentTitle(pathname, language, content.properties,content.neighbourhoods);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (title === null) return;
     let active = true;
     const apply = () => {

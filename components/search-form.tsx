@@ -1,54 +1,40 @@
 "use client";
-import { SelectField } from "./select-field";
-import { useState } from "react";
-import { ArrowRight, MapPin, Building2, Wallet, Search, KeyRound, House, Check } from "lucide-react";
-import { useSite } from "./site-context";
-import type { Filters } from "@/lib/property-search";
-import { AnimatedBackground } from "./motion-primitives/animated-background";
-import { SpotlightCard } from "./react-bits/spotlight-card";
 
-export function SearchForm({ compact=false, initial={} }: { compact?: boolean; initial?: Filters }) {
-  const { t, content, language }=useSite();const [listing,setListing]=useState(initial.listing||"rent");
-  return <SpotlightCard className={`search-box ${compact ? "search-compact" : ""}`}>
-    <div className="search-tabs">
-      <span>{t("I’M LOOKING TO", "TÔI MUỐN")}</span>
-      <div className="search-mode-switch" role="group" aria-label={t("Rent or buy a home", "Thuê hoặc mua nhà")}>
-        <AnimatedBackground activeValue={listing}>
-          <button type="button" data-id="rent" aria-pressed={listing === "rent"} className={listing === "rent" ? "selected" : ""} onClick={() => setListing("rent")}>
-            <KeyRound size={17} aria-hidden="true"/><span>{t("Rent a home", "Thuê nhà")}</span><Check className="search-mode-check" size={15} aria-hidden="true"/>
-          </button>
-          <button type="button" data-id="sale" aria-pressed={listing === "sale"} className={listing === "sale" ? "selected" : ""} onClick={() => setListing("sale")}>
-            <House size={17} aria-hidden="true"/><span>{t("Buy a home", "Mua nhà")}</span><Check className="search-mode-check" size={15} aria-hidden="true"/>
-          </button>
-        </AnimatedBackground>
+import { useId, useState } from "react";
+import { ArrowRight, Building2, CalendarDays, ChevronDown, MapPin, Search, SlidersHorizontal, Wallet } from "lucide-react";
+import { useSite } from "./site-context";
+import { SelectField } from "./select-field";
+import { AnimatedBackground } from "./motion-primitives/animated-background";
+import { Disclosure } from "./motion-primitives/disclosure";
+import { SpotlightCard } from "./react-bits/spotlight-card";
+import { AMENITIES, amenityLabel, RENTAL_TYPES, typeLabel } from "@/lib/rentals";
+import type { Filters } from "@/lib/property-search";
+
+export function SearchForm({compact=false,initial={},action="/homes"}:{compact?:boolean;initial?:Filters;action?:string}) {
+  const {t,content,language}=useSite();const id=useId();
+  const [term,setTerm]=useState(initial.term||""),[advanced,setAdvanced]=useState(!!(initial.q||initial.id||initial.beds||initial.baths||initial.amenity));
+  const [period,setPeriod]=useState(initial.period||"month");
+  const amenities=[...new Set([...Object.keys(AMENITIES),...content.properties.flatMap(p=>p.amenities)])];
+  return <SpotlightCard className={`search-box rental-search ${compact?"rental-search-compact":""}`}>
+    <form action={action} method="get">
+      <div className="rental-stay-tabs"><span>{t("FIND YOUR RENTAL","TÌM NHÀ CHO THUÊ")}</span><div className="rental-stay-switch" role="group" aria-label={t("Rental duration","Thời hạn thuê")}><AnimatedBackground activeValue={term}>
+        {[["short",t("Short-term stays","Thuê ngắn hạn")],["long",t("Long-term homes","Thuê dài hạn")]].map(([value,label])=><button key={value} data-id={value} type="button" aria-pressed={term===value} onClick={()=>setTerm(value)}><CalendarDays size={16}/>{label}</button>)}
+      </AnimatedBackground></div><button className={`rental-any-term ${term?"":"selected"}`} type="button" onClick={()=>setTerm("")}>{t("Any duration","Mọi thời hạn")}</button></div>
+      <input type="hidden" name="term" value={term}/><input type="hidden" name="sort" value={initial.sort||""}/>
+      <div className="search-fields">
+        <label className="search-field"><span><MapPin size={15}/>{t("DISTRICT / AREA","QUẬN / KHU VỰC")}</span><SelectField name="district" defaultValue={initial.district||""} aria-label={t("District or area","Quận hoặc khu vực")}><option value="">{t("Anywhere in Hanoi","Tất cả Hà Nội")}</option>{content.neighbourhoods.map(n=><option key={n.slug} value={n.slug}>{n.name}</option>)}</SelectField></label>
+        <label className="search-field"><span><Building2 size={15}/>{t("PROPERTY TYPE","LOẠI BẤT ĐỘNG SẢN")}</span><SelectField name="type" defaultValue={initial.type||""}><option value="">{t("All property types","Tất cả loại hình")}</option>{RENTAL_TYPES.map(type=><option key={type} value={type}>{typeLabel(type,language)}</option>)}</SelectField></label>
+        <div className="search-field rental-price-field"><span><Wallet size={15}/>{t("BUDGET · USD","NGÂN SÁCH · USD")}</span><div><input name="min" type="number" min="0" step="any" defaultValue={initial.min||""} placeholder={t("Min","Từ")} aria-label={t("Minimum rental price in USD","Giá thuê tối thiểu (USD)")}/><span>—</span><input name="max" type="number" min="0" step="any" defaultValue={initial.max||""} placeholder={t("Max","Đến")} aria-label={t("Maximum rental price in USD","Giá thuê tối đa (USD)")}/></div></div>
+        <button className="button search-submit" type="submit"><Search size={18}/>{t("Find a rental","Tìm nhà thuê")}<ArrowRight size={17}/></button>
       </div>
-    </div>
-    <form action="/homes" method="get" className="search-fields">
-      <input type="hidden" name="listing" value={listing}/>
-      <label className="search-field">
-        <span><MapPin size={16}/>{t("NEIGHBOURHOOD", "KHU VỰC")}</span>
-        <SelectField name="district" defaultValue={initial.district || ""} aria-label={t("Choose neighbourhood", "Chọn khu vực")}>
-          <option value="">{t("Anywhere in Hanoi", "Tất cả Hà Nội")}</option>
-          {content.neighbourhoods.map(n => <option key={n.slug} value={n.slug}>{n.name}</option>)}
-        </SelectField>
-      </label>
-      <label className="search-field">
-        <span><Building2 size={16}/>{t("PROPERTY TYPE", "LOẠI NHÀ")}</span>
-        <SelectField name="type" defaultValue={initial.type || ""}>
-          <option value="">{t("A place that fits", "Tất cả loại nhà")}</option>
-          <option value="Apartment">{t("Apartment", "Căn hộ")}</option><option value="Studio">Studio</option>
-          <option value="House & Villa">{t("House & Villa", "Nhà & biệt thự")}</option>
-          <option value="Office & Restaurant">{t("Office & Restaurant", "Mặt bằng kinh doanh")}</option>
-        </SelectField>
-      </label>
-      <label className="search-field">
-        <span><Wallet size={16}/>{t(listing === "rent" ? "MONTHLY BUDGET" : "BUDGET (USD)", listing === "rent" ? "NGÂN SÁCH / THÁNG" : "NGÂN SÁCH (USD)")}</span>
-        <SelectField key={listing} name="max" defaultValue={(initial.listing || "rent") === listing ? initial.max || "" : ""}>
-          <option value="">{t("What works for you?", "Mọi mức ngân sách")}</option>
-          {(listing === "rent" ? [300, 600, 1000, 1500, 2500] : [100000, 250000, 500000, 1000000]).map(n => <option value={n} key={n}>{t("Up to", "Tối đa")} ${n.toLocaleString(language === "vi" ? "vi-VN" : "en-US")}</option>)}
-        </SelectField>
-      </label>
-      <button className="button search-submit interactive-cta" type="submit"><Search size={18}/>{t("Find my home", "Tìm nhà")}<ArrowRight size={18}/></button>
+      <div className="rental-search-secondary"><button type="button" className="text-link" onClick={()=>setAdvanced(!advanced)} id={`${id}-trigger`} aria-controls={`${id}-panel`} aria-expanded={advanced}><SlidersHorizontal size={16}/>{t("Beds, baths, property ID & amenities","Phòng ngủ, phòng tắm, mã tin & tiện nghi")}<ChevronDown size={15}/></button><label>{t("Prices per","Giá theo")}<SelectField name="period" value={period} onValueChange={setPeriod}><option value="month">{t("Month","Tháng")}</option><option value="week">{t("Week","Tuần")}</option><option value="night">{t("Night","Đêm")}</option></SelectField></label></div>
+      <Disclosure open={advanced} id={`${id}-panel`} labelledBy={`${id}-trigger`}><div className="rental-advanced">
+        <label>{t("Bedrooms","Phòng ngủ")}<SelectField name="beds" defaultValue={initial.beds||""}><option value="">{t("Any","Tất cả")}</option><option value="0">Studio</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}+</option>)}</SelectField></label>
+        <label>{t("Bathrooms","Phòng tắm")}<SelectField name="baths" defaultValue={initial.baths||""}><option value="">{t("Any","Tất cả")}</option>{[1,2,3,4].map(n=><option key={n} value={n}>{n}+</option>)}</SelectField></label>
+        <label>{t("Property ID","Mã bất động sản")}<input name="id" defaultValue={initial.id||""} placeholder="GH-000001" maxLength={80}/></label>
+        <label>{t("Keyword / street","Từ khóa / tên đường")}<input name="q" defaultValue={initial.q||""} placeholder={t("A street or property detail","Tên đường hoặc đặc điểm nhà")} maxLength={200}/></label>
+        <fieldset className="rental-amenities-filter"><legend>{t("Amenities · match all selected","Tiện nghi · có tất cả mục đã chọn")}</legend>{amenities.map(value=><label key={value}><input type="checkbox" name="amenity" value={value} defaultChecked={(initial.amenity||"").split(",").includes(value)}/>{amenityLabel(value,language)}</label>)}</fieldset>
+      </div></Disclosure>
     </form>
   </SpotlightCard>;
 }

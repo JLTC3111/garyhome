@@ -1,7 +1,8 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { Content, Enquiry, Language } from "@/lib/types";
+import { languageValue, persistLanguage } from "@/lib/language";
 import { studioText } from "@/lib/studio-i18n";
 import { browserClient, publicBrowserClient } from "@/lib/browser-client";
 import { readPublishedContent } from "@/lib/public-content";
@@ -9,6 +10,7 @@ import { installRecoveryEvents } from "@/lib/recovery-events";
 import { fetchWithDeadline, request } from "@/lib/requests";
 import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/session-recovery";
 import { customerError, ENQUIRY_FIELDS } from "@/lib/customer-data";
+import { isPublicRental } from "@/lib/rentals";
 import type { StaffRole } from "@/lib/staff";
 
 type Update<T> = T | ((previous: T) => T);
@@ -28,11 +30,19 @@ type SiteContext = {
   notice: (message: string) => void;
 };
 const Context = createContext<SiteContext | null>(null);
-export function SiteProvider({ children, initial }: { children: ReactNode; initial: { content: Content; configured: boolean; error: boolean } }) {
+export function SiteProvider({ children, initial, initialLanguage = "en" }: { children: ReactNode; initialLanguage?: Language; initial: { content: Content; configured: boolean; error: boolean } }) {
   const [content, updateContent] = useState(initial.content);
   const [backendError, setBackendError] = useState(initial.error);
   const [contentRecovering, setContentRecovering] = useState(false);
-  const [language, updateLanguage] = useState<Language>("en");
+  const [language, updateLanguage] = useState<Language>(initialLanguage);
+  useLayoutEffect(() => {
+    let selected=initialLanguage;
+    try{const stored=localStorage.getItem("gary-language");if(stored==="en"||stored==="vi")selected=stored;}catch{/* Optional storage. */}
+    // Legacy browser-only preferences must settle before paint during hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    updateLanguage(selected);persistLanguage(selected);
+    if(document.documentElement?.dataset)delete document.documentElement.dataset.languagePending;
+  }, [initialLanguage]);
   const [saved, setSaved] = useState<string[]>([]);
   const [savedAccount, setSavedAccount] = useState<string | null>(null);
   const [savedError, setSavedError] = useState("");
@@ -99,19 +109,21 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
     const generation = state.generation, startedVersion = version.current;
     if (refreshFlight.current?.generation === generation) return refreshFlight.current.promise;
     const promise = (async () => {
-      const [p, n, s, e] = await request(signal => Promise.all([
+      const [p, n, s, a, act, e] = await request(signal => Promise.all([
         db.from("properties").select("*").order("sort_order").abortSignal(signal),
         db.from("neighbourhoods").select("*").order("sort_order").abortSignal(signal),
         db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
+        db.from("listing_authors").select("*").order("sort_order").abortSignal(signal),
+        db.from("site_activities").select("*").order("sort_order").abortSignal(signal),
         db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes)`).order("created_at", { ascending: false }).abortSignal(signal),
       ]));
       const current = sessionRef.current?.state;
       if (current?.generation !== generation || !current.editor || current.user?.id !== state.user?.id) return;
-      if (p.error || n.error || s.error || e.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
+      if (p.error || n.error || s.error || e.error || a.error || act.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
       // A slow background read must not overwrite a save that completed meanwhile.
       if (startedVersion !== version.current) return;
-      updateContent({ properties: p.data, neighbourhoods: n.data, settings: s.data } as Content);
-      initialRef.current = { properties: p.data.filter(row => row.status === "published"), neighbourhoods: n.data, settings: s.data } as Content;
+      updateContent({ properties: p.data, neighbourhoods: n.data, settings: s.data, authors:a.data||[],activities:act.data||[] } as Content);
+      initialRef.current = { properties: p.data.filter(isPublicRental), neighbourhoods: n.data, settings: s.data,authors:(a.data||[]).filter(row=>row.published),activities:(act.data||[]).filter(row=>row.published) } as Content;
       publicContentNeeded.current = false;
       setBackendError(false);
       updateEnquiries(e.data.map(row => {
@@ -171,7 +183,6 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
     let connecting: Promise<void> | null = null;
     queueMicrotask(() => {
     if (!active) return;
-    try { updateLanguage(localStorage.getItem("gary-language") === "vi" ? "vi" : "en"); } catch { /* Optional browser storage. */ }
     try {
       const ids = JSON.parse(localStorage.getItem("gary-saved") || "[]");
       setSaved(Array.isArray(ids) ? ids.filter(id => typeof id === "string") : []);
@@ -263,16 +274,17 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
   }, [client, user?.id, sessionPhase]);
 
   useEffect(() => {
-    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") updateLanguage(event.newValue === "vi" ? "vi" : "en"); };
+    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") {const selected=languageValue(event.newValue);updateLanguage(selected);persistLanguage(selected);} };
     window.addEventListener("storage", syncLanguage); return () => window.removeEventListener("storage", syncLanguage);
   }, []);
-  useEffect(() => { document.documentElement.lang = language; }, [language]);
+  useLayoutEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 4500); return () => clearTimeout(timer); }, [toast]);
   const setContent = useCallback((next: Update<Content>) => {
     version.current++;
     updateContent(previous => {
       const value = typeof next === "function" ? next(previous) : next;
       if (demo) { try { localStorage.setItem("gary-preview-content", JSON.stringify(value)); } catch { setToast("Browser storage is full. Changes are only kept for this session."); } }
+      else initialRef.current={...value,properties:value.properties.filter(isPublicRental),authors:(value.authors||[]).filter(row=>row.published),activities:(value.activities||[]).filter(row=>row.published)};
       return value;
     });
   }, [demo]);
@@ -318,7 +330,7 @@ export function SiteProvider({ children, initial }: { children: ReactNode; initi
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); try { localStorage.setItem("gary-language", l); } catch { /* optional */ } }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

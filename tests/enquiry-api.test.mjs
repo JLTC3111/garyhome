@@ -14,9 +14,9 @@ function endpoint({ validToken = true, vercel = false } = {}) {
   };
   const source = fs.readFileSync(new URL('../app/api/enquiries/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-  const module = { exports: {} };
-  vm.runInThisContext('(function(exports,require,module,process){' + compiled + '\n})')(module.exports, id => id === '@/lib/server' ? { publicSupabase: token => { calls.tokens.push(token); return client; } } : require(id), module, { env: { VERCEL: vercel ? '1' : undefined } });
-  const send = (overrides = {}, headers = {}) => module.exports.POST(new Request('https://gary.example/api/enquiries', {
+  const loadedModule = { exports: {} };
+  vm.runInThisContext('(function(exports,require,module,process){' + compiled + '\n})')(loadedModule.exports, id => id === '@/lib/server' ? { publicSupabase: token => { calls.tokens.push(token); return client; } } : require(id), loadedModule, { env: { VERCEL: vercel ? '1' : undefined } });
+  const send = (overrides = {}, headers = {}) => loadedModule.exports.POST(new Request('https://gary.example/api/enquiries', {
     method: 'POST', headers: { 'Content-Type': 'application/json', origin: 'https://gary.example', ...headers },
     body: JSON.stringify({ name: 'A Customer', email: 'customer@example.invalid', message: 'Please help me find a home.', consent: true, ...overrides }),
   }));
@@ -68,4 +68,18 @@ test('Vercel and Cloudflare rate limits isolate visitors using the host-owned IP
     assert.equal((await send({}, { [trusted]: '192.0.2.1', [untrusted]: '203.0.113.1' })).status, 429);
     assert.equal((await send({}, { [trusted]: '192.0.2.2', [untrusted]: '203.0.113.1' })).status, 201);
   }
+});
+
+test('a viewing cart submits one atomic, deduplicated insert using verified customer identity',async()=>{
+ const {send,calls}=endpoint();
+ const first='c6e53881-53a0-45cf-bdce-7fe020b0a610',second='8a9e6c41-70cc-4e45-b67b-e91ac8bb48f9';
+ const response=await send({property_ids:[first,second,first],kind:'general',user_id:'forged',status:'scheduled',notes:'forged'}, {authorization:'Bearer customer-token'});
+ assert.equal(response.status,201);assert.equal(calls.records.length,1);
+ assert.deepEqual(calls.records[0].map(row=>row.property_id),[first,second]);
+ for(const row of calls.records[0]){assert.equal(row.kind,'viewing');for(const key of ['property_ids','user_id','status','notes'])assert.ok(!(key in row));}
+});
+test('an invalid or conflicting cart cannot reach the database',async()=>{
+ const {send,calls}=endpoint();const id='c6e53881-53a0-45cf-bdce-7fe020b0a610';
+ for(const input of [{property_ids:[]},{property_ids:['invalid']},{property_ids:Array(13).fill(id)},{property_ids:[id],property_id:id}])assert.equal((await send(input)).status,400);
+ assert.equal(calls.records.length,0);
 });

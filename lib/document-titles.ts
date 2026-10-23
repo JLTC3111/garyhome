@@ -1,8 +1,12 @@
-import type { Language, Property } from "./types";
+import type { Language, Property, Neighbourhood } from "./types";
+import { isPublicRental, propertyTitle } from "./rentals.ts";
 
-type TitleProperty = Pick<Property, "slug" | "title_en" | "title_vi" | "status" | "availability">;
+type TitleProperty = Property;
 const pageTitles: Record<string, readonly [string, string]> = {
-  "/homes": ["Explore Hanoi homes", "Khám phá nhà tại Hà Nội"],
+  "/homes": ["Hanoi rental properties", "Bất động sản cho thuê Hà Nội"],
+  "/cart": ["My rental cart", "Giỏ xem nhà của tôi"],
+  "/activities": ["Our activities", "Hoạt động của chúng tôi"],
+  "/feedback": ["Feedback", "Phản hồi"],
   "/saved": ["Your saved homes", "Nhà đã lưu"],
   "/neighbourhoods": ["Find your kind of Hanoi", "Tìm khu phố dành cho bạn"],
   "/about": ["The Gary way", "Về Gary Home"],
@@ -16,12 +20,12 @@ const pageTitles: Record<string, readonly [string, string]> = {
   "/credits": ["Photo credits", "Nguồn ảnh"],
 };
 
-export function documentTitle(pathname: string | null, language: Language, properties: readonly TitleProperty[]): string | null {
+export function documentTitle(pathname: string | null, language: Language, properties: readonly TitleProperty[],neighbourhoods: readonly Pick<Neighbourhood,"slug"|"name">[] = []): string | null {
   // The router can briefly have no pathname while restoring a route.
   if (pathname === null) return null;
   const path = pathname.replace(/\/+$/, "") || "/";
   const vi = language === "vi";
-  if (path === "/") return vi ? "Gary Home — Tìm tổ ấm tại Hà Nội" : "Gary Home — Find your place in Hanoi";
+  if (path === "/") return vi ? "Căn hộ dịch vụ cho thuê tại Hà Nội | Gary Home" : "Serviced apartments in Hanoi for rent | Gary Home";
   const page = pageTitles[path];
   if (page) return `${page[vi ? 1 : 0]} | Gary Home`;
 
@@ -30,12 +34,9 @@ export function documentTitle(pathname: string | null, language: Language, prope
     let slug: string;
     try { slug = decodeURIComponent(match[1]); } catch { slug = ""; }
     // Match the public detail page, even when Studio has loaded private drafts.
-    const property = properties.find(item => item.slug === slug && item.status === "published" && !["rented", "sold"].includes(item.availability));
+    const property = properties.find(item => item.slug === slug && isPublicRental(item));
     if (!property) return `${vi ? "Không tìm thấy căn nhà" : "Home not found"} | Gary Home`;
-    const preferred = vi ? property.title_vi : property.title_en;
-    const fallback = vi ? property.title_en : property.title_vi;
-    const title = preferred.trim() || fallback.trim() || (vi ? "Thông tin căn nhà" : "Home details");
-    return `${title.replace(/\s+/g, " ")} | Gary Home`;
+    return `${propertyTitle(property,language,neighbourhoods.find(n=>n.slug===property.district_slug)?.name)} | Gary Home`;
   }
   return `${vi ? "Không tìm thấy trang" : "Page not found"} | Gary Home`;
 }

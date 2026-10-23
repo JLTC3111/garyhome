@@ -1,4 +1,6 @@
+import { pageMetadata } from "@/lib/seo";
 import { Suspense } from "react";
+import { PageLoading } from "@/components/page-loading";
 import { ContactPage } from "@/components/content-pages";
-export const metadata={title:"Say hello"};
-export default function Page(){return <Suspense fallback={<div className="container section">Loading…</div>}><ContactPage/></Suspense>;}
+export async function generateMetadata(){return pageMetadata("/contact",false);}
+export default function Page(){return <Suspense fallback={<PageLoading/>}><ContactPage/></Suspense>;}

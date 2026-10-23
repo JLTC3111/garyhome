@@ -8,6 +8,7 @@ import { loadContent } from "@/lib/server";
 import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";
 import { Header, Footer } from "@/components/site-shell";
+import { DocumentTitle } from "@/components/document-title";
 
 // Read CMS content at request time so publishing edits does not need a rebuild.
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function RootLayout({
   const initial = await loadContent();
   return (
     <html lang="en">
-      <body><InteractionProvider><SiteProvider initial={initial}><a className="skip-link" href="#main-content">Skip to content</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></InteractionProvider></body>
+      <body><InteractionProvider><SiteProvider initial={initial}><DocumentTitle/><a className="skip-link" href="#main-content">Skip to content</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></InteractionProvider></body>
     </html>
   );
 }

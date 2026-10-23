@@ -15,7 +15,8 @@ export function SearchForm({compact=false,initial={},action="/homes"}:{compact?:
   const [period,setPeriod]=useState(initial.period||"month");
   const amenities=[...new Set([...Object.keys(AMENITIES),...content.properties.flatMap(p=>p.amenities)])];
   return <SpotlightCard className={`search-box rental-search ${compact?"rental-search-compact":""}`}>
-    <form action={action} method="get">
+    <form action={action} method="get" aria-labelledby={`${id}-heading`}>
+      <div className="rental-search-heading"><h2 id={`${id}-heading`}>{t("Find Your Rental","Tìm nhà cho thuê")}</h2></div>
       <input type="hidden" name="sort" value={initial.sort||""}/>
       <div className="search-fields">
         <label className="search-field"><span><MapPin size={15}/>{t("DISTRICT / AREA","QUẬN / KHU VỰC")}</span><SelectField name="district" defaultValue={initial.district||""} aria-label={t("District or area","Quận hoặc khu vực")}><option value="">{t("Anywhere in Hanoi","Tất cả Hà Nội")}</option>{content.neighbourhoods.map(n=><option key={n.slug} value={n.slug}>{n.name}</option>)}</SelectField></label>

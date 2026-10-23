@@ -2,7 +2,7 @@
   {
     "id": "2636d3f7-a64b-55ed-812e-727ba3783afe",
     "category": "customers",
-    "image_url": "/images/activities/feedback-1.jpg",
+    "image_url": "/images/activities/activity-1.jpg",
     "published": true,
     "caption_en": "Moments with Gary Home",
     "caption_vi": "Khoảnh khắc cùng Gary Home",
@@ -14,7 +14,7 @@
   {
     "id": "c09f4dd6-9a06-5c6c-a478-d52c57d478c4",
     "category": "customers",
-    "image_url": "/images/activities/feedback-2.jpg",
+    "image_url": "/images/activities/activity-2.jpg",
     "published": true,
     "caption_en": "Moments with Gary Home",
     "caption_vi": "Khoảnh khắc cùng Gary Home",
@@ -26,7 +26,7 @@
   {
     "id": "8d865e4d-3a47-513e-86ef-968525a400d3",
     "category": "customers",
-    "image_url": "/images/activities/feedback-3.jpg",
+    "image_url": "/images/activities/activity-3.jpg",
     "published": true,
     "caption_en": "Moments with Gary Home",
     "caption_vi": "Khoảnh khắc cùng Gary Home",
@@ -38,7 +38,7 @@
   {
     "id": "f734cadd-3302-5f5c-83a6-5ddbbb72bbb5",
     "category": "customers",
-    "image_url": "/images/activities/feedback-4.jpg",
+    "image_url": "/images/activities/activity-4.jpg",
     "published": true,
     "caption_en": "Moments with Gary Home",
     "caption_vi": "Khoảnh khắc cùng Gary Home",
@@ -50,7 +50,7 @@
   {
     "id": "3125792e-e8ae-5b83-aa17-81d6830be01c",
     "category": "customers",
-    "image_url": "/images/activities/feedback-5.jpg",
+    "image_url": "/images/activities/activity-5.jpg",
     "published": true,
     "caption_en": "Moments with Gary Home",
     "caption_vi": "Khoảnh khắc cùng Gary Home",
@@ -62,7 +62,7 @@
   {
     "id": "78109c4d-5602-57da-9a6b-d59d22b70342",
     "category": "customers",
-    "image_url": "/images/activities/feedback-6.jpg",
+    "image_url": "/images/activities/activity-6.jpg",
     "published": true,
     "caption_en": "Moments with Gary Home",
     "caption_vi": "Khoảnh khắc cùng Gary Home",
@@ -70,5 +70,137 @@
     "sort_order": 6,
     "source_url": "https://garyhome.vn/wp-content/uploads/2026/06/z6422320121310_a3216eb6ce353db34a1ea562a2042a20.jpg",
     "updated_at": "2026-10-23T11:30:33.02138+00:00"
+  },
+  {
+    "id": "81145523-90a0-5659-b203-c071c4755a3b",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758363774_250296199991685643_250296199991685643_8d57aff1a985be89d04e709012310333.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -20,
+    "updated_at": "2026-10-23T12:50:24.076Z"
+  },
+  {
+    "id": "9a0d7b0d-738a-5114-8cc7-f0b38b2eb247",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758372920_250296199991685643_250296199991685643_8f7a49949dc1bc9736e22ee5ad5712a5.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -19,
+    "updated_at": "2026-10-23T12:50:24.076Z"
+  },
+  {
+    "id": "892ea64a-8a73-538a-a1bf-31d36b20a4ca",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758403181_250296199991685643_250296199991685643_5f2331433c19d7fc214897ba9d222ae7.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -18,
+    "updated_at": "2026-10-23T12:50:24.076Z"
+  },
+  {
+    "id": "1833b425-cd8c-52c7-bffe-3ca3911c73d2",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758403190_250296199991685643_250296199991685643_5261cdcc406e3ff6352a67fe20c39fbe.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -17,
+    "updated_at": "2026-10-23T12:50:24.076Z"
+  },
+  {
+    "id": "4f25795d-a2c1-5d39-9a83-cdbd1ed87b34",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758403196_250296199991685643_250296199991685643_8dcd84faaab5a65e6f1a7ca531826322.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -16,
+    "updated_at": "2026-10-23T12:50:24.077Z"
+  },
+  {
+    "id": "13975278-7c4f-55c1-b61d-c8fb4ae10e16",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758403206_250296199991685643_250296199991685643_0cc9015f7965edf29d422df98b2d6880.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -15,
+    "updated_at": "2026-10-23T12:50:24.077Z"
+  },
+  {
+    "id": "04895f81-82cc-563a-a99b-c3eeccdae28a",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758403213_250296199991685643_250296199991685643_ba2b14bd2a82bd8c638ca2f70aaa2a7e.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -14,
+    "updated_at": "2026-10-23T12:50:24.077Z"
+  },
+  {
+    "id": "988f3dcf-d9aa-5e96-b443-5cd6626b2700",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758410595_250296199991685643_250296199991685643_b1a1bb38db4acd04e4c8f7bfb8de67a7.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -13,
+    "updated_at": "2026-10-23T12:50:24.077Z"
+  },
+  {
+    "id": "8c237014-6403-5356-9488-78ca4eccc803",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758410599_250296199991685643_250296199991685643_e73fcef432b38ff9e97dfc6428c2ec22.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -12,
+    "updated_at": "2026-10-23T12:50:24.077Z"
+  },
+  {
+    "id": "457c442d-31e9-531c-a459-d0efe19b6615",
+    "category": "customers",
+    "media_kind": "photo",
+    "caption_en": "Moments with Gary Home",
+    "caption_vi": "Khoảnh khắc cùng Gary Home",
+    "image_url": "/images/customers/1792758410603_250296199991685643_250296199991685643_f2a18d093dbd9d44cc5834f51d32e306.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -11,
+    "updated_at": "2026-10-23T12:50:24.077Z"
+  },
+  {
+    "id": "152b4164-efaf-5e3f-a40b-35ccfa761eac",
+    "category": "feedback",
+    "media_kind": "screenshot",
+    "caption_en": "Customer feedback shared with Gary Home",
+    "caption_vi": "Phản hồi khách hàng gửi đến Gary Home",
+    "image_url": "/images/feedback/1.jpg",
+    "source_url": "",
+    "published": true,
+    "sort_order": -10,
+    "updated_at": "2026-10-23T12:50:24.077Z"
   }
 ]

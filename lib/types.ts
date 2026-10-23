@@ -14,7 +14,7 @@ export type Property = {
   amenities: string[]; images: string[]; featured: boolean;
   status: "published" | "draft" | "archived";
   availability: "on_request" | "available" | "rented" | "sold";
-  source_url: string | null; sort_order: number; created_at: string; updated_at: string;
+  published_at?: string|null; source_url: string | null; sort_order: number; created_at: string; updated_at: string;
 };
 export type Neighbourhood = {
   slug: string; name: string; tagline_en: string; tagline_vi: string;
@@ -56,4 +56,6 @@ export type SiteActivity = {
   caption_en: string; caption_vi: string; image_url: string; source_url: string;
   published: boolean; sort_order: number; updated_at: string;
 };
-export type Content = { properties: Property[]; neighbourhoods: Neighbourhood[]; settings: Settings; authors?: ListingAuthor[]; activities?: SiteActivity[] };
+export type PropertyOrderScope="home"|"listings";
+export type PropertyOrders=Partial<Record<PropertyOrderScope,string[]>>;
+export type Content = { propertyOrders?:PropertyOrders; properties: Property[]; neighbourhoods: Neighbourhood[]; settings: Settings; authors?: ListingAuthor[]; activities?: SiteActivity[] };

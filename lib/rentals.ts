@@ -35,7 +35,9 @@ export function propertyTitle(p: Property, language: Language, district?: string
   return [base,area,...features].filter(Boolean).join(" · ");
 }
 export function channelUrl(kind:"whatsapp"|"zalo", phone:string, text="") {
-  const digits=phone.replace(/\D/g,"");
+  let digits=phone.replace(/\D/g,"");
+  if(kind==="whatsapp"&&/^0[35789]\d{8}$/.test(digits))digits="84"+digits.slice(1);
+  if(kind==="zalo"&&/^84[35789]\d{8}$/.test(digits))digits="0"+digits.slice(2);
   if(!/^\d{8,15}$/.test(digits))return "";
   return kind==="whatsapp" ? `https://wa.me/${digits}${text?`?text=${encodeURIComponent(text)}`:""}` : `https://zalo.me/${digits}`;
 }

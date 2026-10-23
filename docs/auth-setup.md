@@ -48,7 +48,8 @@ An owner or administrator opens **Studio → Team access** and enters the staff 
 | --- | --- |
 | Owner | Studio, customers and staff management; can appoint administrators. |
 | Administrator | Studio, customers, staff invitations and assignments; cannot edit owners, other administrators or their own access. |
-| Staff | Properties, media, site content, neighbourhoods and customers. No staff management. |
+| Manager | Properties, customers and site content, plus public card ordering. No staff access management. |
+| Staff | Properties, media, site content, neighbourhoods and customers. No staff management or public card ordering. |
 | Customer | Their own details, saved homes, enquiries and viewings. No Studio access. |
 
 For a new email, the server sends an Auth invitation. The recipient confirms their company mailbox and chooses a password at `/auth/invite`. The administrator never chooses or sees that password. Confirmation is required before the assignment can access Studio.

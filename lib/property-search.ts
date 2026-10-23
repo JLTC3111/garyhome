@@ -1,4 +1,5 @@
 import type { Property } from "./types";
+import { newestFirst } from "./property-order.ts";
 import { isPublicRental, listingCode } from "./rentals.ts";
 export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; beds?: string; baths?: string; amenity?: string; listing?: string; period?: string; id?: string; sort?: string };
 export function normalize(value: string) { return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g,"d"); }
@@ -26,5 +27,5 @@ export function filterProperties(properties: Property[], filters: Filters): Prop
       (!id||code===id||code===`GH-${id}`||p.id.toUpperCase()===id) &&
       (!filters.listing||filters.listing==="rent");
   });
-  return found.sort((a,b)=>filters.sort==="price-low"?(a.price??Infinity)-(b.price??Infinity):filters.sort==="price-high"?(b.price??-Infinity)-(a.price??-Infinity):filters.sort==="newest"?b.created_at.localeCompare(a.created_at):Number(b.featured)-Number(a.featured)||a.sort_order-b.sort_order);
+  return found.sort((a,b)=>filters.sort==="price-low"?(a.price??Infinity)-(b.price??Infinity):filters.sort==="price-high"?(b.price??-Infinity)-(a.price??-Infinity):newestFirst(a,b));
 }

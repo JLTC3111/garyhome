@@ -10,6 +10,8 @@ import { installRecoveryEvents } from "@/lib/recovery-events";
 import { fetchWithDeadline, request } from "@/lib/requests";
 import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/session-recovery";
 import { customerError, ENQUIRY_FIELDS } from "@/lib/customer-data";
+import { contentAssets } from "@/lib/content-assets";
+import { propertyOrders } from "@/lib/property-order";
 import { readBrowserFavourites } from "@/lib/favourites";
 import { isPublicRental } from "@/lib/rentals";
 import type { StaffRole } from "@/lib/staff";
@@ -110,21 +112,22 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
     const generation = state.generation, startedVersion = version.current;
     if (refreshFlight.current?.generation === generation) return refreshFlight.current.promise;
     const promise = (async () => {
-      const [p, n, s, a, act, e] = await request(signal => Promise.all([
+      const [p, n, s, a, act, e, orders] = await request(signal => Promise.all([
         db.from("properties").select("*").order("sort_order").abortSignal(signal),
         db.from("neighbourhoods").select("*").order("sort_order").abortSignal(signal),
         db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
         db.from("listing_authors").select("*").order("sort_order").abortSignal(signal),
         db.from("site_activities").select("*").order("sort_order").abortSignal(signal),
         db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes)`).order("created_at", { ascending: false }).abortSignal(signal),
+        db.from("property_display_orders").select("scope,property_ids").abortSignal(signal),
       ]));
       const current = sessionRef.current?.state;
       if (current?.generation !== generation || !current.editor || current.user?.id !== state.user?.id) return;
-      if (p.error || n.error || s.error || e.error || a.error || act.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
+      if (p.error || n.error || s.error || e.error || a.error || act.error || orders.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
       // A slow background read must not overwrite a save that completed meanwhile.
       if (startedVersion !== version.current) return;
-      updateContent({ properties: p.data, neighbourhoods: n.data, settings: s.data, authors:a.data||[],activities:act.data||[] } as Content);
-      initialRef.current = { properties: p.data.filter(isPublicRental), neighbourhoods: n.data, settings: s.data,authors:(a.data||[]).filter(row=>row.published),activities:(act.data||[]).filter(row=>row.published) } as Content;
+      updateContent(contentAssets({ properties: p.data, neighbourhoods: n.data, settings: s.data, authors:a.data||[],activities:act.data||[],propertyOrders:propertyOrders(orders.data) } as Content));
+      initialRef.current = contentAssets({ properties: p.data.filter(isPublicRental), neighbourhoods: n.data, settings: s.data,authors:(a.data||[]).filter(row=>row.published),activities:(act.data||[]).filter(row=>row.published),propertyOrders:propertyOrders(orders.data) } as Content);
       publicContentNeeded.current = false;
       setBackendError(false);
       updateEnquiries(e.data.map(row => {

@@ -115,3 +115,5 @@ The enquiry endpoint validates input, enforces same-origin submissions, uses a h
 The rental-only redesign, live data limits, Studio author/activity setup and verification results are recorded in [the rental audit](docs/rental-redesign-audit.md).
 
 The latest navigation, Favourites, restored hero/theme and Customers media changes are described in [the interface update](docs/interface-simplification.md).
+
+Media folder changes, messaging icons and manager-controlled card ordering are documented in [the media and ordering update](docs/media-and-ordering.md).

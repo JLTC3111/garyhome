@@ -7,7 +7,7 @@ import { useStudioText } from "./use-studio-text";
 import { fetchWithDeadline, request } from "@/lib/requests";
 import { canManageStaff, type StaffAccount } from "@/lib/staff";
 
-export type TeamDraft = { full_name: string; email: string; role: "admin" | "editor" };
+export type TeamDraft = { full_name: string; email: string; role: "admin" | "manager" | "editor" };
 export const emptyTeamDraft = (): TeamDraft => ({ full_name: "", email: "", role: "editor" });
 type Directory = { members: StaffAccount[]; next: string | null; domains: string[]; invitationsEnabled: boolean };
 
@@ -55,14 +55,14 @@ export function TeamManager({ draft, setDraft }: { draft: TeamDraft; setDraft: (
     if (!domains.includes(draft.email.trim().toLowerCase().split("@")[1])) { setError("Use an email address at the company domain."); return; }
     setBusy("invite"); setError(""); version.current++;
     try {
-      const result = await editorTask((_db, signal) => call("POST", signal, { ...draft, role: staffRole === "owner" ? draft.role : "editor" })) as { invited: boolean };
+      const result = await editorTask((_db, signal) => call("POST", signal, { ...draft, role: draft.role })) as { invited: boolean };
       if (!active.current) return;
       setDraft(emptyTeamDraft()); notice(text(result.invited ? "Staff invitation sent. The team member can confirm their email and choose a password." : "Staff access assigned to the existing company account. They can sign in to Studio."));
       await load();
     } catch (error) { if (active.current) setError(error instanceof Error ? error.message : "Couldn’t create the staff account. Refresh before trying again."); }
     finally { if (active.current) setBusy(""); }
   }
-  async function update(member: StaffAccount, role: "admin" | "editor", enabled: boolean) {
+  async function update(member: StaffAccount, role: "admin" | "manager" | "editor", enabled: boolean) {
     if (busy) return;
     setBusy(member.user_id); setError(""); version.current++;
     try {
@@ -81,7 +81,7 @@ export function TeamManager({ draft, setDraft }: { draft: TeamDraft; setDraft: (
       <div className="eyebrow">{text("INVITATION ONLY")}</div><h2>{text("Add a team member")}</h2><p>{text("Create a company account and assign its role. New staff receive an email invitation to choose their own password.")}</p>
       <label>{text("Full name")}<input name="full_name" autoComplete="off" value={draft.full_name} onChange={event => setDraft({ ...draft, full_name: event.target.value })} required minLength={2} maxLength={120} disabled={!!busy}/></label>
       <label>{text("Company email")}<input name="email" type="email" autoComplete="off" value={draft.email} onChange={event => setDraft({ ...draft, email: event.target.value })} required maxLength={254} disabled={!!busy} placeholder={domains.length ? "name@" + domains[0] : ""}/></label>
-      <label>{text("Assigned role")}<SelectField value={staffRole === "owner" ? draft.role : "editor"} disabled={!!busy} onValueChange={value => setDraft({ ...draft, role: value as TeamDraft["role"] })}><option value="editor">{text("Staff · properties and customers")}</option>{staffRole === "owner" && <option value="admin">{text("Administrator · also manages staff")}</option>}</SelectField></label>
+      <label>{text("Assigned role")}<SelectField value={draft.role} disabled={!!busy} onValueChange={value => setDraft({ ...draft, role: value as TeamDraft["role"] })}><option value="editor">{text("Staff · properties and customers")}</option><option value="manager">{text("Manager · also arranges cards")}</option>{staffRole === "owner" && <option value="admin">{text("Administrator · also manages staff")}</option>}</SelectField></label>
       <p className="small muted">{staffRole === "owner" ? text("Administrators can manage staff. Only owners can appoint or change administrators.") : text("You can assign staff access. Administrator accounts are managed by the owner.")}</p>
       {!invitationsEnabled && domains.length > 0 && <p className="form-info">{text("New invitations need server configuration. Existing company accounts can still be assigned.")}</p>}
       <button className="button" disabled={!!busy || !domains.length || sessionPhase !== "ready"}>{busy === "invite" ? <LoaderCircle size={17} className="spin"/> : <MailPlus size={17}/>} {text(busy === "invite" ? "Creating account…" : "Create / assign account")}</button>
@@ -89,9 +89,9 @@ export function TeamManager({ draft, setDraft }: { draft: TeamDraft; setDraft: (
       {!members.length && !loading && <p className="team-empty">{text("No team members loaded. Refresh the directory to try again.")}</p>}
       {members.map(member => {
         const protectedAccount = member.role === "owner" || member.user_id === user?.id || staffRole !== "owner" && member.role === "admin";
-        return <article className="team-member" key={member.user_id}><span className="team-avatar"><UserRound size={21}/></span><div className="team-member-details"><strong>{member.display_name || member.email}</strong><span>{member.email}</span><div><span className={member.active ? "team-state active" : "team-state"}>{text(!member.active ? "Access disabled" : member.confirmed ? "Active" : "Email confirmation pending")}</span><small>{text(member.role === "owner" ? "Owner" : member.role === "admin" ? "Administrator" : "Staff")}</small></div></div>
+        return <article className="team-member" key={member.user_id}><span className="team-avatar"><UserRound size={21}/></span><div className="team-member-details"><strong>{member.display_name || member.email}</strong><span>{member.email}</span><div><span className={member.active ? "team-state active" : "team-state"}>{text(!member.active ? "Access disabled" : member.confirmed ? "Active" : "Email confirmation pending")}</span><small>{text(member.role === "owner" ? "Owner" : member.role === "admin" ? "Administrator" : member.role === "manager" ? "Manager" : "Staff")}</small></div></div>
           {protectedAccount ? <span className="team-protected"><Check size={13}/>{text(member.user_id === user?.id ? "Your account" : "Protected account")}</span>
-            : <div className="team-member-actions"><SelectField aria-label={text("Assigned role") + " · " + member.email} value={member.role} disabled={!!busy} onValueChange={value => void update(member, value as "admin" | "editor", member.active)}><option value="editor">{text("Staff")}</option>{staffRole === "owner" && <option value="admin">{text("Administrator")}</option>}</SelectField><button type="button" className="text-link" disabled={!!busy} onClick={() => void update(member, member.role as "admin" | "editor", !member.active)}>{busy === member.user_id ? <LoaderCircle size={14} className="spin"/> : text(member.active ? "Disable access" : "Restore access")}</button></div>}
+            : <div className="team-member-actions"><SelectField aria-label={text("Assigned role") + " · " + member.email} value={member.role} disabled={!!busy} onValueChange={value => void update(member, value as "admin" | "manager" | "editor", member.active)}><option value="editor">{text("Staff")}</option><option value="manager">{text("Manager")}</option>{staffRole === "owner" && <option value="admin">{text("Administrator")}</option>}</SelectField><button type="button" className="text-link" disabled={!!busy} onClick={() => void update(member, member.role as "admin" | "manager" | "editor", !member.active)}>{busy === member.user_id ? <LoaderCircle size={14} className="spin"/> : text(member.active ? "Disable access" : "Restore access")}</button></div>}
         </article>;
       })}
       {next && <button type="button" className="button button-outline button-small" disabled={loading || !!busy} onClick={() => void load(next)}>{text("Load more")}</button>}

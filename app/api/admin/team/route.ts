@@ -5,8 +5,8 @@ import { StaffRequestError, staffDataError, staffRequest } from "@/lib/staff-ser
 import type { StaffAccount } from "@/lib/staff";
 
 const headers = { "Cache-Control": "private, no-store" };
-const createAccount = z.object({ email: z.string().trim().toLowerCase().email().max(254), full_name: z.string().trim().min(2).max(120), role: z.enum(["admin", "editor"]) });
-const editAccount = z.object({ user_id: z.string().uuid(), role: z.enum(["admin", "editor"]), active: z.boolean() });
+const createAccount = z.object({ email: z.string().trim().toLowerCase().email().max(254), full_name: z.string().trim().min(2).max(120), role: z.enum(["admin", "manager", "editor"]) });
+const editAccount = z.object({ user_id: z.string().uuid(), role: z.enum(["admin", "manager", "editor"]), active: z.boolean() });
 async function body(request: Request) {
   if (Number(request.headers.get("content-length") || 0) > 4096) throw new StaffRequestError("Request too large.", 413);
   try { const value = await request.text(); if (value.length > 4096) throw new Error(); return JSON.parse(value); }
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       const parsed = createAccount.safeParse(await body(request));
       if (!parsed.success) throw new StaffRequestError("Check the company email, name, and assigned role.");
       const input = parsed.data;
-      if (role !== "owner" && input.role !== "editor") throw new StaffRequestError("Only the owner can assign administrator access.", 403);
+      if (role !== "owner" && input.role === "admin") throw new StaffRequestError("Only the owner can assign administrator access.", 403);
       // The RPC validates the company domain, protected accounts, and the
       // actor's fresh membership before any Auth account or email is created.
       const found = await db.rpc("find_staff_account", { target_email: input.email, assigned_role: input.role }).abortSignal(signal);
@@ -74,7 +74,7 @@ export async function PATCH(request: Request) {
       const parsed = editAccount.safeParse(await body(request));
       if (!parsed.success) throw new StaffRequestError("Check the assigned role and account.");
       const input = parsed.data;
-      if (role !== "owner" && input.role !== "editor") throw new StaffRequestError("Only the owner can assign administrator access.", 403);
+      if (role !== "owner" && input.role === "admin") throw new StaffRequestError("Only the owner can assign administrator access.", 403);
       const changed = await db.rpc("set_staff_access", { target_user_id: input.user_id, assigned_role: input.role, enabled: input.active }).abortSignal(signal);
       staffDataError(changed.error);
       return { user_id: changed.data };

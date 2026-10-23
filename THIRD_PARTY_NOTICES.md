@@ -95,3 +95,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Supplied messaging SVGs
+
+`public/svg/WhatsApp.svg` and `public/svg/Zalo.svg` were supplied by the website owner. Their embedded attribution comments are retained. The WhatsApp SVG identifies its icon geometry as Font Awesome Free 6.7.2 under CC BY 4.0: https://fontawesome.com/license/free.

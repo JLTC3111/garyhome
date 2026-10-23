@@ -53,7 +53,7 @@ async function harness(t, options={}){
   query.then=(resolve,reject)=>(async()=>{
    backend.publicCalls.push({table,filters});
    if(backend.publicPending)await backend.publicPending.promise;
-   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:backend.publicRows[table]);
+   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:table==='property_display_orders'?[]:backend.publicRows[table]);
    if(table==='properties')data=data.filter(row=>row.status===filters.status);
    return backend.publicError?{data:null,error:{code:'',message:'Temporary network failure'},status:0}:{data,error:null,status:200};
   })().then(resolve,reject);
@@ -324,14 +324,14 @@ test('a failed server reload automatically recovers public listings and clears t
  assert.equal(h.site.backendError,false);
  assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);
  assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
- assert.equal(h.backend.publicCalls.length,5);
+ assert.equal(h.backend.publicCalls.length,6);
  assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='properties').filters,{status:'published',listing_type:'rent',availability:['available','on_request']});
  assert.equal(h.site.user,null);
 });
 
 test('failed public recovery keeps a translated warning and coalesces retries until live data arrives',async t=>{
  const h=await harness(t,{guest:true,publicOnly:true,initialError:true,publicError:true});
- assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,5);
+ assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,6);
  await act(async()=>{h.site.setLanguage('vi');});
  assert.match(JSON.stringify(h.renderer.toJSON()),/Không thể cập nhật tin đăng/);
  const retry=h.renderer.root.findAllByType('button').find(button=>button.children.includes('Thử lại'));
@@ -339,7 +339,7 @@ test('failed public recovery keeps a translated warning and coalesces retries un
  const gate=deferred();h.backend.publicPending=gate;h.backend.publicError=false;
  let first,second;
  await act(async()=>{retry.props.onClick();first=h.site.reconnect();second=h.site.reconnect();await delay(5);});
- assert.equal(h.backend.publicCalls.length,10);
+ assert.equal(h.backend.publicCalls.length,12);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Đang cập nhật tin đăng/);
  gate.resolve();await act(async()=>{await Promise.all([first,second]);await delay(5);});
  assert.equal(h.site.backendError,false);assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
@@ -349,7 +349,7 @@ test('an offline reload waits for the online event before recovering public cont
  const h=await harness(t,{guest:true,publicOnly:true,initialError:true,offline:true});
  assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,0);
  await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(10);});
- assert.equal(h.backend.publicCalls.length,5);assert.equal(h.site.backendError,false);
+ assert.equal(h.backend.publicCalls.length,6);assert.equal(h.site.backendError,false);
 });
 
 test('Studio refresh clears the fallback warning and a late public read cannot replace drafts or unsaved edits',async t=>{
@@ -382,7 +382,7 @@ test('healthy public reloads and session recovery do not make redundant content 
 
 test('public listing recovery does not wait for a stalled login session',async t=>{
  const gate=deferred(),h=await harness(t,{customer:true,publicOnly:true,initialError:true,authPending:gate});
- assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,5);
+ assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,6);
  gate.resolve({data:{session:authSession('customer')},error:null});
  await act(async()=>{await delay(5);});assert.equal(h.site.sessionPhase,'ready');
 });

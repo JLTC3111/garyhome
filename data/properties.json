@@ -4,10 +4,10 @@
     "slug": "can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho",
     "price": null,
     "images": [
-      "/images/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho-0.jpg",
-      "/images/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho-1.jpg",
-      "/images/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho-2.jpg",
-      "/images/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho-3.jpg"
+      "/images/apartments/hero.jpg",
+      "/images/apartments/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho-1.jpg",
+      "/images/apartments/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho-2.jpg",
+      "/images/apartments/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho-3.jpg"
     ],
     "status": "published",
     "address": "Tây Hồ, Hà Nội",
@@ -60,9 +60,9 @@
     "slug": "can-ho-2n-2wc-dao-tan",
     "price": 800,
     "images": [
-      "/images/can-ho-2n-2wc-dao-tan-0.jpg",
-      "/images/can-ho-2n-2wc-dao-tan-1.jpg",
-      "/images/can-ho-2n-2wc-dao-tan-2.jpg"
+      "/images/apartments/can-ho-2n-2wc-dao-tan-3.jpg",
+      "/images/apartments/can-ho-2n-2wc-dao-tan-1.jpg",
+      "/images/apartments/can-ho-2n-2wc-dao-tan-2.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -113,10 +113,10 @@
     "slug": "can-ho-1n-pho-dao-tan",
     "price": 550,
     "images": [
-      "/images/can-ho-1n-pho-dao-tan-0.jpg",
-      "/images/can-ho-1n-pho-dao-tan-1.jpg",
-      "/images/can-ho-1n-pho-dao-tan-2.jpg",
-      "/images/can-ho-1n-pho-dao-tan-3.jpg"
+      "/images/apartments/can-ho-1n-pho-dao-tan-0.jpg",
+      "/images/apartments/can-ho-1n-pho-dao-tan-1.jpg",
+      "/images/apartments/can-ho-1n-pho-dao-tan-2.jpg",
+      "/images/apartments/can-ho-1n-pho-dao-tan-3.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -168,10 +168,10 @@
     "slug": "can-ho-1n-co-ban-cong-buoi",
     "price": null,
     "images": [
-      "/images/can-ho-1n-co-ban-cong-buoi-0.jpg",
-      "/images/can-ho-1n-co-ban-cong-buoi-1.jpg",
-      "/images/can-ho-1n-co-ban-cong-buoi-2.jpg",
-      "/images/can-ho-1n-co-ban-cong-buoi-3.jpg"
+      "/images/apartments/can-ho-1n-co-ban-cong-buoi-0.jpg",
+      "/images/apartments/can-ho-1n-co-ban-cong-buoi-1.jpg",
+      "/images/apartments/can-ho-1n-co-ban-cong-buoi-2.jpg",
+      "/images/apartments/can-ho-1n-co-ban-cong-buoi-3.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -222,9 +222,9 @@
     "slug": "can-ho-2n-gan-ho",
     "price": 1200,
     "images": [
-      "/images/can-ho-2n-gan-ho-0.jpg",
-      "/images/can-ho-2n-gan-ho-2.jpg",
-      "/images/can-ho-2n-gan-ho-3.jpg"
+      "/images/apartments/can-ho-2n-gan-ho-1.jpg",
+      "/images/apartments/can-ho-2n-gan-ho-2.jpg",
+      "/images/apartments/can-ho-2n-gan-ho-3.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -275,9 +275,9 @@
     "slug": "can-ho-studio-tai-dao-tan-ba-dinh",
     "price": 302,
     "images": [
-      "/images/can-ho-studio-tai-dao-tan-ba-dinh-0.jpg",
-      "/images/can-ho-studio-tai-dao-tan-ba-dinh-1.jpg",
-      "/images/can-ho-studio-tai-dao-tan-ba-dinh-2.jpg"
+      "/images/apartments/can-ho-studio-tai-dao-tan-ba-dinh-3.jpg",
+      "/images/apartments/can-ho-studio-tai-dao-tan-ba-dinh-1.jpg",
+      "/images/apartments/can-ho-studio-tai-dao-tan-ba-dinh-2.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -327,10 +327,10 @@
     "slug": "can-ho-2n-tai-kim-ma",
     "price": 950,
     "images": [
-      "/images/can-ho-2n-tai-kim-ma-0.jpg",
-      "/images/can-ho-2n-tai-kim-ma-1.jpg",
-      "/images/can-ho-2n-tai-kim-ma-2.jpg",
-      "/images/can-ho-2n-tai-kim-ma-3.jpg"
+      "/images/apartments/can-ho-2n-tai-kim-ma-0.jpg",
+      "/images/apartments/can-ho-2n-tai-kim-ma-1.jpg",
+      "/images/apartments/can-ho-2n-tai-kim-ma-2.jpg",
+      "/images/apartments/can-ho-2n-tai-kim-ma-3.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -381,9 +381,9 @@
     "slug": "can-ho-2n-doi-can",
     "price": 550,
     "images": [
-      "/images/can-ho-2n-doi-can-0.jpg",
-      "/images/can-ho-2n-doi-can-2.jpg",
-      "/images/can-ho-2n-doi-can-3.jpg"
+      "/images/apartments/can-ho-2n-doi-can-1.jpg",
+      "/images/apartments/can-ho-2n-doi-can-2.jpg",
+      "/images/apartments/can-ho-2n-doi-can-3.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -433,10 +433,10 @@
     "slug": "can-ho-1n-tai-290-kim-ma",
     "price": 400,
     "images": [
-      "/images/can-ho-1n-tai-290-kim-ma-0.jpg",
-      "/images/can-ho-1n-tai-290-kim-ma-1.jpg",
-      "/images/can-ho-1n-tai-290-kim-ma-2.jpg",
-      "/images/can-ho-1n-tai-290-kim-ma-3.jpg"
+      "/images/apartments/can-ho-1n-tai-290-kim-ma-0.jpg",
+      "/images/apartments/can-ho-1n-tai-290-kim-ma-1.jpg",
+      "/images/apartments/can-ho-1n-tai-290-kim-ma-2.jpg",
+      "/images/apartments/can-ho-1n-tai-290-kim-ma-3.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -486,10 +486,10 @@
     "slug": "can-studio-tai-ngoa-long-bac-tu-liem",
     "price": 170,
     "images": [
-      "/images/can-studio-tai-ngoa-long-bac-tu-liem-0.jpg",
-      "/images/can-studio-tai-ngoa-long-bac-tu-liem-1.jpg",
-      "/images/can-studio-tai-ngoa-long-bac-tu-liem-2.jpg",
-      "/images/can-studio-tai-ngoa-long-bac-tu-liem-3.jpg"
+      "/images/apartments/can-studio-tai-ngoa-long-bac-tu-liem-0.jpg",
+      "/images/apartments/can-studio-tai-ngoa-long-bac-tu-liem-1.jpg",
+      "/images/apartments/can-studio-tai-ngoa-long-bac-tu-liem-2.jpg",
+      "/images/apartments/can-studio-tai-ngoa-long-bac-tu-liem-3.jpg"
     ],
     "status": "published",
     "address": "Hà Nội",
@@ -535,10 +535,10 @@
     "slug": "can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep",
     "price": 604,
     "images": [
-      "/images/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-0.jpg",
-      "/images/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-1.jpg",
-      "/images/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-2.jpg",
-      "/images/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-3.jpg"
+      "/images/apartments/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-0.jpg",
+      "/images/apartments/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-1.jpg",
+      "/images/apartments/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-2.jpg",
+      "/images/apartments/can-ho-3-ngu-tai-ngoc-thuy-long-bien-sieu-dep-3.jpg"
     ],
     "status": "published",
     "address": "Long Biên, Hà Nội",
@@ -589,9 +589,9 @@
     "slug": "can-ho-studio-tai-thuy-khe-tay-ho-2",
     "price": 245,
     "images": [
-      "/images/can-ho-studio-tai-thuy-khe-tay-ho-2-0.jpg",
-      "/images/can-ho-studio-tai-thuy-khe-tay-ho-2-2.jpg",
-      "/images/can-ho-studio-tai-thuy-khe-tay-ho-2-3.jpg"
+      "/images/apartments/can-ho-studio-tai-thuy-khe-tay-ho-2-1.jpg",
+      "/images/apartments/can-ho-studio-tai-thuy-khe-tay-ho-2-2.jpg",
+      "/images/apartments/can-ho-studio-tai-thuy-khe-tay-ho-2-3.jpg"
     ],
     "status": "published",
     "address": "Ba Đình, Hà Nội",
@@ -637,10 +637,10 @@
     "slug": "lux-apartment-in-dang-thai-ma-tay-ho",
     "price": 1600,
     "images": [
-      "/images/lux-apartment-in-dang-thai-ma-tay-ho-0.jpg",
-      "/images/lux-apartment-in-dang-thai-ma-tay-ho-1.jpg",
-      "/images/lux-apartment-in-dang-thai-ma-tay-ho-2.jpg",
-      "/images/lux-apartment-in-dang-thai-ma-tay-ho-3.jpg"
+      "/images/apartments/lux-apartment-in-dang-thai-ma-tay-ho-0.jpg",
+      "/images/apartments/lux-apartment-in-dang-thai-ma-tay-ho-1.jpg",
+      "/images/apartments/lux-apartment-in-dang-thai-ma-tay-ho-2.jpg",
+      "/images/apartments/lux-apartment-in-dang-thai-ma-tay-ho-3.jpg"
     ],
     "status": "published",
     "address": "Phố Đặng Thai Mai, Khu biệt thự bán đảo Hồ Tây, Phường Tây Hồ, Hà Nội, 11214, Việt Nam",
@@ -690,10 +690,10 @@
     "slug": "cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho",
     "price": 380,
     "images": [
-      "/images/cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho-0.jpg",
-      "/images/cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho-1.jpg",
-      "/images/cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho-2.jpg",
-      "/images/cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho-3.jpg"
+      "/images/apartments/gary-way.jpg",
+      "/images/apartments/cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho-1.jpg",
+      "/images/apartments/cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho-2.jpg",
+      "/images/apartments/cho-thue-can-ho-studio-moi-tai-an-duong-vuong-tay-ho-3.jpg"
     ],
     "status": "published",
     "address": "An Duong Vuong, Tay Ho",
@@ -742,10 +742,10 @@
     "slug": "can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh",
     "price": 600,
     "images": [
-      "/images/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-0.jpg",
-      "/images/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-1.jpg",
-      "/images/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-2.jpg",
-      "/images/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-3.jpg"
+      "/images/apartments/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-0.jpg",
+      "/images/apartments/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-1.jpg",
+      "/images/apartments/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-2.jpg",
+      "/images/apartments/can-ho-dich-vu-mot-ngu-cao-cap-tai-hoang-hoa-tham-ba-dinh-3.jpg"
     ],
     "status": "published",
     "address": "Hoang Hoa Tham, Ba Dinh",

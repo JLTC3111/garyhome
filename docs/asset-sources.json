@@ -31,7 +31,7 @@
       "sha256": "cd2926b9fc96c458eedb83d0d2032d9308b62a47428a27d9f8b27a28f5f21e8e",
       "source_category": "Feedback",
       "source_panel_id": "444ad6d-tab-content-0",
-      "local_path": "public/images/activities/feedback-1.jpg"
+      "local_path": "public/images/activities/activity-1.jpg"
     },
     {
       "source": "https://garyhome.vn/wp-content/uploads/2026/06/z7492597855442_14c4fcb97fd1c8d97e5c160986c39156.jpg",
@@ -44,7 +44,7 @@
       "sha256": "57622a2f12c97e3f303c915b1466f656378c5a47f409f54096df1a928b0c6835",
       "source_category": "Feedback",
       "source_panel_id": "444ad6d-tab-content-0",
-      "local_path": "public/images/activities/feedback-2.jpg"
+      "local_path": "public/images/activities/activity-2.jpg"
     },
     {
       "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422320127186_6a07e56449ed0ecb165edad56a33141a.jpg",
@@ -57,7 +57,7 @@
       "sha256": "e68f4d317ee6e31f118980295706c9380984ee1eb851b8f005f7bb81aac47ba5",
       "source_category": "Feedback",
       "source_panel_id": "444ad6d-tab-content-0",
-      "local_path": "public/images/activities/feedback-3.jpg"
+      "local_path": "public/images/activities/activity-3.jpg"
     },
     {
       "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422320132669_33241c0251191f90fe399966364335e5.jpg",
@@ -70,7 +70,7 @@
       "sha256": "2565313b4802782c47def4376a823a071e3eb6be050454fd4cf30bbb2649fc09",
       "source_category": "Feedback",
       "source_panel_id": "444ad6d-tab-content-0",
-      "local_path": "public/images/activities/feedback-4.jpg"
+      "local_path": "public/images/activities/activity-4.jpg"
     },
     {
       "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422318845001_604fa1aca917a232a8d02361bcb592a0.jpg",
@@ -83,7 +83,7 @@
       "sha256": "75ee75edcd49f11330d5e9035bb675ec09ef81f70dff978e049090715e26bfb1",
       "source_category": "Feedback",
       "source_panel_id": "444ad6d-tab-content-0",
-      "local_path": "public/images/activities/feedback-5.jpg"
+      "local_path": "public/images/activities/activity-5.jpg"
     },
     {
       "source": "https://garyhome.vn/wp-content/uploads/2026/06/z6422320121310_a3216eb6ce353db34a1ea562a2042a20.jpg",
@@ -96,7 +96,7 @@
       "sha256": "bac60b33d6b22b1513676cc5e7d3287cdaf6d74f7cca22331be8c0bb8e442bef",
       "source_category": "Feedback",
       "source_panel_id": "444ad6d-tab-content-0",
-      "local_path": "public/images/activities/feedback-6.jpg"
+      "local_path": "public/images/activities/activity-6.jpg"
     }
   ],
   "logo": {
@@ -108,5 +108,88 @@
     ],
     "unmodified": true
   },
-  "presentation_update": "2026-10-23: The user requested that the six photographs be displayed under Customers. Original Feedback-tab provenance remains recorded here."
+  "presentation_update": "2026-10-23: The user requested that the six photographs be displayed under Customers. Original Feedback-tab provenance remains recorded here.",
+  "user_supplied_media": [
+    {
+      "local_path": "public/images/customers/1792758363774_250296199991685643_250296199991685643_8d57aff1a985be89d04e709012310333.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758372920_250296199991685643_250296199991685643_8f7a49949dc1bc9736e22ee5ad5712a5.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758403181_250296199991685643_250296199991685643_5f2331433c19d7fc214897ba9d222ae7.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758403190_250296199991685643_250296199991685643_5261cdcc406e3ff6352a67fe20c39fbe.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758403196_250296199991685643_250296199991685643_8dcd84faaab5a65e6f1a7ca531826322.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758403206_250296199991685643_250296199991685643_0cc9015f7965edf29d422df98b2d6880.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758403213_250296199991685643_250296199991685643_ba2b14bd2a82bd8c638ca2f70aaa2a7e.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758410595_250296199991685643_250296199991685643_b1a1bb38db4acd04e4c8f7bfb8de67a7.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758410599_250296199991685643_250296199991685643_e73fcef432b38ff9e97dfc6428c2ec22.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/customers/1792758410603_250296199991685643_250296199991685643_f2a18d093dbd9d44cc5834f51d32e306.jpg",
+      "category": "customers",
+      "media_kind": "photo",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    },
+    {
+      "local_path": "public/images/feedback/1.jpg",
+      "category": "feedback",
+      "media_kind": "screenshot",
+      "source": "Supplied by the website owner in public/images on 2026-10-23; used as provided."
+    }
+  ],
+  "current_messaging": {
+    "whatsapp": "+84363327342",
+    "zalo": "0363327342",
+    "source": "User instruction on 2026-10-23"
+  },
+  "messaging_icons": [
+    {
+      "local_path": "public/svg/WhatsApp.svg",
+      "source": "Supplied by the website owner; original embedded attribution comments retained."
+    },
+    {
+      "local_path": "public/svg/Zalo.svg",
+      "source": "Supplied by the website owner; original embedded attribution comments retained."
+    }
+  ]
 }

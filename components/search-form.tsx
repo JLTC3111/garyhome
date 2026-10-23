@@ -1,10 +1,9 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ArrowRight, Building2, CalendarDays, ChevronDown, MapPin, Search, SlidersHorizontal, Wallet } from "lucide-react";
+import { ArrowRight, Building2, ChevronDown, MapPin, Search, SlidersHorizontal, Wallet } from "lucide-react";
 import { useSite } from "./site-context";
 import { SelectField } from "./select-field";
-import { AnimatedBackground } from "./motion-primitives/animated-background";
 import { Disclosure } from "./motion-primitives/disclosure";
 import { SpotlightCard } from "./react-bits/spotlight-card";
 import { AMENITIES, amenityLabel, RENTAL_TYPES, typeLabel } from "@/lib/rentals";
@@ -12,15 +11,12 @@ import type { Filters } from "@/lib/property-search";
 
 export function SearchForm({compact=false,initial={},action="/homes"}:{compact?:boolean;initial?:Filters;action?:string}) {
   const {t,content,language}=useSite();const id=useId();
-  const [term,setTerm]=useState(initial.term||""),[advanced,setAdvanced]=useState(!!(initial.q||initial.id||initial.beds||initial.baths||initial.amenity));
+  const [advanced,setAdvanced]=useState(!!(initial.q||initial.id||initial.beds||initial.baths||initial.amenity));
   const [period,setPeriod]=useState(initial.period||"month");
   const amenities=[...new Set([...Object.keys(AMENITIES),...content.properties.flatMap(p=>p.amenities)])];
   return <SpotlightCard className={`search-box rental-search ${compact?"rental-search-compact":""}`}>
     <form action={action} method="get">
-      <div className="rental-stay-tabs"><span>{t("FIND YOUR RENTAL","TÌM NHÀ CHO THUÊ")}</span><div className="rental-stay-switch" role="group" aria-label={t("Rental duration","Thời hạn thuê")}><AnimatedBackground activeValue={term}>
-        {[["short",t("Short-term stays","Thuê ngắn hạn")],["long",t("Long-term homes","Thuê dài hạn")]].map(([value,label])=><button key={value} data-id={value} type="button" aria-pressed={term===value} onClick={()=>setTerm(value)}><CalendarDays size={16}/>{label}</button>)}
-      </AnimatedBackground></div><button className={`rental-any-term ${term?"":"selected"}`} type="button" onClick={()=>setTerm("")}>{t("Any duration","Mọi thời hạn")}</button></div>
-      <input type="hidden" name="term" value={term}/><input type="hidden" name="sort" value={initial.sort||""}/>
+      <input type="hidden" name="sort" value={initial.sort||""}/>
       <div className="search-fields">
         <label className="search-field"><span><MapPin size={15}/>{t("DISTRICT / AREA","QUẬN / KHU VỰC")}</span><SelectField name="district" defaultValue={initial.district||""} aria-label={t("District or area","Quận hoặc khu vực")}><option value="">{t("Anywhere in Hanoi","Tất cả Hà Nội")}</option>{content.neighbourhoods.map(n=><option key={n.slug} value={n.slug}>{n.name}</option>)}</SelectField></label>
         <label className="search-field"><span><Building2 size={15}/>{t("PROPERTY TYPE","LOẠI BẤT ĐỘNG SẢN")}</span><SelectField name="type" defaultValue={initial.type||""}><option value="">{t("All property types","Tất cả loại hình")}</option>{RENTAL_TYPES.map(type=><option key={type} value={type}>{typeLabel(type,language)}</option>)}</SelectField></label>

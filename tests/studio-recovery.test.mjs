@@ -107,7 +107,6 @@ async function harness(t, options={}){
   return loaded.exports;
  }
  const {SiteProvider,useSite}=load(path.join(base,'components/site-context.tsx'));
- const {CartProvider}=load(path.join(base,'components/cart-context.tsx'));
  const Page=options.page==='password'||options.page==='invite'?load(path.join(base,'components/password-reset.tsx')).PasswordReset
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
@@ -119,7 +118,7 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(CartProvider,null,React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page,{invitation:options.page==='invite'})))));await delay(10);});
+ await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page,{invitation:options.page==='invite'}))));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
  const emit=async(next)=>{await act(async()=>{session=next;callback?.(next?'TOKEN_REFRESHED':'SIGNED_OUT',next);await delay(5);});};

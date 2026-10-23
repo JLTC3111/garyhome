@@ -1,4 +1,3 @@
-import { pageMetadata } from "@/lib/seo";
-import { CartPage } from "@/components/cart-page";
-export async function generateMetadata(){return pageMetadata("/cart",true);}
-export default function Page(){return <CartPage/>;}
+import { permanentRedirect } from "next/navigation";
+// Preserve old bookmarks after consolidating the shortlist into Favourites.
+export default function Page(){permanentRedirect("/saved");}

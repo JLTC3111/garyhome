@@ -10,6 +10,7 @@ import { installRecoveryEvents } from "@/lib/recovery-events";
 import { fetchWithDeadline, request } from "@/lib/requests";
 import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/session-recovery";
 import { customerError, ENQUIRY_FIELDS } from "@/lib/customer-data";
+import { readBrowserFavourites } from "@/lib/favourites";
 import { isPublicRental } from "@/lib/rentals";
 import type { StaffRole } from "@/lib/staff";
 
@@ -184,8 +185,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
     queueMicrotask(() => {
     if (!active) return;
     try {
-      const ids = JSON.parse(localStorage.getItem("gary-saved") || "[]");
-      setSaved(Array.isArray(ids) ? ids.filter(id => typeof id === "string") : []);
+      setSaved(readBrowserFavourites(localStorage));
       if (!initial.configured) {
         updateEnquiries(JSON.parse(localStorage.getItem("gary-preview-enquiries") || "[]"));
         if (localStorage.getItem("gary-preview-enabled") === "true") {
@@ -227,7 +227,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
               if (previous.user?.id !== next.user?.id) {
                 savedVersion.current++; setSavedAccount(null); setSavedError(""); setPendingSaved([]);
                 if (next.user) setSaved([]);
-                else { try { const ids = JSON.parse(localStorage.getItem("gary-saved") || "[]"); setSaved(Array.isArray(ids) ? ids.filter(id => typeof id === "string") : []); } catch { setSaved([]); } }
+                else { try { setSaved(readBrowserFavourites(localStorage)); } catch { setSaved([]); } }
               }
               if (next.phase !== "checking" && next.phase !== "recovering") setReady(true);
               if (previous.user && (next.user?.id !== previous.user.id || previous.editor && !next.editor && next.phase === "ready")) {
@@ -315,7 +315,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
     if (!user || savedAccount !== user.id) throw new Error("Reconnect before continuing.");
     const identity = user.id;
     let stored: unknown;
-    try { stored = JSON.parse(localStorage.getItem("gary-saved") || "[]"); } catch { stored = []; }
+    try { stored = readBrowserFavourites(localStorage); } catch { stored = []; }
     const valid = new Set(content.properties.filter(property => property.status === "published").map(property => property.id));
     const ids = Array.isArray(stored) ? [...new Set(stored.filter((id): id is string => typeof id === "string" && valid.has(id)))].slice(0, 100) : [];
     if (!ids.length) return 0;

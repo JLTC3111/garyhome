@@ -9,11 +9,10 @@ test('draft, archived, rented, and sold listings stay out of search',()=>{const 
 test('unknown prices stay last in either price order',()=>{const homes=[home,{...home,id:'unknown',price:null},{...home,id:'low',price:200}];assert.deepEqual(filterProperties(homes,{sort:'price-low'}).map(x=>x.id),['low','one','unknown']);assert.deepEqual(filterProperties(homes,{sort:'price-high'}).map(x=>x.id),['one','low','unknown']);});
 test('sale searches never include rentals and no-match searches return an empty result',()=>{assert.equal(filterProperties([home],{listing:'sale'}).length,0);assert.equal(filterProperties([home],{q:'nonexistent'}).length,0);});
 
-test('short and long terms include only confirmed matching leases, while any duration keeps unclassified rentals',()=>{
+test('retired duration parameters do not hide rentals in older bookmarks',()=>{
  const homes=['short','long','both','on_request'].map(term=>({...home,id:term,rental_term:term}));
- assert.deepEqual(filterProperties(homes,{term:'short'}).map(p=>p.id),['short','both']);
- assert.deepEqual(filterProperties(homes,{term:'long'}).map(p=>p.id),['long','both']);
- assert.equal(filterProperties(homes,{}).length,4);
+ const filters=readFilters(new URLSearchParams('term=short&district=tay-ho'));
+ assert.equal(filters.term,undefined);assert.equal(filterProperties(homes,filters).length,4);
 });
 test('IDs, bathroom count, price bounds, period and repeated amenities apply together',()=>{
  const p={...home,listing_code:'GH-000123',bathrooms:2,price_period:'night',price:60,amenities:['Balcony','Wi-Fi']};

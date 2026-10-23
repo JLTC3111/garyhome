@@ -98,15 +98,14 @@ test('controlled selections and translated labels preserve the customer draft an
   assert.equal(select().props.items.find(item => item.value === 'disabled').disabled, true);
 });
 
-test('short/long rental selection and language changes preserve the other search choices', async t => {
-  const initial = { district: 'tay-ho', type: 'Apartment', term: 'short', max: '600' };
+test('language and price-period changes preserve rental search choices without duration controls', async t => {
+  const initial = { district: 'tay-ho', type: 'Apartment', max: '600' };
   const renderer = await harness(t, React.createElement(SearchForm, { initial }));
   const values = () => Object.fromEntries(renderer.root.findAllByType('input').filter(node => node.props.name && node.props.type!=='checkbox').map(node => [node.props.name, node.props.value ?? node.props.defaultValue]));
-  assert.equal(values().term,'short');assert.equal(values().max,'600');assert.equal(values().district,'tay-ho');
-  await act(async () => renderer.root.findAllByType('button').find(node => node.props['data-id'] === 'long').props.onClick());
-  assert.equal(values().term,'long');assert.equal(values().max,'600');
-  language = 'vi';
-  await act(async () => renderer.update(React.createElement(SearchForm, { initial })));
-  assert.equal(values().term,'long');assert.equal(values().district,'tay-ho');assert.equal(values().type,'Apartment');
-  assert.ok(JSON.stringify(renderer.toJSON()).includes('Thuê dài hạn'));
+  assert.equal(values().max,'600');assert.equal(values().district,'tay-ho');
+  const period=renderer.root.findAllByType(Select.Root).find(node=>node.props.name==='period');
+  await act(async()=>period.props.onValueChange('night'));
+  language='vi';await act(async()=>renderer.update(React.createElement(SearchForm,{initial})));
+  assert.equal(values().period,'night');assert.equal(values().district,'tay-ho');assert.equal(values().type,'Apartment');assert.equal(values().max,'600');
+  assert.ok(!('term' in values()));assert.ok(!JSON.stringify(renderer.toJSON()).includes('Thuê dài hạn'));
 });

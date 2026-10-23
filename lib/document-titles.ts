@@ -4,7 +4,7 @@ import { isPublicRental, propertyTitle } from "./rentals.ts";
 type TitleProperty = Property;
 const pageTitles: Record<string, readonly [string, string]> = {
   "/homes": ["Hanoi rental properties", "Bất động sản cho thuê Hà Nội"],
-  "/cart": ["My rental cart", "Giỏ xem nhà của tôi"],
+  "/cart": ["My Favourites", "Nhà yêu thích"],
   "/activities": ["Our activities", "Hoạt động của chúng tôi"],
   "/feedback": ["Feedback", "Phản hồi"],
   "/saved": ["Your saved homes", "Nhà đã lưu"],

@@ -1,9 +1,9 @@
 import type { Property } from "./types";
 import { isPublicRental, listingCode } from "./rentals.ts";
-export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; beds?: string; baths?: string; amenity?: string; listing?: string; term?: string; period?: string; id?: string; sort?: string };
+export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; beds?: string; baths?: string; amenity?: string; listing?: string; period?: string; id?: string; sort?: string };
 export function normalize(value: string) { return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g,"d"); }
 export function readFilters(params:Pick<URLSearchParams,"entries"|"getAll">):Filters {
-  const result=Object.fromEntries(params.entries());const amenities=params.getAll("amenity");
+  const result=Object.fromEntries(params.entries());delete result.term;const amenities=params.getAll("amenity");
   if(amenities.length)result.amenity=amenities.join(",");return result;
 }
 export function filterProperties(properties: Property[], filters: Filters): Property[] {
@@ -23,7 +23,6 @@ export function filterProperties(properties: Property[], filters: Filters): Prop
       (!filters.baths||(p.bathrooms!==null&&p.bathrooms>=Number(filters.baths))) &&
       requested.every(a=>p.amenities.includes(a)) &&
       (!filters.period||(p.price_period||"month")===filters.period) &&
-      (!filters.term||p.rental_term===filters.term||(["short","long"].includes(filters.term)&&p.rental_term==="both")) &&
       (!id||code===id||code===`GH-${id}`||p.id.toUpperCase()===id) &&
       (!filters.listing||filters.listing==="rent");
   });

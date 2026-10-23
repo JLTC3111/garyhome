@@ -4,7 +4,6 @@ import { publicSupabase } from "@/lib/server";
 const enquiry = z.object({
   name: z.string().trim().min(2).max(120), email: z.string().trim().email().max(254),
   phone: z.string().trim().max(40).default(""), message: z.string().trim().min(10).max(4000),
-  property_ids: z.array(z.string().uuid()).min(1).max(12).optional(),
   property_id: z.string().uuid().nullable().default(null),
   preferred_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
   kind: z.enum(["viewing", "general", "landlord"]).default("general"), consent: z.literal(true),
@@ -30,6 +29,7 @@ export async function POST(request: Request) {
   let input: unknown;
   try { const body = await request.text(); if (body.length > 16000) throw new Error(); input = JSON.parse(body); }
   catch { return Response.json({ error: "Invalid request." }, { status: 400 }); }
+  if(input&&typeof input==="object"&&"property_ids" in input)return Response.json({error:"Choose one property to request a viewing."},{status:400});
   const parsed = enquiry.safeParse(input);
   if (!parsed.success) return Response.json({ error: "Please check your name, email, message, and consent." }, { status: 400 });
   const date = parsed.data.preferred_date;
@@ -44,12 +44,9 @@ export async function POST(request: Request) {
   const recent = (requests.get(ip) || []).filter(t => now - t < 600000);
   if (recent.length >= 5) return Response.json({ error: "Please wait a few minutes before sending another request." }, { status: 429 });
   requests.set(ip, [...recent, now]);
-  const {website:_website,property_ids,...record}=parsed.data;
-  if(property_ids&&record.property_id)return Response.json({error:"Choose a single property or a viewing cart."},{status:400});
-  const targets=property_ids?[...new Set(property_ids)]:null;
-
-  // A single INSERT is atomic: an unavailable property rolls back the whole cart.
-  const { error } = targets ? await db.from("enquiries").insert(targets.map(property_id=>({...record,property_id,kind:"viewing" as const}))) : await db.from("enquiries").insert(record);
+  const record = parsed.data;
+  delete record.website;
+  const { error } = await db.from("enquiries").insert(record);
   if (error) return Response.json({ error: "We couldn’t save your request. Please try again or contact the team directly." }, { status: 500 });
   return Response.json({ ok: true }, { status: 201 });
 }

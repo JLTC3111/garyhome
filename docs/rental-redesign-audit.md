@@ -1,5 +1,7 @@
 # Rental redesign and audit — 23 October 2026
 
+This records the initial redesign. The later [interface simplification](interface-simplification.md) restores the earlier theme and hero, retains Favourites alone, removes duration filters and moves photographs to Customers. Those later choices supersede the corresponding interface descriptions below.
+
 The existing Next.js/Vinext, React and Supabase architecture is retained. The Vercel build still uses `npm run build:vercel`; Sites uses `npm run build`. No new framework, database service or social authentication was introduced.
 
 ## Implemented

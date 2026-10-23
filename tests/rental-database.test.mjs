@@ -83,4 +83,15 @@ test('rental catalogue, public authors, media and carts enforce their real Postg
   await as();const rows=(await db.query("select relname,relrowsecurity from pg_class where oid in ('public.listing_authors'::regclass,'public.site_activities'::regclass,'public.rental_cart'::regclass)")).rows;assert.equal(rows.length,3);assert.ok(rows.every(row=>row.relrowsecurity));
   const functions=(await db.query("select p.proname,p.prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like '%rental%' ")).rows;assert.ok(functions.every(fn=>!fn.prosecdef));
  });
+ await t.test('the single-shortlist migration preserves customer ownership, retires cart access and moves photos to Customers',async()=>{
+  await as();const second=(await db.query('select id from public.properties where status=\'published\' and listing_type=\'rent\' and id<>$1 limit 1',[home.id])).rows[0].id;
+  await db.query('insert into public.saved_homes(user_id,property_id)values($1,$2)',[alice,home.id]);
+  await db.query('insert into public.rental_cart(user_id,property_id)values($1,$2),($3,$4)',[alice,home.id,bob,second]);
+  const migration=await readFile(new URL('../supabase/migrations/20261023120537_restore_hero_and_unify_favourites.sql',import.meta.url),'utf8');await db.exec(migration);await db.exec(migration);
+  assert.equal((await db.query('select count(*)::int n from public.rental_cart')).rows[0].n,2);
+  await as('authenticated',alice);assert.deepEqual((await db.query('select property_id from public.saved_homes')).rows.map(p=>p.property_id),[home.id]);await assert.rejects(db.exec('select * from public.rental_cart'));
+  await as('authenticated',bob);assert.deepEqual((await db.query('select property_id from public.saved_homes')).rows.map(p=>p.property_id),[second]);
+  await as('anon');assert.equal((await db.query("select id from public.site_activities where category='customers'")).rows.length,6);assert.equal((await db.query("select id from public.site_activities where category='feedback' and media_kind='photo'")).rows.length,0);
+  assert.equal((await db.query('select hero_title_en from public.site_settings')).rows[0].hero_title_en,'Find a place.\nFeel at home.');
+ });
 });

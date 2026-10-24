@@ -119,3 +119,19 @@ test('the requirements disclosure opens from its three-dot trigger, closes with 
  assert.equal(prevented,true);assert.equal(trigger().props['aria-expanded'],false);assert.equal(renderer.root.findAllByType('input').filter(n=>n.props.name==='amenity').length,21);
  await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
 });
+test('homepage search prioritizes bedrooms and bathrooms while retaining one budget range and all submitted values',async t=>{
+ language='en';const initial={beds:'2',baths:'1',min:'300',max:'900',period:'month'};
+ const renderer=await harness(t,React.createElement(SearchForm,{roomsFirst:true,initial}));
+ const primary=renderer.root.findByProps({className:'search-fields'}),advanced=renderer.root.findByProps({className:'rental-advanced'});
+ const names=node=>node.findAllByType('input').map(n=>n.props.name).filter(Boolean);
+ assert.ok(names(primary).includes('beds'));assert.ok(names(primary).includes('baths'));assert.ok(!names(primary).includes('min'));
+ assert.ok(names(advanced).includes('min'));assert.ok(names(advanced).includes('max'));assert.ok(!names(advanced).includes('beds'));
+ const selected=()=>Object.fromEntries(renderer.root.findAllByType('input').filter(n=>n.props.name&&n.props.type!=='checkbox').map(n=>[n.props.name,n.props.value??n.props.defaultValue]));
+ for(const key of ['beds','baths','min','max'])assert.equal(renderer.root.findAllByType('input').filter(n=>n.props.name===key).length,1,key);
+ const beds=renderer.root.findAllByType(Select.Root).find(n=>n.props.name==='beds');
+ const trigger=()=>renderer.root.findAllByType('button').find(n=>n.props['aria-controls']?.endsWith('-panel'));await act(async()=>trigger().props.onClick());
+ language='vi';await act(async()=>renderer.update(React.createElement(SearchForm,{roomsFirst:true,initial})));
+ assert.strictEqual(renderer.root.findAllByType(Select.Root).find(n=>n.props.name==='beds'),beds);
+ assert.equal(selected().beds,'2');assert.equal(selected().baths,'1');assert.equal(selected().min,'300');assert.equal(selected().max,'900');assert.equal(selected().period,'month');
+ assert.equal(trigger().props['aria-expanded'],false);
+});

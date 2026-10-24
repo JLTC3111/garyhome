@@ -1,0 +1,59 @@
+/* Primary room choices share the space previously used by budget on the homepage. */
+.rental-search .search-fields>.rental-room-field{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+.rental-room-choice{display:grid;min-width:0;gap:7px}
+.rental-room-choice>span,.rental-advanced-budget>span{display:flex;align-items:center;gap:6px;color:#66705e;font-size:8px;font-weight:600;letter-spacing:.05em;line-height:1.6}
+.rental-room-choice>.site-select-trigger{font-size:12px;border-color:var(--line);background:var(--paper);min-height:43px;padding:9px 10px;color:var(--green)}
+.rental-advanced-budget{grid-column:span 2;align-self:start;display:grid;gap:7px;min-width:0}
+.rental-advanced-budget>span{font-size:11px;letter-spacing:0}
+.rental-advanced-budget>div{gap:10px}
+.rental-advanced-budget input{width:100%;flex:1;min-width:0;min-height:44px;background:#fff}
+/* Show the entire supplied collage rather than the landscape crop used for customer photos. */
+.rental-activities .activity-team-gallery{grid-template-columns:minmax(0,1fr);width:min(100%,680px);margin-inline:auto}
+.rental-activities .activity-team-gallery figure img{width:100%;height:auto;aspect-ratio:1212/1216;object-fit:contain;background:var(--paper)}
+.rental-activities .activity-team-gallery figcaption{text-align:center;padding:16px;font-size:12px}
+/* The desktop columns and mobile accordions reuse the same link groups. */
+.rental-footer .footer-top>.footer-desktop-menus{display:contents}
+.rental-footer .footer-top>.footer-mobile-menus{display:none}
+.rental-footer .footer-column h3{color:#fbf5e9;font-size:13px;font-weight:500;margin:5px 0 19px}
+.rental-footer .footer-column>a{display:flex;gap:12px;align-items:center;justify-content:space-between;width:fit-content;max-width:100%;font-size:11px;color:#c5d3d9;line-height:1.7;margin-top:11px;overflow-wrap:anywhere}
+.rental-footer .footer-desktop-address{margin-top:20px}
+.rental-footer .footer-desktop-address>.footer-location{display:flex;align-items:start;gap:10px;line-height:1.8}
+.rental-footer .footer-column>a:hover{color:#f1bb93}
+@media(min-width:681px) and (max-width:900px){
+ .rental-footer .footer-top{grid-template-columns:1fr 1fr;gap:30px}
+ .rental-footer .footer-intro{grid-column:1/-1}
+ .rental-footer .footer-column:last-child{grid-column:1/-1;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-top:1px solid #bed0db26;padding-top:20px}
+ .rental-footer .footer-column:last-child>h3,.rental-footer .footer-column:last-child>a{margin:0}
+}
+@media(max-width:680px){
+ .rental-search-heading{flex-wrap:wrap;gap:12px}
+ .rental-requirements-trigger{margin-left:auto}
+ .rental-requirements-trigger>span{max-width:86px;text-align:left;line-height:1.35}
+ .rental-search-rooms-first .search-fields>label.search-field,.rental-search-rooms-first .search-fields>.rental-room-field{grid-column:1/-1}
+ .rental-search .search-fields>.rental-room-field{gap:12px;padding:12px;min-height:94px}
+ .rental-room-choice>span{font-size:9px;letter-spacing:0;gap:6px}
+ .rental-room-choice>.site-select-trigger{font-size:16px;min-height:44px;padding:9px}
+ .rental-advanced-budget>span{font-size:10px}
+ .rental-advanced-budget input{font-size:16px;min-height:48px}
+ .rental-search-rooms-first .rental-requirements-hint{max-width:100%}
+ .rental-footer{padding-top:35px}
+ .rental-footer .footer-top{grid-template-columns:minmax(0,1fr);gap:25px;padding-bottom:0}
+ .rental-footer .footer-intro{grid-column:auto}
+ .rental-footer .footer-intro>p{font-size:12px;line-height:1.8;max-width:37ch;margin-top:17px}
+ .rental-footer .footer-desktop-address,.rental-footer .footer-top>.footer-desktop-menus,.rental-footer .footer-bottom>.footer-desktop-legal{display:none}
+ .rental-footer .footer-top>.footer-mobile-menus{display:block;border-top:1px solid #bed0db33;min-width:0}
+ .footer-accordion{border-bottom:1px solid #bed0db33}
+ .footer-accordion>summary{display:flex;align-items:center;justify-content:space-between;gap:15px;min-height:57px;padding:15px 2px;color:#fbf5e9;list-style:none;cursor:pointer}
+ .footer-accordion>summary::-webkit-details-marker{display:none}
+ .footer-accordion>summary h3{font:500 14px/1.5 var(--sans);margin:0}
+ .footer-accordion>summary>svg{color:#becdd4;transition:transform .18s ease}
+ .footer-accordion[open]>summary>svg{transform:rotate(180deg)}
+ .footer-accordion-links{display:flex;flex-direction:column;gap:3px;padding:0 10px 17px}
+ .footer-accordion-links>a,.footer-legal-links>a{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:44px;padding:9px 0;color:#c5d3d9;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+ .footer-accordion-links>a[href^="tel:"]{font-size:16px;font-weight:600;color:#fbf5e9}
+ .footer-accordion-links>.footer-location{justify-content:flex-start;align-items:start;font-size:12px;padding-block:12px;line-height:1.8}
+ .footer-accordion-links>.footer-location>svg{margin-top:3px}
+ .footer-legal-links{display:grid;border-top:1px solid #bed0db26;padding-top:10px;margin-top:10px}
+ .rental-footer .footer-bottom{border-top:0;align-items:flex-start;padding:23px 0 max(85px,calc(env(safe-area-inset-bottom) + 25px));font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.footer-accordion>summary>svg{transition:none}}

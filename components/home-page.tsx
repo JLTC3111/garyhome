@@ -56,7 +56,7 @@ export function HomePage(){
         </div>
       </div>
       <div className="container hero-search">
-        <SearchForm/>
+        <SearchForm roomsFirst/>
         <div className="popular-search"><span>{t("A little inspiration:", "Gợi ý cho bạn:")}</span><Link href="/homes?district=tay-ho">Tây Hồ</Link><span>·</span><Link href="/homes?district=ba-dinh">Ba Đình</Link><span>·</span><Link href="/homes?max=600">{t("Under $600", "Dưới $600")}</Link><span>·</span><Link href="/homes?amenity=Balcony">{t("A balcony, please", "Có ban công")}</Link></div>
       </div>
     </section>

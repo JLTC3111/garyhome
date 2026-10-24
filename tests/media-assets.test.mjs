@@ -20,6 +20,7 @@ test('legacy CMS paths normalize without changing content identity or external u
 });
 test('provided photos and review screenshots remain in separate activity categories',()=>{
  const rows=read('activities');assert.equal(rows.filter(a=>a.category==='customers'&&a.media_kind==='photo').length,16);assert.equal(rows.filter(a=>a.category==='feedback'&&a.media_kind==='screenshot').length,1);assert.ok(rows.find(a=>a.image_url==='/images/feedback/1.jpg'));
+ const team=rows.filter(a=>a.category==='team');assert.equal(team.length,1);assert.equal(team[0].image_url,'/images/ourteam/gary-home-team.png');assert.equal(team[0].published,true);
 });
 test('Vietnamese local and international numbers open the same messaging contact',()=>{
  for(const number of ['0363327342','+84 363 327 342']){assert.equal(channelUrl('whatsapp',number),'https://wa.me/84363327342');assert.equal(channelUrl('zalo',number),'https://zalo.me/0363327342');}

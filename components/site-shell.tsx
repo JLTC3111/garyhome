@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, ChevronDown, Menu, X, Phone, MapPin, UserRound, ShieldCheck } from "lucide-react";
@@ -27,4 +27,54 @@ export function Header(){
   <div className="header-nav"><div className="container header-inner"><Brand/><nav className={open?"main-nav nav-open":"main-nav"} id="site-navigation" aria-label={t("Main navigation","Điều hướng chính")}><div className="district-navigation"><button ref={districtTrigger} type="button" aria-expanded={districts} aria-controls="apartment-districts" onClick={()=>setDistricts(!districts)}>{t("Apartments","Căn hộ")}<ChevronDown size={13}/></button>{districts&&<div className="district-dropdown" id="apartment-districts"><Link href="/homes?type=Apartment" onClick={close}>{t("All apartments","Tất cả căn hộ")}<ArrowUpRight size={14}/></Link>{content.neighbourhoods.map(n=><Link key={n.slug} href={`/homes?type=Apartment&district=${n.slug}`} onClick={close}>{n.name}<ArrowUpRight size={13}/></Link>)}</div>}</div>{links.map(([href,label])=><Link key={href} href={href} onClick={close}>{label}</Link>)}</nav><div className="header-actions"><Link className="button button-small header-contact" href="/contact">{t("Contact","Liên hệ")}<ArrowUpRight size={15}/></Link><button ref={menu} className="mobile-menu icon-button" type="button" aria-label={open?t("Close menu","Đóng menu"):t("Open menu","Mở menu")} aria-controls="site-navigation" aria-expanded={open} onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button></div></div></div>
  </header>;
 }
-export function Footer(){const {t,content}=useSite(),path=usePathname();if(path.startsWith("/admin"))return null;const s=content.settings;return <><footer className="site-footer rental-footer"><div className="container"><div className="footer-top"><div className="footer-intro"><Brand light/><p>{t("Serviced apartments and property rentals in Hanoi. Contact Gary Home for current availability and lease terms.","Căn hộ dịch vụ và bất động sản cho thuê tại Hà Nội. Liên hệ Gary Home để xác nhận tình trạng và điều kiện thuê.")}</p><a className="footer-location" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.contact_address)}`} target="_blank" rel="noreferrer"><MapPin size={17}/>{s.contact_address}</a></div><div><h3>{t("Rental properties","Bất động sản cho thuê")}</h3><Link href="/homes?type=Apartment">{t("Apartments","Căn hộ")}</Link><Link href="/homes">{t("All rentals","Tất cả nhà cho thuê")}</Link><Link href="/neighbourhoods">{t("Neighbourhoods","Khu vực")}</Link></div><div><h3>{t("Gary Home","Gary Home")}</h3><Link href="/activities?category=team">{t("Team activities","Hoạt động đội ngũ")}</Link><Link href="/feedback">{t("Feedback","Phản hồi")}</Link><Link href="/about">{t("About us","Về chúng tôi")}</Link><Link href="/saved">{t("My Favourites","Nhà yêu thích")}</Link><Link href="/account">{t("Customer portal","Cổng khách hàng")}</Link><Link href="/admin">{t("Staff portal","Cổng nhân viên")}</Link></div><div><h3>{t("Contact Gary Home","Liên hệ Gary Home")}</h3><a href={`tel:${s.contact_phone.replace(/[^+\d]/g,"")}`}>{s.contact_phone}<Phone size={15}/></a><a href={`mailto:${s.contact_email}`}>{s.contact_email}<ArrowUpRight size={15}/></a><Link href="/contact">{t("Send a rental enquiry","Gửi yêu cầu thuê nhà")}<ArrowUpRight size={15}/></Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Gary Home.</span><div><Link href="/privacy">{t("Privacy policy","Chính sách bảo mật")}</Link><Link href="/credits">{t("Photo credits","Nguồn ảnh")}</Link></div></div></div></footer><FloatingContact/></>;}
+type FooterItem={href:string;label:string;icon?:typeof Phone};
+function FooterItems({items}:{items:FooterItem[]}){
+ return <>{items.map(({href,label,icon:Icon})=>href.startsWith("/")?<Link key={href} href={href}>{label}{Icon&&<Icon size={15} aria-hidden="true"/>}</Link>:<a key={href} href={href}>{label}{Icon&&<Icon size={15} aria-hidden="true"/>}</a>)}</>;
+}
+function FooterAccordion({title,children}:{title:string;children:ReactNode}){
+ return <details className="footer-accordion" name="gary-footer-menus"><summary><h3>{title}</h3><ChevronDown size={18} aria-hidden="true"/></summary><div className="footer-accordion-links">{children}</div></details>;
+}
+export function Footer(){
+ const {t,content}=useSite(),path=usePathname();
+ if(path.startsWith("/admin"))return null;
+ const s=content.settings;
+ const rentals:FooterItem[]=[
+  {href:"/homes?type=Apartment",label:t("Apartments","Căn hộ")},
+  {href:"/homes",label:t("All rentals","Tất cả nhà cho thuê")},
+  {href:"/neighbourhoods",label:t("Neighbourhoods","Khu vực")},
+ ];
+ const company:FooterItem[]=[
+  {href:"/activities?category=team",label:t("Our team","Đội ngũ")},
+  {href:"/feedback",label:t("Feedback","Phản hồi")},
+  {href:"/about",label:t("About us","Về chúng tôi")},
+ ];
+ const account:FooterItem[]=[
+  {href:"/saved",label:t("My Favourites","Nhà yêu thích")},
+  {href:"/account",label:t("Customer portal","Cổng khách hàng")},
+  {href:"/admin",label:t("Staff portal","Cổng nhân viên")},
+ ];
+ const contact:FooterItem[]=[
+  {href:`tel:${s.contact_phone.replace(/[^+\d]/g,"")}`,label:s.contact_phone,icon:Phone},
+  {href:`mailto:${s.contact_email}`,label:s.contact_email,icon:ArrowUpRight},
+  {href:"/contact",label:t("Send a rental enquiry","Gửi yêu cầu thuê nhà"),icon:ArrowUpRight},
+ ];
+ const legal:FooterItem[]=[{href:"/privacy",label:t("Privacy policy","Chính sách bảo mật")},{href:"/credits",label:t("Photo credits","Nguồn ảnh")}];
+ const address=<a className="footer-location" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.contact_address)}`} target="_blank" rel="noreferrer"><MapPin size={17} aria-hidden="true"/>{s.contact_address}</a>;
+ return <><footer className="site-footer rental-footer"><div className="container">
+  <div className="footer-top">
+   <div className="footer-intro"><Brand light/><p>{t("Serviced apartments and property rentals in Hanoi. Contact Gary Home for current availability and lease terms.","Căn hộ dịch vụ và bất động sản cho thuê tại Hà Nội. Liên hệ Gary Home để xác nhận tình trạng và điều kiện thuê.")}</p><div className="footer-desktop-address">{address}</div></div>
+   <div className="footer-desktop-menus">
+    <div className="footer-column"><h3>{t("Rental properties","Bất động sản cho thuê")}</h3><FooterItems items={rentals}/></div>
+    <div className="footer-column"><h3>Gary Home</h3><FooterItems items={company}/><FooterItems items={account}/></div>
+    <div className="footer-column"><h3>{t("Contact Gary Home","Liên hệ Gary Home")}</h3><FooterItems items={contact}/></div>
+   </div>
+   <nav className="footer-mobile-menus" aria-label={t("Footer navigation","Điều hướng cuối trang")}>
+    <FooterAccordion title={t("Rental properties","Bất động sản cho thuê")}><FooterItems items={rentals}/></FooterAccordion>
+    <FooterAccordion title="Gary Home"><FooterItems items={company}/></FooterAccordion>
+    <FooterAccordion title={t("My account","Tài khoản của tôi")}><FooterItems items={account}/></FooterAccordion>
+    <FooterAccordion title={t("Contact & help","Liên hệ & hỗ trợ")}><FooterItems items={contact}/>{address}<div className="footer-legal-links"><FooterItems items={legal}/></div></FooterAccordion>
+   </nav>
+  </div>
+  <div className="footer-bottom"><span>© {new Date().getFullYear()} Gary Home.</span><div className="footer-desktop-legal"><FooterItems items={legal}/></div></div>
+ </div></footer><FloatingContact/></>;
+}

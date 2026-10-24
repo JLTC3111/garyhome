@@ -15,7 +15,8 @@ test('the fresh-project setup includes every rental schema item and public sourc
  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
  await db.exec('set role anon');assert.equal((await db.query('select id,listing_code,author_id from public.properties')).rows.length,15);
  assert.equal((await db.query('select id from public.listing_authors')).rows.length,1);
- assert.equal((await db.query('select id from public.site_activities')).rows.length,17);
+ assert.equal((await db.query('select id from public.site_activities')).rows.length,18);
+ assert.equal((await db.query("select image_url from public.site_activities where category='team'")).rows[0].image_url,'/images/ourteam/gary-home-team.png');
  await assert.rejects(db.exec('select * from public.rental_cart'));
 });
 

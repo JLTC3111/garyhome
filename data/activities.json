@@ -202,5 +202,17 @@
     "published": true,
     "sort_order": -10,
     "updated_at": "2026-10-23T12:50:24.077Z"
+  },
+  {
+    "id": "a3a31423-c458-5988-b9f8-8720996f64ed",
+    "category": "team",
+    "image_url": "/images/ourteam/gary-home-team.png",
+    "published": true,
+    "caption_en": "From our team collection",
+    "caption_vi": "Hình ảnh từ bộ sưu tập của đội ngũ",
+    "media_kind": "photo",
+    "sort_order": 0,
+    "source_url": "",
+    "updated_at": "2026-10-24T07:29:16.001422+00:00"
   }
 ]

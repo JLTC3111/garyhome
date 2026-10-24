@@ -1,6 +1,8 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
+import { passwordLinkEvidence, type PasswordLink } from "@/lib/password-actions";
 import type { Content, Enquiry, Language } from "@/lib/types";
 import { languageValue, persistLanguage } from "@/lib/language";
 import { studioText } from "@/lib/studio-i18n";
@@ -26,6 +28,7 @@ type SiteContext = {
   compare: string[]; toggleCompare: (id: string) => void;
   configured: boolean; backendError: boolean; client: SupabaseClient | null; ready: boolean;
   user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
+  passwordLink:PasswordLink|null;
   sessionPhase: SessionPhase; reconnect: () => Promise<void>;
   editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
@@ -34,6 +37,9 @@ type SiteContext = {
 };
 const Context = createContext<SiteContext | null>(null);
 export function SiteProvider({ children, initial, initialLanguage = "en" }: { children: ReactNode; initialLanguage?: Language; initial: { content: Content; configured: boolean; error: boolean } }) {
+  const router=useRouter(),routerRef=useRef(router);
+  useEffect(()=>{routerRef.current=router;},[router]);
+  const [passwordLink,setPasswordLink]=useState<PasswordLink|null>(null);
   const [content, updateContent] = useState(initial.content);
   const [backendError, setBackendError] = useState(initial.error);
   const [contentRecovering, setContentRecovering] = useState(false);
@@ -118,7 +124,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
         db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
         db.from("listing_authors").select("*").order("sort_order").abortSignal(signal),
         db.from("site_activities").select("*").order("sort_order").abortSignal(signal),
-        db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes)`).order("created_at", { ascending: false }).abortSignal(signal),
+        db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes,read_at,read_by,property_code,property_address)`).order("created_at", { ascending: false }).abortSignal(signal),
         db.from("property_display_orders").select("scope,property_ids").abortSignal(signal),
       ]));
       const current = sessionRef.current?.state;
@@ -132,8 +138,10 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
       setBackendError(false);
       updateEnquiries(e.data.map(row => {
         const { enquiry_notes, ...enquiry } = row;
-        const privateNotes = enquiry_notes as unknown as { notes: string } | { notes: string }[] | null;
-        return { ...enquiry, notes: Array.isArray(privateNotes) ? privateNotes[0]?.notes ?? "" : privateNotes?.notes ?? "" } as Enquiry;
+        type PrivateNotes=Pick<Enquiry,"notes"|"read_at"|"read_by"|"property_code"|"property_address">;
+        const privateNotes = enquiry_notes as unknown as PrivateNotes | PrivateNotes[] | null;
+        const note=Array.isArray(privateNotes)?privateNotes[0]:privateNotes;
+        return { ...enquiry, notes:note?.notes??"",read_at:note?.read_at??null,read_by:note?.read_by??null,property_code:note?.property_code||"",property_address:note?.property_address||"" } as Enquiry;
       }));
     })();
     refreshFlight.current = { generation, promise };
@@ -203,6 +211,9 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
       const task = (async () => {
         try {
           if (!navigator.onLine) { setSessionPhase("offline"); return; }
+          // Capture the intended identity before the SDK consumes the URL.
+          let pendingLink=passwordLinkEvidence(window.location.hash||"");
+          if(pendingLink)setPasswordLink(pendingLink);
           setSessionPhase("checking");
           const response = await fetchWithDeadline("/api/config", { cache: "no-store" }, 10000);
           if (!response.ok) throw new Error("Configuration unavailable");
@@ -235,12 +246,26 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
               if (next.phase !== "checking" && next.phase !== "recovering") setReady(true);
               if (previous.user && (next.user?.id !== previous.user.id || previous.editor && !next.editor && next.phase === "ready")) {
                 version.current++; updateEnquiries([]); updateContent(initialRef.current);
+                if(next.user?.id!==previous.user.id)setPasswordLink(null);
               }
             },
           });
           sessionRef.current = recovery;
           // Subscribe before the first read. Keep this callback synchronous.
-          const { data } = db.auth.onAuthStateChange((_event, session) => { recovery.observe(session); });
+          let latestAuthUser:string|null=null;
+          const { data } = db.auth.onAuthStateChange((event, session) => {
+            latestAuthUser=session?.user.id||null;
+            recovery.observe(session);
+            const fromHash=pendingLink&&pendingLink.userId===latestAuthUser?pendingLink:null;
+            if(fromHash)pendingLink=null;
+            const link:PasswordLink|null=event==="PASSWORD_RECOVERY"&&session?{type:"recovery",userId:session.user.id}:fromHash;
+            if(link){
+              setPasswordLink(link);
+              const path=link.type==="invite"?"/auth/invite":"/auth/reset";
+              // A provider fallback to the site root must still reach the form.
+              queueMicrotask(()=>{if(active&&latestAuthUser===link.userId&&window.location.pathname!==path)routerRef.current.replace(path);});
+            }
+          });
           unsubscribe = () => data.subscription.unsubscribe();
           await recovery.recover();
         } catch { if (active) setSessionPhase(navigator.onLine ? "error" : "offline"); }
@@ -333,7 +358,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, passwordLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

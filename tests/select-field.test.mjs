@@ -98,15 +98,14 @@ test('controlled selections and translated labels preserve the customer draft an
   assert.equal(select().props.items.find(item => item.value === 'disabled').disabled, true);
 });
 
-test('language and price-period changes preserve rental search choices without duration controls', async t => {
+test('language changes preserve rental search choices without price-period controls', async t => {
   const initial = { district: 'tay-ho', type: 'Apartment', max: '600' };
   const renderer = await harness(t, React.createElement(SearchForm, { initial }));
   const values = () => Object.fromEntries(renderer.root.findAllByType('input').filter(node => node.props.name && node.props.type!=='checkbox').map(node => [node.props.name, node.props.value ?? node.props.defaultValue]));
   assert.equal(values().max,'600');assert.equal(values().district,'tay-ho');
-  const period=renderer.root.findAllByType(Select.Root).find(node=>node.props.name==='period');
-  await act(async()=>period.props.onValueChange('night'));
+  assert.equal(renderer.root.findAllByType(Select.Root).some(node=>node.props.name==='period'),false);
   language='vi';await act(async()=>renderer.update(React.createElement(SearchForm,{initial})));
-  assert.equal(values().period,'night');assert.equal(values().district,'tay-ho');assert.equal(values().type,'Apartment');assert.equal(values().max,'600');
+  assert.equal(values().period,undefined);assert.equal(values().district,'tay-ho');assert.equal(values().type,'Apartment');assert.equal(values().max,'600');
   assert.ok(!('term' in values()));assert.ok(!JSON.stringify(renderer.toJSON()).includes('Thuê dài hạn'));
 });
 test('the requirements disclosure opens from its three-dot trigger, closes with Escape and retains mounted field choices',async t=>{
@@ -132,6 +131,6 @@ test('homepage search prioritizes bedrooms and bathrooms while retaining one bud
  const trigger=()=>renderer.root.findAllByType('button').find(n=>n.props['aria-controls']?.endsWith('-panel'));await act(async()=>trigger().props.onClick());
  language='vi';await act(async()=>renderer.update(React.createElement(SearchForm,{roomsFirst:true,initial})));
  assert.strictEqual(renderer.root.findAllByType(Select.Root).find(n=>n.props.name==='beds'),beds);
- assert.equal(selected().beds,'2');assert.equal(selected().baths,'1');assert.equal(selected().min,'300');assert.equal(selected().max,'900');assert.equal(selected().period,'month');
+ assert.equal(selected().beds,'2');assert.equal(selected().baths,'1');assert.equal(selected().min,'300');assert.equal(selected().max,'900');assert.equal(selected().period,undefined);
  assert.equal(trigger().props['aria-expanded'],false);
 });

@@ -7,6 +7,7 @@ import type { StaffAccount } from "@/lib/staff";
 const headers = { "Cache-Control": "private, no-store" };
 const createAccount = z.object({ email: z.string().trim().toLowerCase().email().max(254), full_name: z.string().trim().min(2).max(120), role: z.enum(["admin", "manager", "editor"]) });
 const editAccount = z.object({ user_id: z.string().uuid(), role: z.enum(["admin", "manager", "editor"]), active: z.boolean() });
+const removeAccount = z.object({ user_id:z.string().uuid() });
 async function body(request: Request) {
   if (Number(request.headers.get("content-length") || 0) > 4096) throw new StaffRequestError("Request too large.", 413);
   try { const value = await request.text(); if (value.length > 4096) throw new Error(); return JSON.parse(value); }
@@ -39,16 +40,16 @@ export async function POST(request: Request) {
     const result = await boundedRequest(async signal => {
       const { db, role } = await staffRequest(request, signal);
       const parsed = createAccount.safeParse(await body(request));
-      if (!parsed.success) throw new StaffRequestError("Check the company email, name, and assigned role.");
+      if (!parsed.success) throw new StaffRequestError("Check the staff email, name, and assigned role.");
       const input = parsed.data;
       if (role !== "owner" && input.role === "admin") throw new StaffRequestError("Only the owner can assign administrator access.", 403);
-      // The RPC validates the company domain, protected accounts, and the
+      // The RPC validates the allowed email domain, protected accounts, and the
       // actor's fresh membership before any Auth account or email is created.
       const found = await db.rpc("find_staff_account", { target_email: input.email, assigned_role: input.role }).abortSignal(signal);
       staffDataError(found.error);
       if (!found.data) {
         const admin = staffAdminClient();
-        if (!admin) throw new StaffRequestError("New staff invitations need the server’s Supabase secret key. Existing company accounts can still be assigned.", 503);
+        if (!admin) throw new StaffRequestError("New staff invitations need the server’s Supabase secret key. Existing staff accounts can still be assigned.", 503);
         const invitation = await admin.auth.admin.inviteUserByEmail(input.email, {
           redirectTo: new URL("/auth/invite", request.url).href,
           data: { full_name: input.full_name },
@@ -81,4 +82,16 @@ export async function PATCH(request: Request) {
     });
     return Response.json(result, { headers });
   } catch (error) { return failure(error); }
+}
+export async function DELETE(request:Request){
+  try{
+    const result=await boundedRequest(async signal=>{
+      const {db}=await staffRequest(request,signal);
+      const parsed=removeAccount.safeParse(await body(request));
+      if(!parsed.success)throw new StaffRequestError("Check the staff account.");
+      const removed=await db.rpc("remove_staff_access",{target_user_id:parsed.data.user_id}).abortSignal(signal);
+      staffDataError(removed.error);if(removed.data!==true)throw new StaffRequestError("Couldn’t confirm deletion. Refresh before trying again.",409);return {ok:true};
+    });
+    return Response.json(result,{headers});
+  }catch(error){return failure(error);}
 }

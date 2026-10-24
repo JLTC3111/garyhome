@@ -1,6 +1,6 @@
 # Customer email sign-in and staff accounts
 
-Customers register and sign in with a personal email and password at `/account`. Email signup requires mailbox confirmation. Staff use `/admin` with a company account explicitly assigned by an owner or administrator. Registering with a company address does not grant Studio access. The existing confirmed owner account remains available for administration.
+Customers register and sign in with a personal email and password at `/account`. Email signup requires mailbox confirmation. Staff use `/admin` with a company or Gmail account explicitly assigned by an owner or administrator. Registering with any allowed address does not grant Studio access. The existing confirmed owner account remains available for administration.
 
 `/login` is a portal chooser. The public header and footer label customer and staff access separately. Each login page has a portal switcher and a link to the other login; switching portals does not change the current session or grant staff access. Password recovery returns confirmed staff to Studio and customers to their account.
 
@@ -8,7 +8,7 @@ Customers register and sign in with a personal email and password at `/account`.
 
 Use project **`duyiihsmaqfgwezmsnjs`**. Confirm the project ID before editing its configuration.
 
-1. Ensure the CMS and customer portal migrations are applied. For an existing project, apply the existing [staff access migration](../supabase/migrations/20261022042327_customer_social_auth_staff_access.sql) after the earlier migrations. Its applied filename is retained; its SQL defines staff domains, membership and role management. Fresh projects can use `supabase/setup.sql`, then `supabase/owner.sql` after creating and confirming the owner user. Do not run the full setup file over an existing database.
+1. Ensure the CMS and customer portal migrations are applied. For an existing project, apply the existing [staff access migration](../supabase/migrations/20261022042327_customer_social_auth_staff_access.sql) after the earlier migrations. Its applied filename is retained; its SQL defines staff domains, membership and role management. After the existing migrations, apply [the Gmail, inbox and deletion migration](../supabase/migrations/20261024173814_staff_gmail_inbox_and_deletion_controls.sql) once to an existing project. Fresh projects can use `supabase/setup.sql`, then `supabase/owner.sql` after creating and confirming the owner user. Do not run the full setup file over an existing database.
 2. In [Authentication → Sign In / Providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers), enable **Email**, email/password signup and email confirmation. Keep other sign-in methods disabled. Hosted settings are managed in the dashboard; changing the repository's local configuration does not update the hosted project.
 3. Configure production email delivery/SMTP for confirmations, password recovery and staff invitations. Keep the normal Supabase confirmation URL in the email templates. The browser SDK consumes the authenticated email redirect.
 4. In [URL Configuration](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration), set **Site URL** to the website origin currently in use. The local preview uses `http://127.0.0.1:3000`; production uses the actual deployed HTTPS origin.
@@ -38,25 +38,29 @@ Hosting audience and platform access controls are separate from these applicatio
 
 Auth sessions stay in the browser and use the SDK's automatic refresh. Email-link handling remains enabled for confirmation, recovery and invitation flows. Password setup is bound to the email link's intended account; changing accounts cannot redirect that password write to another user.
 
-## Company staff and owner access
+## Staff and owner access
 
-Allowed company email domains are **`@garyhome.com` and `@icue.vn`**. The existing bootstrap owner is preserved. If company domains change, update `public.staff_settings.email_domains` as the database owner and verify staff access afterwards.
+Allowed staff email domains are **`@garyhome.com`, `@icue.vn` and `@gmail.com`**. The existing bootstrap owner is preserved. If allowed domains change, update `public.staff_settings.email_domains` as the database owner and verify staff access afterwards.
 
-An owner or administrator opens **Studio → Team access** and enters the staff member's full name, exact company email and role.
+An owner or administrator opens **Studio → Team access** and enters the staff member's full name, exact company or Gmail email and role.
 
 | Role | Access |
 | --- | --- |
-| Owner | Studio, customers and staff management; can appoint administrators. |
-| Administrator | Studio, customers, staff invitations and assignments; cannot edit owners, other administrators or their own access. |
+| Owner | Studio, customers and staff management; can appoint administrators and delete listings, enquiries and eligible staff assignments. |
+| Administrator | Studio, customers, staff invitations and assignments; can delete listings, enquiries and ordinary staff assignments; cannot edit owners, other administrators or their own access. |
 | Manager | Properties, customers and site content, plus public card ordering. No staff access management. |
 | Staff | Properties, media, site content, neighbourhoods and customers. No staff management or public card ordering. |
 | Customer | Their own details, saved homes, enquiries and viewings. No Studio access. |
 
-For a new email, the server sends an Auth invitation. The recipient confirms their company mailbox and chooses a password at `/auth/invite`. The administrator never chooses or sees that password. Confirmation is required before the assignment can access Studio.
+For a new email, the server sends an Auth invitation. The recipient confirms their assigned mailbox and chooses a password at `/auth/invite`. The administrator never chooses or sees that password. Confirmation is required before the assignment can access Studio.
 
-For an existing company Auth account, the role is assigned without another invitation. The account owner uses their existing password or the staff password-reset flow. Assigning an existing account does not require the server invitation secret.
+For an existing eligible Auth account, the role is assigned without another invitation. The account owner uses their existing password or the staff password-reset flow. Assigning an existing account does not require the server invitation secret.
 
-Use **Disable access** to revoke an ordinary staff assignment without deleting their Auth identity or customer data. Database policies check the current confirmed email, exact allowed domain and active membership. Authorization uses server-managed membership; user-editable profile metadata cannot grant a staff role. Owners and the acting administrator's own account are protected.
+Use **Reset password** on a confirmed active team member to request an email link; the server resolves the actual assigned email and enforces the target role. Owners can request resets for ordinary staff and administrators, administrators for ordinary staff, and both for their own account. Protected owner accounts cannot be reset by someone else. Pending invitations must be confirmed first. Customers and staff can also use **Forgot password?** in their respective login portals.
+
+The provider captures invite/recovery identity before Supabase consumes the URL. A `PASSWORD_RECOVERY` redirect reaching the homepage is routed to `/auth/reset` without reloading the recovered session. The password form and authenticated write must still match the link account. A successful request means Auth accepted it, not that the recipient inbox has received it; verify SMTP and the production redirect allow list with a real mailbox.
+
+Use **Delete access** to remove an ordinary staff assignment permanently while preserving the Auth account and customer history. Only owners can remove administrators. Nobody can remove their own assignment or an owner account. Use **Disable access** to revoke an ordinary staff assignment without deleting their Auth identity or customer data. Database policies check the current confirmed email, exact allowed domain and active membership. Authorization uses server-managed membership; user-editable profile metadata cannot grant a staff role. Owners and the acting administrator's own account are protected.
 
 Auth invitations and permission assignment are separate operations. If delivery succeeds but assignment fails, the UI reports the partial result. Refresh the directory before retrying. Timed-out writes are never automatically replayed.
 
@@ -66,8 +70,8 @@ Auth invitations and permission assignment are separate operations. If delivery 
 - [ ] Confirm registration does not grant Studio access or another customer's data.
 - [ ] Sign out and sign in again; reload the account page.
 - [ ] Request a password reset and complete it from the email link.
-- [ ] Invite an eligible company address, confirm it and set a staff password.
-- [ ] Assign an existing company account and verify its role permissions.
+- [ ] Invite an eligible company or Gmail address, confirm it and set a staff password.
+- [ ] Assign an existing company or Gmail account and verify its role permissions.
 - [ ] Disable an ordinary staff assignment and confirm Studio access is revoked.
 - [ ] Confirm the existing owner can still administer the site.
 - [ ] Check English/Vietnamese forms and recovery after inactivity.
@@ -82,3 +86,11 @@ If the account shows “The customer portal is not available yet,” run the rea
 The customer schema is defined by [the customer portal migration](../supabase/migrations/20261021201948_customer_portal.sql). Apply it only when its four new tables and enquiry columns are absent. If only some items are missing, inspect the result before preparing a targeted repair: the migration is transactional but is not designed to be rerun on an already-created schema. Do not rerun `setup.sql` on an existing project.
 
 References: [Supabase password authentication](https://supabase.com/docs/guides/auth/passwords), [email templates](https://supabase.com/docs/guides/auth/auth-email-templates), [redirect URL configuration](https://supabase.com/docs/guides/auth/redirect-urls).
+
+## Enquiry reads and content deletion
+
+Opening an enquiry from the overview, inbox or customer directory records the first read time and staff reader privately. The inbox badge counts unread enquiries. Read tracking does not change the customer conversation status or overwrite internal notes. Failed read writes keep the enquiry unread and offer a retry when it is reopened.
+
+Only owner and administrator roles can delete listings and enquiries, after a confirmation dialog. Database policies enforce this even for direct API requests. Listing deletion removes the public listing, favourites and manual card-order references, while preserving enquiries, internal notes, feedback and assistance reports. Enquiry and commission records retain the original property ID label and address; commission reviews remain available. Deleting an enquiry permanently deletes that conversation and its private notes.
+
+The Gmail/inbox/deletion migration has been applied to `duyiihsmaqfgwezmsnjs`. Read-only verification confirmed all three allowed domains, private read columns, owner/admin delete policies and preserved property-assistance references. Existing production listing, enquiry and staff counts were unchanged. Security Advisor still reports the pre-existing [disabled leaked-password protection setting](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection); no new security findings were introduced. Real mailbox delivery and browser visual checks were not exercised by the local test suite.

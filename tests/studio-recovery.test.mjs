@@ -33,10 +33,12 @@ async function harness(t, options={}){
  setGlobal('FormData',class{constructor(form){this.form=form;}get(key){return this.form.fields?.[key]??null;}});
  setGlobal('fetch',async(input,init)=>{
   if(String(input).startsWith('/api/admin/team')){
-   const method=init?.method??'GET';backend.teamCalls.push({method,input:init?.body?JSON.parse(init.body):null});
+   const method=String(input).endsWith('/reset-password')?'RESET':init?.method??'GET';backend.teamCalls.push({method,input:init?.body?JSON.parse(init.body):null});
+   if(method==='RESET')return Response.json({ok:true});
+   if(method==='DELETE'){backend.teamRows=backend.teamRows.filter(m=>m.user_id!==JSON.parse(init.body).user_id);return Response.json({ok:true});}
    if(method==='GET'){
     if(backend.teamPending)await backend.teamPending.promise;
-    return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn'],invitationsEnabled:true});
+    return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn','gmail.com'],invitationsEnabled:true});
    }
    if(method==='POST'){const data=JSON.parse(init.body);backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});return Response.json({invited:true});}
    return Response.json({user_id:'changed-staff'});
@@ -45,7 +47,7 @@ async function harness(t, options={}){
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
- const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
+ const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
   const filters={},query={};
   query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
@@ -65,15 +67,17 @@ async function harness(t, options={}){
    signInWithPassword:async input=>{backend.authCalls.push({method:'password',input});session=authSession('customer');callback?.('SIGNED_IN',session);return {data:{session},error:null};},
    resetPasswordForEmail:async(...input)=>{backend.authCalls.push({method:'reset',input});return {error:null};},
   },
+  rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
   storage:{from:()=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}})})},
   from(table){
-   let writing=false,payload,single=false;const filters={};const query={};
-   for(const method of ['upsert','update','insert','delete'])query[method]=value=>{writing=true;payload=value;return query;};
+   let writing=false,payload,single=false,writeMethod;const filters={};const query={};
+   for(const method of ['upsert','update','insert','delete'])query[method]=value=>{writing=true;writeMethod=method;payload=value;return query;};
    query.eq=(key,value)=>{filters[key]=value;return query;};
    for(const method of ['single','maybeSingle'])query[method]=()=>{single=true;return query;};
    for(const method of ['select','order','abortSignal','is'])query[method]=()=>query;
    query.then=(resolve,reject)=>{
-    if(writing)backend.calls.push({table,payload});
+    if(writing)backend.calls.push({table,payload,method:writeMethod,filters});
+    if(writing&&backend.writeErrors.has(table))return Promise.resolve({data:null,error:backend.writeErrors.get(table)}).then(resolve,reject);
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
     if(backend.pending.has(table))return backend.pending.get(table).promise.then(resolve,reject);
     if(!writing&&backend.readErrors.has(table))return Promise.resolve({data:null,error:backend.readErrors.get(table)}).then(resolve,reject);
@@ -94,8 +98,8 @@ async function harness(t, options={}){
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
-   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useRouter:()=>({back(){},push(){}})};
-   if(id==='@/lib/browser-client')return {browserClient:()=>client,publicBrowserClient:()=>publicClient};
+   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useRouter:()=>({back(){},push(){},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
+   if(id==='@/lib/browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient};
    if(id.startsWith('.')||id.startsWith('@/')){
     const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);
     const resolved=[target,target+'.tsx',target+'.ts',target+'.json'].find(x=>fs.existsSync(x)&&fs.statSync(x).isFile());
@@ -118,7 +122,8 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- await act(async()=>{renderer=TestRenderer.create(React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly?null:React.createElement(Page,{invitation:options.page==='invite'}))));await delay(10);});
+ const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'})));
+ await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
  const emit=async(next)=>{await act(async()=>{session=next;callback?.(next?'TOKEN_REFRESHED':'SIGNED_OUT',next);await delay(5);});};
@@ -126,7 +131,9 @@ async function harness(t, options={}){
   await act(async()=>{renderer.root.findByProps({'aria-label':'Site settings'}).props.onClick();});
   await act(async()=>{renderer.root.findAllByType('textarea')[0].props.onChange({target:{value}});});
  };
- return {renderer,backend,network,browser,page,emit,editSettings,get site(){return site;}};
+ const mountPage=async()=>{await act(async()=>{renderer.update(render(true));await delay(5);});};
+ const emitEvent=async(event,next)=>{await act(async()=>{session=next;callback?.(event,next);await delay(5);});};
+ return {renderer,backend,network,browser,page,emit,emitEvent,mountPage,editSettings,get site(){return site;}};
 }
 
 test('portal chooser identifies both destinations without changing authentication',async t=>{
@@ -152,11 +159,11 @@ test('customer login identifies personal email and links to the separate staff p
  assert.match(JSON.stringify(h.renderer.toJSON()),/Bạn là nhân viên/);
 });
 
-test('staff login explains assigned company access, retains owner sign-in and offers no registration',async t=>{
+test('staff login explains assigned company or Gmail access, retains owner sign-in and offers no registration',async t=>{
  const h=await harness(t,{guest:true,page:'staff'});
  assert.equal(h.renderer.root.findByType('form').props['aria-label'],'Staff account access');
- assert.match(JSON.stringify(h.renderer.toJSON()),/Use your assigned @garyhome.com or @icue.vn email/);
- assert.match(JSON.stringify(h.renderer.toJSON()),/Existing owner accounts are also supported/);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Use your assigned company or Gmail address/);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Staff email \/ owner account/);
  assert.equal(h.renderer.root.findByProps({className:'portal-other-link'}).props.href,'/account');
  assert.equal(h.renderer.root.findAllByType('input').some(node=>node.props.name==='full_name'),false);
  const selected=h.renderer.root.findByProps({className:'portal-switcher'}).findAllByType('a').filter(node=>node.props['aria-current']==='page');
@@ -182,10 +189,17 @@ test('a customer opening staff login receives a customer return link without sta
 test('public navigation keeps favourites, customer and staff entry together and translates the brand',async t=>{
  const h=await harness(t,{guest:true,page:'header',path:'/login'});
  const band=h.renderer.root.findByProps({className:'top-strip-actions'});
- const customer=band.findAllByType('a').find(node=>node.props.className==='customer-login-link');
- const staff=band.findAllByType('a').find(node=>node.props.className==='staff-login-link');
+ const customer=band.findAllByType('a').find(node=>node.props.className?.split(' ').includes('customer-login-link'));
+ const staff=band.findAllByType('a').find(node=>node.props.className?.split(' ').includes('staff-login-link'));
  assert.equal(customer.props.href,'/account');assert.equal(customer.props['aria-label'],'Customer login');
  assert.equal(staff.props.href,'/admin');assert.equal(staff.props['aria-label'],'Staff login');
+ assert.ok(customer.props.className.includes('desktop-band-control'));assert.ok(staff.props.className.includes('desktop-band-control'));
+ const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});
+ assert.deepEqual(mobile.findAllByType('a').map(n=>n.props.href),['/account','/admin']);
+ assert.equal(mobile.findAllByProps({className:'language-toggle'}).length,1);
+ const toggle=()=>h.renderer.root.findAllByType('button').find(n=>n.props['aria-controls']==='site-navigation');
+ await act(async()=>toggle().props.onClick());assert.equal(toggle().props['aria-expanded'],true);
+ await act(async()=>mobile.findAllByType('a')[0].props.onClick());assert.equal(toggle().props['aria-expanded'],false);
  const favourites=()=>band.findAllByType('button').find(node=>node.props.className==='favourites-trigger');
  assert.equal(favourites().props['aria-expanded'],false);
  assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');
@@ -540,4 +554,87 @@ test('staff can add a customer, keep a follow-up and search the directory',async
  const write=h.backend.calls.find(call=>call.table==='customer_records');assert.equal(write.payload.follow_up_on,'2026-12-01');assert.equal(write.payload.notes,'Private follow-up note');
  await act(async()=>{h.renderer.root.findByProps({'aria-label':'Search customers'}).props.onChange({target:{value:'no match'}});});
  assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Customer QA/);
+});
+
+
+test('a reset form mounted after Supabase clears the hash retains the intended email-link identity',async t=>{
+ const token='header.'+Buffer.from(JSON.stringify({sub:'owner'})).toString('base64url')+'.signature';
+ const h=await harness(t,{page:'password',deferPage:true,clearHashOnClient:true,url:'https://gary.example/auth/reset#type=recovery&access_token='+token});
+ assert.equal(h.browser.location.hash,'');assert.deepEqual(h.site.passwordLink,{type:'recovery',userId:'owner'});
+ await h.mountPage();assert.equal(h.renderer.root.findAllByType('form').length,1);
+ await act(async()=>{await h.renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields:{password:'An updated account password',confirm:'An updated account password'}}});});
+ assert.equal(h.backend.passwordCalls.length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Your password is ready/);
+});
+test('PASSWORD_RECOVERY navigates a fallback root redirect to the reset form without losing the session',async t=>{
+ const h=await harness(t,{customer:true,page:'password',guest:true,url:'https://gary.example/'});
+ assert.equal(h.renderer.root.findAllByType('form').length,0);
+ await h.emitEvent('PASSWORD_RECOVERY',authSession('customer'));
+ assert.deepEqual(h.backend.navigation,['/auth/reset']);assert.equal(h.browser.location.pathname,'/auth/reset');
+ assert.equal(h.renderer.root.findAllByType('form').length,1);assert.deepEqual(h.site.passwordLink,{type:'recovery',userId:'customer'});
+ await h.emit(authSession('another-customer'));assert.equal(h.renderer.root.findAllByType('form').length,0);
+ assert.equal(h.backend.passwordCalls.length,0);
+});
+test('opening an enquiry persists read state and preserves a note edited while the read request is pending',async t=>{
+ const h=await harness(t),pending=deferred();h.backend.rpcPending.set('mark_enquiry_read',pending);
+ const enquiry={id:'read-test',property_id:fixture.properties[0].id,name:'Read Test',kind:'viewing',intent:'rent',source:'website',email:'customer@gmail.com',message:'A viewing please',phone:'',status:'new',notes:'',created_at:'2026-10-25T00:00:00Z',read_at:null};
+ h.backend.rows.enquiries=[enquiry];
+ await act(async()=>{h.site.setEnquiries([enquiry]);h.renderer.root.findByProps({'aria-label':'Enquiries'}).props.onClick();});
+ const row=()=>h.renderer.root.findAllByType('button').find(n=>n.props.className==='enquiry-row');
+ assert.equal(row().props['data-unread'],true);
+ await act(async()=>row().props.onClick());
+ assert.equal(h.backend.rpcCalls.filter(c=>c.name==='mark_enquiry_read').length,1);
+ await act(async()=>h.renderer.root.findAllByType('textarea').find(n=>n.props.maxLength===8000).props.onChange({target:{value:'Keep this concurrent private note'}}));
+ await act(async()=>{pending.resolve({data:{read_at:'2026-10-25T01:02:03Z',read_by:'owner'},error:null});await delay(5);});
+ assert.equal(row().props['data-unread'],false);assert.equal(h.site.enquiries[0].status,'new');
+ assert.equal(h.renderer.root.findAllByType('textarea').find(n=>n.props.maxLength===8000).props.value,'Keep this concurrent private note');
+ const requestCount=h.backend.rpcCalls.length;
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
+ await act(async()=>row().props.onClick());assert.equal(h.backend.rpcCalls.length,requestCount,'Already-read enquiries need no repeated writes');
+});
+test('listing deletion requires explicit confirmation, removes the listing and is unavailable to editors',async t=>{
+ const h=await harness(t);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Properties'}).props.onClick());
+ const target=h.site.content.properties[0].id;
+ const deleteButton=h.renderer.root.findAllByType('button').find(n=>n.props.className==='text-danger');assert.ok(deleteButton);
+ await act(async()=>deleteButton.props.onClick());assert.equal(h.backend.rpcCalls.length,0);
+ const dialog=h.renderer.root.findByType('dialog');assert.equal(dialog.props.role,'alertdialog');
+ await act(async()=>{await dialog.findAllByType('button').find(n=>n.props.className==='button button-danger').props.onClick();await delay(5);});
+ assert.equal(h.backend.rpcCalls.at(-1).name,'delete_property');assert.equal(h.backend.rpcCalls.at(-1).args.target_property,target);
+ assert.ok(!h.site.content.properties.some(p=>p.id===target));
+ await h.emit(null);assert.ok(!h.site.content.properties.some(p=>p.id===target));
+ assert.equal(h.backend.rpcCalls.filter(c=>c.name==='delete_property').length,1);
+});
+test('editors can read enquiries but cannot see destructive listing or enquiry actions',async t=>{
+ const h=await harness(t,{role:'editor'});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Properties'}).props.onClick());
+ assert.equal(h.renderer.root.findAllByType('button').some(n=>n.props.className==='text-danger'),false);
+});
+
+
+test('a stale property editor updates its original record and cannot insert a listing removed by another session',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Properties'}).props.onClick());
+ const target=h.site.content.properties[0].id;
+ await act(async()=>h.renderer.root.findAllByType('button').find(n=>n.children.includes('Edit')).props.onClick());
+ h.backend.writeErrors.set('properties',{code:'PGRST116',message:'No row found'});
+ await act(async()=>h.site.setContent(c=>({...c,properties:c.properties.filter(p=>p.id!==target)})));
+ await act(async()=>{await h.renderer.root.findByProps({className:'editor-form'}).props.onSubmit({preventDefault(){}});await delay(5);});
+ const write=h.backend.calls.find(c=>c.table==='properties');assert.equal(write.method,'update');assert.equal(write.filters.id,target);
+ assert.ok(!h.site.content.properties.some(p=>p.id===target));assert.match(JSON.stringify(h.renderer.toJSON()),/This listing no longer exists/);
+});
+
+
+test('Team access routes reset requests separately and confirms membership-only deletion for assigned Gmail staff',async t=>{
+ const h=await harness(t);h.backend.teamRows.push({user_id:'gmail-staff',display_name:'Assigned Gmail Staff',email:'assigned@gmail.com',role:'editor',active:true,confirmed:true});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ // Resolve the staff row by its email, independent of translated action copy.
+ const row=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('assigned@gmail.com')));assert.ok(row);
+ await act(async()=>{await row.findAllByType('button').find(n=>n.props.className==='text-link team-reset-action').props.onClick();await delay(5);});
+ assert.deepEqual(h.backend.teamCalls.filter(c=>c.method==='RESET'),[{method:'RESET',input:{user_id:'gmail-staff'}}]);
+ assert.equal(h.backend.teamCalls.filter(c=>c.method==='POST').length,0);
+ await act(async()=>row.findAllByType('button').find(n=>n.props.className==='text-link text-danger').props.onClick());
+ const dialog=h.renderer.root.findByType('dialog');assert.match(JSON.stringify(h.renderer.toJSON()),/customer account and customer history are preserved/);
+ await act(async()=>{await dialog.findAllByType('button').find(n=>n.props.className==='button button-danger').props.onClick();await delay(5);});
+ assert.deepEqual(h.backend.teamCalls.filter(c=>c.method==='DELETE'),[{method:'DELETE',input:{user_id:'gmail-staff'}}]);
+ assert.equal(h.backend.teamRows.some(m=>m.user_id==='gmail-staff'),false);
+ assert.equal(h.renderer.root.findAllByProps({className:'team-member'}).length,1);
 });

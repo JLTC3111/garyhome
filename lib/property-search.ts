@@ -1,10 +1,10 @@
 import type { Property } from "./types";
 import { newestFirst } from "./property-order.ts";
 import { canonicalAmenity, isPublicRental, listingCode } from "./rentals.ts";
-export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; beds?: string; baths?: string; amenity?: string; listing?: string; period?: string; id?: string; sort?: string };
+export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; beds?: string; baths?: string; amenity?: string; listing?: string; id?: string; sort?: string };
 export function normalize(value: string) { return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g,"d"); }
 export function readFilters(params:Pick<URLSearchParams,"entries"|"getAll">):Filters {
-  const result=Object.fromEntries(params.entries());delete result.term;const amenities=params.getAll("amenity");
+  const result=Object.fromEntries(params.entries());delete result.term;delete result.period;const amenities=params.getAll("amenity");
   if(amenities.length)result.amenity=amenities.join(",");return result;
 }
 export function filterProperties(properties: Property[], filters: Filters): Property[] {
@@ -18,12 +18,12 @@ export function filterProperties(properties: Property[], filters: Filters): Prop
     const id=(filters.id||"").trim().toUpperCase();const code=listingCode(p).toUpperCase();
     return terms.every(term=>haystack.includes(term)) && matchesType &&
       (!filters.district||p.district_slug===filters.district) &&
+      (!(filters.min||filters.max)||(p.price_period||"month")==="month") &&
       (!filters.min||(p.price!==null&&p.price>=Number(filters.min))) &&
       (!filters.max||(p.price!==null&&p.price<=Number(filters.max))) &&
       (!filters.beds||(filters.beds==="0"?p.bedrooms===0:p.bedrooms>=Number(filters.beds))) &&
       (!filters.baths||(p.bathrooms!==null&&p.bathrooms>=Number(filters.baths))) &&
       requested.every(a=>p.amenities.some(value=>canonicalAmenity(value)===a)) &&
-      (!filters.period||(p.price_period||"month")===filters.period) &&
       (!id||code===id||code===`GH-${id}`||p.id.toUpperCase()===id) &&
       (!filters.listing||filters.listing==="rent");
   });

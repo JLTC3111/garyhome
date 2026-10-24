@@ -34,8 +34,9 @@ export type Enquiry = {
   notes: string; created_at: string;
   user_id?: string | null; appointment_at?: string | null;
   customer_update?: string; cancelled_at?: string | null;
+  read_at?: string|null; read_by?: string|null; property_code?:string; property_address?:string;
 };
-export type CustomerEnquiry = Omit<Enquiry, "notes">;
+export type CustomerEnquiry = Omit<Enquiry, "notes"|"read_at"|"read_by"|"property_code"|"property_address">;
 export type CustomerProfile = {
   user_id: string; full_name: string; email: string; phone: string;
   preferred_district: string | null; budget_min: number | null; budget_max: number | null;

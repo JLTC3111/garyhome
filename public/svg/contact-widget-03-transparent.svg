@@ -25,7 +25,8 @@
     </g>
   </g>
 </defs>
-<path d="M136 30v46" stroke="#DDE3EA" stroke-width="1.5" stroke-linecap="round"/>
+<rect id="contact-outline" x="13" y="12" width="246" height="82" rx="41" fill="none" stroke="#8e9d94" stroke-width="1"/>
+<path d="M136 30v46" stroke="#8e9d94" stroke-width="1" stroke-linecap="round"/>
 <g id="whatsapp" transform="translate(79 53)"><use xlink:href="#whatsapp-badge"/></g>
 <g id="zalo" transform="translate(193 53)"><use xlink:href="#zalo-badge"/></g>
 </svg>

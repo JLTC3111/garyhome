@@ -7,5 +7,6 @@ export function isStaffRole(role: unknown): role is StaffRole {
   return role === "owner" || role === "admin" || role === "manager" || role === "editor";
 }
 export function canManageStaff(role: unknown) { return role === "owner" || role === "admin"; }
+export function canDeleteContent(role: unknown) { return role === "owner" || role === "admin"; }
 
 export function canReorderProperties(role:unknown){return role==="owner"||role==="admin"||role==="manager";}

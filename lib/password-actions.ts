@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchWithDeadline } from "./requests.ts";
 
+export type PasswordLink={type:"invite"|"recovery";userId:string};
+export function passwordLinkEvidence(hash:string):PasswordLink|null{
+  for(const type of ["invite","recovery"] as const){const userId=emailLinkIdentity(hash,type);if(userId)return {type,userId};}
+  return null;
+}
+
 // This unverified subject only binds the form to the email link's intended
 // identity. The SDK session and Auth API still verify every password write.
 export function emailLinkIdentity(hash: string, expectedType: "invite" | "recovery"): string | null {

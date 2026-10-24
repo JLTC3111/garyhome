@@ -14,11 +14,15 @@ test('retired duration parameters do not hide rentals in older bookmarks',()=>{
  const filters=readFilters(new URLSearchParams('term=short&district=tay-ho'));
  assert.equal(filters.term,undefined);assert.equal(filterProperties(homes,filters).length,4);
 });
-test('IDs, bathroom count, price bounds, period and repeated amenities apply together',()=>{
- const p={...home,listing_code:'GH-000123',bathrooms:2,price_period:'night',price:60,amenities:['Balcony','Wi-Fi']};
+test('IDs, bathroom count, monthly price bounds and repeated amenities apply together',()=>{
+ const p={...home,listing_code:'GH-000123',bathrooms:2,price_period:'month',price:60,amenities:['Balcony','Wi-Fi']};
  const filters=readFilters(new URLSearchParams('id=gh-000123&min=50&max=80&baths=2&period=night&amenity=Balcony&amenity=Wi-Fi'));
  assert.equal(filterProperties([p],filters).length,1);
- assert.equal(filterProperties([p],{...filters,period:'month'}).length,0);
+ assert.equal(filters.period,undefined); // old unit parameters cannot silently hide listings
+ assert.equal(filterProperties([p],{...filters,period:'night'}).length,1);
+ const nightly={...p,id:'nightly',price_period:'night'};
+ assert.equal(filterProperties([nightly],{}).length,1);
+ assert.equal(filterProperties([nightly],{min:'50',max:'80'}).length,0);
  assert.equal(filterProperties([p],{...filters,amenity:'Balcony,Elevator'}).length,0);
  assert.equal(filterProperties([p],{id:'000123'}).length,1);
  assert.equal(filterProperties([p],{id:'one'}).length,1);

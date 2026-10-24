@@ -27,3 +27,11 @@ test('Vietnamese local and international numbers open the same messaging contact
  assert.match(channelUrl('whatsapp','0363327342','GH-000001 & viewing'),/text=GH-000001%20%26%20viewing/);assert.equal(channelUrl('whatsapp','not a phone'),'');
  const settings=read('site-content').settings,author=read('authors').find(a=>a.slug==='gary-home-team');assert.equal(settings.whatsapp_phone,'+84363327342');assert.equal(settings.zalo_phone,'0363327342');assert.equal(author.whatsapp_phone,settings.whatsapp_phone);assert.equal(author.zalo_phone,settings.zalo_phone);
 });
+
+
+test('mobile and browser PNG icons have the declared dimensions and PNG signatures',()=>{
+ for(const [name,size] of [['favicon.png',32],['favicon-192.png',192],['apple-touch-icon.png',180]]){
+  const data=fs.readFileSync(path.join(root,'public',name));assert.equal(data.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+  assert.equal(data.readUInt32BE(16),size);assert.equal(data.readUInt32BE(20),size);
+ }
+});

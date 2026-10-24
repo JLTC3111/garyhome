@@ -11,7 +11,7 @@ import type { Filters } from "@/lib/property-search";
 
 function BudgetField({initial,advanced=false}:{initial:Filters;advanced?:boolean}){
   const {t}=useSite();
-  return <div className={`rental-price-field ${advanced?"rental-advanced-budget":"search-field"}`}><span><Wallet size={15}/>{t("BUDGET · USD","NGÂN SÁCH · USD")}</span><div><input name="min" type="number" min="0" step="any" defaultValue={initial.min||""} placeholder={t("Min","Từ")} aria-label={t("Minimum rental price in USD","Giá thuê tối thiểu (USD)")}/><span aria-hidden="true">—</span><input name="max" type="number" min="0" step="any" defaultValue={initial.max||""} placeholder={t("Max","Đến")} aria-label={t("Maximum rental price in USD","Giá thuê tối đa (USD)")}/></div></div>;
+  return <div className={`rental-price-field ${advanced?"rental-advanced-budget":"search-field"}`}><span><Wallet size={15}/>{t("MONTHLY BUDGET · USD","NGÂN SÁCH THÁNG · USD")}</span><div><input name="min" type="number" min="0" step="any" defaultValue={initial.min||""} placeholder={t("Min","Từ")} aria-label={t("Minimum rental price in USD","Giá thuê tối thiểu (USD)")}/><span aria-hidden="true">—</span><input name="max" type="number" min="0" step="any" defaultValue={initial.max||""} placeholder={t("Max","Đến")} aria-label={t("Maximum rental price in USD","Giá thuê tối đa (USD)")}/></div></div>;
 }
 function BedroomField({initial,main=false}:{initial:Filters;main?:boolean}){
   const {t}=useSite();
@@ -25,7 +25,6 @@ function BathroomField({initial,main=false}:{initial:Filters;main?:boolean}){
 export function SearchForm({compact=false,initial={},action="/homes",roomsFirst=false}:{compact?:boolean;initial?:Filters;action?:string;roomsFirst?:boolean}) {
   const {t,content,language}=useSite();const id=useId(),trigger=useRef<HTMLButtonElement>(null);
   const [advanced,setAdvanced]=useState(!!(initial.q||initial.id||initial.amenity||(roomsFirst?(initial.min||initial.max):(initial.beds||initial.baths))));
-  const [period,setPeriod]=useState(initial.period||"month");
   const amenities=[...new Set([...Object.keys(AMENITIES),...content.properties.flatMap(p=>p.amenities.map(canonicalAmenity))])];
   const selected=(initial.amenity||"").split(",").map(canonicalAmenity);
   return <SpotlightCard className={`search-box rental-search ${compact?"rental-search-compact":""} ${roomsFirst?"rental-search-rooms-first":""}`}>
@@ -38,7 +37,7 @@ export function SearchForm({compact=false,initial={},action="/homes",roomsFirst=
         {roomsFirst?<div className="search-field rental-room-field"><BedroomField initial={initial} main/><BathroomField initial={initial} main/></div>:<BudgetField initial={initial}/>}
         <button className="button search-submit" type="submit"><Search size={18}/>{t("Find a rental","Tìm nhà thuê")}<ArrowRight size={17}/></button>
       </div>
-      <div className="rental-search-secondary"><span className="rental-requirements-hint">{roomsFirst?t("Budget, pets, gym, BBQ & more in Custom Requirements","Ngân sách, thú cưng, phòng tập, BBQ… trong Nhu cầu riêng"):t("Pets, gym, BBQ, lake views & more in Custom Requirements","Thú cưng, phòng tập, BBQ, tầm nhìn hồ… trong Nhu cầu riêng")}</span><label>{t("Prices per","Giá theo")}<SelectField name="period" value={period} onValueChange={setPeriod}><option value="month">{t("Month","Tháng")}</option><option value="week">{t("Week","Tuần")}</option><option value="night">{t("Night","Đêm")}</option></SelectField></label></div>
+      <div className="rental-search-secondary"><span className="rental-requirements-hint">{roomsFirst?t("Budget, pets, gym, BBQ & more in Custom Requirements","Ngân sách, thú cưng, phòng tập, BBQ… trong Nhu cầu riêng"):t("Pets, gym, BBQ, lake views & more in Custom Requirements","Thú cưng, phòng tập, BBQ, tầm nhìn hồ… trong Nhu cầu riêng")}</span></div>
       <Disclosure open={advanced} id={`${id}-panel`} labelledBy={`${id}-trigger`}><div className="rental-advanced" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();setAdvanced(false);trigger.current?.focus();}}}>
         {roomsFirst?<BudgetField initial={initial} advanced/>:<><BedroomField initial={initial}/><BathroomField initial={initial}/></>}
         <label>{t("Property ID","Mã bất động sản")}<input name="id" defaultValue={initial.id||""} placeholder="GH-000001" maxLength={80}/></label>

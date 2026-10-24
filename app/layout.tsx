@@ -11,6 +11,7 @@ import "./rental.css";
 import "./customer-experience.css";
 import "./mobile-refinements.css";
 import "./contact-widget.css";
+import "./staff-mobile-updates.css";
 import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";
 import { Header, Footer } from "@/components/site-shell";
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata():Promise<Metadata>{
   const base=await pageMetadata("/");
-  return {...base,metadataBase:new URL(siteUrl()),icons:{icon:"/favicon.svg",shortcut:"/favicon.svg"}};
+  return {...base,metadataBase:new URL(siteUrl()),icons:{icon:[{url:"/favicon.png",type:"image/png",sizes:"32x32"},{url:"/favicon-192.png",type:"image/png",sizes:"192x192"},{url:"/favicon.svg",type:"image/svg+xml",sizes:"any"}],shortcut:"/favicon.png",apple:[{url:"/apple-touch-icon.png",type:"image/png",sizes:"180x180"}]}};
 }
 
 export default async function RootLayout({

@@ -24,6 +24,6 @@ export function staffDataError(error: { code?: string } | null) {
   if (!error) return;
   if (["PGRST202", "42P01", "42883"].includes(error.code ?? "")) throw new StaffRequestError("Apply the staff access database migration before managing the team.", 503);
   if (error.code === "42501") throw new StaffRequestError("Your role cannot change this account. Refresh the team and check your permissions.", 403);
-  if (error.code === "23514") throw new StaffRequestError("Use the company email domain and check the staff details.", 400);
+  if (error.code === "23514") throw new StaffRequestError("Use an allowed company or Gmail address and check the staff details.", 400);
   throw new StaffRequestError("Couldn’t update staff access. Refresh the team before trying again.", 409);
 }

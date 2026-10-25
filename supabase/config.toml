@@ -159,9 +159,11 @@ additional_redirect_urls = [
   "http://127.0.0.1:3000/account",
   "http://127.0.0.1:3000/auth/reset",
   "http://127.0.0.1:3000/auth/invite",
+  "http://127.0.0.1:3000/auth/callback",
   "http://localhost:3000/account",
   "http://localhost:3000/auth/reset",
   "http://localhost:3000/auth/invite",
+  "http://localhost:3000/auth/callback",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -245,10 +247,14 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Local email templates. Hosted templates must also be configured in Auth settings.
+[auth.email.template.invite]
+subject = "Gary Home — Set your staff password / Đặt mật khẩu nhân viên"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Gary Home — Set or reset your password / Đặt lại mật khẩu"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

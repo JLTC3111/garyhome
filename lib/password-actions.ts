@@ -2,6 +2,24 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchWithDeadline } from "./requests.ts";
 
 export type PasswordLink={type:"invite"|"recovery";userId:string};
+export type EmailLinkIssue="expired"|"invalid";
+export type EmailTokenLink={type:PasswordLink["type"];tokenHash:string};
+export function emailTokenLink(hash:string,search=""):EmailTokenLink|null{
+  for(const source of [hash.replace(/^#/,""),search.replace(/^\?/,"")]){
+    const params=new URLSearchParams(source),type=params.get("type"),tokenHash=params.get("token_hash");
+    if((type==="invite"||type==="recovery")&&tokenHash&&/^[a-zA-Z0-9_-]{16,512}$/.test(tokenHash))return {type,tokenHash};
+  }
+  return null;
+}
+export function emailLinkIssue(hash:string,search=""):EmailLinkIssue|null{
+  for(const source of [hash.replace(/^#/,""),search.replace(/^\?/,"")]){
+    const params=new URLSearchParams(source);
+    if(params.get("error_code")==="otp_expired")return "expired";
+    if(params.has("error")||params.has("error_code")||params.has("error_description"))return "invalid";
+    if(params.has("token_hash")&&!emailTokenLink(hash,search))return "invalid";
+  }
+  return null;
+}
 export function passwordLinkEvidence(hash:string):PasswordLink|null{
   for(const type of ["invite","recovery"] as const){const userId=emailLinkIdentity(hash,type);if(userId)return {type,userId};}
   return null;

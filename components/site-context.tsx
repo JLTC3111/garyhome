@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
-import { passwordLinkEvidence, type PasswordLink } from "@/lib/password-actions";
+import { emailLinkIssue, emailTokenLink, passwordLinkEvidence, type PasswordLink, type EmailLinkIssue, type EmailTokenLink } from "@/lib/password-actions";
 import type { Content, Enquiry, Language } from "@/lib/types";
 import { languageValue, persistLanguage } from "@/lib/language";
 import { studioText } from "@/lib/studio-i18n";
@@ -29,6 +29,9 @@ type SiteContext = {
   configured: boolean; backendError: boolean; client: SupabaseClient | null; ready: boolean;
   user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
   passwordLink:PasswordLink|null;
+  passwordLinkIssue:EmailLinkIssue|null;
+  emailVerification:{type:PasswordLink["type"];busy:boolean;failed:boolean}|null;
+  verifyEmailLink:()=>Promise<void>;
   sessionPhase: SessionPhase; reconnect: () => Promise<void>;
   editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
@@ -40,6 +43,9 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   const router=useRouter(),routerRef=useRef(router);
   useEffect(()=>{routerRef.current=router;},[router]);
   const [passwordLink,setPasswordLink]=useState<PasswordLink|null>(null);
+  const [passwordLinkIssue,setPasswordLinkIssue]=useState<EmailLinkIssue|null>(null);
+  const [emailVerification,setEmailVerification]=useState<{type:PasswordLink["type"];busy:boolean;failed:boolean}|null>(null);
+  const pendingEmail=useRef<EmailTokenLink|null>(null),verificationFlight=useRef(false);
   const [content, updateContent] = useState(initial.content);
   const [backendError, setBackendError] = useState(initial.error);
   const [contentRecovering, setContentRecovering] = useState(false);
@@ -81,6 +87,30 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   const publicContentEpoch = useRef(0);
   const publicContentFlight = useRef<{ promise: Promise<void>; controller: AbortController } | null>(null);
   const activeUserId = user?.id;
+
+  const verifyEmailLink=useCallback(async()=>{
+    const input=pendingEmail.current,db=clientRef.current;
+    if(!input||!db||verificationFlight.current)return;
+    verificationFlight.current=true;setEmailVerification({type:input.type,busy:true,failed:false});
+    try{
+      const {data,error}=await request(()=>db.auth.verifyOtp({type:input.type,token_hash:input.tokenHash}));
+      if(error)throw error;
+      const verified=data.session;
+      if(!verified||!data.user||verified.user.id!==data.user.id)throw {code:"otp_expired"};
+      const current=await request(()=>db.auth.getSession());
+      if(current.error||current.data.session?.user.id!==verified.user.id||snapshotRef.current.user?.id!==verified.user.id)throw {code:"identity_changed"};
+      if(clientRef.current!==db||pendingEmail.current!==input)return;
+      pendingEmail.current=null;setPasswordLink({type:input.type,userId:verified.user.id});setPasswordLinkIssue(null);setEmailVerification(null);
+      const path=input.type==="invite"?"/auth/invite":"/auth/reset";
+      if(window.location.pathname!==path)routerRef.current.replace(path);
+    }catch(error){
+      if(clientRef.current!==db||pendingEmail.current!==input)return;
+      const code=(error as {code?:string})?.code;
+      if(["otp_expired","access_denied","validation_failed","identity_changed"].includes(code||"")){
+        pendingEmail.current=null;setEmailVerification(null);setPasswordLink(null);setPasswordLinkIssue(code==="otp_expired"?"expired":"invalid");
+      }else setEmailVerification({type:input.type,busy:false,failed:true});
+    }finally{verificationFlight.current=false;}
+  },[]);
 
   const recoverPublicContent = useCallback(async () => {
     const db = publicClientRef.current;
@@ -214,6 +244,20 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
           // Capture the intended identity before the SDK consumes the URL.
           let pendingLink=passwordLinkEvidence(window.location.hash||"");
           if(pendingLink)setPasswordLink(pendingLink);
+          setPasswordLinkIssue(emailLinkIssue(window.location.hash||"",window.location.search));
+          const token=emailTokenLink(window.location.hash||"",window.location.search);
+          if(token){
+            pendingEmail.current=token;setEmailVerification({type:token.type,busy:false,failed:false});
+            // Keep one-time credentials in memory, out of navigation/referrers.
+            const clean=new URL(window.location.href);
+            for(const params of [clean.searchParams,new URLSearchParams(clean.hash.slice(1))]){
+              if(!params.has("token_hash"))continue;params.delete("token_hash");params.delete("type");
+              if(params!==clean.searchParams)clean.hash=params.toString();
+            }
+            window.history?.replaceState(window.history.state,"",clean.pathname+clean.search+clean.hash);
+            const path=token.type==="invite"?"/auth/invite":"/auth/reset";
+            if(window.location.pathname!==path)routerRef.current.replace(path);
+          }
           setSessionPhase("checking");
           const response = await fetchWithDeadline("/api/config", { cache: "no-store" }, 10000);
           if (!response.ok) throw new Error("Configuration unavailable");
@@ -358,7 +402,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, passwordLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

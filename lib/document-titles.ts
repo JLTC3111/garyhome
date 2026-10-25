@@ -14,6 +14,7 @@ const pageTitles: Record<string, readonly [string, string]> = {
   "/login": ["Choose your login portal", "Chọn cổng đăng nhập"],
   "/account": ["Customer Portal", "Cổng khách hàng"],
   "/admin": ["Staff Portal · Gary Home Studio", "Cổng nhân viên · Gary Home Studio"],
+  "/auth/callback": ["Email verification", "Xác minh email"],
   "/auth/invite": ["Join the Gary Home team", "Gia nhập đội ngũ Gary Home"],
   "/auth/reset": ["Reset your password", "Đặt lại mật khẩu"],
   "/privacy": ["Privacy", "Chính sách bảo mật"],

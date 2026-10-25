@@ -24,6 +24,7 @@ async function harness(t, options={}){
  const browser=new EventTarget(),page=Object.assign(new EventTarget(),{visibilityState:'visible',documentElement:{lang:'en'},body:{style:{overflow:''}}});
  const network={onLine:!options.offline,userAgent:'Node.js',platform:'',maxTouchPoints:0},stored=new Map();
  browser.location=new URL(options.url??'https://gary.example/account');
+ browser.history={state:null,replaceState(_state,_title,url){browser.location=new URL(url,browser.location);}};
  // Headless controls inspect DOM constructors even when test-renderer refs are null.
  class TestElement {} class TestHTMLElement extends TestElement {}
  Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement});
@@ -65,6 +66,7 @@ async function harness(t, options={}){
   auth:{getSession:async()=>backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null}),onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};},
    signUp:async input=>{backend.authCalls.push({method:'signup',input});return {data:{session:null},error:null};},
    signInWithPassword:async input=>{backend.authCalls.push({method:'password',input});session=authSession('customer');callback?.('SIGNED_IN',session);return {data:{session},error:null};},
+   verifyOtp:async input=>{backend.authCalls.push({method:'verify',input});if(backend.verifyError)return {data:{session:null,user:null},error:backend.verifyError};session=authSession(options.verifyUser??'invited-staff');callback?.(input.type==='recovery'?'PASSWORD_RECOVERY':'SIGNED_IN',session);const verified=session;if(backend.verifySwitch){session=authSession('other-account');callback?.('SIGNED_IN',session);}return {data:{session:verified,user:verified.user},error:null};},
    resetPasswordForEmail:async(...input)=>{backend.authCalls.push({method:'reset',input});return {error:null};},
   },
   rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
@@ -111,7 +113,7 @@ async function harness(t, options={}){
   return loaded.exports;
  }
  const {SiteProvider,useSite}=load(path.join(base,'components/site-context.tsx'));
- const Page=options.page==='password'||options.page==='invite'?load(path.join(base,'components/password-reset.tsx')).PasswordReset
+ const Page=options.page==='password'||options.page==='invite'||options.page==='callback'?load(path.join(base,'components/password-reset.tsx')).PasswordReset
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
   :options.page==='staff'?load(path.join(base,'components/admin-page.tsx')).AdminPage
@@ -122,7 +124,7 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'})));
+ const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback'})));
  await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
@@ -287,13 +289,13 @@ test('password setup requires the matching email link and rejects an account swi
  const h=await harness(t,{customer:true,page:'invite',url:'https://gary.example/auth/invite#type=invite&access_token='+token});
  assert.equal(h.renderer.root.findAllByType('form').length,1);
  await h.emit(authSession('other-account'));
- assert.equal(h.renderer.root.findAllByType('form').length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/account changed/);
+ assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/account changed/);
  assert.equal(h.backend.passwordCalls.length,0);
 });
 
 test('opening staff password setup without an invitation cannot change an existing session password',async t=>{
  const h=await harness(t,{customer:true,page:'invite'});
- assert.equal(h.renderer.root.findAllByType('form').length,0);assert.equal(h.backend.passwordCalls.length,0);
+ assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);assert.equal(h.backend.passwordCalls.length,0);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Open the staff invitation link/);
 });
 
@@ -567,11 +569,11 @@ test('a reset form mounted after Supabase clears the hash retains the intended e
 });
 test('PASSWORD_RECOVERY navigates a fallback root redirect to the reset form without losing the session',async t=>{
  const h=await harness(t,{customer:true,page:'password',guest:true,url:'https://gary.example/'});
- assert.equal(h.renderer.root.findAllByType('form').length,0);
+ assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);
  await h.emitEvent('PASSWORD_RECOVERY',authSession('customer'));
  assert.deepEqual(h.backend.navigation,['/auth/reset']);assert.equal(h.browser.location.pathname,'/auth/reset');
  assert.equal(h.renderer.root.findAllByType('form').length,1);assert.deepEqual(h.site.passwordLink,{type:'recovery',userId:'customer'});
- await h.emit(authSession('another-customer'));assert.equal(h.renderer.root.findAllByType('form').length,0);
+ await h.emit(authSession('another-customer'));assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);
  assert.equal(h.backend.passwordCalls.length,0);
 });
 test('opening an enquiry persists read state and preserves a note edited while the read request is pending',async t=>{
@@ -637,4 +639,56 @@ test('Team access routes reset requests separately and confirms membership-only 
  assert.deepEqual(h.backend.teamCalls.filter(c=>c.method==='DELETE'),[{method:'DELETE',input:{user_id:'gmail-staff'}}]);
  assert.equal(h.backend.teamRows.some(m=>m.user_id==='gmail-staff'),false);
  assert.equal(h.renderer.root.findAllByProps({className:'team-member'}).length,1);
+});
+
+
+test('the reported expired callback shows a translated recovery form and never permits a password write',async t=>{
+ const h=await harness(t,{guest:true,page:'callback',url:'http://127.0.0.1:3000/auth/callback#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired&sb='});
+ assert.equal(h.renderer.root.findByType('h1').children.join(''),'Your email link has expired.');assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);
+ const form=()=>h.renderer.root.findByProps({className:'enquiry-form password-resend-form'});
+ await act(async()=>form().findByProps({name:'email'}).props.onChange({target:{value:' Staff@gmail.com '}}));
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});});
+ assert.deepEqual(h.backend.authCalls,[{method:'reset',input:['staff@gmail.com',{redirectTo:'http://127.0.0.1:3000/auth/reset'}]}]);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Use only the newest link/);assert.equal(h.backend.passwordCalls.length,0);
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('h1').children.join(''),'Liên kết email đã hết hạn.');assert.equal(form().findByProps({name:'email'}).props.value,' Staff@gmail.com ');
+});
+test('custom invitation links wait for explicit confirmation, scrub the token URL and then show password plus confirmation',async t=>{
+ const token='a'.repeat(64),h=await harness(t,{guest:true,page:'invite',url:'https://gary.example/auth/invite#token_hash='+token+'&type=invite'});
+ assert.equal(h.backend.authCalls.length,0);assert.equal(h.browser.location.hash,'');assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);
+ const confirm=()=>h.renderer.root.findByProps({className:'button password-verify-button'});
+ await act(async()=>{await confirm().props.onClick();await delay(8);});
+ assert.deepEqual(h.backend.authCalls,[{method:'verify',input:{type:'invite',token_hash:token}}]);
+ assert.equal(h.renderer.root.findByProps({name:'password'}).props.type,'password');assert.equal(h.renderer.root.findByProps({name:'confirm'}).props.minLength,12);
+ assert.deepEqual(h.site.passwordLink,{type:'invite',userId:'invited-staff'});
+ await act(async()=>{await h.renderer.root.findByProps({className:'enquiry-form password-create-form'}).props.onSubmit({preventDefault(){},currentTarget:{fields:{password:'A private staff password',confirm:'A private staff password'}}});});
+ assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.backend.passwordCalls[0].headers.get('authorization'),'Bearer test-token');
+ assert.equal(h.renderer.root.findByProps({className:'button'}).props.href,'/admin');
+});
+test('custom token verification errors offer a new link without granting a password form',async t=>{
+ const h=await harness(t,{guest:true,page:'invite',url:'https://gary.example/auth/invite?type=invite&token_hash='+'b'.repeat(64)});h.backend.verifyError={code:'otp_expired'};
+ await act(async()=>{await h.renderer.root.findByProps({className:'button password-verify-button'}).props.onClick();await delay(5);});
+ assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);assert.equal(h.site.passwordLink,null);assert.equal(h.backend.passwordCalls.length,0);
+ assert.equal(h.renderer.root.findByType('h1').children.join(''),'Your email link has expired.');assert.equal(h.browser.location.search,'');
+});
+test('switching accounts during custom verification cannot bind setup to the wrong user',async t=>{
+ const h=await harness(t,{guest:true,page:'invite',url:'https://gary.example/auth/invite#type=invite&token_hash='+'c'.repeat(64)});h.backend.verifySwitch=true;
+ await act(async()=>{await h.renderer.root.findByProps({className:'button password-verify-button'}).props.onClick();await delay(5);});
+ assert.equal(h.site.passwordLink,null);assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);assert.equal(h.backend.passwordCalls.length,0);
+});
+
+
+test('a custom staff link landing on the homepage retains verification while routing to setup',async t=>{
+ const h=await harness(t,{guest:true,page:'invite',deferPage:true,url:'https://gary.example/#type=invite&token_hash='+'d'.repeat(64)});
+ assert.deepEqual(h.backend.navigation,['/auth/invite']);assert.equal(h.browser.location.pathname,'/auth/invite');assert.equal(h.browser.location.hash,'');assert.equal(h.backend.authCalls.length,0);
+ await h.mountPage();assert.equal(h.renderer.root.findAllByProps({className:'button password-verify-button'}).length,1);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Tiếp tục đặt mật khẩu/);assert.equal(h.backend.authCalls.length,0);
+});
+test('a connection failure during verification releases the action and permits an explicit retry',async t=>{
+ const h=await harness(t,{guest:true,page:'invite',url:'https://gary.example/auth/invite#type=invite&token_hash='+'e'.repeat(64)});h.backend.verifyError={code:'unexpected_failure'};
+ const confirm=()=>h.renderer.root.findByProps({className:'button password-verify-button'});
+ await act(async()=>{await confirm().props.onClick();await delay(5);});
+ assert.equal(confirm().props.disabled,false);assert.equal(h.backend.authCalls.length,1);assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,0);
+ h.backend.verifyError=null;
+ await act(async()=>{await confirm().props.onClick();await delay(5);});
+ assert.equal(h.backend.authCalls.length,2);assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,1);
 });

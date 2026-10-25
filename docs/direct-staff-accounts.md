@@ -43,7 +43,7 @@ The staff login form now normalizes surrounding email whitespace and letter case
 
 Use the photo control at the bottom-left of Studio. JPG, PNG, WebP and AVIF uploads are limited to 2 MB and stored in `staff-avatars` under the authenticated user's folder. Storage policies and profile policies prevent staff from uploading to, or modifying, another person's profile. Current images cannot be deleted through the client while referenced.
 
-The avatar follows the account in Studio, the team directory, the signed-in public header, the customer account sidebar and notification actor thumbnails. Realtime events update open clients and normal session recovery refreshes the own profile.
+The avatar follows the account in Studio, the team directory, notification actor thumbnails and explicitly linked public listing profiles. Customer header controls and the customer account sidebar use customer identity rather than a staff portrait. Realtime events update open clients and normal session recovery refreshes the own profile.
 
 In **Authors & activities → Listing authors**, select **Linked staff photo** to connect an approved public listing profile to a staff account. Subsequent profile-photo changes update every linked author portrait. Separate approved portraits remain supported. Public portrait redirects use an anonymous client and return only portraits linked to a published profile of an active verified member; the lookup is not cached. The storage bucket is public because these images are intended for visible profiles. Names, email addresses and role-management data are not added to the public portrait endpoint.
 
@@ -64,3 +64,14 @@ For another existing project, apply [20261025055215_direct_staff_accounts_profil
 The homepage links to `https://garyvisaservice.vercel.app/` in a new tab. Enquiries and customer feedback use distinct sidebar icons. Feedback and commission headings/sidebar labels have additional left spacing. All new account guidance, controls and notifications support English and Vietnamese.
 
 Applied to project `duyiihsmaqfgwezmsnjs` on 25 October 2026. For another project, the explicit temporary-password controls require [20261025080124_staff_temporary_password_controls.sql](../supabase/migrations/20261025080124_staff_temporary_password_controls.sql) after the migrations above; fresh `setup.sql` includes it.
+
+
+## Re-adding someone after deleting staff access
+
+**Delete access** removes only the team assignment. It preserves the underlying Supabase Auth login and customer history. Creating another login for the same email is therefore a conflict, not a reason to delete the Auth user.
+
+The form now keeps action errors separate from directory-loading errors, so a background refresh cannot erase an unsuccessful creation message. For an existing email it offers **Assign and keep existing password** or **Assign and set temporary password**. The second option retains the entered password locally and shows an explicit replacement choice before the final submit. Existing credentials are never silently ignored or replaced.
+
+When replacement is selected, the server confirms the Auth email, assigns a permitted lower role, rechecks the target through the guarded temporary-password helper and sets the supplied password. If assignment succeeds but the password update cannot be confirmed, the response reports that partial outcome and loads the directory; it never reports password success. Password fields have a labelled visibility toggle, stay out of the parent draft and are masked again after clearing or changing setup mode.
+
+A live Supabase Auth check on 25 October 2026 created a disposable confirmed account, verified email/password sign-in, deleted that account, and confirmed that no disposable accounts remained. No real team member's credentials were changed by that check. HTTP transport was used because the local Node fetch transport could not reach the service. The role and partial-failure boundaries are tested separately in the API/database suites.

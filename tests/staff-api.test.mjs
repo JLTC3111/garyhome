@@ -22,13 +22,13 @@ function endpoint(options={}){
   if(name==='list_staff_accounts')value={data:state.members,error:null};
   return Promise.resolve(value).then(resolve,reject);
  }};return q;}};
- const admin={auth:{admin:{createUser:async input=>{state.creates.push(input);if(state.createError)return {data:{user:null},error:new Error('Auth creation failed')};state.existing=target;if(state.revokeDuringCreate)state.role=null;return {data:{user:{id:target}},error:null};},updateUserById:async(id,input)=>{state.confirms.push({id,input});return {data:{user:{id:state.mismatchedAuthId||id,email:state.resetTarget||'assigned@gmail.com',email_confirmed_at:state.unconfirmedAuth?null:'2026-10-01'}},error:state.confirmError?new Error('Unconfirmed'):null};}}}};
+ const admin={auth:{admin:{createUser:async input=>{state.creates.push(input);if(state.createError)return {data:{user:null},error:state.createErrorCode?{code:state.createErrorCode}:new Error('Auth creation failed')};state.existing=target;if(state.revokeDuringCreate)state.role=null;return {data:{user:{id:target}},error:null};},updateUserById:async(id,input)=>{state.confirms.push({id,input});return {data:{user:{id:state.mismatchedAuthId||id,email:state.resetTarget||'assigned@gmail.com',email_confirmed_at:state.unconfirmedAuth?null:'2026-10-01'}},error:state.confirmError||state.passwordConfirmError&&input.password?new Error('Unconfirmed'):null};}}}};
  const server={publicSupabase:()=>client,staffAdminClient:()=>{state.secretReads++;return state.secret?admin:null;}};
  const modules=new Map();function load(file){if(file.endsWith('/lib/server.ts'))return server;if(modules.has(file))return modules.get(file).exports;const result={exports:{}};modules.set(file,result);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
   const dependency=id=>{if(id==='@/lib/requests')return requests;if(id.startsWith('.')||id.startsWith('@/')){const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);return load(target.endsWith('.ts')?target:target+'.ts');}return require(id);};
   vm.runInThisContext('(function(exports,require,module){'+code+'\n})',{filename:file})(result.exports,dependency,result);return result.exports;
  }
- async function send(method='POST',value={},headers={}){return load(path.join(base,'app/api/admin/team/route.ts'))[method](new Request('https://gary.example/api/admin/team',{method,headers:{authorization:'Bearer valid-token',origin:'https://gary.example','content-type':'application/json',...headers},...(method==='GET'?{}:{body:JSON.stringify(method==='POST'?{email:'staff@gmail.com',full_name:'Team Staff',role:'editor',mode:'create',password,confirm_password:password,...value}:value)})}));}
+ async function send(method='POST',value={},headers={}){return load(path.join(base,'app/api/admin/team/route.ts'))[method](new Request('https://gary.example/api/admin/team',{method,headers:{authorization:'Bearer valid-token',origin:'https://gary.example','content-type':'application/json',...headers},...(method==='GET'?{}:{body:JSON.stringify(method==='POST'?{email:'staff@gmail.com',full_name:'Team Staff',role:'editor',mode:'create',...(value.mode==='assign'?{}:{password,confirm_password:password}),...value}:value)})}));}
  async function sendReset(value={},headers={}){return load(path.join(base,'app/api/admin/team/reset-password/route.ts')).POST(new Request('https://gary.example/api/admin/team/reset-password',{method:'POST',headers:{authorization:'Bearer valid-token',origin:'https://gary.example','content-type':'application/json',...headers},body:JSON.stringify({user_id:target,...value})}));}
  async function sendPassword(value={},headers={}){return load(path.join(base,'app/api/admin/team/set-password/route.ts')).POST(new Request('https://gary.example/api/admin/team/set-password',{method:'POST',headers:{authorization:'Bearer valid-token',origin:'https://gary.example','content-type':'application/json',...headers},body:JSON.stringify({user_id:target,password,confirm_password:password,...value})}));}
  return {state,send,sendReset,sendPassword};
@@ -110,4 +110,18 @@ test('protected, disabled, unassigned and revoked staff cannot have passwords ch
 });
 test('Auth failures and identity or confirmation mismatches never report a password success or expose the password',async()=>{
  for(const options of [{confirmError:true},{mismatchedAuthId:owner},{unconfirmedAuth:true}]){const h=endpoint(options),r=await h.sendPassword();assert.equal(r.status,503);assert.deepEqual(h.state.rpc.map(x=>x.args.failed),[false,true]);const body=await r.text();assert.ok(!body.includes(password));assert.doesNotMatch(body,/password_set/);}
+});
+
+
+test('existing-login conflicts provide a recoverable code without creating a duplicate identity',async()=>{
+ const h=endpoint({existing:target}),r=await h.send();assert.equal(r.status,409);assert.equal((await r.json()).code,'existing_login');assert.equal(h.state.creates.length,0);assert.equal(h.state.confirms.length,0);
+ const race=endpoint({createError:true,createErrorCode:'email_exists'}),conflict=await race.send();assert.equal(conflict.status,409);assert.equal((await conflict.json()).code,'existing_login');assert.equal(race.state.rpc.some(x=>x.name==='assign_staff_account'),false);
+});
+test('restoring an existing login can explicitly set the entered temporary password after fresh role assignment',async()=>{
+ const h=endpoint({existing:target}),r=await h.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});assert.equal(r.status,200);
+ assert.deepEqual(h.state.rpc.map(x=>x.name),['find_staff_account','assign_staff_account','staff_temporary_password_request']);assert.deepEqual(h.state.confirms.map(x=>x.input),[{email_confirm:true},{password,email_confirm:true}]);assert.equal(h.state.creates.length,0);assert.equal(h.state.resets.length,0);assert.deepEqual(await r.json(),{user_id:target,created:false,confirmed:true,password_set:true});
+});
+test('existing-password replacement needs explicit consent and reports partial assignment without claiming password success',async()=>{
+ const preserve=endpoint({existing:target}),rejected=await preserve.send('POST',{mode:'assign',password,confirm_password:password});assert.equal(rejected.status,400);assert.equal((await rejected.json()).code,'password_choice_required');assert.deepEqual(preserve.state.confirms,[]);
+ const failure=endpoint({existing:target,passwordConfirmError:true}),r=await failure.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});assert.equal(r.status,409);const body=await r.json();assert.equal(body.code,'staff_access_assigned_password_unconfirmed');assert.ok(!body.password_set);assert.ok(!JSON.stringify(body).includes(password));assert.ok(failure.state.rpc.some(x=>x.name==='assign_staff_account'));assert.equal(failure.state.rpc.at(-1).args.failed,true);
 });

@@ -40,6 +40,9 @@ test('every public, customer and staff route has a title in the selected languag
     ['/saved', 'Your saved homes', 'Nhà đã lưu'],
     ['/neighbourhoods', 'Find your kind of Hanoi', 'Tìm khu phố dành cho bạn'],
     ['/about', 'The Gary way', 'Về Gary Home'],
+    ['/services', 'Our services', 'Dịch vụ của chúng tôi'],
+    ['/tips-and-news', 'Tips & News', 'Cẩm nang & tin tức'],
+    ['/landlords', 'For landlords', 'Dành cho chủ nhà'],
     ['/contact', 'Contact us', 'Liên hệ'],
     ['/login', 'Choose your login portal', 'Chọn cổng đăng nhập'],
     ['/account', 'Customer Portal', 'Cổng khách hàng'],
@@ -155,4 +158,9 @@ test('late framework metadata and restored tabs cannot retain the wrong title or
   await h.unmount();
   h.page.title = 'Another page'; for (const observer of h.observers) observer.callback();
   assert.equal(h.page.title, 'Another page', 'Cleaned-up callbacks cannot change another page');
+});
+
+
+test('rental guide titles use the selected language and unknown articles stay not found',()=>{
+ assert.equal(documentTitle('/tips-and-news/viewing-checklist','en',[]),'Make the most of a property viewing | Gary Home');assert.equal(documentTitle('/tips-and-news/viewing-checklist','vi',[]),'Tận dụng buổi xem nhà | Gary Home');assert.equal(documentTitle('/tips-and-news/unknown','en',[]),'Page not found | Gary Home');
 });

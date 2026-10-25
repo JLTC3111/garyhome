@@ -496,5 +496,15 @@
   "Profile changes saved.": "Đã lưu thay đổi hồ sơ.",
   "Your profile is up to date.": "Hồ sơ của bạn đã được cập nhật.",
   "Profile changes saved. Your password has been updated.": "Đã lưu thay đổi hồ sơ và cập nhật mật khẩu.",
-  "Your password was updated. Refresh to update the reminder.": "Đã cập nhật mật khẩu. Hãy tải lại để cập nhật lời nhắc."
+  "Your password was updated. Refresh to update the reminder.": "Đã cập nhật mật khẩu. Hãy tải lại để cập nhật lời nhắc.",
+  "A login already exists for this email. Assign or restore staff access instead of creating another login.": "Email này đã có tài khoản đăng nhập. Hãy cấp hoặc khôi phục quyền nhân viên thay vì tạo tài khoản đăng nhập khác.",
+  "Removing staff access keeps the login account and customer history. Choose how to reuse this email.": "Khi xóa quyền nhân viên, tài khoản đăng nhập và lịch sử khách hàng vẫn được giữ lại. Hãy chọn cách sử dụng lại email này.",
+  "Assign and keep existing password": "Cấp quyền, giữ mật khẩu hiện tại",
+  "Assign and set temporary password": "Cấp quyền và đặt mật khẩu tạm thời",
+  "Set a new temporary password for this existing login": "Đặt mật khẩu tạm thời mới cho tài khoản hiện có",
+  "This explicitly replaces the existing login password. Customer history is preserved.": "Thao tác này thay mật khẩu đăng nhập hiện tại. Lịch sử khách hàng được giữ nguyên.",
+  "Staff access assigned and temporary password saved. Use the regular Staff portal to sign in.": "Đã cấp quyền nhân viên và lưu mật khẩu tạm thời. Đăng nhập tại cổng Nhân viên như bình thường.",
+  "Choose Set a temporary password to replace the existing password, or leave both password fields blank.": "Chọn đặt mật khẩu tạm thời để thay mật khẩu hiện tại, hoặc để trống cả hai ô mật khẩu.",
+  "Supabase rejected this password. Choose a stronger password and try again.": "Mật khẩu này chưa đáp ứng yêu cầu. Hãy chọn mật khẩu mạnh hơn và thử lại.",
+  "Staff access was assigned, but the temporary password was not confirmed. Use Set temporary password in the directory before sharing credentials.": "Đã cấp quyền nhân viên nhưng chưa xác nhận được mật khẩu tạm thời. Hãy dùng Đặt mật khẩu tạm thời trong danh sách nhân viên trước khi chia sẻ thông tin đăng nhập."
 }

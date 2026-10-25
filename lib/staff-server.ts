@@ -3,7 +3,7 @@ import { canManageStaff, type StaffRole } from "./staff";
 
 export class StaffRequestError extends Error {
   readonly status: number;
-  constructor(message: string, status = 400) { super(message); this.status = status; }
+  constructor(message: string, status = 400,readonly code?:string) { super(message); this.status = status; }
 }
 export async function staffRequest(request: Request, signal: AbortSignal) {
   const origin = request.headers.get("origin");

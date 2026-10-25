@@ -1,0 +1,61 @@
+.about-navigation{position:relative}
+.about-navigation>button{display:flex;align-items:center;gap:6px;font:inherit;min-height:44px;padding:10px 0;color:var(--ink)}
+.about-navigation>button[aria-expanded="true"]{color:var(--green)}
+.about-dropdown{position:absolute;top:calc(100% + 14px);right:0;width:280px;background:#fffefb;border:1px solid #d9e1d2;border-radius:16px;padding:10px;box-shadow:0 16px 40px #18332320;z-index:70;animation:about-drop-in 140ms ease-out}
+.about-dropdown>a{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 15px;border-radius:9px;font-size:14px;font-weight:500;line-height:1.6;color:#304b39;min-height:48px}
+.about-dropdown>a:hover,.about-dropdown>a:focus-visible{background:#eaf0e2;color:#1f3d29;outline:none}
+.about-dropdown>a>svg{flex:none;opacity:.7}
+.about-breadcrumb{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px;line-height:1.8;color:#65765e;margin-bottom:37px}
+.about-breadcrumb a{text-decoration:underline;text-underline-offset:4px}
+.about-section-hero{display:grid;grid-template-columns:1fr 1fr;gap:65px;align-items:center}
+.about-section-hero h1,.landlord-layout h1,.rental-guide-article h1{font-size:clamp(34px,4.3vw,61px);line-height:1.14;letter-spacing:-.035em;white-space:pre-line}
+.about-section-hero .intro-text,.landlord-layout .intro-text{font-size:15px;line-height:1.95;margin:25px 0}
+.about-section-hero>img{width:100%;height:440px;object-fit:cover;border-radius:18px 18px 80px 18px}
+.service-directory{display:grid;grid-template-columns:1fr 1fr;gap:34px 52px;margin-top:75px}
+.service-directory>section{display:flex;gap:22px;border-top:1px solid #dce2d4;padding-top:28px}
+.service-number{font-size:12px;font-weight:500;color:#849477;padding-top:6px;flex:none}
+.service-directory section>div:last-child>svg{color:#71865d;margin-bottom:17px}
+.service-directory h2{font-size:28px;line-height:1.25;margin-bottom:15px}
+.service-directory p{font-size:13px;line-height:1.95;color:#61705a;margin-bottom:18px}
+.rental-guide-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.rental-guide-card{display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:29px;background:#f1f3e9;border:1px solid #dee5d6;border-radius:14px;transition:background 150ms ease,border-color 150ms ease}
+.rental-guide-card:hover,.rental-guide-card:focus-visible{background:#e7eddd;border-color:#9cae8a;outline:2px solid transparent}
+.guide-card-top{display:flex;justify-content:space-between;gap:20px;width:100%;font-size:9px;letter-spacing:.1em;color:#627452;margin-bottom:36px}
+.rental-guide-card>svg{color:#7b8e66;margin-bottom:22px}
+.rental-guide-card h2{font-size:29px;line-height:1.2;margin-bottom:15px}
+.rental-guide-card p{font-size:13px;line-height:1.9;color:#5a6c52;margin-bottom:25px}
+.rental-guide-card>.text-link{margin-top:auto}
+.rental-guide-article{max-width:860px}
+.rental-guide-article>header{margin:43px 0 48px}
+.rental-guide-article .intro-text{font-size:16px;line-height:1.9;margin-top:24px;color:#5a6d54}
+.rental-guide-article>section{margin-top:35px}
+.rental-guide-article>section h2{font-size:31px;line-height:1.3;margin-bottom:16px}
+.rental-guide-article ul{padding-left:22px}
+.rental-guide-article li{font-size:15px;line-height:1.95;margin-bottom:15px;padding-left:5px;color:#465e43}
+.landlord-layout{display:grid;grid-template-columns:1fr 1fr;gap:65px;align-items:start}
+.landlord-steps{margin-top:37px}
+.landlord-steps>section{display:flex;gap:16px;padding:23px 0;border-top:1px solid #dce3d3}
+.landlord-steps>section>svg{flex:none;color:#788b65;margin-top:3px}
+.landlord-steps h2{font-family:var(--sans);font-size:16px;font-weight:500;margin-bottom:9px;line-height:1.6}
+.landlord-steps p{font-size:13px;color:#5b6c52;line-height:1.95}
+.landlord-form-card{background:#fff;border:1px solid #e1e5da;padding:35px;border-radius:15px}
+.landlord-form-card>h2{font-size:34px;line-height:1.25}
+.landlord-form-card>p{font-size:12px;line-height:1.9;color:#69785c;margin:13px 0 28px}
+.password-control{position:relative;display:block;width:100%;min-width:0}
+.enquiry-form .password-control>input{width:100%;padding-right:52px}
+.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;min-height:36px;padding:0;display:grid;place-items:center;color:inherit;border:0;border-radius:7px;background:transparent;opacity:.8}
+.password-toggle:hover{opacity:1;background:#58704612}
+.password-toggle:focus-visible{outline:2px solid #6c8756;outline-offset:1px;opacity:1}
+.password-toggle:disabled{opacity:.35;cursor:default}
+.team-existing-login-callout{border:1px solid #c8d9b6;background:#f0f5e9;padding:19px 22px;border-radius:10px;margin-bottom:22px}
+.team-existing-login-callout>p{font-size:12px;line-height:1.9;color:#3a5636}
+.team-existing-login-callout>div{display:flex;flex-wrap:wrap;gap:12px;margin-top:15px}
+.team-existing-login-callout .button{font-size:11px;min-height:40px;white-space:normal}
+.team-invite-form label.team-password-choice{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.8;color:#405c38}
+.team-invite-form label.team-password-choice>input{width:18px;height:18px;min-height:18px;flex:0 0 18px;margin-top:3px;accent-color:var(--green)}
+@keyframes about-drop-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:1000px){.about-section-hero,.landlord-layout{gap:35px}.rental-guide-grid{gap:15px}.rental-guide-card{padding:23px}.rental-guide-card h2{font-size:25px}.landlord-form-card{padding:27px}}
+@media(max-width:760px){.about-section-hero,.landlord-layout{grid-template-columns:1fr;gap:35px}.about-section-hero>img{height:330px}.service-directory{gap:30px;margin-top:50px}.rental-guide-grid{grid-template-columns:1fr}.rental-guide-card h2{font-size:31px}.guide-card-top{margin-bottom:24px}.landlord-form-card{padding:28px 23px}}
+@media(max-width:1200px){.about-navigation{width:100%}.main-nav .about-navigation>button{width:100%;justify-content:space-between;padding:13px 0;font-size:15px}.about-dropdown{position:static;width:100%;margin-top:0;box-shadow:none;padding:5px 8px;border-radius:10px;animation:none}.main-nav .about-dropdown>a{font-size:13px;padding:12px;min-height:44px;border:0}}
+@media(max-width:680px){.about-breadcrumb{margin-bottom:28px;font-size:11px}.service-directory{grid-template-columns:1fr}.about-section-hero>img{height:280px;border-bottom-right-radius:45px}.rental-guide-article li{font-size:14px}.landlord-layout h1{font-size:39px}.about-section-page .simple-cta{padding-inline:20px}.team-existing-login-callout{padding:17px}.team-existing-login-callout>div{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.about-dropdown{animation:none}.rental-guide-card{transition:none}}

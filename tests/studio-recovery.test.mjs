@@ -42,9 +42,10 @@ async function harness(t, options={}){
     if(backend.teamPending)await backend.teamPending.promise;
     return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn','gmail.com'],directCreationEnabled:true});
    }
-   if(method==='POST'){const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});if(existing)backend.teamRows=backend.teamRows.map(m=>m.email.toLowerCase()===data.email.toLowerCase()?{...m,confirmed:true}:m);return Response.json(backend.teamResult??{created:data.mode!=='assign',confirmed:true});}
+   if(method==='POST'){if(backend.teamPostError)return Response.json(backend.teamPostError,{status:409});const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});if(existing)backend.teamRows=backend.teamRows.map(m=>m.email.toLowerCase()===data.email.toLowerCase()?{...m,confirmed:true}:m);return Response.json(backend.teamResult??{created:data.mode!=='assign',confirmed:true,...(data.replace_password?{password_set:true}:{})});}
    return Response.json({user_id:'changed-staff'});
   }
+  if(String(input)==='/api/enquiries'){backend.enquiryPosts??=[];backend.enquiryPosts.push({data:JSON.parse(init.body),headers:new Headers(init.headers)});return Response.json({ok:true},{status:201});}
   if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return backend.passwordError?Response.json({message:'Auth unavailable'},{status:503}):Response.json({});}
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
@@ -119,6 +120,9 @@ async function harness(t, options={}){
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
   :options.page==='staff'?load(path.join(base,'components/admin-page.tsx')).AdminPage
+  :options.page==='services'?load(path.join(base,'components/about-sections.tsx')).ServicesPage
+  :options.page==='tips'?load(path.join(base,'components/about-sections.tsx')).TipsPage
+  :options.page==='landlords'?load(path.join(base,'components/about-sections.tsx')).LandlordsPage
   :options.customer?load(path.join(base,'components/account-page.tsx')).AccountPage:load(path.join(base,'components/admin-page.tsx')).AdminPage;
  let site,renderer;
  function Probe(){site=useSite();return null;}
@@ -239,7 +243,7 @@ test('password recovery returns existing staff to Studio',async t=>{
 test('personal email signup confirms the mailbox without staff access',async t=>{
  const h=await harness(t,{customer:true,guest:true});
  const button=label=>h.renderer.root.findAllByType('button').find(node=>node.children.includes(label));
- const labels=()=>h.renderer.root.findAllByType('button').map(node=>node.children.filter(child=>typeof child==='string').join('').trim());
+ const labels=()=>h.renderer.root.findAllByType('button').map(node=>node.children.filter(child=>typeof child==='string').join('').trim()).filter(Boolean);
  assert.deepEqual(labels(),['Sign in','Create an account','Forgot password?']);
  await act(async()=>{h.site.setLanguage('vi');});
  assert.deepEqual(labels(),['Đăng nhập','Tạo tài khoản','Quên mật khẩu?']);
@@ -837,4 +841,44 @@ test('an unconfirmed photo write cannot be acknowledged by Save changes',async t
  await act(async()=>{h.backend.upload.resolve({data:{path:'stored'},error:null});await delay(8);});
  const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.equal(form.findAllByType('button').find(b=>b.children.includes('Save changes')).props.disabled,true);
  await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByType('dialog').length,1);assert.equal(h.renderer.root.findAllByProps({className:'staff-profile-toast'}).length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the photo update/);assert.equal(h.backend.passwordCalls.length,0);
+});
+
+
+test('duplicate staff conflicts survive a background refresh and offer explicit password replacement when restoring access',async t=>{
+ const h=await harness(t);await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
+ await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Returning colleague'}});form().findByProps({name:'email'}).props.onChange({target:{value:'returning@gmail.com'}});form().findByProps({name:'password'}).props.onChange({target:{value:'A new temporary colleague password'}});form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A new temporary colleague password'}});});
+ h.backend.teamPostError={code:'existing_login',error:'A login already exists for this email. Assign or restore staff access instead of creating another login.'};
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.renderer.root.findAllByProps({className:'team-existing-login-callout'}).length,1);
+ await act(async()=>{h.browser.dispatchEvent(new Event('gary-staff-directory-changed'));await delay(5);});assert.match(JSON.stringify(h.renderer.toJSON()),/A login already exists/);
+ await act(async()=>h.renderer.root.findAllByType('button').find(n=>n.children.includes('Assign and set temporary password')).props.onClick());assert.equal(form().findByProps({name:'password'}).props.value,'A new temporary colleague password');
+ h.backend.teamPostError=null;await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const posts=h.backend.teamCalls.filter(x=>x.method==='POST');assert.equal(posts.length,2);assert.equal(posts[1].input.mode,'assign');assert.equal(posts[1].input.replace_password,true);assert.equal(posts[1].input.password,'A new temporary colleague password');assert.match(JSON.stringify(h.renderer.toJSON()),/temporary password saved/);
+});
+test('password visibility controls reveal only the primary field and mask it again after clearing',async t=>{
+ const h=await harness(t);await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
+ await act(async()=>form().findByProps({name:'password'}).props.onChange({target:{value:'A private password to reveal'}}));
+ await act(async()=>form().findByProps({'aria-label':'Show password'}).props.onClick({preventDefault(){}}));assert.equal(form().findByProps({name:'password'}).props.type,'text');assert.equal(form().findByProps({name:'confirm_password'}).props.type,'password');assert.equal(form().findByProps({'aria-label':'Hide password'}).props['aria-pressed'],true);
+ await act(async()=>h.site.setLanguage('vi'));assert.ok(form().findByProps({'aria-label':'Ẩn mật khẩu'}));assert.equal(form().findByProps({name:'password'}).props.value,'A private password to reveal');
+ await act(async()=>form().findByProps({name:'password'}).props.onChange({target:{value:''}}));assert.equal(form().findByProps({name:'password'}).props.type,'password');
+});
+test('the customer header never borrows a signed-in owner staff photo; About Us excludes agent and testimonial links',async t=>{
+ const h=await harness(t,{page:'header',path:'/'});h.backend.profilePaths=new Map([['owner','owner/private-staff-avatar.png']]);await act(async()=>h.site.refreshStaffProfile());
+ for(const link of h.renderer.root.findAllByType('a').filter(n=>n.props.className?.includes('customer-login-link')))assert.equal(link.findAllByType('img').length,0);
+ const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
+ const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/about','/services','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Dịch vụ của chúng tôi/);
+ const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({id:'about-navigation-links'}).length,0);
+});
+test('the landlord page translates and submits the real landlord enquiry kind',async t=>{
+ const h=await harness(t,{page:'landlords'});const form=h.renderer.root.findByType('form');assert.ok(h.renderer.root.findAllByType('input').some(n=>n.props.name==='name'));
+ const fields={name:'Property Owner',email:'owner@example.invalid',phone:'',message:'Apartment in Hanoi available for rental.',preferred_date:'',consent:'on',website:''};
+ await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts.length,1);assert.equal(h.backend.enquiryPosts[0].data.kind,'landlord');assert.equal(h.backend.enquiryPosts[0].headers.get('authorization'),'Bearer test-token');
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Đội ngũ đã nhận yêu cầu/);
+});
+
+
+test('Tips & News links real guide pages and translates without fabricated article dates',async t=>{
+ const h=await harness(t,{page:'tips'});const paths=h.renderer.root.findAllByType('a').map(n=>n.props.href).filter(x=>x?.startsWith('/tips-and-news/'));assert.equal(new Set(paths).size,3);assert.ok(paths.includes('/tips-and-news/viewing-checklist'));
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/CẨM NANG THUÊ NHÀ/);assert.equal(h.renderer.root.findAllByType('time').length,0);
 });

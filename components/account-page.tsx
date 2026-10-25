@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "./password-input";
 import { SelectField } from "./select-field";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -86,7 +87,7 @@ function CustomerAuth() {
         : <form className="enquiry-form" aria-label={t("Customer account access", "Truy cập tài khoản khách hàng")} onSubmit={submit}>
           {mode === "signup" && <label>{t("Your name", "Họ và tên")}<input name="full_name" required minLength={2} maxLength={120} autoComplete="name"/></label>}
           <label>{t("Personal email address", "Địa chỉ email cá nhân")}<input name="email" type="email" required maxLength={254} autoComplete="email"/></label>
-          {mode !== "reset" && <label>{t("Password", "Mật khẩu")}<input name="password" type="password" required minLength={mode === "signup" ? 12 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"}/>{mode === "signup" && <small>{t("Use at least 12 characters.", "Sử dụng ít nhất 12 ký tự.")}</small>}</label>}
+          {mode !== "reset" && <label>{t("Password", "Mật khẩu")}<PasswordInput key={mode} inputProps={{"name":"password","required":true,"minLength":mode === "signup" ? 12 : undefined,"autoComplete":mode === "signup" ? "new-password" : "current-password"}}/>{mode === "signup" && <small>{t("Use at least 12 characters.", "Sử dụng ít nhất 12 ký tự.")}</small>}</label>}
           {mode === "signup" && <label>{t("Confirm password", "Xác nhận mật khẩu")}<input ref={confirmPassword} name="confirm_password" type="password" required minLength={12} autoComplete="new-password"/></label>}
           {mode === "signup" && <label className="consent-label"><input name="consent" type="checkbox" required/><span>{t("I agree to the", "Tôi đồng ý với")} <Link href="/privacy" target="_blank">{t("privacy policy", "chính sách bảo mật")}</Link>.</span></label>}
           {message && <div className="form-info" role="status"><Check size={17}/>{message}</div>}
@@ -107,7 +108,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   setDraft: (next: CustomerProfile | null | ((previous: CustomerProfile | null) => CustomerProfile | null)) => void;
   clearDraft: () => void;
 }) {
-  const { t, content, language, client, staffProfile, user: currentUser, editor, sessionPhase, accountTask, reconnect, saved, savedReady, savedError, importSaved, notice } = useSite();
+  const { t, content, language, client, user: currentUser, editor, sessionPhase, accountTask, reconnect, saved, savedReady, savedError, importSaved, notice } = useSite();
   const [tab, setTab] = useState<AccountTab>("overview"), [enquiries, setEnquiries] = useState<CustomerEnquiry[]>([]);
   const [profile, setProfile] = useState<CustomerProfile | null>(null), [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState("");
@@ -208,7 +209,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   return <section className="container account-page">
     <PortalSwitcher active="customer"/>
     <div className="account-heading"><div><div className="eyebrow">{t("CUSTOMER PORTAL", "CỔNG KHÁCH HÀNG")}</div><h1>{firstName ? t(`Hello, ${firstName}.`, `Xin chào, ${firstName}.`) : t("A little closer to home.", "Gần hơn với tổ ấm.")}</h1><p>{t("Your saved homes, enquiries and viewing plans.", "Nhà đã lưu, yêu cầu và kế hoạch xem nhà của bạn.")}</p></div><Link href="/homes" className="button button-outline">{t("Keep exploring", "Tiếp tục tìm nhà")}<ArrowUpRight size={17}/></Link></div>
-    <div className="account-layout"><aside className="account-sidebar"><div className="account-person"><span className="avatar">{staffProfile?.avatar_path&&client?<img className="account-staff-avatar" src={client.storage.from("staff-avatars").getPublicUrl(staffProfile.avatar_path).data.publicUrl} alt=""/>:(firstName||user.email||"G")[0].toUpperCase()}</span><div><strong>{profile?.full_name || defaultProfile.full_name || t("Your account", "Tài khoản của bạn")}</strong><small>{user.email}</small></div></div>
+    <div className="account-layout"><aside className="account-sidebar"><div className="account-person"><span className="avatar">{(firstName||user.email||"G")[0].toUpperCase()}</span><div><strong>{profile?.full_name || defaultProfile.full_name || t("Your account", "Tài khoản của bạn")}</strong><small>{user.email}</small></div></div>
       <nav aria-label={t("Customer account", "Tài khoản khách hàng")}><AnimatedBackground activeValue={tab}>{tabs.map(([id, label, Icon]) => <button key={id} data-id={id} className={tab === id ? "selected" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}><Icon size={18}/>{label}{id === "saved" && savedReady && <span>{saved.length}</span>}</button>)}</AnimatedBackground></nav>
       <div className="account-sidebar-bottom">{editor && <Link href="/admin"><ShieldCheck size={16}/>{t("Open staff Studio", "Mở Studio nhân viên")}<ArrowUpRight size={14}/></Link>}<button onClick={() => void signOut()} disabled={!!busy}><LogOut size={16}/>{t("Sign out", "Đăng xuất")}</button></div>
     </aside><div className="account-main">

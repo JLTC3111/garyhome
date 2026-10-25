@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "./password-input";
 import { useEffect,useId,useRef,useState,type FormEvent } from "react";
 import { KeyRound,LoaderCircle,X } from "lucide-react";
 import type { StaffAccount } from "@/lib/staff";
@@ -18,7 +19,7 @@ export function StaffTemporaryPassword({member,busy,error,close,save}:{member:St
   <div className="temporary-password-target"><strong>{member.display_name||member.email}</strong><span>{member.email}</span></div>
   <p className="form-info">{text("This replaces this staff account’s current password. Its role and customer history stay unchanged. No email link is required.")}</p>
   <form className="enquiry-form staff-password-form" onSubmit={submit}>
-   <label>{text("Temporary password")}<input name="temporary_password" type="password" autoComplete="new-password" minLength={12} maxLength={128} value={password} required disabled={busy} onChange={event=>setPassword(event.target.value)}/></label>
+   <label>{text("Temporary password")}<PasswordInput inputProps={{"name":"temporary_password","autoComplete":"new-password","minLength":12,"maxLength":128,"value":password,"required":true,"disabled":busy,"onChange":event=>setPassword(event.target.value)}}/></label>
    <label>{text("Confirm password")}<input name="confirm_temporary_password" type="password" autoComplete="new-password" minLength={12} maxLength={128} value={confirmation} required disabled={busy} onChange={event=>setConfirmation(event.target.value)}/></label>
    <p className="small muted">{text("They sign in at the regular Staff portal using this password, then change it in their profile. Share the password privately.")}</p>
    {(error||validation)&&<p className="form-error" role="alert">{text(error||validation)}</p>}

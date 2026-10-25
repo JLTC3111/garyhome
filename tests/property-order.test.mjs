@@ -10,5 +10,5 @@ test('manual ordering is stable, ignores unavailable IDs and leaves unarranged p
 test('only owner, admin and manager assignments allow card ordering',()=>{
  for(const role of ['owner','admin','manager'])assert.equal(canReorderProperties(role),true);
  for(const role of ['editor','customer',undefined,null])assert.equal(canReorderProperties(role),false);
- assert.equal(isStaffRole('manager'),true);assert.equal(canManageStaff('manager'),false);
+ assert.equal(isStaffRole('manager'),true);assert.equal(canManageStaff('manager'),true);
 });

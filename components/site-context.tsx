@@ -16,7 +16,7 @@ import { contentAssets } from "@/lib/content-assets";
 import { propertyOrders } from "@/lib/property-order";
 import { readBrowserFavourites } from "@/lib/favourites";
 import { isPublicRental } from "@/lib/rentals";
-import type { StaffRole } from "@/lib/staff";
+import type { StaffRole,StaffProfile } from "@/lib/staff";
 
 type Update<T> = T | ((previous: T) => T);
 type SiteContext = {
@@ -28,6 +28,7 @@ type SiteContext = {
   compare: string[]; toggleCompare: (id: string) => void;
   configured: boolean; backendError: boolean; client: SupabaseClient | null; ready: boolean;
   user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
+  staffProfile:StaffProfile|null;refreshStaffProfile:()=>Promise<void>;
   passwordLink:PasswordLink|null;
   passwordLinkIssue:EmailLinkIssue|null;
   emailVerification:{type:PasswordLink["type"];busy:boolean;failed:boolean}|null;
@@ -43,6 +44,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   const router=useRouter(),routerRef=useRef(router);
   useEffect(()=>{routerRef.current=router;},[router]);
   const [passwordLink,setPasswordLink]=useState<PasswordLink|null>(null);
+  const [staffProfile,setStaffProfile]=useState<StaffProfile|null>(null);
   const [passwordLinkIssue,setPasswordLinkIssue]=useState<EmailLinkIssue|null>(null);
   const [emailVerification,setEmailVerification]=useState<{type:PasswordLink["type"];busy:boolean;failed:boolean}|null>(null);
   const pendingEmail=useRef<EmailTokenLink|null>(null),verificationFlight=useRef(false);
@@ -87,6 +89,17 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   const publicContentEpoch = useRef(0);
   const publicContentFlight = useRef<{ promise: Promise<void>; controller: AbortController } | null>(null);
   const activeUserId = user?.id;
+
+  const refreshStaffProfile=useCallback(async()=>{
+    const db=clientRef.current,state=sessionRef.current?.state;
+    if(!db||!state?.editor||!state.user){setStaffProfile(null);return;}
+    const id=state.user.id,generation=state.generation;
+    const {data,error}=await request(signal=>db.rpc("get_staff_profile").abortSignal(signal));
+    if(error)throw error;
+    const current=sessionRef.current?.state;
+    if(current?.user?.id!==id||current.generation!==generation||!current.editor)return;
+    if(data&&data.user_id===id)setStaffProfile(data as StaffProfile);
+  },[]);
 
   const verifyEmailLink=useCallback(async()=>{
     const input=pendingEmail.current,db=clientRef.current;
@@ -283,13 +296,13 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
               const previous = snapshotRef.current; snapshotRef.current = next;
               setUser(next.user); setEditor(next.editor); setStaffRole(next.role); setSessionPhase(next.phase);
               if (previous.user?.id !== next.user?.id) {
-                savedVersion.current++; setSavedAccount(null); setSavedError(""); setPendingSaved([]);
+                setStaffProfile(null);savedVersion.current++; setSavedAccount(null); setSavedError(""); setPendingSaved([]);
                 if (next.user) setSaved([]);
                 else { try { setSaved(readBrowserFavourites(localStorage)); } catch { setSaved([]); } }
               }
               if (next.phase !== "checking" && next.phase !== "recovering") setReady(true);
               if (previous.user && (next.user?.id !== previous.user.id || previous.editor && !next.editor && next.phase === "ready")) {
-                version.current++; updateEnquiries([]); updateContent(initialRef.current);
+                if(!next.editor)setStaffProfile(null);version.current++; updateEnquiries([]); updateContent(initialRef.current);
                 if(next.user?.id!==previous.user.id)setPasswordLink(null);
               }
             },
@@ -401,8 +414,29 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   function toggleCompare(id: string) { setCompare(previous => previous.includes(id) ? previous.filter(x => x !== id) : previous.length < 3 ? [...previous, id] : (setToast(language === "en" ? "Compare up to 3 homes at a time." : "So sánh tối đa 3 căn hộ."), previous)); }
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
+  useEffect(()=>{
+    if(!client)return;
+    let active=true;
+    if(editor&&sessionPhase==="ready")void refreshStaffProfile().catch(()=>{});
+    const changed=()=>{
+      if(editor)void refreshStaffProfile().catch(()=>{});
+      const state=snapshotRef.current,actor=state.user?.id,generation=state.generation;
+      void request(async signal=>{
+        let query=client.from("listing_authors").select("*");if(!editor)query=query.eq("published",true);
+        return await query.order("sort_order").abortSignal(signal);
+      }).then(({data,error})=>{
+        if(!active||error||snapshotRef.current.user?.id!==actor||snapshotRef.current.generation!==generation||!Array.isArray(data))return;
+        version.current++;updateContent(previous=>({...previous,authors:data}));initialRef.current={...initialRef.current,authors:data.filter(a=>a.published)};
+      }).catch(()=>{});
+      window.dispatchEvent(new Event("gary-staff-directory-changed"));
+    };
+    window.addEventListener("gary-staff-profile-changed",changed);
+    const channel=typeof client.channel==="function"?client.channel("gary-staff-portraits").on("postgres_changes",{event:"*",schema:"public",table:"staff_profiles"},changed).subscribe():null;
+    return()=>{active=false;window.removeEventListener("gary-staff-profile-changed",changed);if(channel)void client.removeChannel(channel);};
+  },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
+
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

@@ -40,7 +40,7 @@ The app automatically switches from preview to live mode when both configuration
 
 Customers register and sign in with a personal email and password at `/account`. Email signup requires mailbox confirmation. Staff sign in at `/admin` using company accounts explicitly assigned by an owner or administrator. A company address alone grants no staff permissions. The allowed staff domains are `@garyhome.com` and `@icue.vn`. The existing owner account is preserved.
 
-For the existing Gary Home project, apply `supabase/migrations/20261022042327_customer_social_auth_staff_access.sql` after the earlier migrations. This existing migration contains the staff access rules and retains its applied filename. **Studio → Team access** lets owners/admins create invitations, assign roles to existing company or Gmail accounts, reset passwords, and remove eligible staff access. New invitations require a server-only `SUPABASE_SECRET_KEY`; customer access and existing-account assignments use the publishable key and RLS. The privacy page provides data-deletion request instructions at `/privacy#data-deletion`.
+Staff access is managed in **Studio → Team access**. Owners can create Admin, Manager or Staff accounts; Admins can create Manager or Staff accounts; Managers can create Staff accounts. New accounts use a temporary password and automatic confirmation, with a reminder to change the password after login. Existing logins can be assigned without replacing their password or customer history. Direct creation requires the server-only `SUPABASE_SECRET_KEY`. See [the current staff guide](docs/direct-staff-accounts.md) for migrations, photos and persistent notifications. Customer registration still uses email confirmation.
 
 See **[the authentication setup guide](docs/auth-setup.md)** for the exact project, company domains, email confirmation and recovery redirects, staff invitations, secret handling, and live verification steps. Rebuild fresh-project SQL with `node scripts/build-setup.mjs` after adding a migration.
 
@@ -119,3 +119,5 @@ The latest navigation, Favourites, restored hero/theme and Customers media chang
 Media folder changes, messaging icons and manager-controlled card ordering are documented in [the media and ordering update](docs/media-and-ordering.md).
 
 Staff invitation/password pages and branded email-template activation are documented in [docs/staff-password-email-setup.md](docs/staff-password-email-setup.md).
+
+The current direct staff-account workflow, strict role hierarchy, profile photos and persistent activity log are documented in [docs/direct-staff-accounts.md](docs/direct-staff-accounts.md). This replaces invitation-first staff onboarding.

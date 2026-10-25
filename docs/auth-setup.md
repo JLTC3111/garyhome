@@ -1,3 +1,7 @@
+# Current staff account workflow
+
+Staff are now created directly with a temporary password and confirmation, with automatic email confirmation and a first-login password reminder. See [direct-staff-accounts.md](direct-staff-accounts.md) for the current hierarchy, existing-account assignment, profile photos and notifications. The invitation-first staff instructions below are historical; customer email confirmation and optional password recovery still apply.
+
 # Customer email sign-in and staff accounts
 
 Customers register and sign in with a personal email and password at `/account`. Email signup requires mailbox confirmation. Staff use `/admin` with a company or Gmail account explicitly assigned by an owner or administrator. Registering with any allowed address does not grant Studio access. The existing confirmed owner account remains available for administration.

@@ -39,9 +39,9 @@ async function harness(t, options={}){
    if(method==='DELETE'){backend.teamRows=backend.teamRows.filter(m=>m.user_id!==JSON.parse(init.body).user_id);return Response.json({ok:true});}
    if(method==='GET'){
     if(backend.teamPending)await backend.teamPending.promise;
-    return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn','gmail.com'],invitationsEnabled:true});
+    return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn','gmail.com'],directCreationEnabled:true});
    }
-   if(method==='POST'){const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});return Response.json(backend.teamResult??{invited:!existing,email_status:'requested'});}
+   if(method==='POST'){const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});if(existing)backend.teamRows=backend.teamRows.map(m=>m.email.toLowerCase()===data.email.toLowerCase()?{...m,confirmed:true}:m);return Response.json(backend.teamResult??{created:data.mode!=='assign',confirmed:true});}
    return Response.json({user_id:'changed-staff'});
   }
   if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return Response.json({});}
@@ -69,7 +69,7 @@ async function harness(t, options={}){
    verifyOtp:async input=>{backend.authCalls.push({method:'verify',input});if(backend.verifyError)return {data:{session:null,user:null},error:backend.verifyError};session=authSession(options.verifyUser??'invited-staff');callback?.(input.type==='recovery'?'PASSWORD_RECOVERY':'SIGNED_IN',session);const verified=session;if(backend.verifySwitch){session=authSession('other-account');callback?.('SIGNED_IN',session);}return {data:{session:verified,user:verified.user},error:null};},
    resetPasswordForEmail:async(...input)=>{backend.authCalls.push({method:'reset',input});return {error:null};},
   },
-  rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
+  rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(name==='get_staff_profile')return Promise.resolve({data:{user_id:session?.user.id,display_name:'Test staff',avatar_path:backend.profilePaths?.get(session?.user.id)||'',password_change_reminder:backend.passwordReminder||false},error:null}).then(resolve,reject);if(name==='acknowledge_staff_password_reminder')backend.passwordReminder=false;if(name==='mark_studio_notifications_read')backend.notifications=backend.notifications?.map(n=>({...n,unread:false}));if(name==='get_studio_notifications')return Promise.resolve({data:{items:backend.notifications??[],unread_count:backend.notifications?.filter(n=>n.unread).length||0},error:null}).then(resolve,reject);if(name==='staff_photo_directory')return Promise.resolve({data:[],error:null}).then(resolve,reject);if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
   storage:{from:()=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}})})},
   from(table){
    let writing=false,payload,single=false,writeMethod;const filters={};const query={};
@@ -79,6 +79,7 @@ async function harness(t, options={}){
    for(const method of ['select','order','abortSignal','is'])query[method]=()=>query;
    query.then=(resolve,reject)=>{
     if(writing)backend.calls.push({table,payload,method:writeMethod,filters});
+    if(writing&&table==='staff_profiles'){backend.profilePaths??=new Map();backend.profilePaths.set(payload.user_id,payload.avatar_path);}
     if(writing&&backend.writeErrors.has(table))return Promise.resolve({data:null,error:backend.writeErrors.get(table)}).then(resolve,reject);
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
     if(backend.pending.has(table))return backend.pending.get(table).promise.then(resolve,reject);
@@ -143,7 +144,7 @@ test('portal chooser identifies both destinations without changing authenticatio
  assert.deepEqual(h.renderer.root.findAllByType('h2').map(node=>node.children.join('')),['Customer portal','Staff portal']);
  assert.deepEqual(h.renderer.root.findAllByType('a').map(node=>node.props.href),['/account','/admin']);
  assert.match(JSON.stringify(h.renderer.toJSON()),/personal email/);
- assert.match(JSON.stringify(h.renderer.toJSON()),/assigned by an owner or administrator/);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/assigned by a higher-level team member/);
  await act(async()=>{h.site.setLanguage('vi');});
  assert.deepEqual(h.renderer.root.findAllByType('h2').map(node=>node.children.join('')),['Cổng khách hàng','Cổng nhân viên']);
  assert.equal(h.site.user,null);assert.deepEqual(h.backend.authCalls,[]);assert.deepEqual(h.backend.calls,[]);
@@ -299,7 +300,7 @@ test('opening staff password setup without an invitation cannot change an existi
  assert.match(JSON.stringify(h.renderer.toJSON()),/Open the staff invitation link/);
 });
 
-test('owner team invitations preserve their draft through language changes and idle recovery',async t=>{
+test('owner team drafts survive language changes and same-user recovery while temporary passwords clear after sign-out',async t=>{
  const h=await harness(t);
  await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
  const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
@@ -308,6 +309,8 @@ test('owner team invitations preserve their draft through language changes and i
  await h.emit(authSession('owner'));
  await h.emit(null);await h.emit(authSession('owner'));
  assert.equal(form().findByProps({name:'full_name'}).props.value,'New Colleague');assert.equal(form().findByProps({name:'email'}).props.value,'new@garyhome.com');
+ assert.equal(form().findByProps({name:'password'}).props.value,'');
+ await act(async()=>{form().findByProps({name:'password'}).props.onChange({target:{value:'A temporary colleague password'}});form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A temporary colleague password'}});});
  await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
  const create=h.backend.teamCalls.find(call=>call.method==='POST');assert.equal(create.input.email,'new@garyhome.com');assert.equal(create.input.role,'editor');
  assert.match(JSON.stringify(h.renderer.toJSON()),/New Colleague/);
@@ -589,19 +592,19 @@ test('opening an enquiry persists read state and preserves a note edited while t
  await act(async()=>{pending.resolve({data:{read_at:'2026-10-25T01:02:03Z',read_by:'owner'},error:null});await delay(5);});
  assert.equal(row().props['data-unread'],false);assert.equal(h.site.enquiries[0].status,'new');
  assert.equal(h.renderer.root.findAllByType('textarea').find(n=>n.props.maxLength===8000).props.value,'Keep this concurrent private note');
- const requestCount=h.backend.rpcCalls.length;
+ const requestCount=h.backend.rpcCalls.filter(c=>c.name==='mark_enquiry_read').length;
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
- await act(async()=>row().props.onClick());assert.equal(h.backend.rpcCalls.length,requestCount,'Already-read enquiries need no repeated writes');
+ await act(async()=>row().props.onClick());assert.equal(h.backend.rpcCalls.filter(c=>c.name==='mark_enquiry_read').length,requestCount,'Already-read enquiries need no repeated writes');
 });
 test('listing deletion requires explicit confirmation, removes the listing and is unavailable to editors',async t=>{
  const h=await harness(t);
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Properties'}).props.onClick());
  const target=h.site.content.properties[0].id;
  const deleteButton=h.renderer.root.findAllByType('button').find(n=>n.props.className==='text-danger');assert.ok(deleteButton);
- await act(async()=>deleteButton.props.onClick());assert.equal(h.backend.rpcCalls.length,0);
+ await act(async()=>deleteButton.props.onClick());assert.equal(h.backend.rpcCalls.filter(c=>c.name==='delete_property').length,0);
  const dialog=h.renderer.root.findByType('dialog');assert.equal(dialog.props.role,'alertdialog');
  await act(async()=>{await dialog.findAllByType('button').find(n=>n.props.className==='button button-danger').props.onClick();await delay(5);});
- assert.equal(h.backend.rpcCalls.at(-1).name,'delete_property');assert.equal(h.backend.rpcCalls.at(-1).args.target_property,target);
+ assert.equal(h.backend.rpcCalls.find(c=>c.name==='delete_property').name,'delete_property');assert.equal(h.backend.rpcCalls.find(c=>c.name==='delete_property').args.target_property,target);
  assert.ok(!h.site.content.properties.some(p=>p.id===target));
  await h.emit(null);assert.ok(!h.site.content.properties.some(p=>p.id===target));
  assert.equal(h.backend.rpcCalls.filter(c=>c.name==='delete_property').length,1);
@@ -694,20 +697,63 @@ test('a connection failure during verification releases the action and permits a
 });
 
 
-test('existing staff additions retain a visible email failure and pending members can request setup again',async t=>{
+test('existing staff assignments preserve their login and recovery email remains an explicit separate action',async t=>{
  const h=await harness(t);h.backend.teamRows.push({user_id:'pending-staff',display_name:'Pending Staff',email:'pending@gmail.com',role:'editor',active:true,confirmed:false});
- h.backend.teamResult={invited:false,email_status:'failed',email_error:'Email sending limit reached. Wait before trying again or check Supabase SMTP settings.'};
+ h.backend.teamResult={created:false,confirmed:true};
  await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
  const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
+ await act(async()=>h.renderer.root.findAllByType('button').find(n=>n.children.includes('Assign existing login')).props.onClick());
  await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Pending Staff'}});});
  await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'pending@gmail.com'}});});
  await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
- const warning=()=>h.renderer.root.findByProps({className:'form-error team-email-result'});
- assert.equal(warning().props.role,'alert');assert.match(JSON.stringify(h.renderer.toJSON()),/Staff access saved, but the email request was not confirmed/);assert.match(JSON.stringify(h.renderer.toJSON()),/Email sending limit reached/);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/existing login password is unchanged/);assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET').length,0);
  assert.equal(h.backend.teamRows.length,2);assert.equal(h.backend.teamCalls.filter(c=>c.method==='POST').length,1);
  const pending=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('pending@gmail.com')));
- const resend=pending.findAllByType('button').find(n=>n.props.className==='text-link team-reset-action');assert.equal(resend.props.disabled,false);assert.ok(resend.children.includes('Send setup email'));
+ const resend=pending.findAllByType('button').find(n=>n.props.className==='text-link team-reset-action');assert.equal(resend.props.disabled,false);assert.ok(resend.children.includes('Send password link'));
  await act(async()=>{await resend.props.onClick();await delay(5);});
  assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET').length,1);assert.equal(h.backend.teamCalls.filter(c=>c.method==='POST').length,1);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Password link requested/);
+});
+
+test('managers receive Staff-only creation choices and a translated role guide',async t=>{
+ const h=await harness(t,{role:'manager'});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ const form=h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
+ const roles=form.findAllByType(require('@base-ui/react/select').Select.Root)[0].props.items.map(item=>item.value);assert.deepEqual(roles,['editor']);
+ assert.equal(form.findByProps({name:'password'}).props.autoComplete,'new-password');assert.equal(form.findByProps({name:'confirm_password'}).props.minLength,12);
+ const guide=h.renderer.root.findByProps({className:'admin-panel team-permissions-guide'});assert.equal(guide.findAllByType('tbody')[0].findAllByType('tr').length,4);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Ai có thể tạo vai trò nào/);
+});
+test('staff can change their own password from the sidebar and clear the first-login reminder without email',async t=>{
+ const h=await harness(t);h.backend.passwordReminder=true;
+ await act(async()=>{await h.site.refreshStaffProfile();});
+ assert.equal(h.renderer.root.findAllByProps({className:'staff-password-reminder'}).length,1);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});
+ await act(async()=>{form.findByProps({name:'password'}).props.onChange({target:{value:'A new personal staff password'}});form.findByProps({name:'confirm_password'}).props.onChange({target:{value:'A new personal staff password'}});});
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});
+ assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.renderer.root.findAllByProps({className:'staff-password-reminder'}).length,0);assert.deepEqual(h.backend.authCalls,[]);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Your password has been changed/);
+});
+test('profile upload persists a staff-owned path and the sidebar follows the saved photo',async t=>{
+ const h=await harness(t);h.backend.upload=deferred();
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ const upload=h.renderer.root.findAllByType('input').find(n=>n.props.type==='file');
+ await act(async()=>{upload.props.onChange({target:{files:[{type:'image/png',size:1024,name:'portrait.png'}],value:'portrait.png'}});await delay(5);});
+ await act(async()=>{h.backend.upload.resolve({data:{path:'stored'},error:null});await delay(8);});
+ const write=h.backend.calls.find(c=>c.table==='staff_profiles');assert.equal(write.payload.user_id,'owner');assert.match(write.payload.avatar_path,/^owner\/[a-f0-9-]+\.png$/);
+ assert.equal(h.site.staffProfile.avatar_path,write.payload.avatar_path);
+ const button=h.renderer.root.findByProps({'aria-label':'Edit staff profile'});assert.ok(button.findByType('img').props.src.endsWith(write.payload.avatar_path));
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Photo saved/);
+});
+test('notifications load once per refresh, show persisted activity and keep read state',async t=>{
+ const h=await harness(t);h.backend.notifications=[{id:'notice-one',category:'team',action:'team.role_changed',actor_name:'Owner',actor_user_id:'owner',target_name:'Team colleague',target_user_id:'staff',target_role:'editor',details:{from:'manager',to:'editor'},created_at:'2026-10-25T00:00:00Z',unread:true}];
+ const trigger=h.renderer.root.findByProps({className:'icon-button studio-notification-trigger'});
+ await act(async()=>{trigger.props.onClick();await delay(5);});
+ assert.equal(h.renderer.root.findByProps({className:'studio-notification-panel'}).props.role,'dialog');assert.match(JSON.stringify(h.renderer.toJSON()),/Role changed/);
+ const reads=h.backend.rpcCalls.filter(c=>c.name==='get_studio_notifications').length;assert.ok(reads<5,'Background role recovery must not cause a notification read loop');
+ const mark=h.renderer.root.findAllByType('button').find(n=>n.children.includes('Mark all read'));
+ await act(async()=>{await mark.props.onClick();await delay(5);});assert.equal(h.renderer.root.findAllByProps({className:'notification-count'}).length,0);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Hoạt động & thông báo/);
+ const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({className:'studio-notification-panel'}).length,0);
 });

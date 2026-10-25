@@ -2,11 +2,10 @@ import { z } from "zod";
 import { staffAdminClient } from "@/lib/server";
 import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError, staffDataError, staffRequest } from "@/lib/staff-server";
-import type { StaffAccount } from "@/lib/staff";
-import { requestStaffPasswordEmail,staffEmailError } from "@/lib/staff-email";
+import { canManageRole,type StaffAccount } from "@/lib/staff";
 
 const headers = { "Cache-Control": "private, no-store" };
-const createAccount = z.object({ email: z.string().trim().toLowerCase().email().max(254), full_name: z.string().trim().min(2).max(120), role: z.enum(["admin", "manager", "editor"]) });
+const createAccount = z.object({ email:z.string().trim().toLowerCase().email().max(254),full_name:z.string().trim().min(2).max(120),role:z.enum(["admin","manager","editor"]),mode:z.enum(["create","assign"]).default("create"),password:z.string().max(128).optional(),confirm_password:z.string().max(128).optional() }).superRefine((value,ctx)=>{if(value.mode==="create"&&(!value.password||value.password.length<12||value.password!==value.confirm_password))ctx.addIssue({code:"custom",message:"Use matching passwords of at least 12 characters."});});
 const editAccount = z.object({ user_id: z.string().uuid(), role: z.enum(["admin", "manager", "editor"]), active: z.boolean() });
 const removeAccount = z.object({ user_id:z.string().uuid() });
 async function body(request: Request) {
@@ -30,54 +29,49 @@ export async function GET(request: Request) {
       staffDataError(members.error); staffDataError(settings.error);
       if (!settings.data?.email_domains?.length) throw new StaffRequestError("Apply the staff access database migration before managing the team.", 503);
       const rows = (members.data ?? []) as StaffAccount[];
-      return { members: rows.slice(0, 50), next: rows.length > 50 ? rows[49].email : null, domains: settings.data.email_domains as string[], role, invitationsEnabled: !!staffAdminClient() };
+      const selected=rows.slice(0,50);
+      const photos=selected.length?await db.from("staff_profiles").select("user_id,avatar_path").in("user_id",selected.map(m=>m.user_id)).abortSignal(signal):{data:[],error:null};
+      staffDataError(photos.error);
+      return { members:selected.map(member=>({...member,avatar_path:photos.data?.find(p=>p.user_id===member.user_id)?.avatar_path||""})),next:rows.length>50?rows[49].email:null,domains:settings.data.email_domains as string[],role,directCreationEnabled:!!staffAdminClient() };
     });
     return Response.json(result, { headers });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
-  let invited = false;
-  let assignedUser:string|null=null;
+  let created=false;
   try {
     const result = await boundedRequest(async signal => {
       const { db, role } = await staffRequest(request, signal);
       const parsed = createAccount.safeParse(await body(request));
-      if (!parsed.success) throw new StaffRequestError("Check the staff email, name, and assigned role.");
+      if (!parsed.success) throw new StaffRequestError("Check the staff details and matching passwords of at least 12 characters.");
       const input = parsed.data;
-      if (role !== "owner" && input.role === "admin") throw new StaffRequestError("Only the owner can assign administrator access.", 403);
+      if(!canManageRole(role,input.role))throw new StaffRequestError("You can assign roles below your own level only.",403);
       // The RPC validates the allowed email domain, protected accounts, and the
       // actor's fresh membership before any Auth account or email is created.
       const found = await db.rpc("find_staff_account", { target_email: input.email, assigned_role: input.role }).abortSignal(signal);
       staffDataError(found.error);
-      if (!found.data) {
-        const admin = staffAdminClient();
-        if (!admin) throw new StaffRequestError("New staff invitations need the server’s Supabase secret key. Existing staff accounts can still be assigned.", 503);
-        const invitation = await admin.auth.admin.inviteUserByEmail(input.email, {
-          redirectTo: new URL("/auth/invite", request.url).href,
-          data: { full_name: input.full_name },
-        });
-        if(invitation.error)throw staffEmailError(invitation.error);
-        if(!invitation.data.user)throw new StaffRequestError("Couldn’t confirm the invitation request. Refresh the team before trying again.",503);
-        invited = true;
+      const admin=staffAdminClient();
+      if(!admin)throw new StaffRequestError("Direct staff creation needs the server-only Supabase secret key. Ask the owner to configure it in Vercel.",503);
+      if(input.mode==="create"){
+        if(found.data)throw new StaffRequestError("This email already has an account. Choose Assign existing login to keep its current password.",409);
+        const account=await admin.auth.admin.createUser({email:input.email,password:input.password!,email_confirm:true,user_metadata:{full_name:input.full_name}});
+        if(account.error||!account.data.user)throw new StaffRequestError("Couldn’t create the account. Check the email, password requirements and server configuration, then refresh before retrying.",503);
+        created=true;
+      }else{
+        if(!found.data)throw new StaffRequestError("No account exists for this email. Choose Create new account.",404);
+        const confirmed=await admin.auth.admin.updateUserById(found.data,{email_confirm:true});
+        if(confirmed.error)throw new StaffRequestError("Couldn’t confirm this account. Refresh the team before trying again.",503);
       }
-      // This second RPC checks permissions again after the external invite.
+      // This second RPC checks permissions again after the Auth account write.
       // A revoked admin cannot use a delayed Auth response to grant access.
       const assigned = await db.rpc("assign_staff_account", { target_email: input.email, full_name: input.full_name, assigned_role: input.role }).abortSignal(signal);
       staffDataError(assigned.error);
       if(typeof assigned.data!=="string"||!assigned.data)throw new StaffRequestError("Staff access was not confirmed. Refresh the team before trying again.",409);
-      assignedUser=assigned.data;
-      if(invited)return {user_id:assignedUser,invited,email_status:"requested"};
-      try{
-        await requestStaffPasswordEmail(db,assignedUser,request.url,signal);
-        return {user_id:assignedUser,invited,email_status:"requested"};
-      }catch(error){
-        return {user_id:assignedUser,invited,email_status:error instanceof StaffRequestError?"failed":"unconfirmed",email_error:error instanceof StaffRequestError?error.message:"Couldn’t confirm the email request. Refresh the team, then use Send password link."};
-      }
+      return {user_id:assigned.data,created,confirmed:true};
     });
-    return Response.json(result, { status: result.invited ? 201 : 200, headers });
+    return Response.json(result, { status:result.created?201:200,headers });
   } catch (error) {
-    if(assignedUser)return Response.json({user_id:assignedUser,invited,email_status:invited?"requested":"unconfirmed",email_error:invited?undefined:"Couldn’t confirm the email request. Refresh the team, then use Send password link."},{headers});
-    return failure(invited ? new StaffRequestError("The invitation email was requested, but staff access was not confirmed. Refresh the team before assigning access again.", 409) : error);
+    return failure(created?new StaffRequestError("The account was created, but staff access was not confirmed. Refresh and use Assign existing login to finish assigning its role.",409):error);
   }
 }
 export async function PATCH(request: Request) {
@@ -87,7 +81,7 @@ export async function PATCH(request: Request) {
       const parsed = editAccount.safeParse(await body(request));
       if (!parsed.success) throw new StaffRequestError("Check the assigned role and account.");
       const input = parsed.data;
-      if (role !== "owner" && input.role === "admin") throw new StaffRequestError("Only the owner can assign administrator access.", 403);
+      if(!canManageRole(role,input.role))throw new StaffRequestError("You can assign roles below your own level only.",403);
       const changed = await db.rpc("set_staff_access", { target_user_id: input.user_id, assigned_role: input.role, enabled: input.active }).abortSignal(signal);
       staffDataError(changed.error);
       return { user_id: changed.data };

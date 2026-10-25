@@ -32,9 +32,9 @@ test('published card ordering enforces assigned roles, ownership of staff access
   await as('authenticated',users.manager);for(const ids of [[homes[0],homes[0]],['ffffffff-ffff-4fff-8fff-ffffffffffff'],[null]]){await assert.rejects(save('home',ids,[]));await assert.rejects(db.query("update public.property_display_orders set property_ids=$1 where scope='home'",[ids]));}
   const draft=(await db.query("insert into public.properties(slug,title_en,title_vi,district_slug,address,status)values('ordering-private','Private','Nháp','tay-ho','Hanoi','draft')returning id")).rows[0].id;await assert.rejects(save('home',[draft],[]));await assert.rejects(save('other',homes,[]));
  });
- await t.test('manager is assignable by an administrator but cannot administer other staff',async()=>{
+ await t.test('manager is assignable by an administrator and can administer lower staff only',async()=>{
   await as('authenticated',users.admin);await db.query("select public.assign_staff_account('new-manager@garyhome.com','New Manager','manager')");
-  await as('authenticated',users['new-manager']);assert.equal((await db.query('select private.staff_role() role,private.is_editor() editor')).rows[0].role,'manager');assert.equal((await db.query('select private.is_editor() editor')).rows[0].editor,true);await assert.rejects(db.exec('select * from public.list_staff_accounts(null)'));await assert.rejects(db.query("select public.assign_staff_account('editor@garyhome.com','Editor','manager')"));
+  await as('authenticated',users['new-manager']);assert.equal((await db.query('select private.staff_role() role,private.is_editor() editor')).rows[0].role,'manager');assert.equal((await db.query('select private.is_editor() editor')).rows[0].editor,true);const managed=(await db.query('select * from public.list_staff_accounts(null)')).rows;assert.ok(managed.every(m=>m.user_id===users['new-manager']||m.role==='editor'));await assert.rejects(db.query("select public.assign_staff_account('editor@garyhome.com','Editor','manager')"));
   await as('authenticated',users.admin);await assert.rejects(db.query("select public.assign_staff_account('new-manager@garyhome.com','New Manager','admin')"));
  });
  await t.test('publication time is stamped when a draft goes public and cannot be forged on an edit',async()=>{

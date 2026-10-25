@@ -1,3 +1,7 @@
+# Staff onboarding update
+
+Direct account creation replaces invitation-first onboarding. Staff creation now uses a temporary password and automatic confirmation; see [direct-staff-accounts.md](direct-staff-accounts.md). The templates below remain available for optional recovery and previously issued invitations. They are not required to create new staff accounts.
+
 # Staff password setup and Gary Home emails
 
 ## What changed

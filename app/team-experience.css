@@ -1,0 +1,70 @@
+.team-creation-grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(270px,.88fr);gap:24px;align-items:start}
+.team-permissions-guide{position:sticky;top:95px;background:#eef2e9;border:1px solid #dce4d4;padding:28px}
+.team-permissions-guide>svg{color:var(--green);margin-bottom:15px}
+.team-permissions-guide h2{font-size:25px;line-height:1.3}
+.team-permissions-guide p{font-size:12px;line-height:1.9;color:var(--muted);margin-top:14px}
+.team-permissions-guide h3{font-size:13px;margin-top:24px}
+.team-permissions-guide table{border-collapse:collapse;width:100%;margin-top:22px;font-size:11px;line-height:1.8}
+.team-permissions-guide th,.team-permissions-guide td{padding:11px 8px;border-bottom:1px solid #d3dccb;text-align:left;vertical-align:top}
+.team-permissions-guide thead th{font-size:10px;color:var(--muted)}
+.team-account-modes{display:flex;border:1px solid var(--line);border-radius:8px;padding:4px;gap:5px;background:var(--paper)}
+.team-account-modes>button{flex:1;min-height:42px;padding:9px;font-size:11px;border:1px solid transparent;border-radius:5px;line-height:1.6}
+.team-account-modes>button[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green)}
+.team-manager>.team-directory{margin-top:25px}
+.team-invite-form .form-error{font-size:12px}
+.team-avatar>img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.admin-sidebar nav button>.admin-nav-label{font:inherit;line-height:inherit;position:static;color:inherit;background:transparent;border:0;border-radius:0;padding:0;margin:0;min-width:0;text-align:left}
+.admin-sidebar nav button[data-id="feedback"]>.admin-nav-label,.admin-sidebar nav button[data-id="assistance"]>.admin-nav-label{margin-left:6px}
+.submission-manager .panel-heading>div{margin-left:8px}
+.visa-service-link{margin-top:21px;gap:9px;max-width:100%;font-size:11px;min-height:45px;padding:11px 16px;white-space:normal;line-height:1.6}
+.header-staff-avatar{width:16px;height:16px;object-fit:cover;border-radius:50%;flex-shrink:0}
+.mobile-nav-tools .header-staff-avatar{width:23px;height:23px}
+.staff-profile-trigger{position:relative;flex-shrink:0;border:1px solid #ffffff45;padding:0;cursor:pointer}
+.staff-profile-trigger>img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.staff-profile-trigger>svg{position:absolute;right:-3px;bottom:-2px;background:#f5f7ef;border-radius:50%;padding:2px;box-sizing:content-box;color:#31513c}
+.staff-profile-trigger:focus-visible{outline:2px solid #e6b48f;outline-offset:4px}
+.admin-sidebar-bottom>div>span:not(.avatar){min-width:0;flex:1}
+.staff-profile-dialog{position:fixed;inset:50% auto auto 50%;transform:translate(-50%,-50%);margin:0;width:min(620px,calc(100vw - 30px));max-height:calc(100dvh - 40px);overflow:auto;border:1px solid var(--line);border-radius:15px;background:var(--paper);color:var(--ink);padding:29px}
+.staff-profile-dialog::backdrop{background:#152c2280}
+.staff-profile-dialog>header{display:flex;align-items:start;justify-content:space-between;gap:18px;margin-bottom:26px}
+.staff-profile-dialog h2{font-size:29px;line-height:1.3}
+.staff-photo-editor{display:flex;align-items:center;gap:20px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px}
+.staff-profile-photo{width:85px;height:85px;border-radius:50%;overflow:hidden;background:#e6eddc;display:grid;place-items:center;flex-shrink:0;color:var(--green)}
+.staff-profile-photo>img{width:100%;height:100%;object-fit:cover}
+.staff-photo-editor strong{font-size:14px;overflow-wrap:anywhere}
+.staff-photo-editor p{font-size:11px;line-height:1.8;color:var(--muted);margin-top:8px}
+.staff-photo-editor .upload-label{font-size:11px;margin-top:13px;display:inline-flex;align-items:center;gap:8px;min-height:35px}
+.staff-photo-editor small{display:block;font-size:9px;color:var(--muted);margin-top:9px}
+.staff-password-form{margin-top:26px}
+.staff-password-form h3{font-size:18px}
+.staff-password-form input{background:#fff;color:var(--ink);font-size:16px;border:1px solid var(--line);min-height:46px}
+.staff-password-reminder{display:flex;align-items:center;gap:13px;margin-bottom:25px;border:1px solid #e0c7a1;background:#fff5e3;border-radius:9px;padding:15px 18px;font-size:12px;line-height:1.7;color:#705123}
+.staff-password-reminder>svg{flex-shrink:0}
+.staff-password-reminder>.text-link{margin-left:auto;white-space:nowrap;min-height:35px;font-size:12px}
+.studio-notifications{position:relative}
+.studio-notification-trigger{position:relative;min-width:38px;min-height:38px}
+.notification-count{position:absolute;right:-3px;top:-2px;background:#b36346;color:#fff;border-radius:99px;font-size:9px;min-width:17px;height:17px;display:grid;place-items:center;padding:0 4px;line-height:1}
+.studio-notification-panel{position:absolute;right:0;top:calc(100% + 12px);width:min(440px,calc(100vw - 34px));max-height:min(680px,calc(100dvh - 130px));overflow:auto;z-index:100;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:0 18px 55px #17332521;color:var(--ink)}
+.studio-notification-panel>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:21px 20px 14px}
+.studio-notification-panel h2{font-size:23px;line-height:1.3}
+.studio-notification-panel header small{font-size:10px;color:var(--muted);display:block;margin-top:6px}
+.notification-toolbar{display:flex;justify-content:space-between;gap:15px;padding:0 20px 13px;border-bottom:1px solid var(--line)}
+.notification-toolbar>.text-link{display:inline-flex;align-items:center;gap:6px;min-height:35px;font-size:10px}
+.studio-notification-panel>ul{list-style:none;margin:0;padding:0}
+.studio-notification-panel li>button{width:100%;display:flex;align-items:start;gap:11px;padding:17px 20px;text-align:left;border-bottom:1px solid var(--line);background:#fff;color:var(--ink)}
+.studio-notification-panel li>button[data-unread="true"]{background:#f1f5ed}
+.notification-avatar{width:32px;height:32px;background:#e8eedf;color:var(--green);border-radius:50%;flex-shrink:0;display:grid;place-items:center;overflow:hidden}
+.notification-avatar>img{width:100%;height:100%;object-fit:cover}
+.studio-notification-panel li>button>span:nth-child(2){display:grid;gap:6px;min-width:0;flex:1}
+.studio-notification-panel li strong{font-size:12px;line-height:1.6}
+.studio-notification-panel li button>span>span{font-size:11px;color:#617058;overflow-wrap:anywhere;line-height:1.6}
+.studio-notification-panel time,.studio-notification-panel li small{font-size:9px;color:var(--muted);line-height:1.7}
+.notification-unread-dot{width:6px;height:6px;margin-top:6px;flex-shrink:0;background:var(--orange);border-radius:50%}
+.notification-empty,.notification-loading{padding:24px 20px;font-size:12px;color:var(--muted);line-height:1.8}
+.notification-loading{display:flex;align-items:center;gap:10px}
+.notification-load-more{display:flex;align-items:center;gap:8px;margin:13px 20px;min-height:40px;font-size:11px}
+.studio-notification-panel>.form-error{margin:16px 20px;font-size:12px}
+@media(max-width:1000px){.team-creation-grid{grid-template-columns:1fr}.team-permissions-guide{position:static}.team-permissions-guide table{font-size:12px}}
+@media(max-width:680px){.staff-profile-dialog{padding:23px 20px}.staff-photo-editor{gap:14px;padding:16px}.staff-profile-photo{width:65px;height:65px}.staff-profile-dialog h2{font-size:26px}.staff-password-reminder{flex-wrap:wrap;gap:10px}.staff-password-reminder>span{flex:1;min-width:180px}.staff-password-reminder>.text-link{margin-left:28px}.studio-notification-panel{position:fixed;left:15px;right:15px;top:82px;width:auto;max-height:calc(100dvh - 110px)}.team-permissions-guide{padding:22px}.team-account-modes>button{font-size:10px}.visa-service-link{font-size:11px}}
+
+.account-staff-avatar{width:100%;height:100%;object-fit:cover;border-radius:50%}

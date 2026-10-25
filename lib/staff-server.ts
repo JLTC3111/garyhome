@@ -17,7 +17,7 @@ export async function staffRequest(request: Request, signal: AbortSignal) {
   const membership = await db.from("team_members").select("role").eq("user_id", data.user.id).abortSignal(signal).maybeSingle();
   if (membership.error) throw new StaffRequestError("Couldn’t verify staff permissions. Reconnect and try again.", 503);
   const role = membership.data?.role;
-  if (!canManageStaff(role)) throw new StaffRequestError("Owner or admin access required.", 403);
+  if (!canManageStaff(role)) throw new StaffRequestError("Owner, administrator or manager access required.", 403);
   return { db, user: data.user, role: role as StaffRole };
 }
 export function staffDataError(error: { code?: string } | null) {

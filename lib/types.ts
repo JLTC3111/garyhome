@@ -50,7 +50,7 @@ export type CustomerRecord = {
 export type ListingAuthor = {
   id: string; slug: string; display_name: string; bio_en: string; bio_vi: string;
   portrait_url: string; phone: string; whatsapp_phone: string; zalo_phone: string; email: string;
-  is_placeholder: boolean; published: boolean; sort_order: number; updated_at: string;
+  is_placeholder: boolean; published: boolean; sort_order: number; updated_at: string; staff_user_id?:string|null;
 };
 export type SiteActivity = {
   id: string; category: "customers" | "feedback" | "team"; media_kind: "photo" | "screenshot";

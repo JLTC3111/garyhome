@@ -15,6 +15,7 @@ export async function requestStaffPasswordEmail(db:SupabaseClient,userId:string,
   staffDataError(target.error);
   if(typeof target.data!=="string"||!target.data)throw new StaffRequestError("Refresh the team before requesting a password link.",409);
   signal.throwIfAborted();
+  const logged=await db.rpc("log_staff_password_link",{target_user_id:userId,failed:false}).abortSignal(signal);staffDataError(logged.error);
   const {error}=await db.auth.resetPasswordForEmail(target.data,{redirectTo:new URL("/auth/reset",requestUrl).href});
-  if(error)throw staffEmailError(error);
+  if(error){await db.rpc("log_staff_password_link",{target_user_id:userId,failed:true}).abortSignal(signal);throw staffEmailError(error);}
 }

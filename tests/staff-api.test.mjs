@@ -17,11 +17,12 @@ function endpoint(options={}){
   if(name==='assign_staff_account')value=rank(state.role)>rank(args.assigned_role)?{data:state.existing||target,error:null}:{data:null,error:{code:'42501'}};
   if(name==='set_staff_access')value=state.protected?{data:null,error:{code:'42501'}}:{data:args.target_user_id,error:null};
   if(name==='remove_staff_access')value=state.protected||!['owner','admin'].includes(state.role)?{data:null,error:{code:'42501'}}:{data:state.unconfirmedDelete?null:true,error:null};
+  if(name==='staff_temporary_password_request')value={data:state.resetTarget||'assigned@gmail.com',error:state.passwordTargetError||(!['owner','admin','manager'].includes(state.role)?{code:'42501'}:null)};
   if(name==='staff_reset_email')value={data:state.resetTarget||'assigned@gmail.com',error:state.resetTargetError||null};
   if(name==='list_staff_accounts')value={data:state.members,error:null};
   return Promise.resolve(value).then(resolve,reject);
  }};return q;}};
- const admin={auth:{admin:{createUser:async input=>{state.creates.push(input);if(state.createError)return {data:{user:null},error:new Error('Auth creation failed')};state.existing=target;if(state.revokeDuringCreate)state.role=null;return {data:{user:{id:target}},error:null};},updateUserById:async(id,input)=>{state.confirms.push({id,input});return {data:{user:{id}},error:state.confirmError?new Error('Unconfirmed'):null};}}}};
+ const admin={auth:{admin:{createUser:async input=>{state.creates.push(input);if(state.createError)return {data:{user:null},error:new Error('Auth creation failed')};state.existing=target;if(state.revokeDuringCreate)state.role=null;return {data:{user:{id:target}},error:null};},updateUserById:async(id,input)=>{state.confirms.push({id,input});return {data:{user:{id:state.mismatchedAuthId||id,email:state.resetTarget||'assigned@gmail.com',email_confirmed_at:state.unconfirmedAuth?null:'2026-10-01'}},error:state.confirmError?new Error('Unconfirmed'):null};}}}};
  const server={publicSupabase:()=>client,staffAdminClient:()=>{state.secretReads++;return state.secret?admin:null;}};
  const modules=new Map();function load(file){if(file.endsWith('/lib/server.ts'))return server;if(modules.has(file))return modules.get(file).exports;const result={exports:{}};modules.set(file,result);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
   const dependency=id=>{if(id==='@/lib/requests')return requests;if(id.startsWith('.')||id.startsWith('@/')){const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);return load(target.endsWith('.ts')?target:target+'.ts');}return require(id);};
@@ -29,7 +30,8 @@ function endpoint(options={}){
  }
  async function send(method='POST',value={},headers={}){return load(path.join(base,'app/api/admin/team/route.ts'))[method](new Request('https://gary.example/api/admin/team',{method,headers:{authorization:'Bearer valid-token',origin:'https://gary.example','content-type':'application/json',...headers},...(method==='GET'?{}:{body:JSON.stringify(method==='POST'?{email:'staff@gmail.com',full_name:'Team Staff',role:'editor',mode:'create',password,confirm_password:password,...value}:value)})}));}
  async function sendReset(value={},headers={}){return load(path.join(base,'app/api/admin/team/reset-password/route.ts')).POST(new Request('https://gary.example/api/admin/team/reset-password',{method:'POST',headers:{authorization:'Bearer valid-token',origin:'https://gary.example','content-type':'application/json',...headers},body:JSON.stringify({user_id:target,...value})}));}
- return {state,send,sendReset};
+ async function sendPassword(value={},headers={}){return load(path.join(base,'app/api/admin/team/set-password/route.ts')).POST(new Request('https://gary.example/api/admin/team/set-password',{method:'POST',headers:{authorization:'Bearer valid-token',origin:'https://gary.example','content-type':'application/json',...headers},body:JSON.stringify({user_id:target,password,confirm_password:password,...value})}));}
+ return {state,send,sendReset,sendPassword};
 }
 
 test('direct staff creation requires a verified current management role and same-origin bearer request',async()=>{
@@ -89,4 +91,23 @@ test('optional password recovery uses the database-approved email and fixed same
 test('recovery respects protected roles, failed delivery and sending limits',async()=>{
  for(const options of [{role:'editor'},{valid:false},{resetTargetError:{code:'42501'}},{resetTargetError:{code:'23514'}}]){const h=endpoint(options),response=await h.sendReset();assert.ok([401,403,409].includes(response.status));assert.equal(h.state.resets.length,0);}
  for(const resetError of [{code:'over_email_send_rate_limit',status:429},{code:'email_address_not_authorized',status:403}]){const h=endpoint({resetError}),response=await h.sendReset();assert.equal(response.status,resetError.status===429?429:503);assert.ok((await response.json()).error);assert.equal(h.state.rpc.at(-1).args.failed,true);}
+});
+
+
+test('temporary passwords are explicitly set on the approved existing staff Auth identity without changing roles or sending emails',async()=>{
+ const h=endpoint({existing:target}),response=await h.sendPassword();assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
+ assert.deepEqual(h.state.confirms,[{id:target,input:{password,email_confirm:true}}]);assert.deepEqual(h.state.rpc,[{name:'staff_temporary_password_request',args:{target_user_id:target,failed:false}}]);
+ assert.deepEqual(h.state.creates,[]);assert.deepEqual(h.state.resets,[]);const result=await response.json();assert.deepEqual(result,{ok:true,password_set:true,confirmed:true});assert.ok(!JSON.stringify(result).includes(password));
+});
+test('temporary password writes validate matching passwords and the verified management session first',async()=>{
+ for(const input of [{password:'short',confirm_password:'short'},{confirm_password:'A different temporary password'},{user_id:'not-a-uuid'},{role:'owner'}]){const h=endpoint(),r=await h.sendPassword(input);assert.equal(r.status,400);assert.deepEqual(h.state.rpc,[]);assert.deepEqual(h.state.confirms,[]);}
+ for(const options of [{role:null},{role:'editor'},{valid:false}]){const h=endpoint(options);assert.ok([401,403].includes((await h.sendPassword()).status));assert.deepEqual(h.state.confirms,[]);assert.equal(h.state.secretReads,0);}
+ const h=endpoint();assert.equal((await h.sendPassword({}, {origin:'https://evil.invalid'})).status,403);assert.equal((await h.sendPassword({}, {authorization:''})).status,401);assert.deepEqual(h.state.confirms,[]);
+});
+test('protected, disabled, unassigned and revoked staff cannot have passwords changed through the management endpoint',async()=>{
+ for(const passwordTargetError of [{code:'42501'},{code:'23514'},{code:'PGRST202'}]){const h=endpoint({passwordTargetError});assert.ok([400,403,503].includes((await h.sendPassword()).status));assert.deepEqual(h.state.confirms,[]);}
+ const h=endpoint({secret:false});assert.equal((await h.sendPassword()).status,503);assert.deepEqual(h.state.rpc,[]);assert.deepEqual(h.state.confirms,[]);
+});
+test('Auth failures and identity or confirmation mismatches never report a password success or expose the password',async()=>{
+ for(const options of [{confirmError:true},{mismatchedAuthId:owner},{unconfirmedAuth:true}]){const h=endpoint(options),r=await h.sendPassword();assert.equal(r.status,503);assert.deepEqual(h.state.rpc.map(x=>x.args.failed),[false,true]);const body=await r.text();assert.ok(!body.includes(password));assert.doesNotMatch(body,/password_set/);}
 });

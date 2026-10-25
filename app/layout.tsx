@@ -14,6 +14,7 @@ import "./contact-widget.css";
 import "./staff-mobile-updates.css";
 import "./password-access.css";
 import "./team-experience.css";
+import "./studio-navigation.css";
 import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";
 import { Header, Footer } from "@/components/site-shell";
@@ -36,7 +37,7 @@ export default async function RootLayout({
   const initialLanguage=languageValue((await cookies()).get("gary-language")?.value);
   return (
     <html lang={initialLanguage}>
-      <head><script id="gary-language-bootstrap" dangerouslySetInnerHTML={{__html:LANGUAGE_BOOTSTRAP}}/><style>{`html[data-language-pending] body{visibility:hidden}`}</style></head>
+      <head><link rel="preload" href="/fonts/be-vietnam-pro-regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><script id="gary-language-bootstrap" dangerouslySetInnerHTML={{__html:LANGUAGE_BOOTSTRAP}}/><style>{`html[data-language-pending] body{visibility:hidden}`}</style></head>
       <body><InteractionProvider><SiteProvider initial={initial} initialLanguage={initialLanguage}><DocumentTitle/><a className="skip-link" href="#main-content">{initialLanguage==="vi"?"Đến nội dung chính":"Skip to content"}</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></InteractionProvider></body>
     </html>
   );

@@ -1,30 +1,30 @@
 @font-face {
-  font-family: 'DM Sans';
+  font-family: 'Be Vietnam Pro';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(/fonts/gary-font-0.ttf) format('truetype');
+  src: url(/fonts/be-vietnam-pro-regular.woff2) format('woff2');
 }
 @font-face {
-  font-family: 'DM Sans';
+  font-family: 'Be Vietnam Pro';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url(/fonts/gary-font-1.ttf) format('truetype');
+  src: url(/fonts/be-vietnam-pro-medium.woff2) format('woff2');
 }
 @font-face {
-  font-family: 'DM Sans';
+  font-family: 'Be Vietnam Pro';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(/fonts/gary-font-2.ttf) format('truetype');
+  src: url(/fonts/be-vietnam-pro-semibold.woff2) format('woff2');
 }
 @font-face {
-  font-family: 'DM Sans';
+  font-family: 'Be Vietnam Pro';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url(/fonts/gary-font-3.ttf) format('truetype');
+  src: url(/fonts/be-vietnam-pro-bold.woff2) format('woff2');
 }
 @font-face {
   font-family: 'Newsreader';

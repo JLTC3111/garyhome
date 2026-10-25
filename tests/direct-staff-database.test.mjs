@@ -96,4 +96,21 @@ test('direct staff roles, profile photos and persistent activity obey fresh data
   await as('owner');assert.ok((await notifications()).unread_count>0);const page1=await notifications([null,null,2]);const last=page1.items.at(-1);const page2=await notifications([last.created_at,last.id,2]);assert.ok(page1.items.every(a=>page2.items.every(b=>a.id!==b.id)));
   await as('unassigned');await denied(db.query('select public.get_studio_notifications()'));
  });
+ await t.test('temporary-password requests enforce lower roles, reactivate the reminder and never accept or log passwords',async()=>{
+  await as('staff');await db.query('select public.acknowledge_staff_password_reminder()');
+  for(const [actor,target] of [['owner','admin'],['admin','manager'],['manager','staff']]){
+   await as(actor);assert.equal((await one('select public.staff_temporary_password_request($1,false) as email',[ids[target]])).email,emails[target]);
+  }
+  await as('staff');assert.equal((await one('select public.get_staff_profile() as data')).data.password_change_reminder,true);
+  for(const [actor,target] of [['owner','owner'],['admin','admin'],['admin','admin2'],['admin','owner'],['manager','manager'],['manager','manager2'],['manager','admin'],['staff','pending']]){
+   await as(actor);await denied(db.query('select public.staff_temporary_password_request($1,false)',[ids[target]]));
+  }
+  await as('owner');await assert.rejects(db.query('select public.staff_temporary_password_request($1,false)',[ids.unassigned]),e=>e.code==='23514');
+  await db.query("select public.set_staff_access($1,'editor',false)",[ids.pending]);await assert.rejects(db.query('select public.staff_temporary_password_request($1,false)',[ids.pending]),e=>e.code==='23514');await db.query("select public.set_staff_access($1,'editor',true)",[ids.pending]);
+  await as('staff');await db.query('select public.acknowledge_staff_password_reminder()');await as('owner');await db.query('select public.staff_temporary_password_request($1,true)',[ids.staff]);
+  const log=await notifications();assert.ok(log.items.some(n=>n.action==='password.temporary_requested'));assert.ok(log.items.some(n=>n.action==='password.temporary_failed'));assert.ok(log.items.every(n=>!Object.hasOwn(n.details,'password')&&!Object.hasOwn(n.details,'email')));
+  await as('staff');assert.equal((await one('select public.get_staff_profile() as data')).data.password_change_reminder,false,'Recording failure alone must not re-enable the reminder');
+  await as('anon');await denied(db.query('select public.staff_temporary_password_request($1,false)',[ids.staff]));
+ });
+
 });

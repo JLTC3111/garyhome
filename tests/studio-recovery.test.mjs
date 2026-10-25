@@ -34,8 +34,9 @@ async function harness(t, options={}){
  setGlobal('FormData',class{constructor(form){this.form=form;}get(key){return this.form.fields?.[key]??null;}});
  setGlobal('fetch',async(input,init)=>{
   if(String(input).startsWith('/api/admin/team')){
-   const method=String(input).endsWith('/reset-password')?'RESET':init?.method??'GET';backend.teamCalls.push({method,input:init?.body?JSON.parse(init.body):null});
+   const method=String(input).endsWith('/reset-password')?'RESET':String(input).endsWith('/set-password')?'PASSWORD':init?.method??'GET';backend.teamCalls.push({method,input:init?.body?JSON.parse(init.body):null});
    if(method==='RESET')return Response.json({ok:true});
+   if(method==='PASSWORD')return backend.teamPasswordError?Response.json({error:backend.teamPasswordError},{status:503}):Response.json({ok:true,password_set:true,confirmed:true});
    if(method==='DELETE'){backend.teamRows=backend.teamRows.filter(m=>m.user_id!==JSON.parse(init.body).user_id);return Response.json({ok:true});}
    if(method==='GET'){
     if(backend.teamPending)await backend.teamPending.promise;
@@ -44,7 +45,7 @@ async function harness(t, options={}){
    if(method==='POST'){const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});if(existing)backend.teamRows=backend.teamRows.map(m=>m.email.toLowerCase()===data.email.toLowerCase()?{...m,confirmed:true}:m);return Response.json(backend.teamResult??{created:data.mode!=='assign',confirmed:true});}
    return Response.json({user_id:'changed-staff'});
   }
-  if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return Response.json({});}
+  if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return backend.passwordError?Response.json({message:'Auth unavailable'},{status:503}):Response.json({});}
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
@@ -65,7 +66,7 @@ async function harness(t, options={}){
  const client={
   auth:{getSession:async()=>backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null}),onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};},
    signUp:async input=>{backend.authCalls.push({method:'signup',input});return {data:{session:null},error:null};},
-   signInWithPassword:async input=>{backend.authCalls.push({method:'password',input});session=authSession('customer');callback?.('SIGNED_IN',session);return {data:{session},error:null};},
+   signInWithPassword:async input=>{backend.authCalls.push({method:'password',input});if(backend.signInError)return {data:{session:null},error:backend.signInError};session=authSession('customer');callback?.('SIGNED_IN',session);return {data:{session},error:null};},
    verifyOtp:async input=>{backend.authCalls.push({method:'verify',input});if(backend.verifyError)return {data:{session:null,user:null},error:backend.verifyError};session=authSession(options.verifyUser??'invited-staff');callback?.(input.type==='recovery'?'PASSWORD_RECOVERY':'SIGNED_IN',session);const verified=session;if(backend.verifySwitch){session=authSession('other-account');callback?.('SIGNED_IN',session);}return {data:{session:verified,user:verified.user},error:null};},
    resetPasswordForEmail:async(...input)=>{backend.authCalls.push({method:'reset',input});return {error:null};},
   },
@@ -733,7 +734,7 @@ test('staff can change their own password from the sidebar and clear the first-l
  await act(async()=>{form.findByProps({name:'password'}).props.onChange({target:{value:'A new personal staff password'}});form.findByProps({name:'confirm_password'}).props.onChange({target:{value:'A new personal staff password'}});});
  await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});
  assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.renderer.root.findAllByProps({className:'staff-password-reminder'}).length,0);assert.deepEqual(h.backend.authCalls,[]);
- assert.match(JSON.stringify(h.renderer.toJSON()),/Your password has been changed/);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Profile changes saved. Your password has been updated/);assert.equal(h.renderer.root.findAllByType('dialog').length,0);
 });
 test('profile upload persists a staff-owned path and the sidebar follows the saved photo',async t=>{
  const h=await harness(t);h.backend.upload=deferred();
@@ -744,7 +745,10 @@ test('profile upload persists a staff-owned path and the sidebar follows the sav
  const write=h.backend.calls.find(c=>c.table==='staff_profiles');assert.equal(write.payload.user_id,'owner');assert.match(write.payload.avatar_path,/^owner\/[a-f0-9-]+\.png$/);
  assert.equal(h.site.staffProfile.avatar_path,write.payload.avatar_path);
  const button=h.renderer.root.findByProps({'aria-label':'Edit staff profile'});assert.ok(button.findByType('img').props.src.endsWith(write.payload.avatar_path));
- assert.match(JSON.stringify(h.renderer.toJSON()),/Photo saved/);
+ const toast=h.renderer.root.findByType('dialog').findByProps({className:'staff-profile-toast'});assert.equal(toast.props.role,'status');assert.match(JSON.stringify(h.renderer.toJSON()),/Profile photo updated/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Đã cập nhật ảnh hồ sơ/);
+ const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.equal(form.findByProps({name:'password'}).props.required,undefined);
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Đã lưu thay đổi hồ sơ/);
 });
 test('notifications load once per refresh, show persisted activity and keep read state',async t=>{
  const h=await harness(t);h.backend.notifications=[{id:'notice-one',category:'team',action:'team.role_changed',actor_name:'Owner',actor_user_id:'owner',target_name:'Team colleague',target_user_id:'staff',target_role:'editor',details:{from:'manager',to:'editor'},created_at:'2026-10-25T00:00:00Z',unread:true}];
@@ -756,4 +760,81 @@ test('notifications load once per refresh, show persisted activity and keep read
  await act(async()=>{await mark.props.onClick();await delay(5);});assert.equal(h.renderer.root.findAllByProps({className:'notification-count'}).length,0);
  await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Hoạt động & thông báo/);
  const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({className:'studio-notification-panel'}).length,0);
+});
+
+
+test('existing staff passwords can be replaced explicitly without assigning a role, sending an email or switching the owner session',async t=>{
+ const h=await harness(t);h.backend.teamRows.push({user_id:'existing-staff',display_name:'Existing colleague',email:'colleague@gmail.com',role:'manager',active:true,confirmed:true});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ const row=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('colleague@gmail.com')));
+ await act(async()=>row.findByProps({className:'text-link team-password-action'}).props.onClick());
+ let dialog=h.renderer.root.findByType('dialog');assert.match(JSON.stringify(dialog.toJSON?.()??h.renderer.toJSON()),/current password/);
+ const form=()=>h.renderer.root.findByType('dialog').findByType('form');
+ await act(async()=>{form().findByProps({name:'temporary_password'}).props.onChange({target:{value:'A replacement temporary password'}});form().findByProps({name:'confirm_temporary_password'}).props.onChange({target:{value:'Does not match'}});});
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});});assert.equal(h.backend.teamCalls.filter(c=>c.method==='PASSWORD').length,0);
+ await act(async()=>{form().findByProps({name:'confirm_temporary_password'}).props.onChange({target:{value:'A replacement temporary password'}});});
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
+ assert.deepEqual(h.backend.teamCalls.filter(c=>c.method==='PASSWORD'),[{method:'PASSWORD',input:{user_id:'existing-staff',password:'A replacement temporary password',confirm_password:'A replacement temporary password'}}]);
+ assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET'||c.method==='POST'||c.method==='PATCH').length,0);assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.equal(h.site.user.id,'owner');assert.equal(h.backend.authCalls.length,0);assert.equal(h.backend.teamRows.find(m=>m.user_id==='existing-staff').role,'manager');
+});
+test('temporary-password failures keep the form open and private passwords clear on role change',async t=>{
+ const h=await harness(t);h.backend.teamRows.push({user_id:'existing-staff',display_name:'Existing colleague',email:'colleague@gmail.com',role:'editor',active:true,confirmed:true});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ const row=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('colleague@gmail.com')));
+ await act(async()=>row.findByProps({className:'text-link team-password-action'}).props.onClick());
+ const form=()=>h.renderer.root.findByType('dialog').findByType('form');
+ await act(async()=>{form().findByProps({name:'temporary_password'}).props.onChange({target:{value:'Private unsaved temporary password'}});form().findByProps({name:'confirm_temporary_password'}).props.onChange({target:{value:'Private unsaved temporary password'}});});
+ h.backend.teamPasswordError='Couldn’t confirm the temporary password. Check the account before trying again.';
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.teamCalls.filter(c=>c.method==='PASSWORD').length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the temporary password/);
+ h.backend.role='manager';await h.emit(authSession('owner'));assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.equal(h.renderer.root.findAllByProps({name:'temporary_password'}).length,0);
+});
+test('the staff portal normalizes email, preserves exact password characters and explains existing-account credentials in both languages',async t=>{
+ const h=await harness(t,{guest:true,page:'staff'});h.backend.signInError=Object.assign(new Error('Invalid login credentials'),{code:'invalid_credentials'});
+ const fields={email:'  COLLEAGUE@GMAIL.COM  ',password:'  An exact temporary password  '};
+ await act(async()=>{await h.renderer.root.findByProps({'aria-label':'Staff account access'}).props.onSubmit({preventDefault(){},currentTarget:{fields}});});
+ assert.deepEqual(h.backend.authCalls,[{method:'password',input:{email:'colleague@gmail.com',password:fields.password}}]);assert.equal(h.site.user,null);assert.match(JSON.stringify(h.renderer.toJSON()),/Reassigned accounts keep their existing password/);assert.match(JSON.stringify(h.renderer.toJSON()),/no separate first-time login page/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Tài khoản được cấp lại quyền/);assert.match(JSON.stringify(h.renderer.toJSON()),/Không có trang đăng nhập lần đầu riêng/);
+});
+
+
+test('Studio branch disclosures preserve the active form draft and translate without remounting it',async t=>{
+ const h=await harness(t);await h.editSettings('Draft survives branch navigation');
+ const nav=h.renderer.root.findByProps({className:'branched-menu studio-branched-menu'});assert.equal(nav.props['aria-label'],'CMS navigation');
+ let group=nav.findByProps({'aria-label':'Administration'});assert.equal(group.props['aria-expanded'],true);const controlled=group.props['aria-controls'];
+ await act(async()=>group.props.onClick());
+ let body=h.renderer.root.findByProps({id:controlled});assert.equal(body.props.inert,true);assert.equal(body.props['aria-hidden'],true);assert.equal(nav.findByProps({'aria-label':'Site settings'}).props.tabIndex,-1);
+ assert.ok(h.renderer.root.findAllByType('textarea').some(n=>n.props.value==='Draft survives branch navigation'));
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByProps({'aria-label':'Quản trị'}).props['aria-expanded'],false);assert.ok(h.renderer.root.findAllByType('textarea').some(n=>n.props.value==='Draft survives branch navigation'));
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Quản trị'}).props.onClick());body=h.renderer.root.findByProps({id:controlled});assert.equal(body.props.inert,false);
+ assert.equal(h.backend.calls.filter(c=>c.table==='site_settings').length,0);
+});
+test('branch navigation retains staff permissions and hides the email-domain banner in Team access',async t=>{
+ const h=await harness(t,{role:'editor'});assert.equal(h.renderer.root.findAllByProps({'aria-label':'Team access'}).length,0);assert.equal(h.renderer.root.findAllByProps({'aria-label':'Assistance attribution'}).length,0);
+ h.backend.role='manager';await h.emit(authSession('owner'));await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ assert.equal(h.renderer.root.findAllByProps({className:'team-access-summary'}).length,0);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Allowed staff email/);assert.ok(h.renderer.root.findByProps({className:'admin-panel team-permissions-guide'}));
+});
+test('Save changes closes an unchanged profile without changing its password or dismissing the first-login reminder',async t=>{
+ const h=await harness(t);h.backend.passwordReminder=true;await act(async()=>h.site.refreshStaffProfile());
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.ok(form.findAllByType('button').some(b=>b.children.includes('Save changes')));
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.backend.passwordReminder,true);assert.equal(h.backend.rpcCalls.some(c=>c.name==='acknowledge_staff_password_reminder'),false);assert.match(JSON.stringify(h.renderer.toJSON()),/Your profile is up to date/);
+});
+test('profile password mismatches and Auth failures keep the dialog open without claiming a successful save',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});
+ await act(async()=>{form().findByProps({name:'password'}).props.onChange({target:{value:'A private new staff password'}});form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A mismatching password'}});});
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByType('dialog').length,1);
+ await act(async()=>{form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A private new staff password'}});});h.backend.passwordError=true;
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.renderer.root.findAllByType('dialog').length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the password change/);assert.equal(h.backend.rpcCalls.some(c=>c.name==='acknowledge_staff_password_reminder'),false);
+});
+
+
+test('an unconfirmed photo write cannot be acknowledged by Save changes',async t=>{
+ const h=await harness(t);h.backend.upload=deferred();h.backend.writeErrors.set('staff_profiles',{code:'42501',message:'Profile write denied'});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ const upload=h.renderer.root.findAllByType('input').find(n=>n.props.type==='file');
+ await act(async()=>{upload.props.onChange({target:{files:[{type:'image/png',size:1024,name:'portrait.png'}],value:'portrait.png'}});await delay(5);});
+ await act(async()=>{h.backend.upload.resolve({data:{path:'stored'},error:null});await delay(8);});
+ const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.equal(form.findAllByType('button').find(b=>b.children.includes('Save changes')).props.disabled,true);
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByType('dialog').length,1);assert.equal(h.renderer.root.findAllByProps({className:'staff-profile-toast'}).length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the photo update/);assert.equal(h.backend.passwordCalls.length,0);
 });

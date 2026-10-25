@@ -67,7 +67,7 @@ export function Footer(){
  const address=<a className="footer-location" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.contact_address)}`} target="_blank" rel="noreferrer"><MapPin size={17} aria-hidden="true"/>{s.contact_address}</a>;
  return <><footer className="site-footer rental-footer"><div className="container">
   <div className="footer-top">
-   <div className="footer-intro"><Brand light/><p>{t("Serviced apartments and property rentals in Hanoi. Contact Gary Home for current availability and lease terms.","Căn hộ dịch vụ và bất động sản cho thuê tại Hà Nội. Liên hệ Gary Home để xác nhận tình trạng và điều kiện thuê.")}</p><div className="footer-desktop-address">{address}</div></div>
+   <div className="footer-intro"><p>{t("Serviced apartments and property rentals in Hanoi. Contact Gary Home for current availability and lease terms.","Căn hộ dịch vụ và bất động sản cho thuê tại Hà Nội. Liên hệ Gary Home để xác nhận tình trạng và điều kiện thuê.")}</p><div className="footer-desktop-address">{address}</div></div>
    <div className="footer-desktop-menus">
     <div className="footer-column"><h3>{t("Rental properties","Bất động sản cho thuê")}</h3><FooterItems items={rentals}/></div>
     <div className="footer-column"><h3>Gary Home</h3><FooterItems items={company}/><FooterItems items={account}/></div>

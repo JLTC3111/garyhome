@@ -17,7 +17,7 @@ Nobody can create a peer or a higher role. In particular, the website does not c
 
 Open **Studio → Team access → Create new account**. Enter the name, eligible company or Gmail address, assigned role, temporary password and matching confirmation. Passwords require at least 12 characters. The server uses Supabase Auth Admin `createUser` with `email_confirm: true`, then assigns the role through a fresh database permission check. There is no invitation email step.
 
-Share the temporary password privately with the staff member. Passwords are not put in user metadata, the activity log or API responses. On first login, a reminder offers **Change password**. The bottom-left profile button opens the same password form. A successful password change clears the reminder; the log records that the reminder was cleared, rather than claiming to independently verify a password change.
+Share the temporary password privately with the staff member. Passwords are not put in user metadata, the activity log or API responses. On first login, a reminder offers **Change password**. The bottom-left profile button opens the same profile form. **Save changes** saves a supplied password and closes the dialog; leave both password fields blank for a photo-only save. Photo updates show an in-dialog success toast. A successful password change clears the reminder; the log records that the reminder was cleared, rather than claiming to independently verify a password change.
 
 Direct creation requires `SUPABASE_SECRET_KEY` (or the existing service-role fallback) in the server environment. It must be configured in Vercel separately from the ignored local `.env`; it must never be exposed through a public environment variable. Team access displays whether the server has creation configuration. Hosted Auth creation and inbox delivery are not exercised by local automated tests.
 
@@ -26,6 +26,18 @@ The Auth account and database assignment are separate operations. If the account
 ## Assign an existing login
 
 Choose **Assign existing login** for an email that already exists in Supabase. It confirms the email and assigns a permitted lower role while preserving the person's current password and customer history. The mode does not overwrite an existing customer's credentials. Password inputs are shown only for new accounts. Existing staff can change their password in their profile; the directory's optional **Send password link** remains available for recovery.
+
+## Existing staff who cannot sign in
+
+There is no separate temporary or first-time login page. All staff sign in at `/admin`. A new account uses the temporary password entered during creation; assigning an existing account keeps its current password.
+
+For an existing staff member, open **Studio → Team access → Your team → Set temporary password**. Enter a new password and matching confirmation, then choose **Replace password**. This explicit action changes that staff account’s Auth password and confirms its email, without changing its role or customer history. Give the password to the staff member privately. No email link is sent. They sign in through the regular Staff portal and see the password-change reminder.
+
+Only an active, assigned account below the creator’s level is eligible. You cannot reset your own password here or reset a peer/higher role; use the bottom-left profile for your own password. Disabled access must be restored first. The server verifies the current manager and target against the database immediately before the Auth update, and only reports success when Auth returns the expected user, email and email-confirmation state. Failed or uncertain writes are not automatically replayed.
+
+Passwords never enter the database RPCs, notification records, metadata or API responses. The activity log records reset requests and failures, while Supabase Auth records the actual user update. The reminder is re-enabled when a reset is requested, including after an uncertain result, so it remains advisory.
+
+The staff login form now normalizes surrounding email whitespace and letter case, preserves password characters exactly, and explains in English/Vietnamese why reassigned accounts still need their existing password.
 
 ## Staff photos
 
@@ -50,3 +62,5 @@ Applied to project `duyiihsmaqfgwezmsnjs` on 25 October 2026. The existing two s
 For another existing project, apply [20261025055215_direct_staff_accounts_profiles_and_notifications.sql](../supabase/migrations/20261025055215_direct_staff_accounts_profiles_and_notifications.sql) once after the previous migrations. Fresh `setup.sql` includes it. It adds RLS-protected profile, notification and read-state tables, the avatar bucket, author links, strict hierarchy functions and activity triggers. Realtime publication updates are conditional on the host having `supabase_realtime` configured. Apply the follow-up activity deletion migration afterwards; fresh `setup.sql` includes both.
 
 The homepage links to `https://garyvisaservice.vercel.app/` in a new tab. Enquiries and customer feedback use distinct sidebar icons. Feedback and commission headings/sidebar labels have additional left spacing. All new account guidance, controls and notifications support English and Vietnamese.
+
+Applied to project `duyiihsmaqfgwezmsnjs` on 25 October 2026. For another project, the explicit temporary-password controls require [20261025080124_staff_temporary_password_controls.sql](../supabase/migrations/20261025080124_staff_temporary_password_controls.sql) after the migrations above; fresh `setup.sql` includes it.

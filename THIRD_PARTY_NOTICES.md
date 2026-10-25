@@ -2,7 +2,7 @@
 
 This application includes adapted components from the following projects. Existing dependency licenses remain with their respective packages.
 
-## React Bits — Spotlight Card and Tech Text
+## React Bits — Spotlight Card, Tech Text and Branched Menu
 
 Source: https://github.com/DavidHDev/react-bits
 
@@ -99,3 +99,10 @@ SOFTWARE.
 ## Supplied messaging SVGs
 
 `public/svg/WhatsApp.svg` and `public/svg/Zalo.svg` were supplied by the website owner. Their embedded attribution comments are retained. The WhatsApp SVG identifies its icon geometry as Font Awesome Free 6.7.2 under CC BY 4.0: https://fontawesome.com/license/free.
+
+
+## Be Vietnam Pro web fonts
+
+Source: https://github.com/google/fonts/tree/main/ofl/bevietnampro
+
+The official Regular, Medium, SemiBold and Bold files are self-hosted as WOFF2 web fonts. Their glyphs are retained, including Vietnamese precomposed letters and combining marks. Copyright notices and the full SIL Open Font License are retained in [public/fonts/Be-Vietnam-Pro-LICENSE.txt](public/fonts/Be-Vietnam-Pro-LICENSE.txt).

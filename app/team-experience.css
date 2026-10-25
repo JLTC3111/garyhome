@@ -68,3 +68,11 @@
 @media(max-width:680px){.staff-profile-dialog{padding:23px 20px}.staff-photo-editor{gap:14px;padding:16px}.staff-profile-photo{width:65px;height:65px}.staff-profile-dialog h2{font-size:26px}.staff-password-reminder{flex-wrap:wrap;gap:10px}.staff-password-reminder>span{flex:1;min-width:180px}.staff-password-reminder>.text-link{margin-left:28px}.studio-notification-panel{position:fixed;left:15px;right:15px;top:82px;width:auto;max-height:calc(100dvh - 110px)}.team-permissions-guide{padding:22px}.team-account-modes>button{font-size:10px}.visa-service-link{font-size:11px}}
 
 .account-staff-avatar{width:100%;height:100%;object-fit:cover;border-radius:50%}
+
+.temporary-password-target{display:grid;gap:7px;margin-bottom:18px;overflow-wrap:anywhere;font-size:13px}
+.temporary-password-target>span{color:var(--muted);font-size:12px}
+.staff-temporary-password-dialog>.form-info{font-size:12px;line-height:1.9}
+.temporary-password-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px}
+.temporary-password-actions>.button{min-height:43px;font-size:12px}
+.team-password-action{display:inline-flex;align-items:center;gap:6px;font-size:11px;margin-top:11px}
+.staff-login-password-help{font-size:11px;line-height:1.9;color:var(--muted);margin-top:22px}

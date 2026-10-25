@@ -50,3 +50,13 @@ The app sends invitations with `/auth/invite` as the requested redirect and reco
 Only email delivery and this real-mailbox check require a live recipient. Automated tests use mocked Auth boundaries and never send production email or change a production password. No database migration is needed for this change.
 
 References: [Supabase email templates and email prefetching](https://supabase.com/docs/guides/auth/auth-email-templates), [verifyOtp](https://supabase.com/docs/reference/javascript/auth-verifyotp), [Auth recovery confirmation behavior](https://github.com/supabase/auth/blob/master/internal/api/verify.go).
+
+## Adding an address that already exists
+
+**Create / assign & send email** requests an invitation for a new Auth account. For an existing Auth account it saves the staff assignment, checks the actor and target again, then requests a fresh password-setup email to the actual assigned Auth address. It does not create a duplicate account. A recipient who failed to finish an earlier invitation can complete setup using this new recovery email.
+
+Existing team rows expose **Send password link**, or **Send setup email** while email confirmation is pending. Only owners/admins can trigger these actions; protected owner/admin targets and inactive or mismatched assignments stay blocked. An unconfirmed recipient does not gain Studio access before verifying the new email link.
+
+The result remains visible above Team access. Email request failures and unconfirmed requests are reported separately from a saved assignment, with actionable SMTP or sending-limit guidance. “Requested” means Auth accepted the request; it is not inbox delivery confirmation. Neither timeouts nor background refreshes replay email sends automatically. Use the row action to request a fresh link instead of removing and recreating the account.
+
+This change uses [20261025033745_staff_password_setup_retries.sql](../supabase/migrations/20261025033745_staff_password_setup_retries.sql) to permit owner/admin setup-link requests for active pending staff. The existing role checks still require a confirmed actor, an eligible address and explicit membership.

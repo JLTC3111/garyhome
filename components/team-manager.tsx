@@ -18,6 +18,7 @@ export function TeamManager({ draft, setDraft }: { draft: TeamDraft; setDraft: (
   const [domains, setDomains] = useState<string[]>([]), [invitationsEnabled, setInvitationsEnabled] = useState(false);
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [delivery,setDelivery]=useState<{warning:boolean;message:string;detail?:string}|null>(null);
   const [removing,setRemoving]=useState<StaffAccount|null>(null);
   const active = useRef(true), identity = useRef(user?.id), sequence = useRef(0), version = useRef(0);
   useEffect(() => { identity.current = user?.id; }, [user?.id]);
@@ -55,11 +56,14 @@ export function TeamManager({ draft, setDraft }: { draft: TeamDraft; setDraft: (
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (busy) return;
     if (!domains.includes(draft.email.trim().toLowerCase().split("@")[1])) { setError("Use an allowed company or Gmail address."); return; }
-    setBusy("invite"); setError(""); version.current++;
+    setBusy("invite"); setError("");setDelivery(null); version.current++;
     try {
-      const result = await editorTask((_db, signal) => call("POST", signal, { ...draft, role: draft.role })) as { invited: boolean };
+      const result = await editorTask((_db, signal) => call("POST", signal, { ...draft, role: draft.role })) as { invited:boolean;email_status?:string;email_error?:string };
       if (!active.current) return;
-      setDraft(emptyTeamDraft()); notice(text(result.invited ? "Staff invitation sent. The team member can confirm their email and choose a password." : "Staff access assigned to the existing staff account. They can sign in to Studio."));
+      setDraft(emptyTeamDraft());
+      const requested=result.email_status==="requested"||!result.email_status&&result.invited;
+      const message=requested?(result.invited?"Staff access saved. Invitation email requested.":"Staff access saved. A fresh password-setup email was requested for the existing account."):"Staff access saved, but the email request was not confirmed.";
+      setDelivery({warning:!requested,message,detail:result.email_error});notice(text(message));
       await load();
     } catch (error) { if (active.current) setError(error instanceof Error ? error.message : "Couldn’t create the staff account. Refresh before trying again."); }
     finally { if (active.current) setBusy(""); }
@@ -86,8 +90,8 @@ export function TeamManager({ draft, setDraft }: { draft: TeamDraft; setDraft: (
     finally{if(active.current&&identity.current===actor)setBusy("");}
   }
   async function resetPassword(member:StaffAccount){
-    if(busy)return;const actor=user?.id;setBusy("reset:"+member.user_id);setError("");
-    try{await editorTask((_db,signal)=>call("RESET",signal,{user_id:member.user_id}));if(active.current&&identity.current===actor)notice(text("Password reset email requested. The team member should open the latest email link."));}
+    if(busy)return;const actor=user?.id;setBusy("reset:"+member.user_id);setError("");setDelivery(null);
+    try{await editorTask((_db,signal)=>call("RESET",signal,{user_id:member.user_id}));if(active.current&&identity.current===actor){const message="Password link requested. Ask the team member to check the newest email and spam folder.";setDelivery({warning:false,message});notice(text(message));}}
     catch(error){if(active.current&&identity.current===actor)setError(error instanceof Error?error.message:"Couldn’t confirm the reset request. Refresh before trying again.");}
     finally{if(active.current&&identity.current===actor)setBusy("");}
   }
@@ -95,20 +99,21 @@ export function TeamManager({ draft, setDraft }: { draft: TeamDraft; setDraft: (
   return <div className="team-manager">
     <div className="team-access-summary"><ShieldCheck size={22}/><div><h2>{text("A trusted team. Clearly assigned access.")}</h2><p>{domains.length ? text("Allowed staff email") + ": " + domains.map(domain => "@" + domain).join(" · ") : text("Loading staff account settings…")}</p><p>{text("A company or Gmail address needs an owner or admin assignment before it can access Studio.")}</p></div><button className="button button-outline button-small" type="button" disabled={loading || !!busy} onClick={() => void load()}><RefreshCw size={15} className={loading ? "spin" : ""}/>{text("Refresh")}</button></div>
     {error && <div className="form-error" role="alert">{text(error)}</div>}
+    {delivery&&<div className={delivery.warning?"form-error team-email-result":"form-info team-email-result"} role={delivery.warning?"alert":"status"}><strong>{text(delivery.message)}</strong>{delivery.detail&&<p>{text(delivery.detail)}</p>}{!delivery.warning&&<p>{text("Auth accepted the email request; inbox delivery is not confirmed. Use the newest email link.")}</p>}</div>}
     <div className="team-management-grid"><form className="admin-panel enquiry-form team-invite-form" onSubmit={create}>
-      <div className="eyebrow">{text("INVITATION ONLY")}</div><h2>{text("Add a team member")}</h2><p>{text("Assign an approved company or Gmail address. New staff receive an invitation to confirm their email and choose a password.")}</p>
+      <div className="eyebrow">{text("INVITATION ONLY")}</div><h2>{text("Add a team member")}</h2><p>{text("Assign an approved company or Gmail address. New users receive an invitation; existing users receive a fresh password-setup email.")}</p>
       <label>{text("Full name")}<input name="full_name" autoComplete="off" value={draft.full_name} onChange={event => setDraft({ ...draft, full_name: event.target.value })} required minLength={2} maxLength={120} disabled={!!busy}/></label>
       <label>{text("Staff email")}<input name="email" type="email" autoComplete="off" value={draft.email} onChange={event => setDraft({ ...draft, email: event.target.value })} required maxLength={254} disabled={!!busy} placeholder={domains.length ? "name@" + domains[0] : ""}/></label>
       <label>{text("Assigned role")}<SelectField value={draft.role} disabled={!!busy} onValueChange={value => setDraft({ ...draft, role: value as TeamDraft["role"] })}><option value="editor">{text("Staff · properties and customers")}</option><option value="manager">{text("Manager · also arranges cards")}</option>{staffRole === "owner" && <option value="admin">{text("Administrator · also manages staff")}</option>}</SelectField></label>
       <p className="small muted">{staffRole === "owner" ? text("Administrators can manage staff. Only owners can appoint or change administrators.") : text("You can assign staff access. Administrator accounts are managed by the owner.")}</p>
       {!invitationsEnabled && domains.length > 0 && <p className="form-info">{text("New invitations need server configuration. Existing staff accounts can still be assigned.")}</p>}
-      <button className="button" disabled={!!busy || !domains.length || sessionPhase !== "ready"}>{busy === "invite" ? <LoaderCircle size={17} className="spin"/> : <MailPlus size={17}/>} {text(busy === "invite" ? "Creating account…" : "Create / assign account")}</button>
+      <button className="button" disabled={!!busy || !domains.length || sessionPhase !== "ready"}>{busy === "invite" ? <LoaderCircle size={17} className="spin"/> : <MailPlus size={17}/>} {text(busy === "invite" ? "Creating account…" : "Create / assign & send email")}</button>
     </form><section className="admin-panel team-directory" aria-label={text("Team directory")}><header><div><h2>{text("Your team")}</h2><p>{text("Manage staff access while preserving customer accounts and history.")}</p></div>{loading && <LoaderCircle size={18} className="spin"/>}</header>
       {!members.length && !loading && <p className="team-empty">{text("No team members loaded. Refresh the directory to try again.")}</p>}
       {members.map(member => {
         const canReset=member.user_id===user?.id||(member.role!=="owner"&&(staffRole==="owner"||member.role!=="admin"));
         const protectedAccount = member.role === "owner" || member.user_id === user?.id || staffRole !== "owner" && member.role === "admin";
-        return <article className="team-member" key={member.user_id}><span className="team-avatar"><UserRound size={21}/></span><div className="team-member-details"><strong>{member.display_name || member.email}</strong><span>{member.email}</span><div><span className={member.active ? "team-state active" : "team-state"}>{text(!member.active ? "Access disabled" : member.confirmed ? "Active" : "Email confirmation pending")}</span><small>{text(member.role === "owner" ? "Owner" : member.role === "admin" ? "Administrator" : member.role === "manager" ? "Manager" : "Staff")}</small></div>{canReset&&<button type="button" className="text-link team-reset-action" disabled={!!busy||!member.confirmed||!member.active} onClick={()=>void resetPassword(member)}>{busy==="reset:"+member.user_id?text("Requesting reset…"):text("Reset password")}</button>}</div>
+        return <article className="team-member" key={member.user_id}><span className="team-avatar"><UserRound size={21}/></span><div className="team-member-details"><strong>{member.display_name || member.email}</strong><span>{member.email}</span><div><span className={member.active ? "team-state active" : "team-state"}>{text(!member.active ? "Access disabled" : member.confirmed ? "Active" : "Email confirmation pending")}</span><small>{text(member.role === "owner" ? "Owner" : member.role === "admin" ? "Administrator" : member.role === "manager" ? "Manager" : "Staff")}</small></div>{canReset&&<button type="button" className="text-link team-reset-action" disabled={!!busy||!member.active} onClick={()=>void resetPassword(member)}>{busy==="reset:"+member.user_id?text("Requesting reset…"):text(member.confirmed?"Send password link":"Send setup email")}</button>}</div>
           {protectedAccount ? <span className="team-protected"><Check size={13}/>{text(member.user_id === user?.id ? "Your account" : "Protected account")}</span>
             : <div className="team-member-actions"><SelectField aria-label={text("Assigned role") + " · " + member.email} value={member.role} disabled={!!busy} onValueChange={value => void update(member, value as "admin" | "manager" | "editor", member.active)}><option value="editor">{text("Staff")}</option><option value="manager">{text("Manager")}</option>{staffRole === "owner" && <option value="admin">{text("Administrator")}</option>}</SelectField><button type="button" className="text-link" disabled={!!busy} onClick={() => void update(member, member.role as "admin" | "manager" | "editor", !member.active)}>{busy === member.user_id ? <LoaderCircle size={14} className="spin"/> : text(member.active ? "Disable access" : "Restore access")}</button><button type="button" className="text-link text-danger" disabled={!!busy} onClick={()=>{setError("");setRemoving(member);}}><Trash2 size={14}/>{text("Delete access")}</button></div>}
         </article>;

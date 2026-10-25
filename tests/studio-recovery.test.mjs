@@ -41,7 +41,7 @@ async function harness(t, options={}){
     if(backend.teamPending)await backend.teamPending.promise;
     return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn','gmail.com'],invitationsEnabled:true});
    }
-   if(method==='POST'){const data=JSON.parse(init.body);backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});return Response.json({invited:true});}
+   if(method==='POST'){const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});return Response.json(backend.teamResult??{invited:!existing,email_status:'requested'});}
    return Response.json({user_id:'changed-staff'});
   }
   if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return Response.json({});}
@@ -691,4 +691,23 @@ test('a connection failure during verification releases the action and permits a
  h.backend.verifyError=null;
  await act(async()=>{await confirm().props.onClick();await delay(5);});
  assert.equal(h.backend.authCalls.length,2);assert.equal(h.renderer.root.findAllByProps({name:'password'}).length,1);
+});
+
+
+test('existing staff additions retain a visible email failure and pending members can request setup again',async t=>{
+ const h=await harness(t);h.backend.teamRows.push({user_id:'pending-staff',display_name:'Pending Staff',email:'pending@gmail.com',role:'editor',active:true,confirmed:false});
+ h.backend.teamResult={invited:false,email_status:'failed',email_error:'Email sending limit reached. Wait before trying again or check Supabase SMTP settings.'};
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
+ await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Pending Staff'}});});
+ await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'pending@gmail.com'}});});
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const warning=()=>h.renderer.root.findByProps({className:'form-error team-email-result'});
+ assert.equal(warning().props.role,'alert');assert.match(JSON.stringify(h.renderer.toJSON()),/Staff access saved, but the email request was not confirmed/);assert.match(JSON.stringify(h.renderer.toJSON()),/Email sending limit reached/);
+ assert.equal(h.backend.teamRows.length,2);assert.equal(h.backend.teamCalls.filter(c=>c.method==='POST').length,1);
+ const pending=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('pending@gmail.com')));
+ const resend=pending.findAllByType('button').find(n=>n.props.className==='text-link team-reset-action');assert.equal(resend.props.disabled,false);assert.ok(resend.children.includes('Send setup email'));
+ await act(async()=>{await resend.props.onClick();await delay(5);});
+ assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET').length,1);assert.equal(h.backend.teamCalls.filter(c=>c.method==='POST').length,1);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Password link requested/);
 });

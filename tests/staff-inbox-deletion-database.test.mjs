@@ -80,13 +80,14 @@ test('assigned Gmail staff, enquiry reads and protected deletion use current dat
   await as('customer');assert.equal((await db.query('select * from public.saved_homes')).rows.length,0);assert.equal((await db.query('select * from public.property_assistance')).rows.length,1);
  });
 
- await t.test('reset targets use current confirmed membership and cannot cross protected role boundaries',async()=>{
+ await t.test('reset targets allow pending setup while preserving current membership and cannot cross protected role boundaries',async()=>{
   await as('owner');assert.equal((await one('select public.staff_reset_email($1) as email',[ids.gmail])).email,'gmail@gmail.com');
   assert.equal((await one('select public.staff_reset_email($1) as email',[ids.owner])).email,'owner@protonmail.com');
-  for(const name of ['pending','disabled','customer'])await assert.rejects(db.query('select public.staff_reset_email($1)',[ids[name]]),error=>error.code==='23514');
+  assert.equal((await one('select public.staff_reset_email($1) as email',[ids.pending])).email,'pending@gmail.com');
+  for(const name of ['disabled','customer'])await assert.rejects(db.query('select public.staff_reset_email($1)',[ids[name]]),error=>error.code==='23514');
   await as('admin');for(const name of ['owner','admin2'])await denied(db.query('select public.staff_reset_email($1)',[ids[name]]));
   assert.equal((await one('select public.staff_reset_email($1) as email',[ids.admin])).email,'admin@garyhome.com');
-  for(const name of ['manager','editor','customer']){await as(name);await denied(db.query('select public.staff_reset_email($1)',[ids.gmail]));}
+  for(const name of ['manager','editor','customer','pending']){await as(name);await denied(db.query('select public.staff_reset_email($1)',[ids.gmail]));}
   await as('root');await db.query("update auth.users set email='changed@gmail.com' where id=$1",[ids.gmail]);
   await as('owner');await assert.rejects(db.query('select public.staff_reset_email($1)',[ids.gmail]),error=>error.code==='23514');
   await as('root');await db.query("update auth.users set email='gmail@gmail.com' where id=$1",[ids.gmail]);

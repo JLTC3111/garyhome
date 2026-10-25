@@ -11,7 +11,7 @@ const require=createRequire(import.meta.url),base=path.resolve(import.meta.dirna
 function endpoint(options={}){
  const state={role:'owner',valid:true,existing:'00000000-0000-4000-8000-000000000002',secret:true,members:[],rpc:[],invites:[],resets:[],secretReads:0,tokens:[],...options};
  const user={id:'00000000-0000-4000-8000-000000000001',email:'owner@protonmail.com',email_confirmed_at:'2026-10-01T00:00:00Z',user_metadata:{role:'owner'}};
- const client={auth:{getUser:async token=>({data:{user:state.valid&&token==='valid-token'?user:null},error:null}),resetPasswordForEmail:async(email,options)=>{state.resets.push({email,options});return {error:state.resetError||null};}},from(table){
+ const client={auth:{getUser:async token=>({data:{user:state.valid&&token==='valid-token'?user:null},error:null}),resetPasswordForEmail:async(email,options)=>{state.resets.push({email,options});if(state.resetThrow)throw new Error("Network unavailable");return {error:state.resetError||null};}},from(table){
   const q={};for(const name of ['select','eq','abortSignal','single','maybeSingle'])q[name]=()=>q;
   q.then=(resolve,reject)=>Promise.resolve({data:table==='team_members'?(state.role?{role:state.role}:null):{email_domains:['garyhome.com','icue.vn','gmail.com']},error:null}).then(resolve,reject);return q;
  },rpc(name,args){
@@ -21,7 +21,7 @@ function endpoint(options={}){
    if(name==='assign_staff_account')result=['owner','admin'].includes(state.role)?{data:state.existing||'00000000-0000-4000-8000-000000000002',error:null}:{data:null,error:{code:'42501'}};
    if(name==='set_staff_access')result=state.protected?{data:null,error:{code:'42501'}}:{data:args.target_user_id,error:null};
    if(name==='remove_staff_access')result=state.protected?{data:null,error:{code:'42501'}}:{data:state.unconfirmedDelete?null:true,error:null};
-   if(name==='staff_reset_email')result={data:state.resetTarget??'assigned@gmail.com',error:state.resetTargetError??null};
+   if(name==='staff_reset_email')result={data:state.resetTarget??state.rpc.findLast(call=>call.name==='assign_staff_account')?.args.target_email??'assigned@gmail.com',error:state.resetTargetError??null};
    if(name==='list_staff_accounts')result={data:state.members,error:null};
    return Promise.resolve(result).then(resolve,reject);
   }};return q;
@@ -66,14 +66,15 @@ test('administrators cannot use the account API to appoint administrators or own
  assert.equal((await h.send('POST',{role:'admin'})).status,403);assert.equal((await h.send('POST',{role:'owner'})).status,400);
  assert.equal(h.state.invites.length,0);assert.equal(h.state.rpc.length,0);
 });
-test('an existing company account can be assigned without a server secret or email',async()=>{
+test('an existing account is assigned and receives a fresh password email without an invitation secret',async()=>{
  const h=endpoint({secret:false}),response=await h.send();assert.equal(response.status,200);
- assert.deepEqual(await response.json(),{user_id:h.state.existing,invited:false});assert.equal(h.state.secretReads,0);assert.equal(h.state.invites.length,0);
- assert.deepEqual(h.state.rpc.map(call=>call.name),['find_staff_account','assign_staff_account']);assert.deepEqual(h.state.tokens,['valid-token']);
+ assert.deepEqual(await response.json(),{user_id:h.state.existing,invited:false,email_status:'requested'});assert.equal(h.state.secretReads,0);assert.equal(h.state.invites.length,0);
+ assert.deepEqual(h.state.rpc.map(call=>call.name),['find_staff_account','assign_staff_account','staff_reset_email']);assert.deepEqual(h.state.tokens,['valid-token']);
+ assert.deepEqual(h.state.resets,[{email:'staff@garyhome.com',options:{redirectTo:'https://gary.example/auth/reset'}}]);
 });
 test('the second allowed company domain is accepted for an explicitly assigned account',async()=>{
  const h=endpoint({secret:false}),response=await h.send('POST',{email:'colleague@icue.vn'});
- assert.equal(response.status,200);assert.equal(h.state.rpc.at(-1).args.target_email,'colleague@icue.vn');
+ assert.equal(response.status,200);assert.equal(h.state.rpc.findLast(call=>call.name==='assign_staff_account').args.target_email,'colleague@icue.vn');
 });
 test('a new staff account receives an invitation and is assigned only after Auth succeeds',async()=>{
  const h=endpoint({existing:null}),response=await h.send('POST',{email:'  NEW@GARYHOME.COM  ',role:'admin',actor_role:'owner'});
@@ -90,7 +91,7 @@ test('missing invitation configuration and failed delivery never grant staff per
 });
 test('revoking the actor during a pending invitation prevents the delayed role assignment',async()=>{
  const h=endpoint({existing:null,revokeDuringInvite:true}),response=await h.send();assert.equal(response.status,409);
- assert.match((await response.json()).error,/invitation was sent, but staff access was not confirmed/);
+ assert.match((await response.json()).error,/invitation email was requested, but staff access was not confirmed/);
 });
 test('staff access changes remain protected by the database and reject role escalation',async()=>{
  const h=endpoint({protected:true});
@@ -108,7 +109,7 @@ test('the directory paginates and never returns the server key or caches private
 test('Gmail can be explicitly assigned or invited without granting permissions merely by domain',async()=>{
  for(const existing of ['00000000-0000-4000-8000-000000000002',null]){
   const h=endpoint({existing}),response=await h.send('POST',{email:'New.Colleague@GMAIL.COM'});
-  assert.ok([200,201].includes(response.status));assert.equal(h.state.rpc.at(-1).args.target_email,'new.colleague@gmail.com');
+  assert.ok([200,201].includes(response.status));assert.equal(h.state.rpc.findLast(call=>call.name==='assign_staff_account').args.target_email,'new.colleague@gmail.com');
   assert.equal(h.state.invites.length,existing?0:1);
  }
 });
@@ -142,4 +143,25 @@ test('reset delivery failures are actionable and never report success',async()=>
   const h=endpoint({resetError}),response=await h.sendReset();assert.equal(response.status,resetError.status===429?429:503);
   const result=await response.json();assert.ok(result.error);assert.equal(result.ok,undefined);assert.equal(h.state.resets.length,1);
  }
+});
+
+
+test('re-adding an existing staff account requests another setup email without creating a duplicate Auth user',async()=>{
+ const h=endpoint(),first=await h.send('POST',{email:'staff@gmail.com'}),second=await h.send('POST',{email:'staff@gmail.com'});
+ assert.equal(first.status,200);assert.equal(second.status,200);assert.equal((await second.json()).email_status,'requested');
+ assert.equal(h.state.invites.length,0);assert.equal(h.state.resets.length,2);assert.ok(h.state.resets.every(r=>r.email==='staff@gmail.com'));
+ assert.equal(h.state.secretReads,0);
+});
+test('assignment success and email failure are reported separately, with no automatic email replay',async()=>{
+ for(const resetError of [{code:'email_address_not_authorized',status:403},{code:'over_email_send_rate_limit',status:429},{code:'unexpected_failure',status:500}]){
+  const h=endpoint({resetError}),response=await h.send();assert.equal(response.status,200);const data=await response.json();
+  assert.equal(data.user_id,h.state.existing);assert.equal(data.email_status,'failed');assert.ok(data.email_error);assert.equal(h.state.resets.length,1);
+  if(resetError.code==='email_address_not_authorized')assert.match(data.email_error,/Configure custom SMTP/);
+  if(resetError.status===429)assert.match(data.email_error,/sending limit/);
+ }
+ const uncertain=endpoint({resetThrow:true}),response=await uncertain.send();assert.equal((await response.json()).email_status,'unconfirmed');assert.equal(uncertain.state.resets.length,1);
+});
+test('a fresh protected lookup stops email after assignment when the actor no longer has permission',async()=>{
+ const h=endpoint({resetTargetError:{code:'42501'}}),response=await h.send();const data=await response.json();
+ assert.equal(response.status,200);assert.equal(data.email_status,'failed');assert.equal(data.user_id,h.state.existing);assert.equal(h.state.resets.length,0);
 });

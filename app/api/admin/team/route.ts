@@ -3,6 +3,7 @@ import { staffAdminClient } from "@/lib/server";
 import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError, staffDataError, staffRequest } from "@/lib/staff-server";
 import type { StaffAccount } from "@/lib/staff";
+import { requestStaffPasswordEmail,staffEmailError } from "@/lib/staff-email";
 
 const headers = { "Cache-Control": "private, no-store" };
 const createAccount = z.object({ email: z.string().trim().toLowerCase().email().max(254), full_name: z.string().trim().min(2).max(120), role: z.enum(["admin", "manager", "editor"]) });
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   let invited = false;
+  let assignedUser:string|null=null;
   try {
     const result = await boundedRequest(async signal => {
       const { db, role } = await staffRequest(request, signal);
@@ -54,18 +56,28 @@ export async function POST(request: Request) {
           redirectTo: new URL("/auth/invite", request.url).href,
           data: { full_name: input.full_name },
         });
-        if (invitation.error || !invitation.data.user) throw new StaffRequestError("Couldn’t send the staff invitation. Refresh the team before trying again.", 409);
+        if(invitation.error)throw staffEmailError(invitation.error);
+        if(!invitation.data.user)throw new StaffRequestError("Couldn’t confirm the invitation request. Refresh the team before trying again.",503);
         invited = true;
       }
       // This second RPC checks permissions again after the external invite.
       // A revoked admin cannot use a delayed Auth response to grant access.
       const assigned = await db.rpc("assign_staff_account", { target_email: input.email, full_name: input.full_name, assigned_role: input.role }).abortSignal(signal);
       staffDataError(assigned.error);
-      return { user_id: assigned.data, invited };
+      if(typeof assigned.data!=="string"||!assigned.data)throw new StaffRequestError("Staff access was not confirmed. Refresh the team before trying again.",409);
+      assignedUser=assigned.data;
+      if(invited)return {user_id:assignedUser,invited,email_status:"requested"};
+      try{
+        await requestStaffPasswordEmail(db,assignedUser,request.url,signal);
+        return {user_id:assignedUser,invited,email_status:"requested"};
+      }catch(error){
+        return {user_id:assignedUser,invited,email_status:error instanceof StaffRequestError?"failed":"unconfirmed",email_error:error instanceof StaffRequestError?error.message:"Couldn’t confirm the email request. Refresh the team, then use Send password link."};
+      }
     });
     return Response.json(result, { status: result.invited ? 201 : 200, headers });
   } catch (error) {
-    return failure(invited ? new StaffRequestError("The invitation was sent, but staff access was not confirmed. Refresh the team before assigning access again.", 409) : error);
+    if(assignedUser)return Response.json({user_id:assignedUser,invited,email_status:invited?"requested":"unconfirmed",email_error:invited?undefined:"Couldn’t confirm the email request. Refresh the team, then use Send password link."},{headers});
+    return failure(invited ? new StaffRequestError("The invitation email was requested, but staff access was not confirmed. Refresh the team before assigning access again.", 409) : error);
   }
 }
 export async function PATCH(request: Request) {

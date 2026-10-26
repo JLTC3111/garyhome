@@ -9,6 +9,16 @@ test('the original fan spacing and picking stay stable while neighbours move',()
  for(let i=0;i<20;i++)assert.equal(pickBounceCard(slots,42.5,0,200,2,160),2);
  assert.equal(pickBounceCard(slots,350,0,200,2,160),3);assert.equal(pickBounceCard(slots,0,300,200,2,160),-1);
 });
+
+test('landscape district picking respects photo height and spaced hover never moves neighbouring cards over their labels',()=>{
+ const slots=bounceSlots(4,306,2.25,0),width=282,height=width*9/16;
+ assert.equal(pickBounceCard(slots,slots[1].x,0,width,-1,0,height),1);
+ assert.equal(pickBounceCard(slots,slots[1].x,120,width,-1,0,height),-1);
+ const time=clock();let pose;const engine=createBounceAnimator(slots,{...config,cardSize:width,pushDistance:0,hoverScale:1.025},time,p=>pose=p);
+ engine.activate(1);time.settle();assert.equal(pose[1].scale,1.025);assert.equal(pose[1].rotate,0);
+ for(const i of [0,2,3])assert.equal(pose[i].x,slots[i].x);
+ engine.activate(-1);time.settle();assert.deepEqual(pose,slots.map(s=>({...s,scale:1})));assert.equal(time.pending,0);
+});
 test('hover uses the full push distance, rapid changes settle and no idle frames remain',()=>{
  const time=clock(),slots=bounceSlots(4,85,10,0);let pose,active;
  const engine=createBounceAnimator(slots,config,time,(p,a)=>{pose=p;active=a;});engine.activate(2);time.settle();

@@ -10,6 +10,7 @@ import { HomeFaq } from "./home-faq";
 import { Activities } from "./activities";
 import { BlurFade } from "./magicui/blur-fade";
 import { NumberTicker } from "./magicui/number-ticker";
+import { ShinyButton } from "./magicui/shiny-button";
 import TechText from "./react-bits/tech-text";
 import { DistrictGallery } from "./district-gallery";
 import { VinhomesCollection } from "./vinhomes-collection";
@@ -46,7 +47,7 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
             fitToText
           />])}</h1>
           <p>{language === "en" ? content.settings.hero_text_en : content.settings.hero_text_vi}</p>
-          <a className="button button-outline visa-service-link" href="https://garyvisaservice.vercel.app/" target="_blank" rel="noopener noreferrer"><PlaneTakeoff size={18}/>{t("Visa support · Gary Visa Service","Hỗ trợ thị thực · Gary Visa Service")}<ArrowUpRight size={16}/></a>
+          <ShinyButton className="visa-service-link" href="https://garyvisaservice.vercel.app/" target="_blank" rel="noopener noreferrer"><PlaneTakeoff size={18}/>{t("Visa support · Gary Visa Service","Hỗ trợ thị thực · Gary Visa Service")}<ArrowUpRight size={16}/></ShinyButton>
           <div className="hero-location"><MapPin size={17}/>{t("Rooted in Hanoi. Here for you.", "Am Hiểu Hà Nội. Đồng Hành Cùng Bạn.")}</div>
           <div className="hero-collection">
             <span className="collection-avatars" aria-hidden="true">{published.slice(0, 3).map(p => <img key={p.id} src={p.images[0] || "/images/apartments/hero.jpg"} alt="" width="36" height="36"/>)}</span>
@@ -79,6 +80,6 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
 
   <Activities reviews={reviews} reviewsUnavailable={feedbackUnavailable}/>
   <HomeFaq/>
-  <section className="container rental-home-contact"><div><div className="eyebrow">GARY HOME</div><h2>{t("Let’s arrange your next viewing.","Cùng sắp xếp buổi xem nhà tiếp theo.")}</h2><p>{t("Send your preferred properties and let the team confirm availability and lease terms.","Gửi những căn nhà bạn quan tâm để đội ngũ xác nhận tình trạng và điều kiện thuê.")}</p></div><Link className="button" href="/contact">{t("Contact us","Liên hệ")}<ArrowUpRight size={18}/></Link></section>
+  <section className="container rental-home-contact"><div><div className="eyebrow">GARY HOME</div><h2>{t("Let’s arrange your next viewing.","Cùng sắp xếp buổi xem nhà tiếp theo.")}</h2><p>{t("Send your preferred properties and let the team confirm availability and lease terms.","Gửi những căn nhà bạn quan tâm để đội ngũ xác nhận tình trạng và điều kiện thuê.")}</p></div><ShinyButton href="/contact">{t("Contact us","Liên hệ")}<ArrowUpRight size={18}/></ShinyButton></section>
  </>;
 }

@@ -10,11 +10,11 @@ export function DistrictGallery() {
   const areas = browseAreas(content.neighbourhoods, content.properties), { cards, page, pages, start, end } = areaPage(areas, requestedPage);
   return <div className="district-gallery">
     <div id={id} className="district-gallery-stage">
-      <BounceCards key={page} label={t("Explore Hanoi districts and communities", "Khám phá các khu vực và cộng đồng Hà Nội")} cards={cards.map(area => {
+      <BounceCards key={page} layout="spread" aspectRatio={16/9} rotation={2.25} hoverScale={1.025} radius={18} borderWidth={4} animationDelay={.08} animationStagger={.045} label={t("Explore Hanoi districts and communities", "Khám phá các khu vực và cộng đồng Hà Nội")} cards={cards.map(area => {
         const photo = areaPhotograph(area.image);
         return { id: area.slug, href: area.href, image: photo.src, srcSet: photo.srcSet,
-          sizes: "(max-width: 899px) calc((100vw - 70px) / 2), 200px", title: area.name,
-          content: <><p>{language === "vi" ? area.tagline_vi : area.tagline_en}</p><small>{area.collection ? `${area.count} ${t("communities", "khu đô thị")}` : area.count ? `${area.count} ${t("homes to explore", "căn nhà để khám phá")}` : t("Enquire about this area", "Hỏi nhà thuê tại đây")}<ArrowUpRight size={14}/></small></> };
+          sizes: "(max-width: 600px) calc(100vw - 64px), (max-width: 1099px) calc((100vw - 90px) / 2), (max-width: 1320px) 24vw, 280px", title: area.name,
+          content: <><p>{language === "vi" ? area.tagline_vi : area.tagline_en}</p><small>{area.collection ? `${area.count} ${t(area.count===1?"community":"communities", "khu đô thị")}` : area.count ? `${area.count} ${t(area.count===1?"home to explore":"homes to explore", "căn nhà để khám phá")}` : t("Enquire about this area", "Hỏi nhà thuê tại đây")}<ArrowUpRight size={14}/></small></> };
       })}/>
     </div>
     {pages > 1 && <nav className="district-pagination" aria-label={t("Browse more Hanoi areas", "Xem thêm khu vực Hà Nội")}>

@@ -18,6 +18,7 @@ import "./studio-navigation.css";
 import "./about-pages.css";
 import "./collection-motion.css";
 import "./area-gallery.css";
+import "./shiny-button.css";
 import "./editorial-studio.css";
 import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";

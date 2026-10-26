@@ -42,9 +42,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Magic UI — Blur Fade and Number Ticker
+## Magic UI — Blur Fade, Number Ticker and Shiny Button
 
 Source: https://github.com/magicuidesign/magicui
+
+Shiny Button: https://magicui.design/docs/components/shiny-button and the official `apps/www/registry/magicui/shiny-button.tsx` (reviewed 2026-10-27). The diagonal text/border masks are adapted to native links and buttons, CSS animation, the Gary Home palette, readable base text and pause/reduced-motion handling.
 
 ```text
 MIT License

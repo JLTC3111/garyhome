@@ -81,6 +81,8 @@ test('expanded district gallery pages four cards, preserves its page on translat
  function Example(){const [language,setLanguage]=React.useState('en'),[current,setContent]=React.useState(content);changeLanguage=setLanguage;changeContent=setContent;site.current={language,content:current,t:(en,vi)=>language==='vi'?vi:en};return React.createElement(DistrictGallery);}
  const r=await p.mount(React.createElement(Example)),links=()=>r.root.findAllByType('a'),next=()=>r.root.findByProps({'aria-label':'Next areas'});
  assert.equal(links().length,4);assert.ok(links().some(a=>a.props.href==='/vinhomes'));assert.ok(links().find(a=>a.props.href==='/vinhomes').findByType('img').props.srcSet.includes('960w'));
+ assert.equal(r.root.findByType('ul').props['data-layout'],'spread');assert.equal(r.root.findByType('ul').props.style['--bounce-ratio'],16/9);
+ for(const image of r.root.findAllByType('img')){assert.equal(image.props.width/image.props.height,16/9);assert.ok(image.props.sizes.includes('600px'));}
  const control=next();await act(async()=>control.props.onClick());assert.equal(next(),control);assert.ok(links().some(a=>a.props.href==='/contact?area=cau-giay'));
  await act(async()=>next().props.onClick());assert.ok(links().some(a=>a.props.href==='/contact?area=ha-dong'));assert.equal(next().props.disabled,true);
  await act(async()=>changeLanguage('vi'));assert.match(r.root.findByProps({role:'status'}).children.join(''),/Khu vực 9–12/);assert.ok(links().some(a=>a.props.href==='/contact?area=ha-dong'));

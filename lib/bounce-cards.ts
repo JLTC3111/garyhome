@@ -12,10 +12,10 @@ export function bounceSlots(count: number, spread: number, rotation: number, arc
 }
 // Hit-test resting slots, not cards that move beneath the pointer. Hysteresis
 // at each boundary prevents the selected card from oscillating.
-export function pickBounceCard(slots: BounceSlot[], x: number, y: number, size: number, previous = -1, push = 0): number {
+export function pickBounceCard(slots: BounceSlot[], x: number, y: number, size: number, previous = -1, push = 0, height = size): number {
   let next = -1, distance = Infinity;
   slots.forEach((slot, i) => { const gap = Math.abs(x - slot.x); if (gap < distance) { distance = gap; next = i; } });
-  if (next < 0 || Math.abs(y - slots[next].y) > size / 2 + 28 || distance > size / 2 + push + 20) return -1;
+  if (next < 0 || Math.abs(y - slots[next].y) > height / 2 + 28 || distance > size / 2 + push + 20) return -1;
   if (previous >= 0 && previous !== next && slots[previous] && Math.abs(x - slots[previous].x) - distance < 6) return previous;
   return next;
 }

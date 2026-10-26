@@ -14,41 +14,54 @@ type BounceCardsProps = {
   cardSize?: number; spread?: number; rotation?: number; arc?: number; pushDistance?: number;
   hoverScale?: number; bounciness?: number; animationDelay?: number; animationStagger?: number;
   borderWidth?: number; borderColor?: string; radius?: number; shadow?: boolean; enableHover?: boolean;
+  layout?: "stack" | "spread"; aspectRatio?: number;
 };
-const desktopQuery = "(min-width: 900px) and (hover: hover) and (pointer: fine)";
 
 export default function BounceCards({ cards, label, containerWidth = 500, containerHeight = 320,
   cardSize = 200, spread = 85, rotation = 10, arc = 0, pushDistance = 160,
   hoverScale = 1.06, bounciness = .6, animationDelay = .5, animationStagger = .06,
   borderWidth = 5, borderColor = "#fff", radius = 25, shadow = true, enableHover = true,
+  layout = "stack", aspectRatio = 1,
 }: BounceCardsProps) {
   const root = useRef<HTMLUListElement>(null), elements = useRef<(HTMLLIElement | null)[]>([]);
   const count=cards.length;
   const reduced = useMotionPreference(), identity = cards.map(card => card.id).join("|");
   const fullWidth = Math.max(containerWidth, cardSize * hoverScale + Math.max(0, cards.length - 1) * spread + 2 * pushDistance + 52);
   const initialSlots = bounceSlots(cards.length, spread, rotation, arc);
+  const spaced = layout === "spread", ratio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
   useEffect(() => {
     const node = root.current;
     if (!node || typeof window.matchMedia !== "function") return;
     elements.current.length=count;
-    const media = window.matchMedia(desktopQuery);
+    const media = window.matchMedia(`(min-width: ${spaced ? 1100 : 900}px) and (hover: hover) and (pointer: fine)`);
     let animator: ReturnType<typeof createBounceAnimator> | undefined;
     let slots = bounceSlots(count, spread, rotation, arc), size = cardSize, push = pushDistance;
     let hovered = -1, revealed = false, visible = true;
     const paint = (poses: { x: number; y: number; rotate: number; scale: number }[], active: number) => {
       poses.forEach((pose, index) => {
         const element = elements.current[index]; if (!element) return;
-        element.style.transform = `translate(-50%, -50%) translate3d(${pose.x.toFixed(2)}px, ${pose.y.toFixed(2)}px, 0) rotate(${pose.rotate.toFixed(3)}deg) scale(${pose.scale.toFixed(4)})`;
+        element.style.transform = spaced
+          ? `translate3d(${(pose.x - slots[index].x).toFixed(2)}px, ${(pose.y - slots[index].y).toFixed(2)}px, 0) rotate(${pose.rotate.toFixed(3)}deg) scale(${pose.scale.toFixed(4)})`
+          : `translate(-50%, -50%) translate3d(${pose.x.toFixed(2)}px, ${pose.y.toFixed(2)}px, 0) rotate(${pose.rotate.toFixed(3)}deg) scale(${pose.scale.toFixed(4)})`;
         element.style.zIndex = String(active === index ? poses.length + 1 : index + 1);
         element.toggleAttribute("data-active", active === index);
       });
     };
-    const settings = () => ({ cardSize: size, pushDistance: push, hoverScale, bounciness, animationDelay, animationStagger });
+    const settings = () => ({ cardSize: size, pushDistance: spaced ? 0 : push, hoverScale, bounciness, animationDelay, animationStagger });
     const resize = () => {
-      const scale = Math.min(1, Math.max(0, node.getBoundingClientRect().width) / fullWidth) || 1;
-      size = cardSize * scale; push = pushDistance * scale;
-      slots = bounceSlots(count, spread * scale, rotation, arc * scale);
-      node.style.setProperty("--bounce-size", `${size}px`);
+      const width = Math.max(0, node.getBoundingClientRect().width);
+      if (spaced) {
+        size = elements.current[0]?.offsetWidth || width / Math.max(1, count) || cardSize; push = 0;
+        slots = bounceSlots(count, size + 24, rotation, 0).map((slot, index) => ({ ...slot,
+          x: elements.current[index]?.offsetWidth ? elements.current[index]!.offsetLeft + size / 2 - width / 2 : slot.x,
+          y: 0,
+        }));
+      } else {
+        const scale = Math.min(1, width / fullWidth) || 1;
+        size = cardSize * scale; push = pushDistance * scale;
+        slots = bounceSlots(count, spread * scale, rotation, arc * scale);
+        node.style.setProperty("--bounce-size", `${size}px`);
+      }
       if (animator) animator.layout(slots, settings());
       else paint(slots.map(slot => ({ ...slot, scale: 1 })), -1);
     };
@@ -64,7 +77,7 @@ export default function BounceCards({ cards, label, containerWidth = 500, contai
       if (!animator || !enableHover || event.pointerType !== "mouse") return;
       const rect = node.getBoundingClientRect();
       hovered = pickBounceCard(slots, event.clientX - rect.left - rect.width / 2,
-        event.clientY - rect.top - rect.height / 2, size, hovered, push);
+        event.clientY - rect.top - rect.height / 2, size, hovered, push, size / ratio);
       animator.activate(hovered);
     };
     const leave = () => { hovered = -1; animator?.activate(-1); };
@@ -98,13 +111,13 @@ export default function BounceCards({ cards, label, containerWidth = 500, contai
       node.removeEventListener("focusin", focus); node.removeEventListener("focusout", leave); node.removeEventListener("keydown", key);
       if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility);
     };
-  }, [identity, count, reduced, fullWidth, cardSize, spread, rotation, arc, pushDistance, hoverScale, bounciness, animationDelay, animationStagger, enableHover]);
-  const style = { maxWidth: fullWidth, "--bounce-height": `${containerHeight}px`, "--bounce-size": `${cardSize}px`,
+  }, [identity, count, reduced, fullWidth, cardSize, spread, rotation, arc, pushDistance, hoverScale, bounciness, animationDelay, animationStagger, enableHover, spaced, ratio]);
+  const style = { maxWidth: spaced ? undefined : fullWidth, "--bounce-ratio": ratio, "--bounce-height": `${containerHeight}px`, "--bounce-size": `${cardSize}px`,
     "--bounce-border": `${borderWidth}px`, "--bounce-border-color": borderColor, "--bounce-radius": `${radius}px` } as CSSProperties;
-  return <ul ref={root} className="bounce-cards" style={style} aria-label={label} data-reduced-motion={reduced} data-shadow={shadow}>
+  return <ul ref={root} className="bounce-cards" style={style} aria-label={label} data-layout={layout} data-reduced-motion={reduced} data-shadow={shadow}>
     {cards.map((card, index) => <li ref={element => { elements.current[index] = element; }} key={card.id} className="bounce-card"
-      style={{ zIndex: index + 1, transform: `translate(-50%, -50%) translate3d(${initialSlots[index].x}px, ${initialSlots[index].y}px, 0) rotate(${initialSlots[index].rotate}deg)` }}>
-      <Link href={card.href} className="bounce-card-link"><img src={card.image} srcSet={card.srcSet} sizes={card.sizes} alt="" width="480" height="480" loading="lazy" decoding="async" draggable={false}/>
+      style={{ zIndex: index + 1, transform: spaced ? `rotate(${initialSlots[index].rotate}deg)` : `translate(-50%, -50%) translate3d(${initialSlots[index].x}px, ${initialSlots[index].y}px, 0) rotate(${initialSlots[index].rotate}deg)` }}>
+      <Link href={card.href} className="bounce-card-link"><img src={card.image} srcSet={card.srcSet} sizes={card.sizes} alt="" width="480" height={Math.round(480 / ratio)} loading="lazy" decoding="async" draggable={false}/>
         <div className="bounce-card-caption"><h3>{card.title}</h3>{card.content}</div>
       </Link>
     </li>)}

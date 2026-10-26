@@ -39,7 +39,6 @@ test('every public, customer and staff route has a title in the selected languag
     ['/homes', 'Hanoi rental properties', 'Bất động sản cho thuê Hà Nội'],
     ['/saved', 'Your saved homes', 'Nhà đã lưu'],
     ['/neighbourhoods', 'Find your kind of Hanoi', 'Tìm khu phố dành cho bạn'],
-    ['/about', 'The Gary way', 'Về Gary Home'],
     ['/services', 'Our services', 'Dịch vụ của chúng tôi'],
     ['/tips-and-news', 'Tips & News', 'Cẩm nang & tin tức'],
     ['/landlords', 'For landlords', 'Dành cho chủ nhà'],
@@ -163,4 +162,10 @@ test('late framework metadata and restored tabs cannot retain the wrong title or
 
 test('rental guide titles use the selected language and unknown articles stay not found',()=>{
  assert.equal(documentTitle('/tips-and-news/viewing-checklist','en',[]),'Make the most of a property viewing | Gary Home');assert.equal(documentTitle('/tips-and-news/viewing-checklist','vi',[]),'Tận dụng buổi xem nhà | Gary Home');assert.equal(documentTitle('/tips-and-news/unknown','en',[]),'Page not found | Gary Home');
+});
+
+test('original news titles are bilingual and the retired About page is no longer a content title',()=>{
+ assert.equal(documentTitle('/tips-and-news/hanoi-rental-outlook-q3-2026','en',[]),'Hanoi serviced apartments: reading the Q3 2026 update | Gary Home');
+ assert.equal(documentTitle('/tips-and-news/hanoi-rental-outlook-q3-2026','vi',[]),'Căn hộ dịch vụ Hà Nội: đọc báo cáo quý III/2026 | Gary Home');
+ assert.equal(documentTitle('/about','en',[]),'Page not found | Gary Home');
 });

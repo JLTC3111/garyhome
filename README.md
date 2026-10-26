@@ -121,3 +121,5 @@ Media folder changes, messaging icons and manager-controlled card ordering are d
 Staff invitation/password pages and branded email-template activation are documented in [docs/staff-password-email-setup.md](docs/staff-password-email-setup.md).
 
 The current direct staff-account workflow, strict role hierarchy, profile photos and persistent activity log are documented in [docs/direct-staff-accounts.md](docs/direct-staff-accounts.md). This replaces invitation-first staff onboarding.
+
+Landlord introductions support private photos/PDF plans and a Studio review queue under **Customer care → Introduced properties**, with status, assignment, internal notes and draft-listing conversion. See [landlord-introductions.md](docs/landlord-introductions.md) for the migration, permissions and upload maintenance. About Us links Services, Tips & News, Contact and Landlords; [about-pages.md](docs/about-pages.md) covers the bilingual editorial pages and their sources.

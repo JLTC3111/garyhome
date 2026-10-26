@@ -26,7 +26,7 @@ export function Header(){
   window.addEventListener("keydown",key);document.addEventListener("pointerdown",outside);return()=>{window.removeEventListener("keydown",key);document.removeEventListener("pointerdown",outside);};
  },[open,dropdown]);
  if(path.startsWith("/admin"))return null;
- const aboutLinks=[["/about",t("About Gary Home","Về Gary Home")],["/services",t("Our Services","Dịch vụ của chúng tôi")],["/tips-and-news",t("Tips & News","Cẩm nang & tin tức")],["/contact",t("Contact","Liên hệ")],["/landlords",t("Landlords","Dành cho chủ nhà")]];
+ const aboutLinks=[["/services",t("Our Services","Dịch vụ của chúng tôi")],["/tips-and-news",t("Tips & News","Cẩm nang & tin tức")],["/contact",t("Contact","Liên hệ")],["/landlords",t("Landlords","Dành cho chủ nhà")]];
  return <header className="site-header rental-site-header" ref={header}>
   <div className="top-strip"><div className="container rental-header-band"><div className="rental-band-contact"><BackNavigation/><a className="top-strip-phone" href={`tel:${content.settings.contact_phone.replace(/[^+\d]/g,"")}`}><Phone size={16}/><span>{content.settings.contact_phone}</span></a><LanguageSwitcher className="desktop-band-control"/></div><div className="top-strip-actions"><FavouritesDropdown onOpen={close}/><HeaderPortals onFollow={close}/></div></div></div>
   <div className="header-nav"><div className="container header-inner"><Brand/><nav className={open?"main-nav nav-open":"main-nav"} id="site-navigation" aria-label={t("Main navigation","Điều hướng chính")}>
@@ -36,7 +36,7 @@ export function Header(){
     {dropdown==="about"&&<div ref={aboutMenu} id="about-navigation-links" className="about-dropdown" onKeyDown={event=>{const links=Array.from(aboutMenu.current?.querySelectorAll<HTMLAnchorElement>("a")||[]),index=links.indexOf(event.target as HTMLAnchorElement);if(index<0||!["ArrowDown","ArrowUp","Home","End"].includes(event.key))return;event.preventDefault();links[event.key==="Home"?0:event.key==="End"?links.length-1:(index+(event.key==="ArrowDown"?1:-1)+links.length)%links.length]?.focus();}}>{aboutLinks.map(([href,label])=><Link key={href} href={href} onClick={close}>{label}<ArrowUpRight size={15} aria-hidden="true"/></Link>)}</div>}
    </div>
    <div className="mobile-nav-tools"><div className="mobile-nav-portals"><HeaderPortals mobile onFollow={close}/></div><div className="mobile-nav-language"><span>{t("Language","Ngôn ngữ")}</span><LanguageSwitcher/></div></div>
-  </nav><div className="header-actions"><Link className="button button-small header-contact" href="/contact" onClick={close}>{t("Contact","Liên hệ")}<ArrowUpRight size={15}/></Link><button ref={menu} className="mobile-menu icon-button" type="button" aria-label={open?t("Close menu","Đóng menu"):t("Open menu","Mở menu")} aria-controls="site-navigation" aria-expanded={open} onClick={()=>{setOpen(!open);setDropdown(null);}}>{open?<X/>:<Menu/>}</button></div></div></div>
+  </nav><div className="header-actions"><button ref={menu} className="mobile-menu icon-button" type="button" aria-label={open?t("Close menu","Đóng menu"):t("Open menu","Mở menu")} aria-controls="site-navigation" aria-expanded={open} onClick={()=>{setOpen(!open);setDropdown(null);}}>{open?<X/>:<Menu/>}</button></div></div></div>
  </header>;
 }
 type FooterItem={href:string;label:string;icon?:typeof Phone};
@@ -58,7 +58,6 @@ export function Footer(){
  const company:FooterItem[]=[
   {href:"/activities?category=team",label:t("Our team","Đội ngũ")},
   {href:"/feedback",label:t("Feedback","Phản hồi")},
-  {href:"/about",label:t("About us","Về chúng tôi")},
   {href:"/services",label:t("Our Services","Dịch vụ của chúng tôi")},
   {href:"/tips-and-news",label:t("Tips & News","Cẩm nang & tin tức")},
   {href:"/landlords",label:t("Landlords","Dành cho chủ nhà")},

@@ -1,4 +1,3 @@
-import { pageMetadata } from "@/lib/seo";
-import { AboutPage } from "@/components/content-pages";
-export async function generateMetadata(){return pageMetadata("/about",false);}
-export default function Page(){return <AboutPage/>;}
+import { permanentRedirect } from "next/navigation";
+// Preserve old bookmarks while retiring the former About Gary Home page.
+export default function Page(){permanentRedirect("/services");}

@@ -1,7 +1,7 @@
 import type { Language, Property, Neighbourhood } from "./types";
 import { isPublicRental, propertyTitle } from "./rentals.ts";
 
-import { rentalGuides } from "./rental-guides.ts";
+import { editorialArticles } from "./rental-guides.ts";
 
 type TitleProperty = Property;
 const pageTitles: Record<string, readonly [string, string]> = {
@@ -11,7 +11,6 @@ const pageTitles: Record<string, readonly [string, string]> = {
   "/feedback": ["Feedback", "Phản hồi"],
   "/saved": ["Your saved homes", "Nhà đã lưu"],
   "/neighbourhoods": ["Find your kind of Hanoi", "Tìm khu phố dành cho bạn"],
-  "/about": ["The Gary way", "Về Gary Home"],
   "/services": ["Our services", "Dịch vụ của chúng tôi"],
   "/tips-and-news": ["Tips & News", "Cẩm nang & tin tức"],
   "/landlords": ["For landlords", "Dành cho chủ nhà"],
@@ -35,7 +34,7 @@ export function documentTitle(pathname: string | null, language: Language, prope
   const page = pageTitles[path];
   if (page) return `${page[vi ? 1 : 0]} | Gary Home`;
 
-  const guide=rentalGuides.find(item=>path==="/tips-and-news/"+item.slug);if(guide)return `${guide.title[vi?1:0]} | Gary Home`;
+  const guide=editorialArticles.find(item=>path==="/tips-and-news/"+item.slug);if(guide)return `${guide.title[vi?1:0]} | Gary Home`;
   const match = /^\/homes\/([^/]+)$/.exec(path);
   if (match) {
     let slug: string;

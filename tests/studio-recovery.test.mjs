@@ -45,6 +45,11 @@ async function harness(t, options={}){
    if(method==='POST'){if(backend.teamPostError)return Response.json(backend.teamPostError,{status:409});const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});if(existing)backend.teamRows=backend.teamRows.map(m=>m.email.toLowerCase()===data.email.toLowerCase()?{...m,confirmed:true}:m);return Response.json(backend.teamResult??{created:data.mode!=='assign',confirmed:true,...(data.replace_password?{password_set:true}:{})});}
    return Response.json({user_id:'changed-staff'});
   }
+  if(String(input)==='/api/landlords'){
+   const body=JSON.parse(init.body);backend.landlordCalls??=[];backend.landlordCalls.push({body,headers:new Headers(init.headers)});
+   if(body.action==='prepare')return Response.json({permit:'test-permit',expires:Date.now()+7200000,url:'https://unit-test.invalid',key:'public-test-key',files:body.files.map((file,i)=>({...file,id:'test-file-'+i,path:'test-submission/'+i+'.png',token:'scoped-token'}))});
+   if(backend.landlordFinalError)return Response.json({error:'connection'},{status:503});return Response.json({ok:true,id:'test-submission'},{status:201});
+  }
   if(String(input)==='/api/enquiries'){backend.enquiryPosts??=[];backend.enquiryPosts.push({data:JSON.parse(init.body),headers:new Headers(init.headers)});return Response.json({ok:true},{status:201});}
   if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return backend.passwordError?Response.json({message:'Auth unavailable'},{status:503}):Response.json({});}
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
@@ -78,9 +83,10 @@ async function harness(t, options={}){
    for(const method of ['upsert','update','insert','delete'])query[method]=value=>{writing=true;writeMethod=method;payload=value;return query;};
    query.eq=(key,value)=>{filters[key]=value;return query;};
    for(const method of ['single','maybeSingle'])query[method]=()=>{single=true;return query;};
-   for(const method of ['select','order','abortSignal','is'])query[method]=()=>query;
+   for(const method of ['select','order','abortSignal','is','limit','or'])query[method]=()=>query;
    query.then=(resolve,reject)=>{
     if(writing)backend.calls.push({table,payload,method:writeMethod,filters});
+    if(!writing){backend.privateReads??=[];backend.privateReads.push(table);}
     if(writing&&table==='staff_profiles'){backend.profilePaths??=new Map();backend.profilePaths.set(payload.user_id,payload.avatar_path);}
     if(writing&&backend.writeErrors.has(table))return Promise.resolve({data:null,error:backend.writeErrors.get(table)}).then(resolve,reject);
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
@@ -104,6 +110,7 @@ async function harness(t, options={}){
   function dependency(id){
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
    if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useRouter:()=>({back(){},push(){},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
+   if(id==='@supabase/supabase-js')return {createClient:()=>({storage:{from:()=>({uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
    if(id==='@/lib/browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient};
    if(id.startsWith('.')||id.startsWith('@/')){
     const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);
@@ -866,19 +873,42 @@ test('the customer header never borrows a signed-in owner staff photo; About Us 
  const h=await harness(t,{page:'header',path:'/'});h.backend.profilePaths=new Map([['owner','owner/private-staff-avatar.png']]);await act(async()=>h.site.refreshStaffProfile());
  for(const link of h.renderer.root.findAllByType('a').filter(n=>n.props.className?.includes('customer-login-link')))assert.equal(link.findAllByType('img').length,0);
  const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
- const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/about','/services','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
+ const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/services','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
  await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Dịch vụ của chúng tôi/);
  const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({id:'about-navigation-links'}).length,0);
 });
-test('the landlord page translates and submits the real landlord enquiry kind',async t=>{
- const h=await harness(t,{page:'landlords'});const form=h.renderer.root.findByType('form');assert.ok(h.renderer.root.findAllByType('input').some(n=>n.props.name==='name'));
- const fields={name:'Property Owner',email:'owner@example.invalid',phone:'',message:'Apartment in Hanoi available for rental.',preferred_date:'',consent:'on',website:''};
- await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts.length,1);assert.equal(h.backend.enquiryPosts[0].data.kind,'landlord');assert.equal(h.backend.enquiryPosts[0].headers.get('authorization'),'Bearer test-token');
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Đội ngũ đã nhận yêu cầu/);
+test('the landlord page translates and submits through the private introduction API',async t=>{
+ const h=await harness(t,{page:'landlords'});const form=h.renderer.root.findByType('form');assert.ok(h.renderer.root.findAllByType('input').some(n=>n.props.name==='owner_name'));
+ const fields={owner_name:'Property Owner',email:'owner@example.invalid',phone:'',message:'Apartment in Hanoi available for rental.',address:'12 Example Street, Hanoi',district_slug:'tay-ho',property_type:'Apartment',bedrooms:'2',bathrooms:'1',area_sqm:'75',expected_rent:'800',consent:'on',website:''};
+ await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.landlordCalls.length,2);assert.equal(h.backend.landlordCalls[1].body.action,'finalize');assert.equal(h.backend.landlordCalls[1].body.details.property_type,'Apartment');assert.equal(h.backend.landlordCalls[1].headers.get('authorization'),'Bearer test-token');
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Đã nhận thông tin bất động sản/);
 });
 
 
-test('Tips & News links real guide pages and translates without fabricated article dates',async t=>{
- const h=await harness(t,{page:'tips'});const paths=h.renderer.root.findAllByType('a').map(n=>n.props.href).filter(x=>x?.startsWith('/tips-and-news/'));assert.equal(new Set(paths).size,3);assert.ok(paths.includes('/tips-and-news/viewing-checklist'));
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/CẨM NANG THUÊ NHÀ/);assert.equal(h.renderer.root.findAllByType('time').length,0);
+test('Tips & News links original sourced articles and undated rental guides in both languages',async t=>{
+ const h=await harness(t,{page:'tips'});const paths=h.renderer.root.findAllByType('a').map(n=>n.props.href).filter(x=>x?.startsWith('/tips-and-news/'));assert.equal(new Set(paths).size,6);assert.ok(paths.includes('/tips-and-news/viewing-checklist'));
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/CẨM NANG THUÊ NHÀ/);assert.equal(h.renderer.root.findAllByType('time').length,3);assert.equal(h.renderer.root.findAllByType('time')[0].props.dateTime,'2026-10-26');
+});
+
+test('landlord uploads keep the draft and completed files across language changes and manual retry',async t=>{
+ const h=await harness(t,{page:'landlords'}),fields={owner_name:'Property Owner',email:'owner@example.invalid',phone:'',address:'12 Example Street, Hanoi',district_slug:'tay-ho',property_type:'Apartment',bedrooms:'2',bathrooms:'1',area_sqm:'75',expected_rent:'800',message:'Current property details for the review.',consent:'on',website:''};
+ const fileInput=()=>h.renderer.root.findByProps({type:'file'}),submit=()=>h.renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields}});
+ const files=[new File([new Uint8Array(128)],'first.png',{type:'image/png'}),new File([new Uint8Array(128)],'second.png',{type:'image/png'})];
+ await act(async()=>fileInput().props.onChange({target:{files,value:'selected'}}));h.backend.privateUploadError='second.png';
+ await act(async()=>{await submit();await delay(5);});assert.equal(h.backend.privateUploads.length,2);assert.equal(h.backend.landlordCalls.length,1);assert.ok(h.renderer.root.findAllByProps({role:'alert'}).length);
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findAllByProps({className:'landlord-file-list'})[0].findAllByType('li').length,2);assert.equal(h.backend.privateUploads.length,2);
+ h.backend.privateUploadError=null;await act(async()=>{await submit();await delay(5);});assert.equal(h.backend.privateUploads.length,3);assert.equal(h.backend.privateUploads[2].name,'second.png');assert.equal(h.backend.landlordCalls.filter(call=>call.body.action==='prepare').length,1);assert.equal(h.backend.landlordCalls.filter(call=>call.body.action==='finalize').length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Đã nhận thông tin bất động sản/);
+});
+test('Services uses a cover with different image bytes from the home hero',async t=>{
+ const h=await harness(t,{page:'services'});const image=h.renderer.root.findByProps({className:'about-section-hero'}).findByType('img');assert.notEqual(image.props.src,fixture.settings.hero_image);assert.notDeepEqual(fs.readFileSync(path.join(base,'public',image.props.src)),fs.readFileSync(path.join(base,'public',fixture.settings.hero_image)));
+});
+
+test('the private property queue preserves a review during translation and only reloads when requested',async t=>{
+ const h=await harness(t),id='record-1';h.backend.rows.landlord_submissions=[{id,address:'12 Example Street',owner_name:'Private Owner',email:'private@example.invalid',phone:'',district_slug:'tay-ho',property_type:'Apartment',bedrooms:2,bathrooms:1,area_sqm:75,expected_rent:800,currency:'USD',message:'Private property introduction.',status:'new',assigned_to:null,staff_notes:'Existing note',listing_id:null,created_at:'2026-10-26T00:00:00Z'}];
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Introduced properties'}).props.onClick();await delay(5);});
+ const list=()=>h.renderer.root.findByProps({className:'landlord-records'});await act(async()=>{list().findByType('button').props.onClick();await delay(5);});const notes=h.renderer.root.findByProps({name:'staff_notes'});
+ const count=()=>h.backend.privateReads.filter(table=>table==='landlord_submissions').length;const before=count();assert.equal(before,1);
+ await act(async()=>{h.site.setLanguage('vi');await delay(25);});assert.equal(count(),before);assert.equal(h.renderer.root.findByProps({name:'staff_notes'}),notes);assert.match(JSON.stringify(h.renderer.toJSON()),/Bất động sản được giới thiệu/);
+ const form=h.renderer.root.findByProps({className:'editor-form landlord-review'});await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields:{decision:'reviewing',staff_notes:'A new internal note',assignee:''}}});await delay(5);});const saved=h.backend.rpcCalls.filter(call=>call.name==='review_landlord_submission');assert.equal(saved.length,1);assert.equal(saved[0].args.notes,'A new internal note');assert.equal(count(),before);assert.equal(saved[0].args.assignee,null);
+ await h.emit(null);assert.equal(h.renderer.root.findAllByProps({className:'landlord-review'}).length,0);
 });

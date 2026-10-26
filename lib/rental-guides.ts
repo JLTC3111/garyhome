@@ -1,3 +1,4 @@
+import { newsArticles } from "./news-articles.ts";
 export type RentalGuide={slug:string;title:readonly[string,string];summary:readonly[string,string];sections:{title:readonly[string,string];items:(readonly[string,string])[]}[]};
 export const rentalGuides:RentalGuide[]=[
  {slug:"prepare-your-rental-brief",title:["A clear brief makes a better shortlist","Nhu cầu rõ ràng, danh sách nhà phù hợp hơn"],summary:["The details to share before you start exploring Hanoi rentals.","Những thông tin nên chia sẻ trước khi tìm nhà thuê tại Hà Nội."],sections:[
@@ -13,3 +14,5 @@ export const rentalGuides:RentalGuide[]=[
   {title:["Use the property ID","Sử dụng mã tin"],items:[["Each listing has a visible ID. Include it when contacting Gary Home so the team can identify the exact home you mean.","Mỗi tin đăng có mã tin riêng. Gửi kèm mã khi liên hệ Gary Home để đội ngũ xác định chính xác căn nhà bạn đang nhắc đến."]]},
   {title:["Follow your enquiries","Theo dõi yêu cầu"],items:[["Sign in to the customer portal before sending a request if you want it linked to your account. You can review your requests and the team's updates there.","Đăng nhập cổng khách hàng trước khi gửi yêu cầu nếu muốn liên kết với tài khoản. Bạn có thể xem lại yêu cầu và cập nhật từ đội ngũ tại đó."],["Guest enquiries sent before registration are not automatically added to a new account. Contact the team if you need help finding an earlier conversation.","Yêu cầu gửi khi chưa đăng nhập không tự động được thêm vào tài khoản mới. Liên hệ đội ngũ nếu cần tìm lại trao đổi trước đó."]]}]}
 ];
+
+export const editorialArticles = [...newsArticles,...rentalGuides];

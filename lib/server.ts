@@ -16,8 +16,9 @@ export function publicSupabase(accessToken?: string) {
   const { url, key } = backendConfig();
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}), fetch: (input, init) => fetchWithDeadline(input, init, 10000) } }) : null;
 }
-// This key is used only by server routes after verifying the caller's current
-// owner/admin membership. It is never returned by /api/config.
+// Service credentials stay on the server. Routes must enforce fresh staff
+// permissions or validated, tightly scoped public intake rules before using
+// this client. The secret is never returned by /api/config.
 export function staffAdminClient() {
   const runtime = runtimeEnv as unknown as Record<string, string | undefined>;
   const secret = runtime.SUPABASE_SECRET_KEY || process.env.SUPABASE_SECRET_KEY

@@ -506,5 +506,6 @@
   "Staff access assigned and temporary password saved. Use the regular Staff portal to sign in.": "Đã cấp quyền nhân viên và lưu mật khẩu tạm thời. Đăng nhập tại cổng Nhân viên như bình thường.",
   "Choose Set a temporary password to replace the existing password, or leave both password fields blank.": "Chọn đặt mật khẩu tạm thời để thay mật khẩu hiện tại, hoặc để trống cả hai ô mật khẩu.",
   "Supabase rejected this password. Choose a stronger password and try again.": "Mật khẩu này chưa đáp ứng yêu cầu. Hãy chọn mật khẩu mạnh hơn và thử lại.",
-  "Staff access was assigned, but the temporary password was not confirmed. Use Set temporary password in the directory before sharing credentials.": "Đã cấp quyền nhân viên nhưng chưa xác nhận được mật khẩu tạm thời. Hãy dùng Đặt mật khẩu tạm thời trong danh sách nhân viên trước khi chia sẻ thông tin đăng nhập."
+  "Staff access was assigned, but the temporary password was not confirmed. Use Set temporary password in the directory before sharing credentials.": "Đã cấp quyền nhân viên nhưng chưa xác nhận được mật khẩu tạm thời. Hãy dùng Đặt mật khẩu tạm thời trong danh sách nhân viên trước khi chia sẻ thông tin đăng nhập.",
+  "Introduced properties": "Bất động sản được giới thiệu"
 }

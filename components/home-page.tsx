@@ -11,7 +11,7 @@ import { Activities } from "./activities";
 import { BlurFade } from "./magicui/blur-fade";
 import { NumberTicker } from "./magicui/number-ticker";
 import TechText from "./react-bits/tech-text";
-import BounceCards from "./react-bits/bounce-cards";
+import { DistrictGallery } from "./district-gallery";
 import { VinhomesCollection } from "./vinhomes-collection";
 import { filterProperties } from "@/lib/property-search";
 import type { PublicFeedback } from "@/lib/submissions";
@@ -65,7 +65,16 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
       </div>
     </section>
   <section className="section container rental-featured"><BlurFade className="section-heading"><div><div className="eyebrow">{t("AVAILABLE TO DISCOVER","KHÁM PHÁ NHÀ CHO THUÊ")}</div><h2>{t("Find your next rental in Hanoi.","Tìm nhà thuê tiếp theo tại Hà Nội.")}</h2><p>{t("Compare property details, keep your favourites and request a viewing.","So sánh thông tin, lưu yêu thích và đặt lịch xem nhà.")}</p></div><Link className="text-link" href="/homes">{t("View all rentals","Tất cả nhà cho thuê")}<ArrowUpRight size={18}/></Link></BlurFade><PropertyOrderControls scope="home" properties={rentals}/><div className="property-grid">{featured.map(p=><PropertyCard key={p.id} property={p}/>)}</div>{!featured.length&&<div className="empty-state"><h3>{t("Tell us what you’re looking for.","Chia sẻ nhu cầu tìm nhà của bạn.")}</h3><Link className="button" href="/contact">{t("Contact Gary Home","Liên hệ Gary Home")}<ArrowRight size={16}/></Link></div>}</section>
-  <section className="neighbourhood-section bounce-district-section"><div className="section container"><div className="section-heading"><div><div className="eyebrow">{t("DISTRICTS & NEIGHBOURHOODS","QUẬN & KHU VỰC")}</div><h2>{t("Choose your part of Hanoi.","Chọn khu vực bạn muốn sống.")}</h2></div><Link className="text-link" href="/neighbourhoods">{t("Explore areas","Khám phá khu vực")}<ArrowUpRight size={18}/></Link></div><p className="district-gallery-note">{t("A neighbourhood for every kind of day. Choose an area to explore its homes.","Mỗi khu phố, một nhịp sống riêng. Chọn khu vực để khám phá nhà cho thuê.")}</p><BounceCards label={t("Explore Hanoi districts","Khám phá các khu vực Hà Nội")} cards={content.neighbourhoods.map(n=>({id:n.slug,href:`/homes?district=${n.slug}`,image:n.image,title:n.name,content:<><p>{language==="vi"?n.tagline_vi:n.tagline_en}</p><small>{rentals.filter(p=>p.district_slug===n.slug).length} {t("homes to explore","căn nhà để khám phá")}<ArrowUpRight size={14}/></small></>}))}/></div></section>
+  <section className="neighbourhood-section bounce-district-section">
+    <div className="section container">
+      <div className="section-heading">
+        <div><div className="eyebrow">{t("DISTRICTS & NEIGHBOURHOODS","QUẬN & KHU VỰC")}</div><h2>{t("Choose your part of Hanoi.","Chọn khu vực bạn muốn sống.")}</h2></div>
+        <Link className="text-link" href="/neighbourhoods">{t("Explore areas","Khám phá khu vực")}<ArrowUpRight size={18}/></Link>
+      </div>
+      <p className="district-gallery-note">{t("A neighbourhood for every kind of day. Explore Hanoi’s districts and Vinhomes communities.","Mỗi khu phố, một nhịp sống riêng. Khám phá các khu vực Hà Nội và cộng đồng Vinhomes.")}</p>
+      <DistrictGallery/>
+    </div>
+  </section>
   <VinhomesCollection/>
 
   <Activities reviews={reviews} reviewsUnavailable={feedbackUnavailable}/>

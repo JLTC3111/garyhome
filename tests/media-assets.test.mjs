@@ -8,7 +8,7 @@ const root=path.resolve(import.meta.dirname,'..');
 const read=name=>JSON.parse(fs.readFileSync(path.join(root,'data',name+'.json'),'utf8'));
 test('every referenced local media asset and moved destination exists',()=>{
  const files=new Set();function collect(value){if(typeof value==='string'&&/^\/(images|svg)\//.test(value))files.add(value);else if(Array.isArray(value))value.forEach(collect);else if(value&&typeof value==='object')Object.values(value).forEach(collect);}
- for(const name of ['properties','site-content','activities','authors'])collect(read(name));Object.values(read('asset-paths')).forEach(collect);
+ for(const name of ['properties','site-content','activities','authors','neighbourhood-photos'])collect(read(name));Object.values(read('asset-paths')).forEach(collect);
  for(const file of ['/svg/WhatsApp.svg','/svg/Zalo.svg','/svg/contact-widget-03-compact.svg','/svg/contact-widget-03-transparent.svg','/svg/contact-widget-04-chat-with-us.svg','/svg/contact-widget-04-chat-with-us-vi.svg'])files.add(file);assert.ok(files.size>65);
  for(const file of files)assert.ok(fs.existsSync(path.join(root,'public',file)),file);
  assert.equal(assetPath('/images/hero.jpg'),'/images/apartments/hero.jpg');assert.equal(assetPath('/images/activities/feedback-1.jpg'),'/images/activities/activity-1.jpg');

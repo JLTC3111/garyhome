@@ -73,3 +73,16 @@ test('Vinhomes uses the supplied homes, original currency and local photos with 
  const smart=vinhomesProjects.find(p=>p.slug==='smart-city');assert.equal(smart.reference,'GH202');assert.equal(smart.areaSqm,undefined);assert.equal(smart.bathrooms,undefined);assert.equal(smart.leaseMonths,undefined);assert.equal(smart.rentVnd,10500000);assert.equal(projectSummary(smart,'vi'),'1+ phòng ngủ');assert.ok(smart.images.every(p=>!p.includes('1793001532444')));
  assert.equal(enquiryContext('restaurant',null,'en'),'Restaurant opening consultancy');assert.equal(enquiryContext('office',null,'vi'),'Tư vấn mở văn phòng');assert.equal(enquiryContext(null,'smart-city','en'),'Vinhomes Smart City · S403 · GH202');assert.equal(enquiryContext('<script>',null,'en'),'');
 });
+
+test('expanded district gallery pages four cards, preserves its page on translation and clamps after CMS removal',async t=>{
+ const p=platform(t),site={current:null},load=loader(site),{DistrictGallery}=load(path.join(root,'components/district-gallery.tsx'));
+ const content={...JSON.parse(fs.readFileSync(path.join(root,'data/site-content.json'),'utf8')),properties:JSON.parse(fs.readFileSync(path.join(root,'data/properties.json'),'utf8'))};
+ let changeLanguage,changeContent;
+ function Example(){const [language,setLanguage]=React.useState('en'),[current,setContent]=React.useState(content);changeLanguage=setLanguage;changeContent=setContent;site.current={language,content:current,t:(en,vi)=>language==='vi'?vi:en};return React.createElement(DistrictGallery);}
+ const r=await p.mount(React.createElement(Example)),links=()=>r.root.findAllByType('a'),next=()=>r.root.findByProps({'aria-label':'Next areas'});
+ assert.equal(links().length,4);assert.ok(links().some(a=>a.props.href==='/vinhomes'));assert.ok(links().find(a=>a.props.href==='/vinhomes').findByType('img').props.srcSet.includes('960w'));
+ const control=next();await act(async()=>control.props.onClick());assert.equal(next(),control);assert.ok(links().some(a=>a.props.href==='/contact?area=cau-giay'));
+ await act(async()=>next().props.onClick());assert.ok(links().some(a=>a.props.href==='/contact?area=ha-dong'));assert.equal(next().props.disabled,true);
+ await act(async()=>changeLanguage('vi'));assert.match(r.root.findByProps({role:'status'}).children.join(''),/Khu vực 9–12/);assert.ok(links().some(a=>a.props.href==='/contact?area=ha-dong'));
+ await act(async()=>changeContent({...content,neighbourhoods:content.neighbourhoods.slice(0,4)}));assert.equal(links().length,1);assert.match(r.root.findByProps({role:'status'}).children.join(''),/Khu vực 5–5/);
+});

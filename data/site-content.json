@@ -39,6 +39,76 @@
       "description_vi": "Tìm góc riêng của bạn tại phía Tây Hà Nội với các căn studio và căn hộ phù hợp nhiều mức ngân sách.",
       "image": "/images/apartments/can-studio-tai-ngoa-long-bac-tu-liem-0.jpg",
       "sort_order": 3
+    },
+    {
+      "slug": "cau-giay",
+      "name": "Cầu Giấy",
+      "tagline_en": "An everyday rhythm in western Hanoi.",
+      "tagline_vi": "Nhịp sống thường ngày phía Tây Hà Nội.",
+      "description_en": "Explore Cầu Giấy, from the skyline to its neighbourhood streets. Tell us your preferred address and budget so the team can check suitable rentals.",
+      "description_vi": "Khám phá Cầu Giấy, từ những tòa nhà cao tầng đến các khu phố dân cư. Chia sẻ vị trí và ngân sách mong muốn để đội ngũ kiểm tra nhà thuê phù hợp.",
+      "image": "/images/neighbourhoods/cau-giay.jpg",
+      "sort_order": 4
+    },
+    {
+      "slug": "hoan-kiem",
+      "name": "Hoàn Kiếm",
+      "tagline_en": "At the heart of Hanoi.",
+      "tagline_vi": "Giữa trái tim Hà Nội.",
+      "description_en": "Discover the streets around Hoàn Kiếm Lake. Share the part of the centre you have in mind, and we will help you compare available rental options.",
+      "description_vi": "Khám phá những con phố quanh Hồ Hoàn Kiếm. Chia sẻ khu vực trung tâm bạn yêu thích để cùng so sánh các lựa chọn thuê hiện có.",
+      "image": "/images/neighbourhoods/hoan-kiem.jpg",
+      "sort_order": 5
+    },
+    {
+      "slug": "dong-da",
+      "name": "Đống Đa",
+      "tagline_en": "A neighbourhood with stories to tell.",
+      "tagline_vi": "Khu phố lưu giữ những câu chuyện.",
+      "description_en": "The Temple of Literature offers a glimpse of Đống Đa’s history. Tell us where you would like to live, and the team can help with your rental search.",
+      "description_vi": "Văn Miếu gợi mở một phần lịch sử Đống Đa. Hãy chia sẻ nơi bạn muốn sống để đội ngũ hỗ trợ tìm nhà thuê.",
+      "image": "/images/neighbourhoods/dong-da.jpg",
+      "sort_order": 6
+    },
+    {
+      "slug": "hai-ba-trung",
+      "name": "Hai Bà Trưng",
+      "tagline_en": "City life, with a green pause.",
+      "tagline_vi": "Nhịp sống phố, khoảng xanh riêng.",
+      "description_en": "Get to know the area around Thống Nhất Park and the surrounding streets. Ask us to check rentals that fit your daily routine and preferred location.",
+      "description_vi": "Tìm hiểu khu vực quanh công viên Thống Nhất và những con phố lân cận. Nhờ đội ngũ kiểm tra nhà thuê phù hợp với sinh hoạt và vị trí bạn mong muốn.",
+      "image": "/images/neighbourhoods/hai-ba-trung.jpg",
+      "sort_order": 7
+    },
+    {
+      "slug": "nam-tu-liem",
+      "name": "Nam Từ Liêm",
+      "tagline_en": "A new perspective on western Hanoi.",
+      "tagline_vi": "Một góc nhìn mới phía Tây Hà Nội.",
+      "description_en": "Explore the Mỹ Đình area and Nam Từ Liêm neighbourhoods. Share the building or street you prefer so we can discuss current availability and lease terms.",
+      "description_vi": "Khám phá Mỹ Đình và các khu dân cư Nam Từ Liêm. Chia sẻ tòa nhà hoặc tuyến phố bạn quan tâm để trao đổi tình trạng và điều kiện thuê hiện tại.",
+      "image": "/images/neighbourhoods/nam-tu-liem.jpg",
+      "sort_order": 8
+    },
+    {
+      "slug": "thanh-xuan",
+      "name": "Thanh Xuân",
+      "tagline_en": "Your own corner of the city.",
+      "tagline_vi": "Một góc thành phố dành cho bạn.",
+      "description_en": "Royal City is one of Thanh Xuân’s recognisable landmarks. Tell us your preferred neighbourhood or building, and we can help you explore rental options.",
+      "description_vi": "Royal City là một điểm nhấn quen thuộc tại Thanh Xuân. Chia sẻ khu dân cư hoặc tòa nhà bạn yêu thích để cùng tìm hiểu các lựa chọn thuê.",
+      "image": "/images/neighbourhoods/thanh-xuan.jpg",
+      "sort_order": 9
+    },
+    {
+      "slug": "ha-dong",
+      "name": "Hà Đông",
+      "tagline_en": "Local craft. A place to settle.",
+      "tagline_vi": "Nét làng nghề. Chốn an cư.",
+      "description_en": "From Vạn Phúc’s silk village to the surrounding neighbourhoods, discover another side of Hanoi. Contact the team to check rental options in Hà Đông.",
+      "description_vi": "Từ làng lụa Vạn Phúc đến các khu dân cư lân cận, khám phá một góc Hà Nội khác. Liên hệ đội ngũ để kiểm tra các lựa chọn thuê tại Hà Đông.",
+      "image": "/images/neighbourhoods/ha-dong.jpg",
+      "sort_order": 10
     }
   ],
   "settings": {

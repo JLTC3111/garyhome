@@ -1,0 +1,13 @@
+.district-gallery-stage{min-width:0}
+.district-pagination{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}
+.district-pagination button{display:inline-grid;place-items:center;min-width:44px;min-height:44px;border:1px solid #c4cdbf;border-radius:50%;background:#faf9f5;color:#233d30;font:600 13px var(--sans);cursor:pointer;transition:background-color 160ms ease,border-color 160ms ease}
+.district-pagination button:hover:not(:disabled){background:#e9eddf;border-color:#718568}
+.district-pagination button[aria-current=page]{background:#314f3e;color:#fff;border-color:#314f3e}
+.district-pagination button:focus-visible{outline:3px solid #b7603c;outline-offset:4px}
+.district-pagination button:disabled{opacity:.35;cursor:default}
+.district-page-numbers{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.district-page-status{text-align:center;font-size:12px;color:#52634b;margin-top:12px;font-variant-numeric:tabular-nums}
+.neighbourhood-guides article>img{object-fit:cover}
+@media(min-width:1201px){.district-dropdown{max-height:calc(100dvh - 175px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
+@media(max-width:480px){.district-pagination{gap:12px}.district-page-numbers{gap:6px}.district-gallery .bounce-card-caption small{font-size:10px;line-height:1.6;flex-wrap:wrap}.district-gallery .bounce-card-caption p{display:none}}
+@media(prefers-reduced-motion:reduce){.district-pagination button{transition:none}}

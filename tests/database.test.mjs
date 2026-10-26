@@ -78,7 +78,8 @@ test('CMS schema and row-level permissions in an isolated Postgres engine', asyn
       await db.exec(seed);await db.exec(seed);
       const sources=JSON.parse(await readFile(new URL('../data/properties.json',import.meta.url),'utf8'));
       assert.equal((await db.query('select count(*)::int as total from public.properties')).rows[0].total,sources.length+2);
-      assert.equal((await db.query('select count(*)::int as total from public.neighbourhoods')).rows[0].total,4);
+      const areas=JSON.parse(await readFile(new URL('../data/site-content.json',import.meta.url),'utf8')).neighbourhoods;
+      assert.equal((await db.query('select count(*)::int as total from public.neighbourhoods')).rows[0].total,areas.length);
     });
   }
 });

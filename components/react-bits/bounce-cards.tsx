@@ -8,7 +8,7 @@ import Link from "next/link";
 import { bounceSlots, createBounceAnimator, pickBounceCard } from "@/lib/bounce-cards";
 import { useMotionPreference } from "../use-motion-preference";
 
-type DistrictCard = { id: string; href: string; image: string; title: string; content: ReactNode };
+type DistrictCard = { id: string; href: string; image: string; srcSet?: string; sizes?: string; title: string; content: ReactNode };
 type BounceCardsProps = {
   cards: DistrictCard[]; label: string; containerWidth?: number; containerHeight?: number;
   cardSize?: number; spread?: number; rotation?: number; arc?: number; pushDistance?: number;
@@ -104,7 +104,7 @@ export default function BounceCards({ cards, label, containerWidth = 500, contai
   return <ul ref={root} className="bounce-cards" style={style} aria-label={label} data-reduced-motion={reduced} data-shadow={shadow}>
     {cards.map((card, index) => <li ref={element => { elements.current[index] = element; }} key={card.id} className="bounce-card"
       style={{ zIndex: index + 1, transform: `translate(-50%, -50%) translate3d(${initialSlots[index].x}px, ${initialSlots[index].y}px, 0) rotate(${initialSlots[index].rotate}deg)` }}>
-      <Link href={card.href} className="bounce-card-link"><img src={card.image} alt="" width="480" height="480" loading="lazy" draggable={false}/>
+      <Link href={card.href} className="bounce-card-link"><img src={card.image} srcSet={card.srcSet} sizes={card.sizes} alt="" width="480" height="480" loading="lazy" decoding="async" draggable={false}/>
         <div className="bounce-card-caption"><h3>{card.title}</h3>{card.content}</div>
       </Link>
     </li>)}

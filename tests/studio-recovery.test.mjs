@@ -934,6 +934,14 @@ test('About Us opens on desktop hover, closes outside its container and stays cl
  const nav=h.renderer.root.findByProps({id:'site-navigation'}),items=nav.children.filter(child=>typeof child!=='string');assert.equal(items[0].props.className,'district-navigation');assert.equal(items[1].props.className,'about-navigation');assert.ok(items[2].props.className.includes('header-feedback'));assert.equal(items[2].props.href,'/feedback');
 });
 
+test('area links retain their rental context through translation and enquiry submission',async t=>{
+ const h=await harness(t,{guest:true,page:'contact',url:'https://gary.example/contact?area=cau-giay',path:'/contact'}),form=h.renderer.root.findByType('form'),message=form.findByProps({name:'message'});
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Rental search in Cầu Giấy/);
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('form'),form);assert.equal(form.findByProps({name:'message'}),message);assert.match(JSON.stringify(h.renderer.toJSON()),/Tìm nhà thuê tại Cầu Giấy/);
+ const fields={name:'A customer',email:'customer@example.invalid',phone:'',message:'Near my office, please.',preferred_date:'',consent:'on',website:''};
+ await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts.length,1);assert.equal(h.backend.enquiryPosts[0].data.message,'Tìm nhà thuê tại Cầu Giấy\n\nNear my office, please.');
+});
+
 test('restaurant and office consultancy links translate and open the real contact flow',async t=>{
  const h=await harness(t,{page:'services'}),links=()=>h.renderer.root.findAllByType('a').filter(n=>n.props.href?.startsWith('/contact?service='));assert.deepEqual(links().map(n=>n.props.href),['/contact?service=restaurant','/contact?service=office']);assert.match(JSON.stringify(h.renderer.toJSON()),/Opening a restaurant/);await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Mở văn phòng/);assert.equal(links().length,2);
 });

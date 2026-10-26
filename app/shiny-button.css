@@ -1,17 +1,14 @@
-/* Magic UI's moving diagonal masks, adapted to Gary Home's palette. */
-@property --shiny-x{syntax:"<percentage>";inherits:true;initial-value:100%}
-.button.shiny-button{--shiny-x:100%;--shiny-glow:#fff5d8;position:relative;isolation:isolate;display:inline-grid;place-items:center;overflow:hidden;min-height:48px;padding:16px 23px;border:1px solid #708772;border-radius:10px;background:radial-gradient(ellipse at 50% 0,#ffffff12,transparent 65%),#314f3e;color:#fffdf5;box-shadow:inset 0 1px 0 #ffffff14,0 3px 12px #233d3012;transition:box-shadow 220ms ease,transform 180ms ease,border-color 220ms ease;white-space:normal;text-align:center;cursor:pointer}
-.shiny-button-label,.shiny-button-glint{display:flex;align-items:center;justify-content:center;gap:12px;grid-area:1/1;min-width:0;line-height:1.65}
-.shiny-button-label{position:relative;z-index:1}
-.shiny-button-label>svg,.shiny-button-glint>svg{flex-shrink:0}
-.shiny-button-glint{color:var(--shiny-glow);pointer-events:none;user-select:none;z-index:2;mask-image:linear-gradient(-75deg,transparent calc(var(--shiny-x) + 14%),#000 calc(var(--shiny-x) + 24%),transparent calc(var(--shiny-x) + 40%));-webkit-mask-image:linear-gradient(-75deg,transparent calc(var(--shiny-x) + 14%),#000 calc(var(--shiny-x) + 24%),transparent calc(var(--shiny-x) + 40%))}
-.shiny-button-rim{position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:inherit;padding:1px;background-image:linear-gradient(-75deg,#fff1c318 calc(var(--shiny-x) + 20%),#fff4cfb3 calc(var(--shiny-x) + 25%),#fff1c318 calc(var(--shiny-x) + 100%));mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);-webkit-mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
-.shiny-button[data-shiny-active=true]{animation:gary-shiny-button 4.6s cubic-bezier(.22,.61,.36,1) infinite}
-.button.shiny-button:hover{background:radial-gradient(ellipse at 50% 0,#ffffff1a,transparent 65%),#314f3e;border-color:#a3b49a;box-shadow:inset 0 1px 0 #ffffff26,0 6px 20px #233d3026;transform:translateY(-1px)}
-.button.shiny-button:active{transform:translateY(0) scale(.98)}
+/* Match ICUE People app's Magic UI Shiny Button: transparent pill, animated
+   label mask and cyan border sweep. Motion drives --x, including on Safari. */
+.button.shiny-button{--primary:#7ec8ff;--shine-soft:rgba(126,200,255,.22);--shine-peak:rgba(29,183,255,.7);--x:100%;position:relative;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;min-height:48px;padding:14px 28px;border:1px solid var(--ink);border-radius:999px;background:transparent;color:var(--ink);box-shadow:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:14px;font-weight:700;line-height:1.4;text-align:center;white-space:normal;cursor:pointer;text-decoration:none;transition:box-shadow .3s ease,border-color .3s ease,color .3s ease}
+.button.shiny-button:hover{background:transparent;color:var(--ink);border-color:var(--ink);box-shadow:none}
+.shiny-button-label{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;min-width:0;letter-spacing:.04em;color:inherit}
+.shiny-button-label>svg{flex-shrink:0}
+.shiny-button[data-shiny-active=true]>.shiny-button-label{mask-image:linear-gradient(-75deg,var(--primary) calc(var(--x) + 20%),transparent calc(var(--x) + 30%),var(--primary) calc(var(--x) + 100%));-webkit-mask-image:linear-gradient(-75deg,var(--primary) calc(var(--x) + 20%),transparent calc(var(--x) + 30%),var(--primary) calc(var(--x) + 100%))}
+.shiny-button-rim{position:absolute;inset:0;z-index:2;display:block;padding:1px;border-radius:inherit;pointer-events:none;mask:linear-gradient(#000,#000) content-box exclude,linear-gradient(#000,#000);-webkit-mask:linear-gradient(#000,#000) content-box exclude,linear-gradient(#000,#000);background-image:linear-gradient(-75deg,var(--shine-soft) calc(var(--x) + 20%),var(--shine-peak) calc(var(--x) + 25%),var(--shine-soft) calc(var(--x) + 100%))}
+.shiny-button[data-shiny-active=false]>.shiny-button-rim{visibility:hidden}
 .button.shiny-button:focus-visible{outline:3px solid #b7603c;outline-offset:4px}
-.button.shiny-button:disabled{opacity:.55;cursor:default;transform:none;animation:none}
-.button.shiny-button.visa-service-link{border-color:#829679;box-shadow:inset 0 1px 0 #fff1c31f,0 5px 18px #314f3e17}
-@keyframes gary-shiny-button{0%{--shiny-x:100%}72%,100%{--shiny-x:-100%}}
-@media(prefers-reduced-motion:reduce){.button.shiny-button,.shiny-button[data-shiny-active=true]{animation:none;transition:none}.button.shiny-button:hover,.button.shiny-button:active{transform:none}}
-@media(forced-colors:active){.shiny-button-glint,.shiny-button-rim{display:none}.button.shiny-button{background:ButtonFace;color:ButtonText;border:1px solid ButtonText;box-shadow:none}}
+.button.shiny-button:disabled{opacity:.55;cursor:default}
+@media(max-width:600px){.button.shiny-button{font-size:12px;padding:14px 20px}.shiny-button-label{gap:9px;letter-spacing:.025em}}
+@media(prefers-reduced-motion:reduce){.button.shiny-button{transition:none}.shiny-button[data-shiny-active=true]>.shiny-button-label{mask-image:none;-webkit-mask-image:none}.shiny-button-rim{display:none}}
+@media(forced-colors:active){.button.shiny-button{background:ButtonFace;color:ButtonText;border:1px solid ButtonText;box-shadow:none}.shiny-button[data-shiny-active=true]>.shiny-button-label{mask-image:none;-webkit-mask-image:none}.shiny-button-rim{display:none}}

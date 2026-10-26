@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, ImageOff, X } from "lucide-react";
 import { useSite } from "./site-context";
 
-export function PropertyGallery({images,title}:{images:string[];title:string}) {
+export function PropertyGallery({images,title,variant="property"}:{images:string[];title:string;variant?:"property"|"feedback"}) {
+  const feedback=variant==="feedback";
   const {t}=useSite();const [photo,setPhoto]=useState(0),[open,setOpen]=useState(false),[failed,setFailed]=useState<string[]>([]);
   const dialog=useRef<HTMLDialogElement>(null),restoreFocus=useRef<HTMLElement|null>(null);
   const hasImages=images.length>0;
@@ -20,12 +21,12 @@ export function PropertyGallery({images,title}:{images:string[];title:string}) {
     document.body.style.overflow="hidden";
     return()=>{document.body.style.overflow=overflow;if(node.open)node.close?.();};
   },[open,hasImages]);
-  function picture(src:string,alt:string,priority=false){return failed.includes(src)?<div className="photo-unavailable"><ImageOff size={28}/><span>{t("This photo is unavailable.","Ảnh này hiện chưa xem được.")}</span></div>:<img src={src} alt={alt} width="1200" height="800" loading={priority?"eager":"lazy"} fetchPriority={priority?"high":"auto"} onError={()=>setFailed(previous=>[...new Set([...previous,src])])}/>;}
+  function picture(src:string,alt:string,priority=false){return failed.includes(src)?<div className="photo-unavailable"><ImageOff size={28}/><span>{t("This photo is unavailable.","Ảnh này hiện chưa xem được.")}</span></div>:<img src={src} alt={alt} width={feedback?900:1200} height={feedback?1600:800} loading={priority?"eager":"lazy"} fetchPriority={priority?"high":"auto"} onError={()=>setFailed(previous=>[...new Set([...previous,src])])}/>;}
   if(!images.length)return <div className="rental-gallery-empty"><ImageOff size={35}/>{t("Ask the team for property photographs.","Liên hệ đội ngũ để nhận ảnh bất động sản.")}</div>;
-  return <div className="rental-gallery">
-    <div className="rental-gallery-grid"><button type="button" className="rental-gallery-cover" onClick={()=>show(0)} aria-label={t("Open property gallery","Mở thư viện ảnh")}>{picture(images[0],title,true)}</button><div className="rental-gallery-side">{images.slice(1,3).map((src,i)=><button key={src+i} type="button" onClick={()=>show(i+1)} aria-label={t(`View photo ${i+2}`,`Xem ảnh ${i+2}`)}>{picture(src,`${title} · ${i+2}`)}</button>)}</div><button className="button rental-gallery-count" type="button" onClick={()=>show(0)}><Camera size={17}/>{t("View all photos","Xem tất cả ảnh")} · {images.length}</button></div>
-    <div className="rental-inline-thumbs" aria-label={t("Property photos","Ảnh bất động sản")}>{images.map((src,i)=><button key={src+i} type="button" onClick={()=>show(i)} aria-label={t(`Open photo ${i+1}`,`Mở ảnh ${i+1}`)}>{picture(src,"")}</button>)}</div>
-    <dialog ref={dialog} className="rental-lightbox" aria-label={t("Property photo gallery","Thư viện ảnh bất động sản")} aria-modal="true" onCancel={event=>{event.preventDefault();close();}} onClose={()=>setOpen(false)} onClick={event=>{if(event.target===event.currentTarget)close();}} onKeyDown={event=>{
+  return <div className={feedback?"rental-gallery rental-gallery-feedback":"rental-gallery"}>
+    <div className="rental-gallery-grid"><button type="button" className="rental-gallery-cover" onClick={()=>show(0)} aria-label={feedback?t("Open feedback photos","Mở ảnh phản hồi"):t("Open property gallery","Mở thư viện ảnh")}>{picture(images[0],title,true)}</button><div className="rental-gallery-side">{images.slice(1,3).map((src,i)=><button key={src+i} type="button" onClick={()=>show(i+1)} aria-label={t(`View photo ${i+2}`,`Xem ảnh ${i+2}`)}>{picture(src,`${title} · ${i+2}`)}</button>)}</div><button className="button rental-gallery-count" type="button" onClick={()=>show(0)}><Camera size={17}/>{t("View all photos","Xem tất cả ảnh")} · {images.length}</button></div>
+    <div className="rental-inline-thumbs" aria-label={feedback?t("Feedback photos","Ảnh phản hồi"):t("Property photos","Ảnh bất động sản")}>{images.map((src,i)=><button key={src+i} type="button" onClick={()=>show(i)} aria-label={t(`Open photo ${i+1}`,`Mở ảnh ${i+1}`)}>{picture(src,"")}</button>)}</div>
+    <dialog ref={dialog} className="rental-lightbox" aria-label={feedback?t("Feedback photo gallery","Thư viện ảnh phản hồi"):t("Property photo gallery","Thư viện ảnh bất động sản")} aria-modal="true" onCancel={event=>{event.preventDefault();close();}} onClose={()=>setOpen(false)} onClick={event=>{if(event.target===event.currentTarget)close();}} onKeyDown={event=>{
       if(event.key==="ArrowRight"){event.preventDefault();move(1);}if(event.key==="ArrowLeft"){event.preventDefault();move(-1);}if(event.key==="Escape"){event.preventDefault();close();}
       if(event.key==="Tab"){const nodes=Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
     }}>

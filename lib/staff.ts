@@ -7,6 +7,9 @@ export function isStaffRole(role: unknown): role is StaffRole {
   return role === "owner" || role === "admin" || role === "manager" || role === "editor";
 }
 export const staffRank=(role:unknown)=>role==="owner"?4:role==="admin"?3:role==="manager"?2:role==="editor"?1:0;
+export function canViewTeam(role:unknown){return staffRank(role)>0;}
+// Viewing a peer never grants permission to change their access or password.
+export function canViewRole(actor:unknown,target:unknown){return staffRank(target)>0&&staffRank(target)<=staffRank(actor);}
 export function assignableRoles(role:unknown):Exclude<StaffRole,"owner">[]{return (["admin","manager","editor"] as const).filter(target=>staffRank(target)<staffRank(role));}
 export function canManageStaff(role: unknown) { return staffRank(role)>=2; }
 export function canManageRole(actor:unknown,target:unknown){return staffRank(target)>0&&staffRank(target)<staffRank(actor);}

@@ -4,14 +4,14 @@ This is the current staff workflow. It supersedes invitation-first staff onboard
 
 ## Role hierarchy
 
-| Signed-in role | Can create or assign | Can change or disable | Can delete access |
-| --- | --- | --- | --- |
-| Owner | Administrator, Manager, Staff | Lower roles | Lower roles |
-| Administrator | Manager, Staff | Lower roles | Lower roles |
-| Manager | Staff | Staff | None |
-| Staff | None | None | None |
+| Signed-in role | Can view | Can create or assign | Can change or disable | Can delete access |
+| --- | --- | --- | --- | --- |
+| Owner | Owner, Administrator, Manager, Staff | Administrator, Manager, Staff | Lower roles | Lower roles |
+| Administrator | Administrator, Manager, Staff | Manager, Staff | Lower roles | Lower roles |
+| Manager | Manager, Staff | Staff | Staff | None |
+| Staff | Staff | None | None | None |
 
-Nobody can create a peer or a higher role. In particular, the website does not create another Owner. Own-role changes are protected. Database functions and server routes enforce the hierarchy independently of the dropdown. The directory shows the current account and lower roles; the full matrix is explained in the right-hand panel of Team access. Historical SQL owner bootstrap remains the way to establish the initial owner.
+Nobody can create a peer or a higher role. In particular, the website does not create another Owner. Own-role changes are protected. Database functions and server routes enforce the hierarchy independently of the dropdown. The directory shows accounts at the current role level and below, with higher roles filtered by the database and server; peer accounts are view-only. Staff have a read-only Team access tab; the full matrix is explained in the right-hand panel of Team access. Historical SQL owner bootstrap remains the way to establish the initial owner.
 
 ## Create a confirmed account
 
@@ -75,3 +75,11 @@ The form now keeps action errors separate from directory-loading errors, so a ba
 When replacement is selected, the server confirms the Auth email, assigns a permitted lower role, rechecks the target through the guarded temporary-password helper and sets the supplied password. If assignment succeeds but the password update cannot be confirmed, the response reports that partial outcome and loads the directory; it never reports password success. Password fields have a labelled visibility toggle, stay out of the parent draft and are masked again after clearing or changing setup mode.
 
 A live Supabase Auth check on 25 October 2026 created a disposable confirmed account, verified email/password sign-in, deleted that account, and confirmed that no disposable accounts remained. No real team member's credentials were changed by that check. HTTP transport was used because the local Node fetch transport could not reach the service. The role and partial-failure boundaries are tested separately in the API/database suites.
+
+## Peer and lower role visibility
+
+The shared browser helpers `canViewRole` / `canViewTeam` separate viewing from `canManageRole` / `canManageStaff`. Database function `private.can_view_staff_role` applies the same inclusive rank comparison using an actor role obtained from fresh database membership. `list_staff_accounts` now accepts every active verified staff role and includes peers, while its stable email cursor and 51-row lookahead stay intact. The GET API uses the caller’s Supabase session, filters the result again, and returns no creation configuration to read-only Staff. All write endpoints retain management-only authorization; peers cannot be assigned, disabled, deleted or have their passwords reset. Own profile password changes remain separate.
+
+Private profile reads, staff-photo pickers and commission staff pickers follow the same visibility limit. Existing higher-role property/commission assignments retain their stored account ID without displaying that account in a picker. A commission reviewer may retain an already assigned, active higher-role account while editing notes, but cannot newly select a hidden account. Approved public listing-author contacts remain public. Language changes preserve team drafts and directory state; changing the signed-in role remounts the private team panel.
+
+Migration: `supabase/migrations/20261026064456_staff_peer_and_lower_role_visibility.sql`, also included in fresh-project setup. No environment changes are required. Tests exercise all role combinations, raw RPC/RLS access, pagination, peer mutation denial, fresh demotion/revocation, read-only Staff UI and preserved commission attribution.

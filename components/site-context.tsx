@@ -14,7 +14,7 @@ import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/ses
 import { customerError, ENQUIRY_FIELDS } from "@/lib/customer-data";
 import { contentAssets } from "@/lib/content-assets";
 import { propertyOrders } from "@/lib/property-order";
-import { readBrowserFavourites } from "@/lib/favourites";
+import { readBrowserFavourites,claimBrowserFavourites,acknowledgeBrowserFavourites,releaseBrowserFavouriteClaim } from "@/lib/favourites";
 import { isPublicRental } from "@/lib/rentals";
 import type { StaffRole,StaffProfile } from "@/lib/staff";
 
@@ -26,7 +26,7 @@ type SiteContext = {
   savedReady: boolean; savedError: string; pendingSaved: string[];
   importSaved: () => Promise<number>;
   compare: string[]; toggleCompare: (id: string) => void;
-  configured: boolean; backendError: boolean; client: SupabaseClient | null; ready: boolean;
+  configured: boolean; backendError: boolean; client: SupabaseClient | null; publicClient:SupabaseClient|null; ready: boolean;
   user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
   staffProfile:StaffProfile|null;refreshStaffProfile:()=>Promise<void>;
   passwordLink:PasswordLink|null;
@@ -66,8 +66,11 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   const [pendingSaved, setPendingSaved] = useState<string[]>([]);
   const savedFlight = useRef(new Set<string>());
   const savedVersion = useRef(0);
+  const guestImportAttempts=useRef(new Set<string>()),guestImportFlights=useRef(new Map<string,Promise<number>>());
+  const [guestImportError,setGuestImportError]=useState(false);
   const [compare, setCompare] = useState<string[]>([]);
   const [client, setClient] = useState<SupabaseClient | null>(null);
+  const [publicClient,setPublicClient]=useState<SupabaseClient|null>(null);
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [editor, setEditor] = useState(false);
@@ -277,8 +280,8 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
           const config = await response.json() as { configured: boolean; url: string; publishableKey: string };
           if (!active) return;
           if (!config.configured) { setSessionPhase("ready"); return; }
+          const publicDb=publicBrowserClient(config.url,config.publishableKey);publicClientRef.current=publicDb;setPublicClient(publicDb);
           if (publicContentNeeded.current) {
-            publicClientRef.current = publicBrowserClient(config.url, config.publishableKey);
             void recoverPublicContent();
           }
           const db = browserClient(config.url, config.publishableKey);
@@ -296,7 +299,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
               const previous = snapshotRef.current; snapshotRef.current = next;
               setUser(next.user); setEditor(next.editor); setStaffRole(next.role); setSessionPhase(next.phase);
               if (previous.user?.id !== next.user?.id) {
-                setStaffProfile(null);savedVersion.current++; setSavedAccount(null); setSavedError(""); setPendingSaved([]);
+                setStaffProfile(null);savedVersion.current++; setSavedAccount(null); setSavedError(""); setGuestImportError(false); setPendingSaved([]);
                 if (next.user) setSaved([]);
                 else { try { setSaved(readBrowserFavourites(localStorage)); } catch { setSaved([]); } }
               }
@@ -382,7 +385,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
     });
   }
   function toggleSaved(id: string) {
-    if (!user) { setSaved(previous => { const next = previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id]; try { localStorage.setItem("gary-saved", JSON.stringify(next)); } catch { setToast("Saved for this visit. Browser storage is unavailable."); } return next; }); return; }
+    if (!user) { setSaved(previous => { const next = previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id]; try { localStorage.setItem("gary-saved", JSON.stringify(next));if(!next.includes(id))releaseBrowserFavouriteClaim(localStorage,id); } catch { setToast("Saved for this visit. Browser storage is unavailable."); } return next; }); return; }
     const identity = user.id, key = identity + ":" + id, remove = saved.includes(id);
     if (savedFlight.current.has(key)) return;
     if (savedAccount !== identity) { setToast(language === "vi" ? "Đang kết nối danh sách nhà đã lưu. Hãy kết nối lại và thử lại." : "Your saved homes are still connecting. Reconnect and try again."); return; }
@@ -396,21 +399,31 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
       }).catch(error => { if (snapshotRef.current.user?.id === identity) setToast(customerError(error, language)); })
       .finally(() => { savedFlight.current.delete(key); if (snapshotRef.current.user?.id === identity) setPendingSaved(previous => previous.filter(value => value !== id)); });
   }
-  async function importSaved() {
+  async function importSaved():Promise<number> {
     if (!user || savedAccount !== user.id) throw new Error("Reconnect before continuing.");
-    const identity = user.id;
-    let stored: unknown;
-    try { stored = readBrowserFavourites(localStorage); } catch { stored = []; }
-    const valid = new Set(content.properties.filter(property => property.status === "published").map(property => property.id));
-    const ids = Array.isArray(stored) ? [...new Set(stored.filter((id): id is string => typeof id === "string" && valid.has(id)))].slice(0, 100) : [];
-    if (!ids.length) return 0;
-    savedVersion.current++;
-    const { error } = await accountTask((db, signal, userId) => db.from("saved_homes").upsert(ids.map(property_id => ({ user_id: userId, property_id })), { onConflict: "user_id,property_id", ignoreDuplicates: true }).select("property_id").abortSignal(signal));
-    if (error) throw error;
-    if (snapshotRef.current.user?.id !== identity) throw new Error("Your account changed during this request.");
-    savedVersion.current++; setSaved(previous => [...new Set([...previous, ...ids])]);
-    return ids.length;
+    const identity=user.id,generation=snapshotRef.current.generation,key=identity+":"+generation;
+    const running=guestImportFlights.current.get(key);if(running)return running;
+    const task=(async()=>{
+      const stored=readBrowserFavourites(localStorage),valid=new Set(content.properties.filter(isPublicRental).map(property=>property.id));
+      const candidates=stored.filter(id=>valid.has(id)).slice(0,100);if(!candidates.length){setGuestImportError(false);return 0;}
+      const ids=claimBrowserFavourites(localStorage,identity,candidates);if(!ids.length)return 0;
+      const existing=new Set(saved),additions=ids.filter(id=>!existing.has(id));savedVersion.current++;
+      if(additions.length){const {error}=await accountTask((db,signal,userId)=>db.from("saved_homes").upsert(additions.map(property_id=>({user_id:userId,property_id})),{onConflict:"user_id,property_id",ignoreDuplicates:true}).select("property_id").abortSignal(signal));if(error)throw error;}
+      if(snapshotRef.current.user?.id!==identity||snapshotRef.current.generation!==generation)throw new Error("Your account changed during this request.");
+      savedVersion.current++;setSaved(previous=>[...new Set([...previous,...ids])]);
+      acknowledgeBrowserFavourites(localStorage,identity,ids);setGuestImportError(false);return additions.length;
+    })();guestImportFlights.current.set(key,task);
+    try{return await task;}finally{if(guestImportFlights.current.get(key)===task)guestImportFlights.current.delete(key);}
   }
+  useEffect(()=>{
+    if(!user||savedAccount!==user.id||sessionPhase!=="ready")return;
+    const identity=user.id,generation=snapshotRef.current.generation,key=identity+":"+generation;
+    if(guestImportAttempts.current.has(key))return;guestImportAttempts.current.add(key);
+    void importSaved().catch(()=>{if(snapshotRef.current.user?.id===identity&&snapshotRef.current.generation===generation)setGuestImportError(true);});
+    // Once per authenticated generation. Manual Sync remains available after a
+    // failure; language changes and auth recovery never replay a pending write.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[user?.id,savedAccount,sessionPhase]);
   function toggleCompare(id: string) { setCompare(previous => previous.includes(id) ? previous.filter(x => x !== id) : previous.length < 3 ? [...previous, id] : (setToast(language === "en" ? "Compare up to 3 homes at a time." : "So sánh tối đa 3 căn hộ."), previous)); }
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
@@ -436,7 +449,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
 
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError, pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

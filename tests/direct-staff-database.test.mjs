@@ -31,12 +31,12 @@ test('direct staff roles, profile photos and persistent activity obey fresh data
   }
   await as('admin');await denied(assign('admin2','editor'));await assert.rejects(assign('owner','editor'));
   await as('manager');await denied(assign('manager2','editor'));await denied(assign('manager','editor'));
-  await as('staff');await denied(assign('unassigned','editor'));await denied(db.query('select * from public.list_staff_accounts(null)'));
+  await as('staff');await denied(assign('unassigned','editor'));assert.ok((await db.query('select * from public.list_staff_accounts(null)')).rows.every(member=>member.role==='editor'));
  });
- await t.test('managers can add and control staff; directory results omit peers and higher roles',async()=>{
+ await t.test('managers can add and control staff; directory results include peers and omit higher roles',async()=>{
   await as('manager');await assign('customer','editor');await db.query("select public.set_staff_access($1,'editor',false)",[ids.customer]);
   const directory=(await db.query('select * from public.list_staff_accounts(null)')).rows;
-  assert.ok(directory.some(m=>m.user_id===ids.manager));assert.ok(directory.some(m=>m.user_id===ids.staff));assert.ok(!directory.some(m=>[ids.owner,ids.admin,ids.admin2,ids.manager2].includes(m.user_id)));
+  assert.ok(directory.some(m=>m.user_id===ids.manager));assert.ok(directory.some(m=>m.user_id===ids.staff));assert.ok(directory.some(m=>m.user_id===ids.manager2));assert.ok(!directory.some(m=>[ids.owner,ids.admin,ids.admin2].includes(m.user_id)));
   await denied(db.query('select public.remove_staff_access($1)',[ids.staff]));
   await db.query("select public.set_staff_access($1,'editor',true)",[ids.customer]);
  });

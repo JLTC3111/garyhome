@@ -22,7 +22,7 @@ async function harness(t, options={}){
  const descriptors=new Map();
  const setGlobal=(key,value)=>{descriptors.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,writable:true,configurable:true});};
  const browser=new EventTarget(),page=Object.assign(new EventTarget(),{visibilityState:'visible',documentElement:{lang:'en'},body:{style:{overflow:''}}});
- const network={onLine:!options.offline,userAgent:'Node.js',platform:'',maxTouchPoints:0},stored=new Map();
+ const network={onLine:!options.offline,userAgent:'Node.js',platform:'',maxTouchPoints:0},stored=new Map(Object.entries(options.storage||{}));
  browser.location=new URL(options.url??'https://gary.example/account');
  browser.history={state:null,replaceState(_state,_title,url){browser.location=new URL(url,browser.location);}};
  // Headless controls inspect DOM constructors even when test-renderer refs are null.
@@ -59,7 +59,7 @@ async function harness(t, options={}){
  const publicClient={from(table){
   const filters={},query={};
   query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
-  for(const method of ['select','order','abortSignal','single'])query[method]=()=>query;
+  for(const method of ['select','order','abortSignal','single','limit'])query[method]=()=>query;
   query.then=(resolve,reject)=>(async()=>{
    backend.publicCalls.push({table,filters});
    if(backend.publicPending)await backend.publicPending.promise;
@@ -90,6 +90,10 @@ async function harness(t, options={}){
     if(writing&&table==='staff_profiles'){backend.profilePaths??=new Map();backend.profilePaths.set(payload.user_id,payload.avatar_path);}
     if(writing&&backend.writeErrors.has(table))return Promise.resolve({data:null,error:backend.writeErrors.get(table)}).then(resolve,reject);
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
+    if(writing&&table==='saved_homes'){
+     const items=Array.isArray(payload)?payload:payload?[payload]:[];if(writeMethod==='upsert'||writeMethod==='insert')for(const item of items)if(!backend.rows.saved_homes.some(row=>row.user_id===item.user_id&&row.property_id===item.property_id))backend.rows.saved_homes.push(item);
+     if(writeMethod==='delete')backend.rows.saved_homes=backend.rows.saved_homes.filter(row=>row.user_id!==filters.user_id||row.property_id!==filters.property_id);
+    }
     if(backend.pending.has(table))return backend.pending.get(table).promise.then(resolve,reject);
     if(!writing&&backend.readErrors.has(table))return Promise.resolve({data:null,error:backend.readErrors.get(table)}).then(resolve,reject);
     let rows=structuredClone(backend.rows[table]??fixture[table]??[]);
@@ -148,7 +152,7 @@ async function harness(t, options={}){
  };
  const mountPage=async()=>{await act(async()=>{renderer.update(render(true));await delay(5);});};
  const emitEvent=async(event,next)=>{await act(async()=>{session=next;callback?.(event,next);await delay(5);});};
- return {renderer,backend,network,browser,page,emit,emitEvent,mountPage,editSettings,get site(){return site;}};
+ return {renderer,backend,network,browser,page,stored,emit,emitEvent,mountPage,editSettings,get site(){return site;}};
 }
 
 test('portal chooser identifies both destinations without changing authentication',async t=>{
@@ -201,29 +205,12 @@ test('a customer opening staff login receives a customer return link without sta
  assert.match(JSON.stringify(h.renderer.toJSON()),/Mở cổng khách hàng/);
 });
 
-test('public navigation keeps favourites, customer and staff entry together and translates the brand',async t=>{
- const h=await harness(t,{guest:true,page:'header',path:'/login'});
- const band=h.renderer.root.findByProps({className:'top-strip-actions'});
- const customer=band.findAllByType('a').find(node=>node.props.className?.split(' ').includes('customer-login-link'));
- const staff=band.findAllByType('a').find(node=>node.props.className?.split(' ').includes('staff-login-link'));
- assert.equal(customer.props.href,'/account');assert.equal(customer.props['aria-label'],'Customer login');
- assert.equal(staff.props.href,'/admin');assert.equal(staff.props['aria-label'],'Staff login');
- assert.ok(customer.props.className.includes('desktop-band-control'));assert.ok(staff.props.className.includes('desktop-band-control'));
- const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});
- assert.deepEqual(mobile.findAllByType('a').map(n=>n.props.href),['/account','/admin']);
- assert.equal(mobile.findAllByProps({className:'language-toggle'}).length,1);
- const toggle=()=>h.renderer.root.findAllByType('button').find(n=>n.props['aria-controls']==='site-navigation');
- await act(async()=>toggle().props.onClick());assert.equal(toggle().props['aria-expanded'],true);
- await act(async()=>mobile.findAllByType('a')[0].props.onClick());assert.equal(toggle().props['aria-expanded'],false);
- const favourites=()=>band.findAllByType('button').find(node=>node.props.className==='favourites-trigger');
- assert.equal(favourites().props['aria-expanded'],false);
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');
- await act(async()=>h.site.setLanguage('vi'));
- assert.equal(customer.props['aria-label'],'Khách hàng đăng nhập');assert.equal(staff.props['aria-label'],'Nhân viên đăng nhập');
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).props.lang,'vi');
- await h.emit(authSession('customer'));assert.equal(customer.props['aria-label'],'Tài khoản khách hàng');
- await h.emit(null);assert.equal(customer.props['aria-label'],'Khách hàng đăng nhập');
+test('public navigation keeps favourites and one translated login entry pointing to the existing chooser',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),login=band.findAllByType('a').find(node=>node.props.className?.split(' ').includes('login-portal-link'));
+ assert.equal(login.props.href,'/login');assert.equal(login.props['aria-label'],'Sign in / Login');assert.ok(login.props.className.includes('desktop-band-control'));assert.equal(band.findAllByType('a').filter(node=>['/account','/admin'].includes(node.props.href)).length,0);
+ const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/login']);assert.equal(mobile.findAllByProps({className:'language-toggle'}).length,1);
+ const toggle=()=>h.renderer.root.findAllByType('button').find(node=>node.props['aria-controls']==='site-navigation');await act(async()=>toggle().props.onClick());assert.equal(toggle().props['aria-expanded'],true);await act(async()=>mobile.findAllByType('a')[0].props.onClick());assert.equal(toggle().props['aria-expanded'],false);
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');await act(async()=>h.site.setLanguage('vi'));assert.equal(login.props['aria-label'],'Đăng nhập');assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');await h.emit(authSession('customer'));assert.equal(login.props.href,'/login');assert.equal(login.findAllByType('img').length,0);
 });
 
 test('customer schema errors stay visible until a successful refresh loads real data',async t=>{
@@ -329,10 +316,10 @@ test('owner team drafts survive language changes and same-user recovery while te
  assert.ok(h.backend.teamCalls.length<10,'Directory reads must not loop through session recovery');
 });
 
-test('staff roles can use Studio without seeing owner/admin team management',async t=>{
+test('staff roles can use Studio and a read-only team directory',async t=>{
  const h=await harness(t,{role:'editor'});
  assert.equal(h.site.editor,true);assert.equal(h.site.staffRole,'editor');
- assert.equal(h.renderer.root.findAllByProps({'aria-label':'Team access'}).length,0);
+ assert.equal(h.renderer.root.findAllByProps({'aria-label':'Team access'}).length,1);
  assert.equal(h.backend.teamCalls.length,0);
 });
 
@@ -819,8 +806,8 @@ test('Studio branch disclosures preserve the active form draft and translate wit
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Quản trị'}).props.onClick());body=h.renderer.root.findByProps({id:controlled});assert.equal(body.props.inert,false);
  assert.equal(h.backend.calls.filter(c=>c.table==='site_settings').length,0);
 });
-test('branch navigation retains staff permissions and hides the email-domain banner in Team access',async t=>{
- const h=await harness(t,{role:'editor'});assert.equal(h.renderer.root.findAllByProps({'aria-label':'Team access'}).length,0);assert.equal(h.renderer.root.findAllByProps({'aria-label':'Assistance attribution'}).length,0);
+test('branch navigation offers a read-only staff directory and hides the email-domain banner in Team access',async t=>{
+ const h=await harness(t,{role:'editor'});assert.equal(h.renderer.root.findAllByProps({'aria-label':'Team access'}).length,1);assert.equal(h.renderer.root.findAllByProps({'aria-label':'Assistance attribution'}).length,0);
  h.backend.role='manager';await h.emit(authSession('owner'));await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
  assert.equal(h.renderer.root.findAllByProps({className:'team-access-summary'}).length,0);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Allowed staff email/);assert.ok(h.renderer.root.findByProps({className:'admin-panel team-permissions-guide'}));
 });
@@ -911,4 +898,37 @@ test('the private property queue preserves a review during translation and only 
  await act(async()=>{h.site.setLanguage('vi');await delay(25);});assert.equal(count(),before);assert.equal(h.renderer.root.findByProps({name:'staff_notes'}),notes);assert.match(JSON.stringify(h.renderer.toJSON()),/Bất động sản được giới thiệu/);
  const form=h.renderer.root.findByProps({className:'editor-form landlord-review'});await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields:{decision:'reviewing',staff_notes:'A new internal note',assignee:''}}});await delay(5);});const saved=h.backend.rpcCalls.filter(call=>call.name==='review_landlord_submission');assert.equal(saved.length,1);assert.equal(saved[0].args.notes,'A new internal note');assert.equal(count(),before);assert.equal(saved[0].args.assignee,null);
  await h.emit(null);assert.equal(h.renderer.root.findAllByProps({className:'landlord-review'}).length,0);
+});
+
+test('admin directory shows peer admins with no management controls and filters out owner accounts',async t=>{
+ const h=await harness(t,{role:'admin'});h.backend.teamRows=['owner','admin','manager','editor'].map(role=>({user_id:'directory-'+role,display_name:'Directory '+role,email:role+'@gmail.com',role,active:true,confirmed:true}));
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});const rows=h.renderer.root.findAllByProps({className:'team-member'});assert.equal(rows.length,3);assert.ok(!rows.some(row=>row.findByType('strong').children.join('')==='Directory owner'));
+ const peer=rows.find(row=>row.findByType('strong').children.join('')==='Directory admin');assert.ok(peer);assert.equal(peer.findAllByType('button').length,0);assert.match(peer.findByProps({className:'team-protected'}).children.filter(child=>typeof child==='string').join(''),/View only/);
+ const manager=rows.find(row=>row.findByType('strong').children.join('')==='Directory manager');assert.ok(manager.findAllByType('button').length>0);assert.equal(h.backend.teamCalls.filter(call=>call.method!=='GET').length,0);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Chỉ xem/);
+});
+test('staff can see a read-only peer directory without creation, access or password controls',async t=>{
+ const h=await harness(t,{role:'editor'});h.backend.teamRows=['owner','admin','manager','editor','editor'].map((role,index)=>({user_id:'directory-'+index,display_name:'Directory '+role+' '+index,email:'directory'+index+'@gmail.com',role,active:true,confirmed:true}));
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});const rows=h.renderer.root.findAllByProps({className:'team-member'});assert.equal(rows.length,2);assert.ok(rows.every(row=>row.findByType('strong').children.join('').startsWith('Directory editor')));assert.equal(h.renderer.root.findAllByProps({className:'admin-panel enquiry-form team-invite-form'}).length,0);assert.ok(rows.every(row=>row.findAllByType('button').length===0));
+ const count=h.backend.teamCalls.length;await act(async()=>{h.site.setLanguage('vi');await delay(10);});assert.equal(h.backend.teamCalls.length,count);assert.match(JSON.stringify(h.renderer.toJSON()),/Bạn có thể xem các nhân viên khác/);
+});
+
+test('guest favourites automatically merge into the logged-in account without duplicates or replacing existing saves',async t=>{
+ const ids=fixture.properties.slice(0,3).map(p=>p.id),h=await harness(t,{guest:true,customer:true,publicOnly:true,storage:{'gary-saved':JSON.stringify([ids[0],ids[1],ids[0]])}});h.backend.rows.saved_homes=[{user_id:'customer',property_id:ids[2]}];
+ await h.emit(authSession('customer'));await act(async()=>{await delay(35);});assert.deepEqual(new Set(h.site.saved),new Set(ids));const writes=h.backend.calls.filter(call=>call.table==='saved_homes'&&call.method==='upsert');assert.equal(writes.length,1);assert.ok(writes[0].payload.every(row=>row.user_id==='customer'));assert.equal(h.stored.get('gary-saved'),undefined);
+ await h.emit(authSession('customer'));assert.equal(h.backend.calls.filter(call=>call.table==='saved_homes'&&call.method==='upsert').length,1);assert.deepEqual(new Set(h.site.saved),new Set(ids));
+});
+test('failed guest-favourite sync retains the cache and supports a manual retry without automatic write loops',async t=>{
+ const id=fixture.properties[0].id,h=await harness(t,{guest:true,customer:true,publicOnly:true,storage:{'gary-saved':JSON.stringify([id])}});h.backend.writeErrors.set('saved_homes',new Error('Offline'));await h.emit(authSession('customer'));await act(async()=>{await delay(25);});assert.ok(h.stored.get('gary-saved')?.includes(id));assert.ok(h.site.savedError);const before=h.backend.calls.filter(call=>call.table==='saved_homes'&&call.method==='upsert').length;await act(async()=>h.site.setLanguage('vi'));assert.equal(h.backend.calls.filter(call=>call.table==='saved_homes'&&call.method==='upsert').length,before);
+ h.backend.writeErrors.delete('saved_homes');await act(async()=>{await h.site.importSaved();await delay(10);});assert.ok(h.site.saved.includes(id));assert.equal(h.stored.get('gary-saved'),undefined);
+});
+test('a pending guest-favourite transfer never crosses into another account',async t=>{
+ const id=fixture.properties[0].id,h=await harness(t,{guest:true,customer:true,publicOnly:true,storage:{'gary-saved':JSON.stringify([id])}}),pending=deferred();h.backend.writes.set('saved_homes',pending);await h.emit(authSession('customer'));await h.emit(authSession('other-customer'));assert.ok(!h.site.saved.includes(id));assert.equal(h.backend.calls.filter(call=>call.table==='saved_homes'&&call.method==='upsert').length,1);
+ await act(async()=>{pending.resolve({data:[{property_id:id}],error:null});await delay(10);});assert.equal(h.site.user.id,'other-customer');assert.ok(!h.site.saved.includes(id));assert.ok(h.stored.get('gary-saved')?.includes(id));
+});
+
+test('About Us opens on desktop hover, closes outside its container and stays click-operated on touch',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/'}),about=()=>h.renderer.root.findByProps({className:'about-navigation'}),trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});
+ await act(async()=>about().props.onPointerEnter({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onPointerLeave({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>about().props.onPointerEnter({pointerType:'touch'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:null}));assert.equal(trigger().props['aria-expanded'],false);
+ const nav=h.renderer.root.findByProps({id:'site-navigation'}),items=nav.children.filter(child=>typeof child!=='string');assert.equal(items[0].props.className,'district-navigation');assert.equal(items[1].props.className,'about-navigation');assert.ok(items[2].props.className.includes('header-feedback'));assert.equal(items[2].props.href,'/feedback');
 });

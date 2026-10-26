@@ -34,7 +34,7 @@ test('published card ordering enforces assigned roles, ownership of staff access
  });
  await t.test('manager is assignable by an administrator and can administer lower staff only',async()=>{
   await as('authenticated',users.admin);await db.query("select public.assign_staff_account('new-manager@garyhome.com','New Manager','manager')");
-  await as('authenticated',users['new-manager']);assert.equal((await db.query('select private.staff_role() role,private.is_editor() editor')).rows[0].role,'manager');assert.equal((await db.query('select private.is_editor() editor')).rows[0].editor,true);const managed=(await db.query('select * from public.list_staff_accounts(null)')).rows;assert.ok(managed.every(m=>m.user_id===users['new-manager']||m.role==='editor'));await assert.rejects(db.query("select public.assign_staff_account('editor@garyhome.com','Editor','manager')"));
+  await as('authenticated',users['new-manager']);assert.equal((await db.query('select private.staff_role() role,private.is_editor() editor')).rows[0].role,'manager');assert.equal((await db.query('select private.is_editor() editor')).rows[0].editor,true);const managed=(await db.query('select * from public.list_staff_accounts(null)')).rows;assert.ok(managed.every(m=>['manager','editor'].includes(m.role)));await assert.rejects(db.query("select public.assign_staff_account('editor@garyhome.com','Editor','manager')"));
   await as('authenticated',users.admin);await assert.rejects(db.query("select public.assign_staff_account('new-manager@garyhome.com','New Manager','admin')"));
  });
  await t.test('publication time is stamped when a draft goes public and cannot be forged on an edit',async()=>{

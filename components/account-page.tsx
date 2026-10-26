@@ -197,7 +197,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   }
   async function importShortlist() {
     setBusy("import"); setError("");
-    try { const count = await importSaved(); if (active.current) notice(count ? t("Your browser shortlist is now saved to your account.", "Đã thêm danh sách trên trình duyệt vào tài khoản.") : t("No published homes to import from this browser.", "Trình duyệt chưa có nhà đang đăng để nhập.")); }
+    try { const count = await importSaved(); if (active.current) notice(count ? t("Your browser shortlist is now saved to your account.", "Đã thêm danh sách trên trình duyệt vào tài khoản.") : t("Your browser favourites are already synced or no longer available.", "Nhà yêu thích trên trình duyệt đã được đồng bộ hoặc không còn khả dụng.")); }
     catch (error) { if (active.current) setError(customerError(error, language)); }
     finally { if (active.current) setBusy(""); }
   }
@@ -217,7 +217,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
       {error && <div className="form-error" role="alert">{error}</div>}
       {savedError && tab === "saved" && <div className="form-error" role="alert">{savedError}</div>}
       {tab === "submissions" && <SubmissionHistory/>}
-      {tab === "saved" && <div className="account-import"><p>{t("Saved homes before signing in on this browser? Bring them with you.", "Bạn đã lưu nhà trên trình duyệt trước khi đăng nhập? Hãy thêm vào tài khoản.")}</p><button type="button" className="text-link" disabled={!!busy || !savedReady} onClick={() => void importShortlist()}>{busy === "import" ? t("Importing…", "Đang nhập…") : t("Import browser shortlist", "Nhập danh sách trên trình duyệt")}<ArrowRight size={15}/></button></div>}
+      {tab === "saved" && <div className="account-import"><p>{t("Browser favourites sync automatically after login. You can retry here if a connection was interrupted.", "Nhà yêu thích trên trình duyệt được tự động đồng bộ sau khi đăng nhập. Bạn có thể thử lại tại đây nếu kết nối bị gián đoạn.")}</p><button type="button" className="text-link" disabled={!!busy || !savedReady} onClick={() => void importShortlist()}>{busy === "import" ? t("Syncing…", "Đang đồng bộ…") : t("Sync browser favourites", "Đồng bộ nhà yêu thích trên trình duyệt")}<ArrowRight size={15}/></button></div>}
       {!loaded && loading && <div className="account-loading" role="status"><LoaderCircle size={20} className="spin"/>{t("Bringing your plans together…", "Đang tải kế hoạch của bạn…")}</div>}
       {tab === "overview" && <>
         <div className="account-stats">{[[Heart, savedReady ? saved.length : "—", t("Homes you love", "Nhà bạn yêu thích"), "saved"], [CalendarDays, loaded ? upcoming.length : "—", t("Viewing plans", "Kế hoạch xem nhà"), "viewings"], [MessageSquare, loaded ? enquiries.length : "—", t("Conversations", "Cuộc trao đổi"), "enquiries"]].map(([Icon, count, label, target]) => { const Symbol = Icon as typeof Heart; return <button key={String(target)} onClick={() => setTab(target as AccountTab)}><Symbol size={21}/><strong>{typeof count === "number" ? <NumberTicker value={count}/> : String(count)}</strong><span>{String(label)}<ArrowUpRight size={15}/></span></button>; })}</div>

@@ -88,3 +88,8 @@ test('legacy language preferences are migrated before paint and valid language w
  delete p.page.documentElement.dataset.languagePending;p.stored.set('gary-language','untrusted');
  vm.runInThisContext(LANGUAGE_BOOTSTRAP);assert.equal(p.page.documentElement.dataset.languagePending,undefined);
 });
+
+test('feedback uses an uncropped portrait gallery and keeps landscape navigation and translated controls',async t=>{
+ const p=await platform(t),site={current:{t:en=>en}}, {gallery:{PropertyGallery}}=loadComponents(site);const view=()=>React.createElement(PropertyGallery,{images:['portrait-9-16.jpg','landscape.jpg'],title:'Customer feedback',variant:'feedback'}),renderer=await p.mount(view());assert.ok(renderer.root.findByProps({className:'rental-gallery rental-gallery-feedback'}));const cover=renderer.root.findByProps({className:'rental-gallery-cover'}).findByType('img');assert.equal(cover.props.width,900);assert.equal(cover.props.height,1600);
+ await act(async()=>renderer.root.findAllByType('button').find(button=>button.props['aria-label']==='Open feedback photos').props.onClick());assert.equal(renderer.root.findByType('dialog').props['aria-label'],'Feedback photo gallery');await act(async()=>renderer.root.findByType('dialog').props.onKeyDown({key:'ArrowRight',preventDefault(){}}));assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,'landscape.jpg');site.current.t=(_en,vi)=>vi;await act(async()=>renderer.update(view()));assert.equal(renderer.root.findByType('dialog').props['aria-label'],'Thư viện ảnh phản hồi');assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,'landscape.jpg');
+});

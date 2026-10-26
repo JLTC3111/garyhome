@@ -2,7 +2,7 @@ import { z } from "zod";
 import { staffAdminClient } from "@/lib/server";
 import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError, staffDataError, staffRequest } from "@/lib/staff-server";
-import { canManageRole,type StaffAccount } from "@/lib/staff";
+import { canManageRole,canManageStaff,canViewRole,type StaffAccount } from "@/lib/staff";
 
 import { setStaffTemporaryPassword } from "@/lib/staff-password-server";
 
@@ -21,20 +21,21 @@ function failure(error: unknown) {
 export async function GET(request: Request) {
   try {
     const result = await boundedRequest(async signal => {
-      const { db, role } = await staffRequest(request, signal);
+      const { db, role } = await staffRequest(request, signal,"view");
+      const managing=canManageStaff(role);
       const after = new URL(request.url).searchParams.get("after");
       if (after && after.length > 254) throw new StaffRequestError("Invalid page.");
       const [members, settings] = await Promise.all([
         db.rpc("list_staff_accounts", { after_email: after }).abortSignal(signal),
-        db.from("staff_settings").select("email_domains").eq("id", "main").abortSignal(signal).single(),
+        managing?db.from("staff_settings").select("email_domains").eq("id", "main").abortSignal(signal).single():Promise.resolve({data:{email_domains:[] as string[]},error:null}),
       ]);
       staffDataError(members.error); staffDataError(settings.error);
-      if (!settings.data?.email_domains?.length) throw new StaffRequestError("Apply the staff access database migration before managing the team.", 503);
-      const rows = (members.data ?? []) as StaffAccount[];
+      if (managing&&!settings.data?.email_domains?.length) throw new StaffRequestError("Apply the staff access database migration before managing the team.", 503);
+      const rows = ((members.data ?? []) as StaffAccount[]).filter(member=>canViewRole(role,member.role));
       const selected=rows.slice(0,50);
       const photos=selected.length?await db.from("staff_profiles").select("user_id,avatar_path").in("user_id",selected.map(m=>m.user_id)).abortSignal(signal):{data:[],error:null};
       staffDataError(photos.error);
-      return { members:selected.map(member=>({...member,avatar_path:photos.data?.find(p=>p.user_id===member.user_id)?.avatar_path||""})),next:rows.length>50?rows[49].email:null,domains:settings.data.email_domains as string[],role,directCreationEnabled:!!staffAdminClient() };
+      return { members:selected.map(member=>({...member,avatar_path:photos.data?.find(p=>p.user_id===member.user_id)?.avatar_path||""})),next:rows.length>50?rows[49].email:null,domains:settings.data?.email_domains??[],role,directCreationEnabled:managing&&!!staffAdminClient() };
     });
     return Response.json(result, { headers });
   } catch (error) { return failure(error); }

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useSite } from "./site-context";
 import { SUBMISSION_STATUS, type AssistanceReport, type FeedbackSubmission } from "@/lib/submissions";
+import { notifyPublicFeedbackChanged } from "@/lib/published-feedback";
 import { listingCode } from "@/lib/rentals";
 
 export function SubmissionHistory(){const {user}=useSite();return user?<History key={user.id}/>:null;}
@@ -16,7 +17,7 @@ function History(){
   }).then(data=>{if(current){setFeedback(data.feedback);setReports(data.reports);setFailed(false);}}).catch(()=>{if(current)setFailed(true);}).finally(()=>{if(current)setLoading(false);});
   return()=>{current=false;};
  },[accountTask,user?.id,version]);
- async function withdraw(id:string){setBusy(id);try{const {error,data}=await accountTask((db,signal,userId)=>db.from("feedback_submissions").delete().eq("id",id).eq("user_id",userId).select("id").abortSignal(signal));if(error||!data?.length)throw new Error();setFeedback(rows=>rows.filter(row=>row.id!==id));}catch{setFailed(true);}finally{setBusy(null);}}
+ async function withdraw(id:string){setBusy(id);try{const {error,data}=await accountTask((db,signal,userId)=>db.from("feedback_submissions").delete().eq("id",id).eq("user_id",userId).select("id").abortSignal(signal));if(error||!data?.length)throw new Error();setFeedback(rows=>rows.filter(row=>row.id!==id));notifyPublicFeedbackChanged();}catch{setFailed(true);}finally{setBusy(null);}}
  return <section className="submission-history"><div className="section-heading"><h2>{t("My feedback & help records","Phản hồi & thông tin hỗ trợ của tôi")}</h2><button type="button" className="text-link" disabled={loading||!!busy} onClick={()=>{setLoading(true);setVersion(v=>v+1);}}><RefreshCw size={16}/>{t("Refresh","Tải lại")}</button></div>
   {failed&&<p className="form-error" role="alert">{t("Couldn’t confirm the latest records. Refresh before trying again.","Chưa thể xác nhận dữ liệu mới nhất. Tải lại trước khi thử lại.")}</p>}
   {loading?<p role="status">{t("Loading your submissions…","Đang tải thông tin đã gửi…")}</p>:<>

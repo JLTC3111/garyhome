@@ -507,5 +507,11 @@
   "Choose Set a temporary password to replace the existing password, or leave both password fields blank.": "Chọn đặt mật khẩu tạm thời để thay mật khẩu hiện tại, hoặc để trống cả hai ô mật khẩu.",
   "Supabase rejected this password. Choose a stronger password and try again.": "Mật khẩu này chưa đáp ứng yêu cầu. Hãy chọn mật khẩu mạnh hơn và thử lại.",
   "Staff access was assigned, but the temporary password was not confirmed. Use Set temporary password in the directory before sharing credentials.": "Đã cấp quyền nhân viên nhưng chưa xác nhận được mật khẩu tạm thời. Hãy dùng Đặt mật khẩu tạm thời trong danh sách nhân viên trước khi chia sẻ thông tin đăng nhập.",
-  "Introduced properties": "Bất động sản được giới thiệu"
+  "Introduced properties": "Bất động sản được giới thiệu",
+  "Who can you see?": "Bạn có thể xem những ai?",
+  "Your directory includes accounts at your own role level and below. Higher roles are hidden. Peer accounts are view-only.": "Danh bạ hiển thị tài khoản cùng cấp hoặc thấp hơn bạn. Tài khoản cấp cao hơn được ẩn. Tài khoản cùng cấp chỉ được xem.",
+  "You can view other staff members. Team access changes require a higher role.": "Bạn có thể xem các nhân viên khác. Việc thay đổi quyền truy cập cần vai trò cấp cao hơn.",
+  "View accounts at your level or below. Manage lower-level accounts and preserve customer history.": "Xem tài khoản cùng cấp hoặc thấp hơn. Quản lý tài khoản cấp thấp hơn và giữ nguyên lịch sử khách hàng.",
+  "View only": "Chỉ xem",
+  "Active staff access required.": "Cần quyền nhân viên đang hoạt động."
 }

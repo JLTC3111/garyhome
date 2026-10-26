@@ -1,2 +1,3 @@
 import { HomePage } from "@/components/home-page";
-export default function Page() { return <HomePage/>; }
+import { loadPublicFeedback } from "@/lib/published-feedback-server";
+export default async function Page(){const feedback=await loadPublicFeedback(6);return <HomePage reviews={feedback.reviews} feedbackUnavailable={feedback.unavailable}/>;}

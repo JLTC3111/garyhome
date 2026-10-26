@@ -1,11 +1,11 @@
 import { publicSupabase } from "./server";
-import { canManageStaff, type StaffRole } from "./staff";
+import { canManageStaff, canViewTeam, type StaffRole } from "./staff";
 
 export class StaffRequestError extends Error {
   readonly status: number;
   constructor(message: string, status = 400,readonly code?:string) { super(message); this.status = status; }
 }
-export async function staffRequest(request: Request, signal: AbortSignal) {
+export async function staffRequest(request: Request, signal: AbortSignal, access:"manage"|"view"="manage") {
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) throw new StaffRequestError("Invalid origin.", 403);
   const token = request.headers.get("authorization")?.match(/^Bearer (\S+)$/i)?.[1];
@@ -17,7 +17,7 @@ export async function staffRequest(request: Request, signal: AbortSignal) {
   const membership = await db.from("team_members").select("role").eq("user_id", data.user.id).abortSignal(signal).maybeSingle();
   if (membership.error) throw new StaffRequestError("Couldn’t verify staff permissions. Reconnect and try again.", 503);
   const role = membership.data?.role;
-  if (!canManageStaff(role)) throw new StaffRequestError("Owner, administrator or manager access required.", 403);
+  if (!(access==="view"?canViewTeam(role):canManageStaff(role))) throw new StaffRequestError(access==="view"?"Active staff access required.":"Owner, administrator or manager access required.", 403);
   return { db, user: data.user, role: role as StaffRole };
 }
 export function staffDataError(error: { code?: string } | null) {

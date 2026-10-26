@@ -78,7 +78,7 @@ test('role updates are checked both by hierarchy and protected database targets'
  const blocked=endpoint({protected:true});assert.equal((await blocked.send('PATCH',{user_id:target,role:'editor',active:false})).status,403);
 });
 test('directory responses include current photos, paginate and never expose credentials',async()=>{
- const members=Array.from({length:51},(_,i)=>({user_id:String(i),email:String(i).padStart(3,'0')+'@garyhome.com'}));
+ const members=Array.from({length:51},(_,i)=>({user_id:String(i),role:'editor',email:String(i).padStart(3,'0')+'@garyhome.com'}));
  const h=endpoint({members,profiles:[{user_id:'0',avatar_path:'portrait.jpg'}]}),response=await h.send('GET');assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');const body=await response.json();assert.equal(body.members.length,50);assert.equal(body.next,members[49].email);assert.equal(body.directCreationEnabled,true);assert.equal(body.members[0].avatar_path,'portrait.jpg');assert.ok(!('secret'in body));assert.ok(!('password'in body));
 });
 test('only owners and admins can delete lower staff assignments; Auth identities are retained',async()=>{
@@ -124,4 +124,14 @@ test('restoring an existing login can explicitly set the entered temporary passw
 test('existing-password replacement needs explicit consent and reports partial assignment without claiming password success',async()=>{
  const preserve=endpoint({existing:target}),rejected=await preserve.send('POST',{mode:'assign',password,confirm_password:password});assert.equal(rejected.status,400);assert.equal((await rejected.json()).code,'password_choice_required');assert.deepEqual(preserve.state.confirms,[]);
  const failure=endpoint({existing:target,passwordConfirmError:true}),r=await failure.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});assert.equal(r.status,409);const body=await r.json();assert.equal(body.code,'staff_access_assigned_password_unconfirmed');assert.ok(!body.password_set);assert.ok(!JSON.stringify(body).includes(password));assert.ok(failure.state.rpc.some(x=>x.name==='assign_staff_account'));assert.equal(failure.state.rpc.at(-1).args.failed,true);
+});
+
+test('the team directory includes peers and lower roles and filters higher roles before sending a response',async()=>{
+ const roles=['owner','admin','manager','editor'],members=roles.map(role=>({user_id:role,email:role+'@gmail.com',role,display_name:role}));
+ for(const actor of roles){const h=endpoint({role:actor,members}),response=await h.send('GET');assert.equal(response.status,200);const body=await response.json();assert.deepEqual(body.members.map(member=>member.role),roles.filter(target=>rank(target)<=rank(actor)));if(actor==='editor'){assert.deepEqual(body.domains,[]);assert.equal(body.directCreationEnabled,false);assert.equal(h.state.secretReads,0);}}
+ for(const role of [null,'customer','bogus']){const h=endpoint({role,members});assert.equal((await h.send('GET')).status,403);}
+ const invalid=endpoint({role:'editor',valid:false});assert.equal((await invalid.send('GET')).status,401);
+});
+test('read-only directory access never permits staff to call any team management or password endpoint',async()=>{
+ const h=endpoint({role:'editor'});for(const method of ['POST','PATCH','DELETE'])assert.equal((await h.send(method,method==='POST'?{}:{user_id:target,role:'editor',active:false})).status,403);assert.equal((await h.sendReset()).status,403);assert.equal((await h.sendPassword()).status,403);assert.deepEqual(h.state.creates,[]);assert.deepEqual(h.state.confirms,[]);assert.deepEqual(h.state.resets,[]);assert.equal(h.state.secretReads,0);
 });

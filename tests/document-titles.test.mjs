@@ -16,6 +16,7 @@ const property = { id:'test-home',listing_type:'rent',property_type:'Apartment',
 let pathname = '/account';
 let site = { language: 'en', content: { properties: [property] } };
 function load(file) {
+  if(file.endsWith(".json"))return JSON.parse(fs.readFileSync(file,"utf8"));
   if (modules.has(file)) return modules.get(file).exports;
   const loadedModule = { exports: {} }; modules.set(file, loadedModule);
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
@@ -169,4 +170,9 @@ test('original news titles are bilingual and the retired About page is no longer
  assert.equal(documentTitle('/tips-and-news/hanoi-rental-outlook-q3-2026','en',[]),'Hanoi serviced apartments: reading the Q3 2026 update | Gary Home');
  assert.equal(documentTitle('/tips-and-news/hanoi-rental-outlook-q3-2026','vi',[]),'Căn hộ dịch vụ Hà Nội: đọc báo cáo quý III/2026 | Gary Home');
  assert.equal(documentTitle('/about','en',[]),'Page not found | Gary Home');
+});
+
+test('live editorial titles translate while draft and withdrawn pages never fall back to seed titles',()=>{
+ const original=JSON.parse(fs.readFileSync(path.join(base,'data/editorial.json'),'utf8'))[0],row={...original,slug:'newly-published-story',title_en:'A new published story',title_vi:'Bài viết mới đã đăng'};
+ assert.equal(documentTitle('/tips-and-news/newly-published-story','en',[],[],[row]),'A new published story | Gary Home');assert.equal(documentTitle('/tips-and-news/newly-published-story','vi',[],[],[row]),'Bài viết mới đã đăng | Gary Home');assert.equal(documentTitle('/tips-and-news/newly-published-story','vi',[],[],[{...row,status:'draft'}]),'Không tìm thấy trang | Gary Home');assert.equal(documentTitle('/tips-and-news/'+original.slug,'en',[],[],[]),'Page not found | Gary Home');
 });

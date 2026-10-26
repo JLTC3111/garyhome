@@ -513,5 +513,11 @@
   "You can view other staff members. Team access changes require a higher role.": "Bạn có thể xem các nhân viên khác. Việc thay đổi quyền truy cập cần vai trò cấp cao hơn.",
   "View accounts at your level or below. Manage lower-level accounts and preserve customer history.": "Xem tài khoản cùng cấp hoặc thấp hơn. Quản lý tài khoản cấp thấp hơn và giữ nguyên lịch sử khách hàng.",
   "View only": "Chỉ xem",
-  "Active staff access required.": "Cần quyền nhân viên đang hoạt động."
+  "Active staff access required.": "Cần quyền nhân viên đang hoạt động.",
+  "Listings": "Tin đăng",
+  "People & galleries": "Thành viên & thư viện",
+  "Assistance & publishing": "Hỗ trợ & biên tập",
+  "News articles": "Bài tin tức",
+  "Rental tips": "Cẩm nang thuê nhà",
+  "Listing workspace": "Quản lý tin đăng"
 }

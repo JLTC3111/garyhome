@@ -11,7 +11,7 @@ import ts from 'typescript';
 
 const base=path.resolve(import.meta.dirname,'..');
 const require=createRequire(path.join(base,'package.json'));
-const fixture={...JSON.parse(fs.readFileSync(path.join(base,'data/site-content.json'),'utf8')),properties:JSON.parse(fs.readFileSync(path.join(base,'data/properties.json'),'utf8')),authors:[],activities:[]};
+const fixture={...JSON.parse(fs.readFileSync(path.join(base,'data/site-content.json'),'utf8')),properties:JSON.parse(fs.readFileSync(path.join(base,'data/properties.json'),'utf8')),editorial:JSON.parse(fs.readFileSync(path.join(base,'data/editorial.json'),'utf8')),authors:[],activities:[]};
 const user=id=>({id,email:`${id}@example.invalid`,aud:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'});
 const authSession=id=>({user:user(id),access_token:'test-token',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer'});
 const deferred=()=>{let resolve;const promise=new Promise(yes=>{resolve=yes;});return {promise,resolve};};
@@ -55,7 +55,7 @@ async function harness(t, options={}){
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
- const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
+ const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{editorial_articles:structuredClone(fixture.editorial),enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
   const filters={},query={};
   query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
@@ -63,7 +63,7 @@ async function harness(t, options={}){
   query.then=(resolve,reject)=>(async()=>{
    backend.publicCalls.push({table,filters});
    if(backend.publicPending)await backend.publicPending.promise;
-   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:table==='property_display_orders'?[]:backend.publicRows[table]);
+   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:table==='property_display_orders'?[]:table==='editorial_articles'?backend.publicRows.editorial||[]:backend.publicRows[table]);
    if(table==='properties')data=data.filter(row=>row.status===filters.status);
    return backend.publicError?{data:null,error:{code:'',message:'Temporary network failure'},status:0}:{data,error:null,status:200};
   })().then(resolve,reject);
@@ -142,7 +142,7 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback'})));
+ const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback',articles:options.editorialPageRows})));
  await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
@@ -343,14 +343,14 @@ test('a failed server reload automatically recovers public listings and clears t
  assert.equal(h.site.backendError,false);
  assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);
  assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
- assert.equal(h.backend.publicCalls.length,6);
+ assert.equal(h.backend.publicCalls.length,7);
  assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='properties').filters,{status:'published',listing_type:'rent',availability:['available','on_request']});
  assert.equal(h.site.user,null);
 });
 
 test('failed public recovery keeps a translated warning and coalesces retries until live data arrives',async t=>{
  const h=await harness(t,{guest:true,publicOnly:true,initialError:true,publicError:true});
- assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,6);
+ assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,7);
  await act(async()=>{h.site.setLanguage('vi');});
  assert.match(JSON.stringify(h.renderer.toJSON()),/Không thể cập nhật tin đăng/);
  const retry=h.renderer.root.findAllByType('button').find(button=>button.children.includes('Thử lại'));
@@ -358,7 +358,7 @@ test('failed public recovery keeps a translated warning and coalesces retries un
  const gate=deferred();h.backend.publicPending=gate;h.backend.publicError=false;
  let first,second;
  await act(async()=>{retry.props.onClick();first=h.site.reconnect();second=h.site.reconnect();await delay(5);});
- assert.equal(h.backend.publicCalls.length,12);
+ assert.equal(h.backend.publicCalls.length,14);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Đang cập nhật tin đăng/);
  gate.resolve();await act(async()=>{await Promise.all([first,second]);await delay(5);});
  assert.equal(h.site.backendError,false);assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
@@ -368,7 +368,7 @@ test('an offline reload waits for the online event before recovering public cont
  const h=await harness(t,{guest:true,publicOnly:true,initialError:true,offline:true});
  assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,0);
  await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(10);});
- assert.equal(h.backend.publicCalls.length,6);assert.equal(h.site.backendError,false);
+ assert.equal(h.backend.publicCalls.length,7);assert.equal(h.site.backendError,false);
 });
 
 test('Studio refresh clears the fallback warning and a late public read cannot replace drafts or unsaved edits',async t=>{
@@ -401,7 +401,7 @@ test('healthy public reloads and session recovery do not make redundant content 
 
 test('public listing recovery does not wait for a stalled login session',async t=>{
  const gate=deferred(),h=await harness(t,{customer:true,publicOnly:true,initialError:true,authPending:gate});
- assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,6);
+ assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,7);
  gate.resolve({data:{session:authSession('customer')},error:null});
  await act(async()=>{await delay(5);});assert.equal(h.site.sessionPhase,'ready');
 });
@@ -598,7 +598,7 @@ test('opening an enquiry persists read state and preserves a note edited while t
 });
 test('listing deletion requires explicit confirmation, removes the listing and is unavailable to editors',async t=>{
  const h=await harness(t);
- await act(async()=>h.renderer.root.findByProps({'aria-label':'Properties'}).props.onClick());
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  const target=h.site.content.properties[0].id;
  const deleteButton=h.renderer.root.findAllByType('button').find(n=>n.props.className==='text-danger');assert.ok(deleteButton);
  await act(async()=>deleteButton.props.onClick());assert.equal(h.backend.rpcCalls.filter(c=>c.name==='delete_property').length,0);
@@ -611,13 +611,13 @@ test('listing deletion requires explicit confirmation, removes the listing and i
 });
 test('editors can read enquiries but cannot see destructive listing or enquiry actions',async t=>{
  const h=await harness(t,{role:'editor'});
- await act(async()=>h.renderer.root.findByProps({'aria-label':'Properties'}).props.onClick());
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  assert.equal(h.renderer.root.findAllByType('button').some(n=>n.props.className==='text-danger'),false);
 });
 
 
 test('a stale property editor updates its original record and cannot insert a listing removed by another session',async t=>{
- const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Properties'}).props.onClick());
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  const target=h.site.content.properties[0].id;
  await act(async()=>h.renderer.root.findAllByType('button').find(n=>n.children.includes('Edit')).props.onClick());
  h.backend.writeErrors.set('properties',{code:'PGRST116',message:'No row found'});
@@ -947,4 +947,42 @@ test('commercial enquiries preserve their draft through translation and send the
 test('Vinhomes enquiries carry the exact apartment reference and still require a customer message',async t=>{
  const h=await harness(t,{customer:true,page:'contact',url:'https://gary.example/contact?project=smart-city',path:'/contact'}),form=h.renderer.root.findByType('form');assert.match(JSON.stringify(h.renderer.toJSON()),/Vinhomes Smart City · S403 · GH202/);const fields={name:'A customer',email:'customer@example.invalid',message:'',consent:'on',website:''};await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts?.length||0,0);
  fields.message='Please arrange a viewing for this home.';await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts.length,1);assert.equal(h.backend.enquiryPosts[0].data.message,'Vinhomes Smart City · S403 · GH202\n\nPlease arrange a viewing for this home.');assert.equal(h.backend.enquiryPosts[0].headers.get('authorization'),'Bearer test-token');
+});
+
+
+test('Studio groups listings and galleries under rentals and separates assistance and editorial work',async t=>{
+ const h=await harness(t),nav=h.renderer.root.findByProps({className:'branched-menu studio-branched-menu'});
+ const children=label=>nav.findByProps({'aria-label':label}).parent.findAllByType('button').map(n=>n.props['data-id']).filter(Boolean);
+ assert.deepEqual(children('Rentals & content'),['properties','landlords','neighbourhoods','rental-content']);assert.deepEqual(children('Customer care'),['enquiries','customers','feedback']);assert.deepEqual(children('Assistance & publishing'),['assistance','news','tips']);
+ assert.equal(nav.findAllByProps({'data-id':'media'}).length,0);
+ await act(async()=>nav.findByProps({'aria-label':'Listings'}).props.onClick());const workspace=h.renderer.root.findByProps({'aria-label':'Listing workspace'});await act(async()=>workspace.findAllByType('button')[1].props.onClick());assert.ok(h.renderer.root.findByProps({className:'admin-media-grid'}));assert.equal(nav.findByProps({'aria-label':'Listings'}).props['aria-current'],'page');
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findAllByProps({'aria-label':'Hỗ trợ & biên tập'}).length,1);assert.equal(h.renderer.root.findAllByProps({'aria-label':'Thành viên & thư viện'}).length,1);
+});
+
+test('gallery sections separate feedback screenshots and retain a feedback draft across tabs and translation',async t=>{
+ const h=await harness(t);await act(async()=>h.site.setContent(previous=>({...previous,activities:JSON.parse(fs.readFileSync(path.join(base,'data/activities.json'),'utf8'))})));
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'People & galleries'}).props.onClick());const gallery=()=>h.renderer.root.findByProps({className:'rental-cms'}),tabs=()=>gallery().findByProps({'aria-label':h.site.language==='vi'?'Mục nội dung':'Content section'}).findAllByType('button');assert.equal(tabs().length,3);assert.equal(gallery().findAllByProps({className:'rental-cms-row'}).length,17);
+ await act(async()=>tabs()[2].props.onClick());assert.equal(gallery().findAllByProps({className:'rental-cms-row'}).length,1);await act(async()=>gallery().findByProps({className:'rental-cms-row'}).props.onClick());const caption=gallery().findAllByType('textarea')[0];await act(async()=>caption.props.onChange({target:{value:'Approved screenshot caption draft'}}));await act(async()=>tabs()[1].props.onClick());await act(async()=>tabs()[2].props.onClick());assert.equal(gallery().findAllByType('textarea')[0].props.value,'Approved screenshot caption draft');await act(async()=>h.site.setLanguage('vi'));assert.equal(gallery().findAllByType('textarea')[0].props.value,'Approved screenshot caption draft');
+ await act(async()=>{gallery().findByType('form').props.onSubmit({preventDefault(){}});await delay(10);});assert.equal(h.backend.calls.filter(c=>c.table==='site_activities').at(-1).payload.category,'feedback');
+});
+
+test('news drafts survive language and session refresh, save privately and clear from public content after sign-out',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'News articles'}).props.onClick());await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('New article')).props.onClick());const form=h.renderer.root.findByType('form');await act(async()=>{form.findByProps({name:'article_slug'}).props.onChange({target:{value:'private-editorial-ui-test'}});form.findByProps({name:'article_title_en'}).props.onChange({target:{value:'Private unfinished news draft'}});});
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('form'),form);assert.equal(form.findByProps({name:'article_title_en'}).props.value,'Private unfinished news draft');await act(async()=>{await h.site.refresh();await delay(5);});assert.equal(form.findByProps({name:'article_title_en'}).props.value,'Private unfinished news draft');
+ await act(async()=>{form.props.onSubmit({preventDefault(){}});await delay(10);});const saved=h.backend.calls.filter(c=>c.table==='editorial_articles').at(-1);assert.equal(saved.method,'insert');assert.equal(saved.payload.status,'draft');assert.equal(saved.payload.kind,'news');assert.ok(h.site.content.editorial.some(row=>row.slug==='private-editorial-ui-test'));await h.emit(null);assert.ok(h.site.content.editorial.every(row=>row.status==='published'));assert.ok(!h.site.content.editorial.some(row=>row.slug==='private-editorial-ui-test'));
+});
+
+test('rental-tip edits made during a slow save remain a draft with the latest concurrency timestamp',async t=>{
+ const h=await harness(t,{role:'manager'});await act(async()=>h.renderer.root.findByProps({'aria-label':'Rental tips'}).props.onClick());await act(async()=>h.renderer.root.findByProps({className:'admin-panel editorial-list'}).findAllByType('button')[0].props.onClick());const form=()=>h.renderer.root.findByType('form');assert.ok(!form().findAllByType('button').some(b=>b.children.includes('Delete article')));const current=h.site.content.editorial.find(row=>row.slug===form().findByProps({name:'article_slug'}).props.value),pending=deferred(),stamp='2026-10-26T18:00:00.123456Z';h.backend.writes.set('editorial_articles',pending);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});await act(async()=>form().findByProps({name:'article_title_en'}).props.onChange({target:{value:'A newer unsaved rental tip title'}}));await act(async()=>{pending.resolve({data:{...current,updated_at:stamp},error:null});await delay(10);});assert.equal(form().findByProps({name:'article_title_en'}).props.value,'A newer unsaved rental tip title');h.backend.writes.delete('editorial_articles');await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});const calls=h.backend.calls.filter(c=>c.table==='editorial_articles');assert.equal(calls.length,2);assert.equal(calls[1].filters.updated_at,stamp);assert.equal(calls[1].payload.title_en,'A newer unsaved rental tip title');
+});
+
+test('editorial publication errors translate in place and preserve the incomplete draft',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'News articles'}).props.onClick());await act(async()=>h.renderer.root.findByProps({className:'admin-panel editorial-list'}).findAllByType('button')[0].props.onClick());const form=h.renderer.root.findByType('form');await act(async()=>form.findByProps({name:'article_title_vi'}).props.onChange({target:{value:''}}));await act(async()=>{form.props.onSubmit({preventDefault(){}});await delay(5);});assert.match(JSON.stringify(h.renderer.root.findByProps({role:'alert'}).children),/Before publishing/);assert.equal(h.backend.calls.filter(c=>c.table==='editorial_articles').length,0);await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('form'),form);assert.equal(form.findByProps({name:'article_title_vi'}).props.value,'');assert.match(JSON.stringify(h.renderer.root.findByProps({role:'alert'}).children),/Trước khi đăng/);
+});
+
+
+test('fresh editorial page props update a persistent public snapshot without discarding private staff drafts',async t=>{
+ const original=fixture.editorial[0],newRow={...original,id:'fresh-public-story',slug:'fresh-public-story',title_en:'Freshly published story'},serverRows=[...fixture.editorial,newRow],draft={...original,id:'private-draft',slug:'private-draft',status:'draft',title_en:'Private local article'};
+ const h=await harness(t,{page:'tips',editorialPageRows:serverRows,deferPage:true});await act(async()=>h.site.setContent(previous=>({...previous,editorial:[...fixture.editorial,draft]})));await h.mountPage();assert.ok(h.site.content.editorial.some(a=>a.id===newRow.id));assert.ok(h.site.content.editorial.some(a=>a.id===draft.id));assert.ok(h.renderer.root.findAllByType('a').some(a=>a.props.href==='/tips-and-news/fresh-public-story'));const before=h.backend.privateReads.filter(table=>table==='editorial_articles').length;await act(async()=>h.site.setLanguage('vi'));assert.equal(h.backend.privateReads.filter(table=>table==='editorial_articles').length,before);await h.emit(null);assert.ok(h.site.content.editorial.some(a=>a.id===newRow.id));assert.ok(!h.site.content.editorial.some(a=>a.id===draft.id));
 });

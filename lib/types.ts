@@ -1,3 +1,4 @@
+import type { EditorialArticle } from "./editorial";
 export type Language = "en" | "vi";
 export type Property = {
   id: string; slug: string; title_en: string; title_vi: string;
@@ -59,4 +60,4 @@ export type SiteActivity = {
 };
 export type PropertyOrderScope="home"|"listings";
 export type PropertyOrders=Partial<Record<PropertyOrderScope,string[]>>;
-export type Content = { propertyOrders?:PropertyOrders; properties: Property[]; neighbourhoods: Neighbourhood[]; settings: Settings; authors?: ListingAuthor[]; activities?: SiteActivity[] };
+export type Content = { editorial?:EditorialArticle[]; propertyOrders?:PropertyOrders; properties: Property[]; neighbourhoods: Neighbourhood[]; settings: Settings; authors?: ListingAuthor[]; activities?: SiteActivity[] };

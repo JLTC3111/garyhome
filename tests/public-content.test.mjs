@@ -7,14 +7,14 @@ import { createClient } from '@supabase/supabase-js';
 import { ContentReadError, readPublishedContent } from '../lib/public-content.ts';
 import { fetchWithDeadline } from '../lib/requests.ts';
 
-const content={properties:[{id:'published-home',status:'published',images:[]}],neighbourhoods:[{slug:'tay-ho',image:''}],settings:{id:'main',hero_title_en:'Live data',hero_image:''},authors:[],activities:[],propertyOrders:{}};
+const content={editorial:[],properties:[{id:'published-home',status:'published',images:[]}],neighbourhoods:[{slug:'tay-ho',image:''}],settings:{id:'main',hero_title_en:'Live data',hero_image:''},authors:[],activities:[],propertyOrders:{}};
 function database(fetch){return createClient('https://public-content-test.invalid','sb_publishable_test',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch}});}
-function responseFor(input){const table=new URL(input).pathname.split('/').at(-1);return Response.json(table==='site_settings'?content.settings:table==='listing_authors'?content.authors:table==='site_activities'?content.activities:table==='property_display_orders'?[]:content[table]);}
+function responseFor(input){const table=new URL(input).pathname.split('/').at(-1);return Response.json(table==='site_settings'?content.settings:table==='listing_authors'?content.authors:table==='site_activities'?content.activities:table==='property_display_orders'?[]:table==='editorial_articles'?content.editorial:content[table]);}
 
 test('the real SDK loads only published homes and the main public settings',async()=>{
  const calls=[];
  const result=await readPublishedContent(database(async(input,init)=>{calls.push({url:new URL(input),method:init.method});return responseFor(input);}));
- assert.deepEqual(result,content);assert.equal(calls.length,6);assert.ok(calls.every(call=>call.method==='GET'));
+ assert.deepEqual(result,content);assert.equal(calls.length,7);assert.ok(calls.every(call=>call.method==='GET'));
  assert.equal(calls.find(call=>call.url.pathname.endsWith('/properties')).url.searchParams.get('status'),'eq.published');
  assert.equal(calls.find(call=>call.url.pathname.endsWith('/site_settings')).url.searchParams.get('id'),'eq.main');
 });
@@ -47,7 +47,7 @@ test('public recovery cancellation reaches every SDK read',async()=>{
  });
  const reading=readPublishedContent(db,controller.signal);
  await new Promise(resolve=>setTimeout(resolve,5));controller.abort();
- await assert.rejects(reading,ContentReadError);assert.equal(signals.length,6);assert.ok(signals.every(signal=>signal.aborted));
+ await assert.rejects(reading,ContentReadError);assert.equal(signals.length,7);assert.ok(signals.every(signal=>signal.aborted));
 });
 
 test('browser public recovery ignores stored staff tokens and login callback URLs',async t=>{
@@ -66,6 +66,6 @@ test('browser public recovery ignores stored staff tokens and login callback URL
  const db=loaded.exports.publicBrowserClient('https://public-content-test.invalid','sb_publishable_test');
  assert.equal((await db.auth.getSession()).data.session,null);
  assert.deepEqual(await readPublishedContent(db),content);
- assert.equal(storedReads.length,0);assert.equal(calls.length,6);
+ assert.equal(storedReads.length,0);assert.equal(calls.length,7);
  assert.ok(calls.every(call=>call.url.pathname.startsWith('/rest/v1/')&&call.headers.get('apikey')==='sb_publishable_test'&&!call.headers.get('authorization')?.includes('staff-private-token')));
 });

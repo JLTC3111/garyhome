@@ -164,7 +164,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
     const generation = state.generation, startedVersion = version.current;
     if (refreshFlight.current?.generation === generation) return refreshFlight.current.promise;
     const promise = (async () => {
-      const [p, n, s, a, act, e, orders] = await request(signal => Promise.all([
+      const [p, n, s, a, act, e, orders, articles] = await request(signal => Promise.all([
         db.from("properties").select("*").order("sort_order").abortSignal(signal),
         db.from("neighbourhoods").select("*").order("sort_order").abortSignal(signal),
         db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
@@ -172,14 +172,15 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
         db.from("site_activities").select("*").order("sort_order").abortSignal(signal),
         db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes,read_at,read_by,property_code,property_address)`).order("created_at", { ascending: false }).abortSignal(signal),
         db.from("property_display_orders").select("scope,property_ids").abortSignal(signal),
+        db.from("editorial_articles").select("*").order("updated_at",{ascending:false}).abortSignal(signal),
       ]));
       const current = sessionRef.current?.state;
       if (current?.generation !== generation || !current.editor || current.user?.id !== state.user?.id) return;
-      if (p.error || n.error || s.error || e.error || a.error || act.error || orders.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
+      if (p.error || n.error || s.error || e.error || a.error || act.error || orders.error || articles.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
       // A slow background read must not overwrite a save that completed meanwhile.
       if (startedVersion !== version.current) return;
-      updateContent(contentAssets({ properties: p.data, neighbourhoods: n.data, settings: s.data, authors:a.data||[],activities:act.data||[],propertyOrders:propertyOrders(orders.data) } as Content));
-      initialRef.current = contentAssets({ properties: p.data.filter(isPublicRental), neighbourhoods: n.data, settings: s.data,authors:(a.data||[]).filter(row=>row.published),activities:(act.data||[]).filter(row=>row.published),propertyOrders:propertyOrders(orders.data) } as Content);
+      updateContent(contentAssets({ editorial:articles.data||[], properties: p.data, neighbourhoods: n.data, settings: s.data, authors:a.data||[],activities:act.data||[],propertyOrders:propertyOrders(orders.data) } as Content));
+      initialRef.current = contentAssets({ editorial:(articles.data||[]).filter(row=>row.status==="published"), properties: p.data.filter(isPublicRental), neighbourhoods: n.data, settings: s.data,authors:(a.data||[]).filter(row=>row.published),activities:(act.data||[]).filter(row=>row.published),propertyOrders:propertyOrders(orders.data) } as Content);
       publicContentNeeded.current = false;
       setBackendError(false);
       updateEnquiries(e.data.map(row => {
@@ -372,7 +373,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
     updateContent(previous => {
       const value = typeof next === "function" ? next(previous) : next;
       if (demo) { try { localStorage.setItem("gary-preview-content", JSON.stringify(value)); } catch { setToast("Browser storage is full. Changes are only kept for this session."); } }
-      else initialRef.current={...value,properties:value.properties.filter(isPublicRental),authors:(value.authors||[]).filter(row=>row.published),activities:(value.activities||[]).filter(row=>row.published)};
+      else initialRef.current={...value,editorial:(value.editorial||[]).filter(row=>row.status==="published"),properties:value.properties.filter(isPublicRental),authors:(value.authors||[]).filter(row=>row.published),activities:(value.activities||[]).filter(row=>row.published)};
       return value;
     });
   }, [demo]);

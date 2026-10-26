@@ -6,7 +6,7 @@ button[data-squish-switch]{display:inline-flex;align-items:center;justify-conten
 .squish-switch-options{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;place-items:center;font-size:11px;font-weight:600;color:#53674b}
 .squish-switch-thumb{position:absolute;top:4px;left:4px;width:calc(var(--switch-height) - 8px);height:calc(var(--switch-height) - 8px);display:grid;place-items:center;transform:translateX(0);transition:transform var(--switch-duration) cubic-bezier(.22,1.35,.36,1)}
 [data-squish-switch][aria-checked=true] .squish-switch-thumb{transform:translateX(var(--switch-travel))}
-.squish-switch-blob{position:absolute;inset:0;border-radius:50%;background:#314f3e;box-shadow:0 2px 4px #1d342122;transition:background-color var(--switch-color-duration) ease,scale var(--switch-duration) ease}
+.squish-switch-blob{position:absolute;inset:0;border-radius:50%;background:var(--navy-blue);box-shadow:0 2px 4px #1d342122;transition:background-color var(--switch-color-duration) ease,scale var(--switch-duration) ease}
 .squish-switch-current{position:relative;font-size:10px;font-weight:700;color:#fffef8;z-index:1}
 [data-squish-active=true][aria-checked=true] .squish-switch-blob{animation:squish-switch-on var(--switch-duration) both}
 [data-squish-active=true][aria-checked=false] .squish-switch-blob{animation:squish-switch-off var(--switch-duration) both}
@@ -26,21 +26,21 @@ button.language-toggle-light[data-squish-switch]{color:#fffef8}
 .district-gallery-note{font-size:12px;line-height:1.9;color:#56694f;max-width:560px;margin-bottom:18px}
 .bounce-cards{list-style:none;margin:0 auto;padding:18px 4px 10px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;isolation:isolate}
 .bounce-card{min-width:0}
-.bounce-card-link{position:relative;display:block;aspect-ratio:3/4;border:var(--bounce-border) solid var(--bounce-border-color);border-radius:var(--bounce-radius);overflow:hidden;background:#314f3e}
+.bounce-card-link{position:relative;display:block;aspect-ratio:1;border:var(--bounce-border) solid var(--bounce-border-color);border-radius:var(--bounce-radius);overflow:hidden;background:#314f3e}
 [data-shadow=true] .bounce-card-link{box-shadow:0 14px 28px #23372820}
 .bounce-card-link>img{width:100%;height:100%;object-fit:cover;transition:filter 200ms ease}
 .bounce-card-caption{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 20px;background:linear-gradient(0deg,#12291df0,#12291d35 58%,transparent 80%);color:#fff}
-.bounce-card-caption h3{font-size:31px;line-height:1.25;margin:0 0 10px;color:#fff}
+.bounce-card-caption h3{font-size:26px;line-height:1.25;margin:0 0 10px;color:#fff}
 .bounce-card-caption p{font-size:11px;line-height:1.8;margin:0 0 12px;color:#eff1e5}
 .bounce-card-caption small{font-size:10px;line-height:1.7;font-weight:600;display:flex;align-items:center;gap:7px;color:#fff}
 .bounce-card-link:focus-visible{outline:3px solid #b7603c;outline-offset:5px}
 @media(min-width:900px) and (hover:hover) and (pointer:fine){
  .bounce-cards{display:block;position:relative;height:var(--bounce-height);padding:0}
- .bounce-card{position:absolute;top:50%;left:50%;width:var(--bounce-size);margin-left:calc(var(--bounce-size) / -2);margin-top:calc(var(--bounce-size) * -2 / 3)}
- .bounce-cards[data-in-view=true]:not([data-reduced-motion=true]) .bounce-card-link{animation:district-card-arrive 650ms cubic-bezier(.22,1.2,.36,1) var(--bounce-delay) backwards}
- .bounce-card-link:hover>img{filter:brightness(1.04)}
+ .bounce-card{position:absolute;top:50%;left:50%;width:var(--bounce-size);aspect-ratio:1;margin:0;transform-origin:center}
+ .bounce-card-link{width:100%;height:100%}.bounce-card-caption{padding:18px 15px}.bounce-card-caption p{display:none}[data-shadow=true] .bounce-card[data-active] .bounce-card-link{box-shadow:0 22px 44px -10px #23372855}
+ .bounce-card[data-active] .bounce-card-link>img{filter:brightness(1.04)}
 }
-@keyframes district-card-arrive{from{translate:0 38px;scale:.96}to{translate:0 0;scale:1}}
+
 @media(max-width:899px),(hover:none),(pointer:coarse){.bounce-card{transform:none!important;translate:none!important}.bounce-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.bounce-card-link{aspect-ratio:4/3}.bounce-card-caption h3{font-size:28px}.bounce-card-caption p{font-size:12px}}
 @media(max-width:480px){.bounce-cards{gap:13px;padding-inline:0}.bounce-card-link{aspect-ratio:3/4;border-width:3px;border-radius:19px}.bounce-card-caption{padding:17px 12px}.bounce-card-caption h3{font-size:24px}.bounce-card-caption p{font-size:10px;line-height:1.7}.bounce-card-caption small{font-size:9px;gap:4px}.district-gallery-note{font-size:11px}}
 /* Owner-supplied Vinhomes photographs and rental notes. */

@@ -8,7 +8,7 @@ import { useSite } from "./site-context";
 export function DocumentTitle() {
   const pathname = usePathname();
   const { language, content } = useSite();
-  const title = documentTitle(pathname, language, content.properties,content.neighbourhoods);
+  const title = documentTitle(pathname, language, content.properties,content.neighbourhoods,content.editorial);
 
   useLayoutEffect(() => {
     if (title === null) return;

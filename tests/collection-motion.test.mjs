@@ -21,7 +21,7 @@ function loader(site){
    if(id==='next/link')return {__esModule:true,default:({children,...props})=>React.createElement('a',props,children)};
    if(id==='../site-context'||id==='./site-context')return {useSite:()=>site.current};
    // Motion is a rendering boundary here; its spring targets are inspected below.
-   if(id==='motion/react')return {motion:{li:({children,...props})=>React.createElement('li',props,children)},useInView:()=>true};
+   if(id==='motion/react'){const li=({children,...props})=>React.createElement('li',props,children);return {m:{li},motion:{li},useInView:()=>true};}
    if(id.startsWith('.')||id.startsWith('@/')){const target=id.startsWith('@/')?path.join(root,id.slice(2)):path.resolve(path.dirname(file),id);return load([target,target+'.ts',target+'.tsx',target+'.json'].find(p=>fs.existsSync(p)&&fs.statSync(p).isFile()));}
    return require(id);
   };
@@ -52,18 +52,18 @@ test('the squish language switch changes language immediately, supports arrow ke
  await p.unmount();assert.equal(p.callbacks.size,0);
 });
 
-test('district bounce cards render genuine links in SSR, react to focus and release observers',async t=>{
+test('district cards render native links without a motion-provider dependency and clean up their observers',async t=>{
  const p=platform(t),load=loader({current:{}}),BounceCards=load(path.join(root,'components/react-bits/bounce-cards.tsx')).default;
  const cards=JSON.parse(fs.readFileSync(path.join(root,'data/site-content.json'),'utf8')).neighbourhoods.map(n=>({id:n.slug,href:'/homes?district='+n.slug,image:n.image,title:n.name,content:n.tagline_en}));
  const view=()=>React.createElement(BounceCards,{cards,label:'Hanoi districts'});
- const html=renderToString(view());for(const card of cards){assert.ok(html.includes('href="'+card.href+'"'));assert.ok(html.includes(card.title));}assert.ok(!html.includes('opacity:0'));
- const r=await p.mount(view(),node=>node.type==='ul'?{node:'district-list'}:null),list=()=>r.root.findByType('ul'),items=()=>r.root.findAllByType('li');
- assert.equal(list().props['data-reduced-motion'],false);assert.equal(items().length,cards.length);assert.equal(p.observers.length,1);
- await act(async()=>items()[1].props.onFocus());assert.equal(items()[1].props.animate.rotate,0);assert.equal(items()[1].props.animate.scale,1.06);
- const links=r.root.findAllByType('a');assert.deepEqual(links.map(n=>n.props.href),cards.map(n=>n.href));
- await act(async()=>p.observers[0].cb([{contentRect:{width:900}}]));for(const item of items())assert.ok(Math.abs(item.props.animate.x)+242*1.06/2<450);
- await act(async()=>{p.media.matches=true;for(const cb of p.callbacks)cb();});assert.equal(list().props['data-reduced-motion'],true);assert.equal(items()[1].props.animate.scale,1);assert.equal(items()[1].props.transition.duration,0);
- await p.unmount();assert.equal(p.callbacks.size,0);assert.equal(p.observers[0].closed,true);
+ const html=renderToString(view());for(const card of cards){assert.ok(html.includes('href="'+card.href+'"'));assert.ok(html.includes(card.title));}assert.ok(!html.includes('opacity:0'));assert.ok(!html.includes('scale(0)'));
+ const listeners=new Map(),rootNode={style:{setProperty(){}},getBoundingClientRect:()=>({width:839,left:0,top:1200,height:320}),addEventListener:(type,fn)=>listeners.set(type,fn),removeEventListener:type=>listeners.delete(type)};
+ const r=await p.mount(view(),node=>node.type==='ul'?rootNode:null),list=()=>r.root.findByType('ul');
+ assert.equal(list().props['data-reduced-motion'],false);assert.equal(r.root.findAllByType('li').length,cards.length);assert.equal(p.observers.length,1);
+ assert.deepEqual(r.root.findAllByType('a').map(n=>n.props.href),cards.map(n=>n.href));assert.ok(listeners.has('pointermove'));assert.ok(!listeners.has('pointerenter'));
+ await act(async()=>p.observers[0].cb([{contentRect:{width:900}}]));
+ await act(async()=>{p.media.matches=true;for(const cb of [...p.callbacks])cb();});assert.equal(list().props['data-reduced-motion'],true);
+ await p.unmount();assert.equal(p.callbacks.size,0);assert.ok(p.observers.every(o=>o.closed));assert.equal(listeners.size,0);
 });
 
 test('Vinhomes uses the supplied homes, original currency and local photos with no invented missing specifications',()=>{

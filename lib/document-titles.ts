@@ -1,7 +1,7 @@
 import type { Language, Property, Neighbourhood } from "./types";
 import { isPublicRental, propertyTitle } from "./rentals.ts";
 
-import { editorialArticles } from "./rental-guides.ts";
+import { publicArticles, articleText, type EditorialArticle } from "./editorial.ts";
 
 type TitleProperty = Property;
 const pageTitles: Record<string, readonly [string, string]> = {
@@ -26,7 +26,7 @@ const pageTitles: Record<string, readonly [string, string]> = {
   "/credits": ["Photo credits", "Nguồn ảnh"],
 };
 
-export function documentTitle(pathname: string | null, language: Language, properties: readonly TitleProperty[],neighbourhoods: readonly Pick<Neighbourhood,"slug"|"name">[] = []): string | null {
+export function documentTitle(pathname: string | null, language: Language, properties: readonly TitleProperty[],neighbourhoods: readonly Pick<Neighbourhood,"slug"|"name">[] = [], articles?: readonly EditorialArticle[]): string | null {
   // The router can briefly have no pathname while restoring a route.
   if (pathname === null) return null;
   const path = pathname.replace(/\/+$/, "") || "/";
@@ -35,7 +35,7 @@ export function documentTitle(pathname: string | null, language: Language, prope
   const page = pageTitles[path];
   if (page) return `${page[vi ? 1 : 0]} | Gary Home`;
 
-  const guide=editorialArticles.find(item=>path==="/tips-and-news/"+item.slug);if(guide)return `${guide.title[vi?1:0]} | Gary Home`;
+  const guide=publicArticles(articles).find(item=>path==="/tips-and-news/"+item.slug);if(guide)return `${articleText(guide,"title",language)} | Gary Home`;
   const match = /^\/homes\/([^/]+)$/.exec(path);
   if (match) {
     let slug: string;

@@ -16,6 +16,7 @@ import "./password-access.css";
 import "./team-experience.css";
 import "./studio-navigation.css";
 import "./about-pages.css";
+import "./collection-motion.css";
 import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";
 import { Header, Footer } from "@/components/site-shell";

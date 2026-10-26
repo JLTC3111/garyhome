@@ -1,0 +1,95 @@
+/* Squish Switch: only the control animates; translations update immediately. */
+button[data-squish-switch]{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;min-height:44px;min-width:80px;padding:3px 2px;border:0;background:transparent;color:#314f3e;line-height:1;cursor:pointer;touch-action:manipulation}
+.rental-band-contact>button[data-squish-switch]{padding:3px 2px;border:0;min-height:44px;font-size:11px}
+.squish-switch-track{position:relative;display:block;width:var(--switch-width);height:var(--switch-height);border-radius:var(--switch-radius);background:var(--switch-track);box-shadow:inset 0 0 0 1px #8c9e7b50;transition:background-color var(--switch-color-duration) ease}
+[data-squish-switch][aria-checked=true] .squish-switch-track{background:var(--switch-track-on)}
+.squish-switch-options{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;place-items:center;font-size:11px;font-weight:600;color:#53674b}
+.squish-switch-thumb{position:absolute;top:4px;left:4px;width:calc(var(--switch-height) - 8px);height:calc(var(--switch-height) - 8px);display:grid;place-items:center;transform:translateX(0);transition:transform var(--switch-duration) cubic-bezier(.22,1.35,.36,1)}
+[data-squish-switch][aria-checked=true] .squish-switch-thumb{transform:translateX(var(--switch-travel))}
+.squish-switch-blob{position:absolute;inset:0;border-radius:50%;background:#314f3e;box-shadow:0 2px 4px #1d342122;transition:background-color var(--switch-color-duration) ease,scale var(--switch-duration) ease}
+.squish-switch-current{position:relative;font-size:10px;font-weight:700;color:#fffef8;z-index:1}
+[data-squish-active=true][aria-checked=true] .squish-switch-blob{animation:squish-switch-on var(--switch-duration) both}
+[data-squish-active=true][aria-checked=false] .squish-switch-blob{animation:squish-switch-off var(--switch-duration) both}
+[data-squish-switch]:focus-visible{outline:2px solid #b7603c;outline-offset:3px;border-radius:24px}
+[data-squish-switch]:disabled{opacity:.45;cursor:default}
+button.language-toggle-light[data-squish-switch]{color:#fffef8}
+.mobile-nav-language>button[data-squish-switch]{padding:3px 2px;border:0;border-radius:24px;min-height:44px}
+.language-toggle-light .squish-switch-track{box-shadow:inset 0 0 0 1px #bdcbb89c}
+@keyframes squish-switch-on{0%{transform:scale(1)}35%{transform:scaleX(var(--switch-stretch)) scaleY(.86)}70%{transform:scaleX(.88) scaleY(1.1)}100%{transform:scale(1)}}
+@keyframes squish-switch-off{0%{transform:scale(1)}35%{transform:scaleX(var(--switch-stretch)) scaleY(.86)}70%{transform:scaleX(.88) scaleY(1.1)}100%{transform:scale(1)}}
+@media(hover:hover) and (pointer:fine){button[data-squish-switch]:hover{background:transparent}.squish-switch-track:hover .squish-switch-blob{scale:var(--switch-hover-scale)}}
+.about-navigation>button>svg{transition:transform 320ms cubic-bezier(.22,.8,.25,1);transform:rotate(0)}
+.about-navigation>button[aria-expanded=true]>svg{transform:rotate(-180deg)}
+/* Districts remain real links; touch screens receive a readable grid. */
+.bounce-district-section{background:#f0f1e8;overflow:clip}
+.bounce-district-section .section-heading{margin-bottom:12px}
+.district-gallery-note{font-size:12px;line-height:1.9;color:#56694f;max-width:560px;margin-bottom:18px}
+.bounce-cards{list-style:none;margin:0 auto;padding:18px 4px 10px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;isolation:isolate}
+.bounce-card{min-width:0}
+.bounce-card-link{position:relative;display:block;aspect-ratio:3/4;border:var(--bounce-border) solid var(--bounce-border-color);border-radius:var(--bounce-radius);overflow:hidden;background:#314f3e}
+[data-shadow=true] .bounce-card-link{box-shadow:0 14px 28px #23372820}
+.bounce-card-link>img{width:100%;height:100%;object-fit:cover;transition:filter 200ms ease}
+.bounce-card-caption{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 20px;background:linear-gradient(0deg,#12291df0,#12291d35 58%,transparent 80%);color:#fff}
+.bounce-card-caption h3{font-size:31px;line-height:1.25;margin:0 0 10px;color:#fff}
+.bounce-card-caption p{font-size:11px;line-height:1.8;margin:0 0 12px;color:#eff1e5}
+.bounce-card-caption small{font-size:10px;line-height:1.7;font-weight:600;display:flex;align-items:center;gap:7px;color:#fff}
+.bounce-card-link:focus-visible{outline:3px solid #b7603c;outline-offset:5px}
+@media(min-width:900px) and (hover:hover) and (pointer:fine){
+ .bounce-cards{display:block;position:relative;height:var(--bounce-height);padding:0}
+ .bounce-card{position:absolute;top:50%;left:50%;width:var(--bounce-size);margin-left:calc(var(--bounce-size) / -2);margin-top:calc(var(--bounce-size) * -2 / 3)}
+ .bounce-cards[data-in-view=true]:not([data-reduced-motion=true]) .bounce-card-link{animation:district-card-arrive 650ms cubic-bezier(.22,1.2,.36,1) var(--bounce-delay) backwards}
+ .bounce-card-link:hover>img{filter:brightness(1.04)}
+}
+@keyframes district-card-arrive{from{translate:0 38px;scale:.96}to{translate:0 0;scale:1}}
+@media(max-width:899px),(hover:none),(pointer:coarse){.bounce-card{transform:none!important;translate:none!important}.bounce-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.bounce-card-link{aspect-ratio:4/3}.bounce-card-caption h3{font-size:28px}.bounce-card-caption p{font-size:12px}}
+@media(max-width:480px){.bounce-cards{gap:13px;padding-inline:0}.bounce-card-link{aspect-ratio:3/4;border-width:3px;border-radius:19px}.bounce-card-caption{padding:17px 12px}.bounce-card-caption h3{font-size:24px}.bounce-card-caption p{font-size:10px;line-height:1.7}.bounce-card-caption small{font-size:9px;gap:4px}.district-gallery-note{font-size:11px}}
+/* Owner-supplied Vinhomes photographs and rental notes. */
+.vinhomes-collection{padding-block:75px}
+.vinhomes-collection .section-heading>div{max-width:680px}
+.vinhomes-collection .section-heading p{max-width:620px}
+.vinhomes-collection-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:25px}
+.vinhomes-card{min-width:0;background:#fff;border:1px solid #dce3d5;border-radius:20px;overflow:hidden;display:flex;flex-direction:column}
+.vinhomes-card-cover{display:block;overflow:hidden;background:#e7eade}
+.vinhomes-card-cover img{width:100%;aspect-ratio:4/3;object-fit:cover;transition:transform 350ms ease}
+.vinhomes-card-body{padding:26px;display:flex;flex-direction:column;align-items:flex-start;flex:1}
+.vinhomes-card-body>.eyebrow{font-size:10px;letter-spacing:.06em;line-height:1.7}
+.vinhomes-card h3{font-size:31px;line-height:1.22;margin:13px 0 14px}
+.vinhomes-card p{font-size:12px;line-height:1.85;color:#586c50;margin-bottom:13px}
+.vinhomes-card .vinhomes-rent{font-size:15px;font-weight:600;color:var(--green)}
+.vinhomes-card-body>.text-link{margin-top:auto;padding-top:10px}
+.vinhomes-collection-note{margin-top:20px;font-size:11px;line-height:1.9;color:#5a6b52}
+.vinhomes-page .page-intro{max-width:800px}
+.vinhomes-project{scroll-margin-top:175px;margin-top:65px;padding-top:40px;border-top:1px solid #dbe1d2}
+.vinhomes-project>header{display:flex;align-items:center;justify-content:space-between;gap:25px;margin-bottom:25px}
+.vinhomes-project h2{font-size:40px;line-height:1.25;margin:10px 0}
+.vinhomes-project>header p{font-size:13px;line-height:1.9;color:#5b6d52}
+.vinhomes-project .rental-gallery-grid{height:430px}
+.vinhomes-project-details{display:grid;grid-template-columns:1.5fr 1fr;gap:35px;align-items:start;margin-top:27px}
+.vinhomes-project-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:0;padding:27px;border:1px solid #dce3d4;border-radius:15px;background:#fff}
+.vinhomes-project-facts dt{font-size:10px;line-height:1.7;color:#5b6e50;margin-bottom:7px}
+.vinhomes-project-facts dd{font-size:14px;line-height:1.8;color:#304d36;margin:0;font-weight:500}
+.vinhomes-project-enquiry{padding:27px;background:#eaf0e1;border:1px solid #d6e1c7;border-radius:15px}
+.vinhomes-project-enquiry>strong{font-size:23px;color:#314f3e;line-height:1.5}
+.vinhomes-project-enquiry>p{font-size:12px;line-height:1.9;color:#4f6744;margin:12px 0 20px}
+.vinhomes-project-enquiry>.button{font-size:12px;white-space:normal}
+/* Restaurant and office consultancy lives within the existing services page. */
+.commercial-consultancy{margin-top:75px;padding:40px;background:#edf1e5;border:1px solid #dce5d0;border-radius:20px;scroll-margin-top:170px}
+.commercial-consultancy>header{max-width:740px}
+.commercial-consultancy h2{font-size:38px;line-height:1.22;margin:15px 0 18px}
+.commercial-consultancy>header p{font-size:14px;line-height:1.95;color:#4f6645}
+.commercial-consultancy-grid{display:grid;grid-template-columns:1fr 1fr;gap:25px;margin-top:30px}
+.commercial-consultancy-grid>article{background:#fffefb;border:1px solid #dce3d3;border-radius:13px;padding:28px;min-width:0}
+.commercial-consultancy-grid>article>svg{color:#a85d3d}
+.commercial-consultancy h3{font-size:30px;line-height:1.25;margin:18px 0}
+.commercial-consultancy ul{list-style:none;padding:0;margin:0 0 25px;display:flex;flex-direction:column;gap:14px}
+.commercial-consultancy li{font-size:13px;line-height:1.85;color:#4d6346;padding-left:16px;position:relative}
+.commercial-consultancy li::before{content:"";position:absolute;left:0;top:.75em;width:5px;height:5px;border-radius:50%;background:#b86b48}
+.commercial-consultancy .text-link{font-size:12px;line-height:1.8}
+.contact-enquiry-context{padding:15px 18px;background:#eff2e6;border-left:3px solid #8ba773;border-radius:6px;color:#3c5734;font-size:12px;line-height:1.9}
+@media(hover:hover){.vinhomes-card-cover:hover img{transform:scale(1.035)}}
+@media(max-width:1200px){.mobile-nav-portals{grid-template-columns:1fr 1fr}.rental-site-header .mobile-nav-portals>.staff-login-link{color:#63725a;background:#f3f5ed}}
+@media(max-width:900px){.vinhomes-collection-grid{gap:16px}.vinhomes-card-body{padding:21px}.vinhomes-card h3{font-size:27px}.vinhomes-project-details{grid-template-columns:1fr}.commercial-consultancy{padding:30px}.commercial-consultancy-grid{gap:18px}.commercial-consultancy-grid>article{padding:23px}}
+@media(max-width:680px){.vinhomes-collection{padding-block:48px}.vinhomes-collection-grid{grid-template-columns:1fr}.vinhomes-card-cover img{max-height:330px}.vinhomes-card h3{font-size:32px}.vinhomes-project{margin-top:42px;padding-top:30px}.vinhomes-project>header{align-items:flex-start;flex-direction:column;gap:10px}.vinhomes-project h2{font-size:34px}.vinhomes-project .rental-gallery-grid{height:290px}.vinhomes-project-facts{grid-template-columns:1fr 1fr;padding:22px;gap:22px 16px}.vinhomes-project-enquiry{padding:23px}.commercial-consultancy{padding:25px 20px;margin-top:50px}.commercial-consultancy h2{font-size:31px}.commercial-consultancy-grid{grid-template-columns:1fr}.commercial-consultancy h3{font-size:29px}}
+@media(max-width:380px){.mobile-nav-portals{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){[data-squish-switch] *, .about-navigation>button>svg,.bounce-card-link,.vinhomes-card-cover img{transition:none!important;animation:none!important}.squish-switch-blob{scale:1!important}.bounce-cards{display:grid;height:auto;padding:18px 4px 10px}.bounce-card{position:relative;top:auto;left:auto;width:auto;margin:0;transform:none!important}}
+[data-squish-switch][data-reduced-motion=true] *{transition:none!important;animation:none!important}

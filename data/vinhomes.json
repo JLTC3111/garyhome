@@ -1,0 +1,84 @@
+[
+  {
+    "slug": "gardenia",
+    "name": "Vinhomes Gardenia",
+    "location": [
+      "Mỹ Đình · Nam Từ Liêm",
+      "Mỹ Đình · Nam Từ Liêm"
+    ],
+    "building": "A1",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "areaSqm": 106,
+    "rentVnd": 21000000,
+    "leaseMonths": 12,
+    "depositMonths": 1,
+    "paymentMonths": 3,
+    "images": [
+      "/vinhomes_affiliation/gardenia/1793001532483_250296199991685643_250296199991685643_2a0ab84926b18d480d933767a54c364f.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532427_250296199991685643_250296199991685643_6cf428f5e8fbb1dfbcaef9ba84943c79.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532444_250296199991685643_250296199991685643_cbb8df51e68cd14991818a04ad00e7f9.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532452_250296199991685643_250296199991685643_70df71657cae5f53ce67cc2d39bd734c.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532457_250296199991685643_250296199991685643_ac8d12ec07665a7dd188d0532444029e.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532470_250296199991685643_250296199991685643_2c695829b8939e2bb5fc765d9ca379a0.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532472_250296199991685643_250296199991685643_5b5c28136f67521f75b6e41a561c2d2f.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532475_250296199991685643_250296199991685643_ee57c1677941070bc544c96b66dfb283.jpg",
+      "/vinhomes_affiliation/gardenia/1793001532478_250296199991685643_250296199991685643_4b6a67300a9f1bd227f9781f713c5867.jpg"
+    ],
+    "sourceNote": "public/vinhomes_affiliation/gardenia/gardenia_apartment_contract.md"
+  },
+  {
+    "slug": "skylake",
+    "name": "Vinhomes Skylake",
+    "location": [
+      "Phạm Hùng · Cầu Giấy",
+      "Phạm Hùng · Cầu Giấy"
+    ],
+    "building": "S2",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "areaSqm": 97,
+    "rentVnd": 29000000,
+    "leaseMonths": 12,
+    "depositMonths": 1,
+    "paymentMonths": 3,
+    "images": [
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559556_250296199991685643_250296199991685643_74afac153e02cd268bfde1ec16cf1404.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559565_250296199991685643_250296199991685643_e07c578ac7f36f86e35c734f35a254f6.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559570_250296199991685643_250296199991685643_7217af2bd9f6cfd94f1607a7024fd693.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559576_250296199991685643_250296199991685643_ee530ac521dca18cb8089eb22bade769.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559580_250296199991685643_250296199991685643_b69923c08eef8061b238fee8a4b81c08.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559583_250296199991685643_250296199991685643_62a601839098ec43b077c6fc2561c3dd.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559587_250296199991685643_250296199991685643_ae8786c0d23f7d0fd92221192833a5bf.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559589_250296199991685643_250296199991685643_69c095478618c210fcd800b9f948f747.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559592_250296199991685643_250296199991685643_fb98cd77bbe6d7aa014c21593b390a9f.jpg",
+      "/vinhomes_affiliation/vinskylake_phamhung_caugiay/1793001559595_250296199991685643_250296199991685643_9535d10563a5f4e662c8d985413bf2f9.jpg"
+    ],
+    "sourceNote": "public/vinhomes_affiliation/vinskylake_phamhung_caugiay/vinskylake_phamhung_caugiay.md"
+  },
+  {
+    "slug": "smart-city",
+    "name": "Vinhomes Smart City",
+    "location": [
+      "Tây Mỗ · Nam Từ Liêm",
+      "Tây Mỗ · Nam Từ Liêm"
+    ],
+    "building": "S403",
+    "bedrooms": 1,
+    "bedroomPlus": true,
+    "rentVnd": 10500000,
+    "depositMonths": 1,
+    "paymentMonths": 3,
+    "reference": "GH202",
+    "images": [
+      "/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/1793001544466_250296199991685643_250296199991685643_849b0dc509875e9b999dda59490f5e7c.jpg",
+      "/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/1793001544471_250296199991685643_250296199991685643_cd074569b622de8b3748567ccdbb91c8.jpg",
+      "/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/1793001544475_250296199991685643_250296199991685643_fbc0143d618582fd5a78313f4d90fdc8.jpg",
+      "/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/1793001544486_250296199991685643_250296199991685643_7557685b13e982b77f71b0320dd69bed.jpg",
+      "/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/1793001544490_250296199991685643_250296199991685643_e63a3cc968e9d1bda8fd473776ea9b67.jpg",
+      "/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/1793001544497_250296199991685643_250296199991685643_0ce8acd1baf5094b75556b7a0102dd5c.jpg",
+      "/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/1793001544499_250296199991685643_250296199991685643_638a0f5a85e371843b3f46f7500f7cf1.jpg"
+    ],
+    "sourceNote": "public/vinhomes_affiliation/vinsmartcity_taymo_namtuliem_gh202/vinsmartcity_gh202.md"
+  }
+]

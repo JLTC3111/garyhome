@@ -40,6 +40,7 @@ test('every public, customer and staff route has a title in the selected languag
     ['/saved', 'Your saved homes', 'Nhà đã lưu'],
     ['/neighbourhoods', 'Find your kind of Hanoi', 'Tìm khu phố dành cho bạn'],
     ['/services', 'Our services', 'Dịch vụ của chúng tôi'],
+    ['/vinhomes', 'Vinhomes rental collection in Hanoi', 'Bộ sưu tập căn hộ Vinhomes cho thuê tại Hà Nội'],
     ['/tips-and-news', 'Tips & News', 'Cẩm nang & tin tức'],
     ['/landlords', 'For landlords', 'Dành cho chủ nhà'],
     ['/contact', 'Contact us', 'Liên hệ'],

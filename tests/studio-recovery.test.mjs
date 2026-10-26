@@ -113,7 +113,7 @@ async function harness(t, options={}){
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
-   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useRouter:()=>({back(){},push(){},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
+   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(){},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
    if(id==='@supabase/supabase-js')return {createClient:()=>({storage:{from:()=>({uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
    if(id==='@/lib/browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient};
    if(id.startsWith('.')||id.startsWith('@/')){
@@ -131,6 +131,7 @@ async function harness(t, options={}){
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
   :options.page==='staff'?load(path.join(base,'components/admin-page.tsx')).AdminPage
+  :options.page==='contact'?load(path.join(base,'components/content-pages.tsx')).ContactPage
   :options.page==='services'?load(path.join(base,'components/about-sections.tsx')).ServicesPage
   :options.page==='tips'?load(path.join(base,'components/about-sections.tsx')).TipsPage
   :options.page==='landlords'?load(path.join(base,'components/about-sections.tsx')).LandlordsPage
@@ -205,12 +206,12 @@ test('a customer opening staff login receives a customer return link without sta
  assert.match(JSON.stringify(h.renderer.toJSON()),/Mở cổng khách hàng/);
 });
 
-test('public navigation keeps favourites and one translated login entry pointing to the existing chooser',async t=>{
- const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),login=band.findAllByType('a').find(node=>node.props.className?.split(' ').includes('login-portal-link'));
- assert.equal(login.props.href,'/login');assert.equal(login.props['aria-label'],'Sign in / Login');assert.ok(login.props.className.includes('desktop-band-control'));assert.equal(band.findAllByType('a').filter(node=>['/account','/admin'].includes(node.props.href)).length,0);
- const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/login']);assert.equal(mobile.findAllByProps({className:'language-toggle'}).length,1);
+test('public navigation restores separate customer and staff controls with mobile access inside the menu',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),logins=band.findAllByType('a').filter(node=>['/account','/admin'].includes(node.props.href));
+ assert.deepEqual(logins.map(n=>n.props.href),['/account','/admin']);assert.deepEqual(logins.map(n=>n.props['aria-label']),['Customer account','Staff login']);assert.ok(logins.every(n=>n.props.className.includes('desktop-band-control')));
+ const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/account','/admin']);assert.equal(mobile.findAllByType('button').filter(n=>n.props.role==='switch').length,1);
  const toggle=()=>h.renderer.root.findAllByType('button').find(node=>node.props['aria-controls']==='site-navigation');await act(async()=>toggle().props.onClick());assert.equal(toggle().props['aria-expanded'],true);await act(async()=>mobile.findAllByType('a')[0].props.onClick());assert.equal(toggle().props['aria-expanded'],false);
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');await act(async()=>h.site.setLanguage('vi'));assert.equal(login.props['aria-label'],'Đăng nhập');assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');await h.emit(authSession('customer'));assert.equal(login.props.href,'/login');assert.equal(login.findAllByType('img').length,0);
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');await act(async()=>h.site.setLanguage('vi'));assert.equal(logins[0].props['aria-label'],'Tài khoản khách hàng');assert.equal(logins[1].props['aria-label'],'Đăng nhập nhân viên');assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');await h.emit(authSession('customer'));assert.equal(logins[0].props.href,'/account');assert.equal(logins[0].findAllByType('img').length,0);
 });
 
 test('customer schema errors stay visible until a successful refresh loads real data',async t=>{
@@ -860,7 +861,7 @@ test('the customer header never borrows a signed-in owner staff photo; About Us 
  const h=await harness(t,{page:'header',path:'/'});h.backend.profilePaths=new Map([['owner','owner/private-staff-avatar.png']]);await act(async()=>h.site.refreshStaffProfile());
  for(const link of h.renderer.root.findAllByType('a').filter(n=>n.props.className?.includes('customer-login-link')))assert.equal(link.findAllByType('img').length,0);
  const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
- const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/services','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
+ const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/services','/vinhomes','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
  await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Dịch vụ của chúng tôi/);
  const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({id:'about-navigation-links'}).length,0);
 });
@@ -931,4 +932,19 @@ test('About Us opens on desktop hover, closes outside its container and stays cl
  const h=await harness(t,{guest:true,page:'header',path:'/'}),about=()=>h.renderer.root.findByProps({className:'about-navigation'}),trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});
  await act(async()=>about().props.onPointerEnter({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onPointerLeave({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>about().props.onPointerEnter({pointerType:'touch'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:null}));assert.equal(trigger().props['aria-expanded'],false);
  const nav=h.renderer.root.findByProps({id:'site-navigation'}),items=nav.children.filter(child=>typeof child!=='string');assert.equal(items[0].props.className,'district-navigation');assert.equal(items[1].props.className,'about-navigation');assert.ok(items[2].props.className.includes('header-feedback'));assert.equal(items[2].props.href,'/feedback');
+});
+
+test('restaurant and office consultancy links translate and open the real contact flow',async t=>{
+ const h=await harness(t,{page:'services'}),links=()=>h.renderer.root.findAllByType('a').filter(n=>n.props.href?.startsWith('/contact?service='));assert.deepEqual(links().map(n=>n.props.href),['/contact?service=restaurant','/contact?service=office']);assert.match(JSON.stringify(h.renderer.toJSON()),/Opening a restaurant/);await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Mở văn phòng/);assert.equal(links().length,2);
+});
+
+test('commercial enquiries preserve their draft through translation and send the selected service to the inbox',async t=>{
+ const h=await harness(t,{guest:true,page:'contact',url:'https://gary.example/contact?service=restaurant',path:'/contact'}),form=h.renderer.root.findByType('form'),message=form.findByProps({name:'message'});assert.match(JSON.stringify(h.renderer.toJSON()),/Restaurant opening consultancy/);
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('form'),form);assert.equal(form.findByProps({name:'message'}),message);assert.match(JSON.stringify(h.renderer.toJSON()),/Tư vấn mở nhà hàng/);
+ const fields={name:'A customer',email:'customer@example.invalid',phone:'',message:'A small restaurant space in Hanoi.',preferred_date:'',consent:'on',website:''};await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts.length,1);assert.equal(h.backend.enquiryPosts[0].data.message,'Tư vấn mở nhà hàng\n\nA small restaurant space in Hanoi.');assert.equal(h.backend.enquiryPosts[0].data.kind,'general');assert.equal(h.backend.enquiryPosts[0].data.property_id,null);
+});
+
+test('Vinhomes enquiries carry the exact apartment reference and still require a customer message',async t=>{
+ const h=await harness(t,{customer:true,page:'contact',url:'https://gary.example/contact?project=smart-city',path:'/contact'}),form=h.renderer.root.findByType('form');assert.match(JSON.stringify(h.renderer.toJSON()),/Vinhomes Smart City · S403 · GH202/);const fields={name:'A customer',email:'customer@example.invalid',message:'',consent:'on',website:''};await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts?.length||0,0);
+ fields.message='Please arrange a viewing for this home.';await act(async()=>{await form.props.onSubmit({preventDefault(){},currentTarget:{fields}});await delay(5);});assert.equal(h.backend.enquiryPosts.length,1);assert.equal(h.backend.enquiryPosts[0].data.message,'Vinhomes Smart City · S403 · GH202\n\nPlease arrange a viewing for this home.');assert.equal(h.backend.enquiryPosts[0].headers.get('authorization'),'Bearer test-token');
 });

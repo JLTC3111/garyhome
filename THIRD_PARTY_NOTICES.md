@@ -2,9 +2,11 @@
 
 This application includes adapted components from the following projects. Existing dependency licenses remain with their respective packages.
 
-## React Bits — Spotlight Card, Tech Text and Branched Menu
+## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards and Squish Switch
 
 Source: https://github.com/DavidHDev/react-bits
+
+Bounce Cards is adapted to accessible district links, responsive layouts and Motion springs. Squish Switch is adapted to a controlled bilingual toggle with CSS squash and stretch. Sources: https://reactbits.dev/components/bounce-cards and https://reactbits.dev/c/micro/squish-switch (reviewed 2026-10-26).
 
 The following notice is retained from the upstream `LICENSE.md` reviewed on 2026-10-22:
 

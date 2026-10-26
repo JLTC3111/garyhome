@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, ChevronDown, Menu, X, Phone, MapPin, LogIn } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Menu, X, Phone, MapPin, UserRound, ShieldCheck } from "lucide-react";
 import { useSite } from "./site-context";
 import { LanguageSwitcher } from "./language-switcher";
 import { BackNavigation } from "./back-navigation";
@@ -12,7 +12,7 @@ import { FloatingContact } from "./listing-author";
 export function Brand({light=false}:{light?:boolean}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href="/" aria-label={t("Gary Home homepage","Trang chủ Gary Home")}><img src="/images/brand/gary-home-logo.png" alt="Gary Home" width="220" height="64"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></Link>;}
 function HeaderPortals({mobile=false,onFollow}:{mobile?:boolean;onFollow:()=>void}){
  const {t}=useSite();
- return <Link className={`customer-login-link login-portal-link ${mobile?"":"desktop-band-control"}`} href="/login" onClick={onFollow} aria-label={t("Sign in / Login","Đăng nhập")}><LogIn size={mobile?18:12}/><span className="portal-full-label">{t("Sign in / Login","Đăng nhập")}</span><span className="portal-short-label">{t("Login","Đăng nhập")}</span></Link>;
+ return <><Link className={`customer-login-link ${mobile?"":"desktop-band-control"}`} href="/account" onClick={onFollow} aria-label={t("Customer account","Tài khoản khách hàng")}><UserRound size={mobile?18:12}/><span className="portal-full-label">{t("Customer account","Tài khoản khách hàng")}</span><span className="portal-short-label">{t("Customer","Khách hàng")}</span></Link><Link className={`staff-login-link ${mobile?"":"desktop-band-control"}`} href="/admin" onClick={onFollow} aria-label={t("Staff login","Đăng nhập nhân viên")}><ShieldCheck size={mobile?18:12}/><span className="portal-full-label">{t("Staff login","Đăng nhập nhân viên")}</span><span className="portal-short-label">{t("Staff","Nhân viên")}</span></Link></>;
 }
 export function Header(){
  const {t,content}=useSite(),path=usePathname();
@@ -26,7 +26,7 @@ export function Header(){
   window.addEventListener("keydown",key);document.addEventListener("pointerdown",outside);return()=>{window.removeEventListener("keydown",key);document.removeEventListener("pointerdown",outside);};
  },[open,dropdown]);
  if(path.startsWith("/admin"))return null;
- const aboutLinks=[["/services",t("Our Services","Dịch vụ của chúng tôi")],["/tips-and-news",t("Tips & News","Cẩm nang & tin tức")],["/contact",t("Contact","Liên hệ")],["/landlords",t("Landlords","Dành cho chủ nhà")]];
+ const aboutLinks=[["/services",t("Our Services","Dịch vụ của chúng tôi")],["/vinhomes",t("Vinhomes collection","Bộ sưu tập Vinhomes")],["/tips-and-news",t("Tips & News","Cẩm nang & tin tức")],["/contact",t("Contact","Liên hệ")],["/landlords",t("Landlords","Dành cho chủ nhà")]];
  return <header className="site-header rental-site-header" ref={header}>
   <div className="top-strip"><div className="container rental-header-band"><div className="rental-band-contact"><BackNavigation/><a className="top-strip-phone" href={`tel:${content.settings.contact_phone.replace(/[^+\d]/g,"")}`}><Phone size={16}/><span>{content.settings.contact_phone}</span></a><LanguageSwitcher className="desktop-band-control"/></div><div className="top-strip-actions"><FavouritesDropdown onOpen={close}/><HeaderPortals onFollow={close}/></div></div></div>
   <div className="header-nav"><div className="container header-inner"><Brand/><nav className={open?"main-nav nav-open":"main-nav"} id="site-navigation" aria-label={t("Main navigation","Điều hướng chính")}>
@@ -54,6 +54,7 @@ export function Footer(){
   {href:"/homes?type=Apartment",label:t("Apartments","Căn hộ")},
   {href:"/homes",label:t("All rentals","Tất cả nhà cho thuê")},
   {href:"/neighbourhoods",label:t("Neighbourhoods","Khu vực")},
+  {href:"/vinhomes",label:t("Vinhomes collection","Bộ sưu tập Vinhomes")},
  ];
  const company:FooterItem[]=[
   {href:"/activities?category=team",label:t("Our team","Đội ngũ")},

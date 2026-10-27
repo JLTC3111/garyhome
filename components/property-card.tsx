@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "./content-image";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -18,7 +19,7 @@ export function PropertyCard({property:p}:{property:Property}) {
   const index=Math.min(photo,Math.max(0,p.images.length-1)),src=p.images[index];
   const title=propertyTitle(p,language,district,false);
   return <article className="property-card rental-property-card">
-    <div className="property-image"><Link href={`/homes/${p.slug}`} tabIndex={-1} aria-hidden="true">{src&&!failed.includes(src)?<img src={src} alt="" loading="lazy" width="640" height="440" onError={()=>setFailed(previous=>[...previous,src])}/>:<div className="rental-photo-placeholder"><ImageOff size={30}/>{t("Photos on request","Liên hệ nhận ảnh")}</div>}</Link>
+    <div className="property-image"><Link href={`/homes/${p.slug}`} tabIndex={-1} aria-hidden="true">{src&&!failed.includes(src)?<ContentImage src={src} alt="" loading="lazy" width={640} height={440} sizes="(max-width: 650px) 100vw, (max-width: 1000px) 50vw, 33vw" onError={()=>setFailed(previous=>[...previous,src])}/>:<div className="rental-photo-placeholder"><ImageOff size={30}/>{t("Photos on request","Liên hệ nhận ảnh")}</div>}</Link>
       <div className="property-badges"><span>{t("FOR RENT","CHO THUÊ")}</span><span className="property-code">{listingCode(p)}</span></div>
       <button type="button" className={`save-button ${saved.includes(p.id)?"is-saved":""}`} onClick={()=>toggleSaved(p.id)} disabled={pendingSaved.includes(p.id)} aria-busy={pendingSaved.includes(p.id)} aria-label={saved.includes(p.id)?t("Remove from favourites","Bỏ yêu thích"):t("Add to favourites","Thêm yêu thích")} aria-pressed={saved.includes(p.id)}>{pendingSaved.includes(p.id)?<LoaderCircle className="spin" size={18}/>:<Heart size={18} fill={saved.includes(p.id)?"currentColor":"none"}/>}</button>
       {p.images.length>1&&<><div className="rental-card-photo-nav"><button type="button" onClick={()=>setPhoto((index-1+p.images.length)%p.images.length)} aria-label={t("Previous property photo","Ảnh bất động sản trước")}><ChevronLeft size={17}/></button><button type="button" onClick={()=>setPhoto((index+1)%p.images.length)} aria-label={t("Next property photo","Ảnh bất động sản tiếp theo")}><ChevronRight size={17}/></button></div><span className="rental-photo-position">{index+1} / {p.images.length}</span></>}

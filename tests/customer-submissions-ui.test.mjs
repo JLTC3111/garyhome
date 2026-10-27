@@ -9,7 +9,8 @@ async function harness(t){
  const property={id:'c6e53881-53a0-45cf-bdce-7fe020b0a610',listing_code:'GH-000001',status:'published',listing_type:'rent',availability:'on_request',address:'Hanoi'};
  const site={user:null,configured:true,content:{properties:[property],settings:{contact_phone:'+84 356 175 046'}},t:(en,vi)=>language==='vi'?vi:en,accountTask:async job=>job({auth:{getSession:async()=>({data:{session:{access_token:'test-session'}}})}},new AbortController().signal)};
  const modules=new Map();function load(file){if(modules.has(file))return modules.get(file).exports;const m={exports:{}};modules.set(file,m);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;function dep(id){
-  if(id==='./site-context')return {useSite:()=>site};if(id==='next/link')return {__esModule:true,default:({children,...props})=>React.createElement('a',props,children)};
+  if(id==='./site-context')return {useSite:()=>site};if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
+   if(id==='next/link')return {__esModule:true,default:({children,...props})=>React.createElement('a',props,children)};
   if(id==='next/navigation')return {usePathname:()=>pathname,useRouter:()=>({back:()=>navigation.push('back'),push:href=>navigation.push(href)})};
   if(id==='@/lib/requests')return {fetchWithDeadline:async(url,init)=>{calls.push({url,headers:init.headers,body:JSON.parse(init.body)});if(responseError)throw responseError;return Response.json({ok:true},{status:201});}};
   if(id.startsWith('.')||id.startsWith('@/')){const base=id.startsWith('@/')?path.join(root,id.slice(2)):path.resolve(path.dirname(file),id);return load([base,base+'.ts',base+'.tsx'].find(f=>fs.existsSync(f)&&fs.statSync(f).isFile()));}return require(id);

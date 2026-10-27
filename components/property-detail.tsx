@@ -2,15 +2,17 @@
 import Link from "next/link";
 import { ArrowUpRight, Check, Heart, Mail, MapPin, Send, Share2, Phone } from "lucide-react";
 import { useSite } from "./site-context";
+import { usePublishedProperty } from "./use-published-property";
+import type { Neighbourhood, Property } from "@/lib/types";
 import { Price, PropertyCard } from "./property-card";
 import { PropertyGallery } from "./property-gallery";
 import { CustomerSubmissionForm } from "./customer-submission-form";
 import { filterProperties } from "@/lib/property-search";
 import { amenityLabel, isPublicRental, listingCode, propertyTitle, rentalTermLabel, typeLabel } from "@/lib/rentals";
-export function PropertyDetail({slug}:{slug:string}){
- const {content,t,language,saved,toggleSaved,pendingSaved,notice}=useSite();const p=content.properties.find(p=>p.slug===slug&&isPublicRental(p));
- if(!p)return <div className="container section empty-state"><h1>{t("This rental is no longer listed.","Bất động sản này không còn được hiển thị.")}</h1><p>{t("Explore current rentals or contact Gary Home for availability.","Khám phá nhà cho thuê hiện tại hoặc liên hệ Gary Home để được hỗ trợ.")}</p><Link className="button" href="/homes">{t("View rentals","Xem nhà cho thuê")}</Link></div>;
- const district=content.neighbourhoods.find(n=>n.slug===p.district_slug),title=propertyTitle(p,language,district?.name),code=listingCode(p);
+export function PropertyDetail({slug,property,neighbourhood}:{slug:string;property?:Property;neighbourhood?:Neighbourhood}){
+ const {content,t,language,saved,toggleSaved,pendingSaved,notice}=useSite();const {property:p,district}=usePublishedProperty(slug,property,neighbourhood);
+ if(!p||!isPublicRental(p))return <div className="container section empty-state"><h1>{t("This rental is no longer listed.","Bất động sản này không còn được hiển thị.")}</h1><p>{t("Explore current rentals or contact Gary Home for availability.","Khám phá nhà cho thuê hiện tại hoặc liên hệ Gary Home để được hỗ trợ.")}</p><Link className="button" href="/homes">{t("View rentals","Xem nhà cho thuê")}</Link></div>;
+ const title=propertyTitle(p,language,district?.name),code=listingCode(p);
  const overview=(language==="vi"?p.overview_vi:p.overview_en)||(language==="vi"?p.description_vi:p.description_en);
  const location=(language==="vi"?p.location_vi:p.location_en)||(district?(language==="vi"?district.description_vi:district.description_en):p.address);
  const furnishings=language==="vi"?p.furnishings_vi:p.furnishings_en;

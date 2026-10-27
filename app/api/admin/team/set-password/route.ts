@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readJsonBody, BodyReadError } from "@/lib/request-body";
 import { staffAdminClient } from "@/lib/server";
 import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError,staffRequest } from "@/lib/staff-server";
@@ -12,8 +13,7 @@ export async function POST(request:Request){
  try{
   await boundedRequest(async signal=>{
    const {db}=await staffRequest(request,signal);
-   if(Number(request.headers.get("content-length")||0)>4096)throw new StaffRequestError("Request too large.",413);
-   let value:unknown;try{const body=await request.text();if(body.length>4096)throw new Error();value=JSON.parse(body);}catch{throw new StaffRequestError("Check the staff account and password.");}
+   let value:unknown;try{value=await readJsonBody(request,4096);}catch(error){throw new StaffRequestError("Check the staff account and password.",error instanceof BodyReadError?error.status:503);}
    const parsed=input.safeParse(value);
    if(!parsed.success)throw new StaffRequestError("Use matching passwords of at least 12 characters.");
    const admin=staffAdminClient();

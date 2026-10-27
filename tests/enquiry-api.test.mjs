@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
+import { readJsonBody, BodyReadError } from '../lib/request-body.ts';
 
 const require = createRequire(import.meta.url);
 function endpoint({ validToken = true, vercel = false } = {}) {
@@ -15,12 +16,12 @@ function endpoint({ validToken = true, vercel = false } = {}) {
   const source = fs.readFileSync(new URL('../app/api/enquiries/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   const loadedModule = { exports: {} };
-  vm.runInThisContext('(function(exports,require,module,process){' + compiled + '\n})')(loadedModule.exports, id => id === '@/lib/server' ? { publicSupabase: token => { calls.tokens.push(token); return client; } } : require(id), loadedModule, { env: { VERCEL: vercel ? '1' : undefined } });
+  vm.runInThisContext('(function(exports,require,module,process){' + compiled + '\n})')(loadedModule.exports, id => id === '@/lib/request-body' ? { readJsonBody, BodyReadError } : id === '@/lib/server' ? { publicSupabase: token => { calls.tokens.push(token); return client; } } : require(id), loadedModule, { env: { VERCEL: vercel ? '1' : undefined } });
   const send = (overrides = {}, headers = {}) => loadedModule.exports.POST(new Request('https://gary.example/api/enquiries', {
     method: 'POST', headers: { 'Content-Type': 'application/json', origin: 'https://gary.example', ...headers },
     body: JSON.stringify({ name: 'A Customer', email: 'customer@example.invalid', message: 'Please help me find a home.', consent: true, ...overrides }),
   }));
-  return { send, calls };
+  return { send, calls, POST: loadedModule.exports.POST };
 }
 
 test('guest enquiry input cannot choose identity or internal workflow fields', async () => {
@@ -74,4 +75,12 @@ test('retired batch requests cannot silently create a general enquiry',async()=>
  const {send,calls}=endpoint();
  assert.equal((await send({property_ids:['c6e53881-53a0-45cf-bdce-7fe020b0a610']})).status,400);
  assert.equal(calls.records.length,0);
+});
+
+
+test('oversized streamed enquiries never reach Auth or the database',async()=>{
+ const {POST,calls}=endpoint();let cancelled=false,pulls=0;
+ const body=new ReadableStream({pull(controller){pulls++;controller.enqueue(new Uint8Array(8192));},cancel(){cancelled=true;}});
+ const response=await POST(new Request('https://gary.example/api/enquiries',{method:'POST',duplex:'half',headers:{origin:'https://gary.example','content-type':'application/json','content-length':'1'},body}));
+ assert.equal(response.status,413);assert.equal(cancelled,true);assert.ok(pulls<=3);assert.equal(calls.records.length,0);assert.equal(calls.verified.length,0);
 });

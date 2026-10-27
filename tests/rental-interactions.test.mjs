@@ -18,6 +18,7 @@ function loadComponents(site){
   const loadedModule={exports:{}};cache.set(file,loadedModule);
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
+   if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
    if(id==='./site-context')return {useSite:()=>site.current};
    if(id.startsWith('.')||id.startsWith('@/')){const target=id.startsWith('@/')?path.join(root,id.slice(2)):path.resolve(path.dirname(file),id);return load([target,target+'.ts',target+'.tsx'].find(p=>fs.existsSync(p)&&fs.statSync(p).isFile()));}
    return require(id);

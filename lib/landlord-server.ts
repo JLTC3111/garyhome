@@ -1,3 +1,4 @@
+import { readJsonBody, BodyReadError } from "./request-body";
 import { z } from "zod";
 import { backendConfig,publicSupabase,staffAdminClient } from "./server";
 import { runtimeEnv } from "./runtime-env";
@@ -28,7 +29,7 @@ export async function landlordRequest(request:Request){
   const auth=request.headers.get("authorization"),token=auth?.match(/^Bearer (\S+)$/i)?.[1];if(auth&&!token)return fail("session",401);
   let userId:string|null=null;
   if(token){const result=await publicSupabase(token)?.auth.getUser(token);if(!result||result.error||!result.data.user)return fail("session",401);userId=result.data.user.id;}
-  const text=await request.text();if(text.length>32000)return fail("invalid",413);let body:unknown;try{body=JSON.parse(text);}catch{return fail("invalid");}
+  let body:unknown;try{body=await readJsonBody(request,32000);}catch(error){return fail(error instanceof BodyReadError?"invalid":"connection",error instanceof BodyReadError?error.status:503);}
   const preparation=landlordPrepare.safeParse(body);
   if(preparation.success){
    const files=preparation.data.files;

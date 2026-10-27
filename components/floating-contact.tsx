@@ -9,7 +9,7 @@ type ChannelProps={whatsapp:string;zalo:string;whatsappLabel:string;zaloLabel:st
 function ChannelLinks({whatsapp,zalo,whatsappLabel,zaloLabel,language,compact=false,onFollow}:{compact?:boolean;onFollow?:()=>void}&ChannelProps){
  if(!whatsapp||!zalo)return <a className="contact-single-link" href={whatsapp||zalo} target="_blank" rel="noreferrer" aria-label={whatsapp?whatsappLabel:zaloLabel} onClick={onFollow}><img src={whatsapp?"/svg/WhatsApp.svg":"/svg/Zalo.svg"} alt="" width="32" height="32"/><span>{whatsapp?"WhatsApp":"Zalo"}</span></a>;
  return <>
-  <picture className="contact-widget-art" aria-hidden="true">
+  <picture className="contact-widget-art">
    <img key={compact?"compact":language} src={compact?"/svg/contact-widget-03-transparent.svg":language==="vi"?"/svg/contact-widget-04-chat-with-us-vi.svg":"/svg/contact-widget-04-chat-with-us.svg"} alt="" width={compact?272:586} height={compact?106:115} decoding="async"/>
   </picture>
   <a className="contact-widget-action contact-widget-whatsapp" href={whatsapp} target="_blank" rel="noreferrer" aria-label={whatsappLabel} title="WhatsApp" onClick={onFollow}><span className="sr-only">WhatsApp</span></a>

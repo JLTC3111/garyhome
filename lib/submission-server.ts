@@ -1,3 +1,4 @@
+import { readJsonBody, BodyReadError } from "./request-body";
 import { publicSupabase } from "./server";
 import { assistanceInput, feedbackInput, validHelpDate } from "./submissions";
 
@@ -12,7 +13,7 @@ export async function submitCustomerInput(request:Request,kind:"feedback"|"assis
  if(authorization&&!token)return fail("session",401);
  const db=publicSupabase(token);if(!db)return fail("unavailable",503);
  let input:unknown;
- try{const body=await request.text();if(body.length>16000)return fail("invalid",413);input=JSON.parse(body);}catch{return fail("invalid",400);}
+ try{input=await readJsonBody(request,16000);}catch(error){return fail(error instanceof BodyReadError?"invalid":"connection",error instanceof BodyReadError?error.status:503);}
  const parsed=(kind==="feedback"?feedbackInput:assistanceInput).safeParse(input);
  if(!parsed.success)return fail("invalid",400);
  if("helped_on" in parsed.data&&!validHelpDate(parsed.data.helped_on))return fail("date",400);

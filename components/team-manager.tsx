@@ -25,7 +25,7 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
  const roles=assignableRoles(staffRole),mode=draft.mode||"create";
  useEffect(()=>{identity.current=user?.id;},[user?.id]);
  useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
- useEffect(()=>{if(!roles.includes(draft.role)&&roles.length)setDraft({...draft,role:roles[0]});},[staffRole,draft,setDraft]);
+ useEffect(()=>{const allowed=assignableRoles(staffRole);if(!allowed.includes(draft.role)&&allowed.length)setDraft({...draft,role:allowed[0]});},[staffRole,draft,setDraft]);
  const call=useCallback(async(method:string,signal:AbortSignal,input?:unknown,cursor?:string|null):Promise<unknown>=>{
   if(!client||!user)throw new Error("Sign in again before managing staff.");
   const {data,error}=await client.auth.getSession();

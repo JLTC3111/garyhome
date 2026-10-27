@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "./content-image";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Home, MapPin, PlaneTakeoff } from "lucide-react";
 import { useSite } from "./site-context";
@@ -50,12 +51,12 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
           <ShinyButton className="visa-service-link" href="https://garyvisaservice.vercel.app/" target="_blank" rel="noopener noreferrer"><PlaneTakeoff size={18}/>{t("Visa support · Gary Visa Service","Hỗ trợ thị thực · Gary Visa Service")}<ArrowUpRight size={16}/></ShinyButton>
           <div className="hero-location"><MapPin size={17}/>{t("Rooted in Hanoi. Here for you.", "Am Hiểu Hà Nội. Đồng Hành Cùng Bạn.")}</div>
           <div className="hero-collection">
-            <span className="collection-avatars" aria-hidden="true">{published.slice(0, 3).map(p => <img key={p.id} src={p.images[0] || "/images/apartments/hero.jpg"} alt="" width="36" height="36"/>)}</span>
+            <span className="collection-avatars" aria-hidden="true">{published.slice(0, 3).map(p => <ContentImage key={p.id} src={p.images[0] || "/images/apartments/hero.jpg"} alt="" width={36} height={36} sizes="36px" loading="lazy"/>)}</span>
             <span><strong><NumberTicker value={published.length}/></strong> {t("homes to discover", "căn nhà để khám phá")}<small>{t("Your next chapter, thoughtfully chosen.", "Chọn tổ ấm cho chương mới của bạn.")}</small></span>
           </div>
         </div>
         <div className="hero-visual">
-          <img className="hero-photo" src={content.settings.hero_image} alt={t("Light-filled Gary Home apartment with a dining area and leafy views in Tây Hồ", "Căn hộ Gary Home đầy ánh sáng, có bàn ăn và tầm nhìn xanh tại Tây Hồ")} width="900" height="680" fetchPriority="high"/>
+          <ContentImage className="hero-photo" src={content.settings.hero_image} alt={t("Light-filled Gary Home apartment with a dining area and leafy views in Tây Hồ", "Căn hộ Gary Home đầy ánh sáng, có bàn ăn và tầm nhìn xanh tại Tây Hồ")} width={900} height={680} sizes="(max-width: 900px) 100vw, 50vw" loading="eager" fetchPriority="high"/>
           <div className="hero-photo-label"><span className="live-dot"/>{t("A LITTLE PIECE OF HANOI", "MỘT GÓC NHỎ HÀ NỘI")}</div>
           <div className="hero-note"><span className="hero-note-icon"><Home size={21}/></span><span>{t("More than an address.", "Hơn một địa chỉ.")}<strong>{t("A place to belong.", "Là nơi thuộc về.")}</strong></span><svg viewBox="0 0 54 44" aria-hidden="true"><path d="M2 39C18 44 40 29 39 12c-1-13-15-14-17-4-3 14 18 22 28 11m-9-2 10 1-2 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg></div>
         </div>

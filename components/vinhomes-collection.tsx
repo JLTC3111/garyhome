@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "./content-image";
 import Link from "next/link";
 import { ArrowUpRight, Building2 } from "lucide-react";
 import { useSite } from "./site-context";
@@ -13,7 +14,7 @@ export function VinhomesCollection() {
       <p>{t("Explore Gardenia, Skylake and Smart City through our newly added rental collection.", "Khám phá Gardenia, Skylake và Smart City qua bộ sưu tập nhà cho thuê mới bổ sung.")}</p>
     </div><Link className="text-link" href="/vinhomes">{t("Explore the collection", "Khám phá bộ sưu tập")}<ArrowUpRight size={18}/></Link></div>
     <div className="vinhomes-collection-grid">{vinhomesProjects.map(project => <article key={project.slug} className="vinhomes-card">
-      <Link href={`/vinhomes#${project.slug}`} className="vinhomes-card-cover" aria-label={t(`Explore ${project.name}`, `Khám phá ${project.name}`)}><img src={project.images[0]} alt={t(`Apartment interior at ${project.name}`, `Không gian căn hộ tại ${project.name}`)} width="720" height="540" loading="lazy"/></Link>
+      <Link href={`/vinhomes#${project.slug}`} className="vinhomes-card-cover" aria-label={t(`Explore ${project.name}`, `Khám phá ${project.name}`)}><ContentImage src={project.images[0]} alt={t(`Apartment interior at ${project.name}`, `Không gian căn hộ tại ${project.name}`)} width={720} height={540} sizes="(max-width: 700px) 100vw, (max-width: 1000px) 50vw, 33vw" loading="lazy"/></Link>
       <div className="vinhomes-card-body"><div className="eyebrow">{project.location[language === "vi" ? 1 : 0]}</div>
         <h3><Link href={`/vinhomes#${project.slug}`}>{project.name}</Link></h3><p>{projectSummary(project, language)}</p>
         <p className="vinhomes-rent">{projectRent(project, language)}<small> / {t("month", "tháng")}</small></p>

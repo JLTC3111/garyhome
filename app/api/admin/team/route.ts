@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readJsonBody, BodyReadError } from "@/lib/request-body";
 import { staffAdminClient } from "@/lib/server";
 import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError, staffDataError, staffRequest } from "@/lib/staff-server";
@@ -11,9 +12,8 @@ const createAccount = z.object({ email:z.string().trim().toLowerCase().email().m
 const editAccount = z.object({ user_id: z.string().uuid(), role: z.enum(["admin", "manager", "editor"]), active: z.boolean() });
 const removeAccount = z.object({ user_id:z.string().uuid() });
 async function body(request: Request) {
-  if (Number(request.headers.get("content-length") || 0) > 4096) throw new StaffRequestError("Request too large.", 413);
-  try { const value = await request.text(); if (value.length > 4096) throw new Error(); return JSON.parse(value); }
-  catch { throw new StaffRequestError("Invalid staff details.", 400); }
+  try { return await readJsonBody(request, 4096); }
+  catch (error) { if (error instanceof BodyReadError) throw new StaffRequestError(error.status === 413 ? "Request too large." : "Invalid staff details.", error.status); throw error; }
 }
 function failure(error: unknown) {
   return Response.json({ error: error instanceof StaffRequestError ? error.message : "The request could not be completed. Refresh the team before trying again.",...(error instanceof StaffRequestError&&error.code?{code:error.code}:{}) }, { status: error instanceof StaffRequestError ? error.status : 503, headers });

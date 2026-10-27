@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readJsonBody, BodyReadError } from "@/lib/request-body";
 import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError,staffRequest } from "@/lib/staff-server";
 import { requestStaffPasswordEmail } from "@/lib/staff-email";
@@ -9,8 +10,7 @@ export async function POST(request:Request){
  try{
   await boundedRequest(async signal=>{
    const {db}=await staffRequest(request,signal);
-   if(Number(request.headers.get("content-length")||0)>2048)throw new StaffRequestError("Request too large.",413);
-   let body:unknown;try{const text=await request.text();if(text.length>2048)throw new Error();body=JSON.parse(text);}catch{throw new StaffRequestError("Check the staff account.");}
+   let body:unknown;try{body=await readJsonBody(request,2048);}catch(error){throw new StaffRequestError("Check the staff account.",error instanceof BodyReadError?error.status:503);}
    const parsed=input.safeParse(body);if(!parsed.success)throw new StaffRequestError("Check the staff account.");
    await requestStaffPasswordEmail(db,parsed.data.user_id,request.url,signal);
   });

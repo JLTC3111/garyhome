@@ -8,7 +8,7 @@ import { useStudioText } from "./use-studio-text";
 export function StaffTemporaryPassword({member,busy,error,close,save}:{member:StaffAccount;busy:boolean;error:string;close:()=>void;save:(password:string,confirmation:string)=>Promise<void>}){
  const text=useStudioText(),dialog=useRef<HTMLDialogElement>(null),id=useId();
  const [password,setPassword]=useState(""),[confirmation,setConfirmation]=useState(""),[validation,setValidation]=useState("");
- useEffect(()=>{const previous=document.activeElement as HTMLElement|null;dialog.current?.showModal();return()=>{dialog.current?.close();previous?.focus?.();};},[]);
+ useEffect(()=>{const previous=document.activeElement as HTMLElement|null,node=dialog.current;node?.showModal();return()=>{node?.close();previous?.focus?.();};},[]);
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();if(busy)return;
   if(password.length<12||password!==confirmation){setValidation("Use matching passwords of at least 12 characters.");return;}

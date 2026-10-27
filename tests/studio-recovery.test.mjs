@@ -76,7 +76,7 @@ async function harness(t, options={}){
    verifyOtp:async input=>{backend.authCalls.push({method:'verify',input});if(backend.verifyError)return {data:{session:null,user:null},error:backend.verifyError};session=authSession(options.verifyUser??'invited-staff');callback?.(input.type==='recovery'?'PASSWORD_RECOVERY':'SIGNED_IN',session);const verified=session;if(backend.verifySwitch){session=authSession('other-account');callback?.('SIGNED_IN',session);}return {data:{session:verified,user:verified.user},error:null};},
    resetPasswordForEmail:async(...input)=>{backend.authCalls.push({method:'reset',input});return {error:null};},
   },
-  rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(name==='get_staff_profile')return Promise.resolve({data:{user_id:session?.user.id,display_name:'Test staff',avatar_path:backend.profilePaths?.get(session?.user.id)||'',password_change_reminder:backend.passwordReminder||false},error:null}).then(resolve,reject);if(name==='acknowledge_staff_password_reminder')backend.passwordReminder=false;if(name==='mark_studio_notifications_read')backend.notifications=backend.notifications?.map(n=>({...n,unread:false}));if(name==='get_studio_notifications')return Promise.resolve({data:{items:backend.notifications??[],unread_count:backend.notifications?.filter(n=>n.unread).length||0},error:null}).then(resolve,reject);if(name==='staff_photo_directory')return Promise.resolve({data:[],error:null}).then(resolve,reject);if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
+  rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(['get_studio_notifications','mark_studio_notifications_read'].includes(name)&&backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='get_staff_profile')return Promise.resolve({data:{user_id:session?.user.id,display_name:'Test staff',avatar_path:backend.profilePaths?.get(session?.user.id)||'',password_change_reminder:backend.passwordReminder||false},error:null}).then(resolve,reject);if(name==='acknowledge_staff_password_reminder')backend.passwordReminder=false;if(name==='mark_studio_notifications_read')backend.notifications=backend.notifications?.map(n=>({...n,unread:false}));if(name==='get_studio_notifications')return Promise.resolve({data:{items:backend.notifications??[],unread_count:backend.notifications?.filter(n=>n.unread).length||0},error:null}).then(resolve,reject);if(name==='staff_photo_directory')return Promise.resolve({data:[],error:null}).then(resolve,reject);if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
   storage:{from:()=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}})})},
   from(table){
    let writing=false,payload,single=false,writeMethod;const filters={};const query={};
@@ -112,6 +112,7 @@ async function harness(t, options={}){
   const loaded={exports:{}};modules.set(file,loaded);
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
+   if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
    if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(){},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
    if(id==='@supabase/supabase-js')return {createClient:()=>({storage:{from:()=>({uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
@@ -128,6 +129,8 @@ async function harness(t, options={}){
  }
  const {SiteProvider,useSite}=load(path.join(base,'components/site-context.tsx'));
  const Page=options.page==='password'||options.page==='invite'||options.page==='callback'?load(path.join(base,'components/password-reset.tsx')).PasswordReset
+  :options.page==='property'?load(path.join(base,'components/property-detail.tsx')).PropertyDetail
+  :options.page==='error'?load(path.join(base,'app/error.tsx')).default
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
   :options.page==='staff'?load(path.join(base,'components/admin-page.tsx')).AdminPage
@@ -142,7 +145,7 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback',articles:options.editorialPageRows})));
+ const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback',articles:options.editorialPageRows,slug:options.propertyPage?.slug,property:options.propertyPage,neighbourhood:options.propertyArea,retry:options.retry})));
  await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
@@ -165,6 +168,45 @@ test('portal chooser identifies both destinations without changing authenticatio
  await act(async()=>{h.site.setLanguage('vi');});
  assert.deepEqual(h.renderer.root.findAllByType('h2').map(node=>node.children.join('')),['Cổng khách hàng','Cổng nhân viên']);
  assert.equal(h.site.user,null);assert.deepEqual(h.backend.authCalls,[]);assert.deepEqual(h.backend.calls,[]);
+});
+
+test('fresh server property props synchronize a persistent layout before rendering or translating',async t=>{
+ const property={...fixture.properties[0],id:'fresh-property',slug:'freshly-published-rental',bedrooms:4,price:1777,updated_at:'2026-10-27T09:00:00Z'};
+ const h=await harness(t,{guest:true,page:'property',propertyPage:property,path:'/homes/'+property.slug});
+ assert.match(h.renderer.root.findByType('h1').children.join(''),/4-bedroom/);
+ assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);
+ assert.equal(h.site.content.properties.length,fixture.properties.length+1);
+ assert.equal(h.renderer.root.findAllByProps({className:'enquiry-form customer-submission-form'}).length,1);
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.match(h.renderer.root.findByType('h1').children.join(''),/4 phòng ngủ/);
+ assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);
+});
+
+test('pending property navigation cannot undo a newer CMS save or unpublish',async t=>{
+ const property={...fixture.properties[0],price:1888,updated_at:'2026-10-27T09:00:00Z'},options={page:'property',propertyPage:property};
+ const h=await harness(t,options);
+ await act(async()=>h.site.setContent(previous=>({...previous,properties:previous.properties.map(row=>row.id===property.id?{...row,price:1999,status:'draft',updated_at:'2026-10-27T10:00:00Z'}:row)})));
+ options.propertyPage={...property};await h.mountPage();
+ assert.equal(h.site.content.properties.find(row=>row.id===property.id).status,'draft');
+ assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1999);
+ assert.equal(h.renderer.root.findByType('h1').children.join(''),'This rental is no longer listed.');
+});
+
+test('stale editorial page props cannot republish an article withdrawn in Studio',async t=>{
+ const article={...fixture.editorial[0],updated_at:'2026-10-27T09:00:00Z'},options={page:'tips',editorialPageRows:[article]};
+ const h=await harness(t,options);
+ await act(async()=>h.site.setContent(previous=>({...previous,editorial:previous.editorial.map(row=>row.id===article.id?{...row,status:'draft',updated_at:'2026-10-27T10:00:00Z'}:row)})));
+ options.editorialPageRows=[{...article}];await h.mountPage();
+ assert.equal(h.site.content.editorial.find(row=>row.id===article.id).status,'draft');
+ assert.equal(h.renderer.root.findAllByType('a').some(a=>a.props.href==='/tips-and-news/'+article.slug),false);
+});
+
+test('transient page errors offer a bilingual retry without exposing backend details',async t=>{
+ let retries=0;const h=await harness(t,{guest:true,page:'error',retry:()=>{retries++;}});
+ assert.equal(h.renderer.root.findByType('h1').children.join(''),'We couldn’t load this page.');
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(h.renderer.root.findByType('h1').children.join(''),'Chưa thể tải trang này.');
+ await act(async()=>h.renderer.root.findByType('button').props.onClick());assert.equal(retries,1);
 });
 
 test('customer login identifies personal email and links to the separate staff portal in both languages',async t=>{
@@ -993,4 +1035,29 @@ test('editorial publication errors translate in place and preserve the incomplet
 test('fresh editorial page props update a persistent public snapshot without discarding private staff drafts',async t=>{
  const original=fixture.editorial[0],newRow={...original,id:'fresh-public-story',slug:'fresh-public-story',title_en:'Freshly published story'},serverRows=[...fixture.editorial,newRow],draft={...original,id:'private-draft',slug:'private-draft',status:'draft',title_en:'Private local article'};
  const h=await harness(t,{page:'tips',editorialPageRows:serverRows,deferPage:true});await act(async()=>h.site.setContent(previous=>({...previous,editorial:[...fixture.editorial,draft]})));await h.mountPage();assert.ok(h.site.content.editorial.some(a=>a.id===newRow.id));assert.ok(h.site.content.editorial.some(a=>a.id===draft.id));assert.ok(h.renderer.root.findAllByType('a').some(a=>a.props.href==='/tips-and-news/fresh-public-story'));const before=h.backend.privateReads.filter(table=>table==='editorial_articles').length;await act(async()=>h.site.setLanguage('vi'));assert.equal(h.backend.privateReads.filter(table=>table==='editorial_articles').length,before);await h.emit(null);assert.ok(h.site.content.editorial.some(a=>a.id===newRow.id));assert.ok(!h.site.content.editorial.some(a=>a.id===draft.id));
+});
+
+
+test('a notification read started before Mark all read cannot restore stale unread badges',async t=>{
+ const h=await harness(t,{page:'staff'});
+ const row={id:'test-notification',created_at:'2026-10-27T09:00:00Z',action:'enquiry_created',category:'enquiries',details:{},unread:true};h.backend.notifications=[row];
+ await act(async()=>{h.browser.dispatchEvent(new Event('gary-team-access-changed'));await delay(5);});
+ await act(async()=>{h.renderer.root.findByProps({className:'icon-button studio-notification-trigger'}).props.onClick();await delay(5);});
+ const mark=deferred();h.backend.rpcPending.set('mark_studio_notifications_read',mark);
+ await act(async()=>{h.renderer.root.findAllByType('button').find(b=>b.children.includes('Mark all read')).props.onClick();await delay(5);});
+ const stale=deferred();h.backend.rpcPending.set('get_studio_notifications',stale);
+ await act(async()=>{h.browser.dispatchEvent(new Event('gary-team-access-changed'));await delay(5);});
+ h.backend.rpcPending.delete('get_studio_notifications');h.backend.notifications=[{...row,unread:false}];
+ await act(async()=>{mark.resolve({error:null});await delay(5);});
+ await act(async()=>{stale.resolve({data:{items:[row],unread_count:1},error:null});await delay(5);});
+ assert.equal(h.renderer.root.findAllByProps({className:'notification-count'}).length,0);assert.equal(h.renderer.root.findAllByProps({className:'notification-unread-dot'}).length,0);
+});
+
+
+test('password visibility can be enabled before typing and resets when an uncontrolled login is cleared',async t=>{
+ const h=await harness(t,{guest:true,page:'staff'});
+ const input=()=>h.renderer.root.findByProps({name:'password'});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Show password'}).props.onClick({preventDefault(){}}));assert.equal(input().props.type,'text');
+ await act(async()=>input().props.onChange({target:{value:'An exact staff password'}}));assert.equal(input().props.type,'text');
+ await act(async()=>input().props.onChange({target:{value:''}}));assert.equal(input().props.type,'password');
 });

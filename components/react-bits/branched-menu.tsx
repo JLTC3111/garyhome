@@ -5,7 +5,7 @@
 // MIT + Commons Clause; retained in THIRD_PARTY_NOTICES.md.
 // Gary Home: controlled navigation, existing Lucide icons, native disclosure
 // semantics, keyboard controls, badges and a responsive compact sidebar.
-import { useEffect,useId,useRef,useState,type KeyboardEvent,type ReactNode } from "react";
+import { useId,useRef,useState,type KeyboardEvent,type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 export type BranchedMenuChild={value:string;label:string;icon?:ReactNode;badge?:number};
@@ -17,7 +17,8 @@ export function BranchedMenu({items,active,onSelect,label}:Props){
  const [open,setOpen]=useState(()=>new Set(items.filter(item=>item.children).map(item=>item.value)));
  const nav=useRef<HTMLElement>(null),id=useId();
  const activeGroup=items.find(item=>item.children?.some(child=>child.value===active))?.value;
- useEffect(()=>{if(activeGroup)setOpen(previous=>previous.has(activeGroup)?previous:new Set([...previous,activeGroup]));},[activeGroup]);
+ const [previousGroup,setPreviousGroup]=useState(activeGroup);
+ if(previousGroup!==activeGroup){setPreviousGroup(activeGroup);if(activeGroup&&!open.has(activeGroup))setOpen(new Set([...open,activeGroup]));}
  function toggle(value:string){setOpen(previous=>{const next=new Set(previous);if(next.has(value))next.delete(value);else next.add(value);return next;});}
  function keyboard(event:KeyboardEvent<HTMLElement>){
   if(!["ArrowDown","ArrowUp","Home","End"].includes(event.key))return;

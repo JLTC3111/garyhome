@@ -22,7 +22,7 @@ function StaffProfileDialog({close}:{close:()=>void}){
  const dialog=useRef<HTMLDialogElement>(null),active=useRef(true);
  const [busy,setBusy]=useState(""),[error,setError]=useState(""),[photoToast,setPhotoToast]=useState(false);
  const [password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[photoChanged,setPhotoChanged]=useState(false),[photoFailed,setPhotoFailed]=useState(false);
- useEffect(()=>{active.current=true;dialog.current?.showModal();return()=>{active.current=false;dialog.current?.close();};},[]);
+ useEffect(()=>{active.current=true;const node=dialog.current;node?.showModal();return()=>{active.current=false;node?.close();};},[]);
  async function upload(file:File){
   if(!user||busy)return;
   if(!["image/jpeg","image/png","image/webp","image/avif"].includes(file.type)||file.size>2097152){setPhotoFailed(true);setError(t("Choose a JPG, PNG, WebP or AVIF image up to 2 MB.","Chọn ảnh JPG, PNG, WebP hoặc AVIF tối đa 2 MB."));return;}

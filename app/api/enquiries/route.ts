@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { publicSupabase } from "@/lib/server";
+import { readJsonBody, BodyReadError } from "@/lib/request-body";
 
 const enquiry = z.object({
   name: z.string().trim().min(2).max(120), email: z.string().trim().email().max(254),
@@ -27,8 +28,8 @@ export async function POST(request: Request) {
     } catch { return Response.json({ error: "Couldn’t verify your account. Reconnect before sending this request." }, { status: 503 }); }
   }
   let input: unknown;
-  try { const body = await request.text(); if (body.length > 16000) throw new Error(); input = JSON.parse(body); }
-  catch { return Response.json({ error: "Invalid request." }, { status: 400 }); }
+  try { input = await readJsonBody(request, 16000); }
+  catch (error) { return Response.json({ error: error instanceof BodyReadError && error.status === 413 ? "Request too large." : "Invalid request." }, { status: error instanceof BodyReadError ? error.status : 503 }); }
   if(input&&typeof input==="object"&&"property_ids" in input)return Response.json({error:"Choose one property to request a viewing."},{status:400});
   const parsed = enquiry.safeParse(input);
   if (!parsed.success) return Response.json({ error: "Please check your name, email, message, and consent." }, { status: 400 });

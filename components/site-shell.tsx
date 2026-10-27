@@ -1,4 +1,5 @@
 "use client";
+import { ContentImage } from "./content-image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,7 +10,7 @@ import { BackNavigation } from "./back-navigation";
 import { FavouritesDropdown } from "./favourites-dropdown";
 import { FloatingContact } from "./listing-author";
 
-export function Brand({light=false}:{light?:boolean}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href="/" aria-label={t("Gary Home homepage","Trang chủ Gary Home")}><img src="/images/brand/gary-home-logo.png" alt="Gary Home" width="220" height="64"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></Link>;}
+export function Brand({light=false}:{light?:boolean}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href="/" aria-label={t("Gary Home homepage","Trang chủ Gary Home")}><ContentImage src="/images/brand/gary-home-logo.png" alt="Gary Home" width={220} height={64} sizes="(max-width: 640px) 193px, 220px" loading="eager"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></Link>;}
 function HeaderPortals({mobile=false,onFollow}:{mobile?:boolean;onFollow:()=>void}){
  const {t}=useSite();
  return <><Link className={`customer-login-link ${mobile?"":"desktop-band-control"}`} href="/account" onClick={onFollow} aria-label={t("Customer account","Tài khoản khách hàng")}><UserRound size={mobile?18:12}/><span className="portal-full-label">{t("Customer account","Tài khoản khách hàng")}</span><span className="portal-short-label">{t("Customer","Khách hàng")}</span></Link><Link className={`staff-login-link ${mobile?"":"desktop-band-control"}`} href="/admin" onClick={onFollow} aria-label={t("Staff login","Đăng nhập nhân viên")}><ShieldCheck size={mobile?18:12}/><span className="portal-full-label">{t("Staff login","Đăng nhập nhân viên")}</span><span className="portal-short-label">{t("Staff","Nhân viên")}</span></Link></>;

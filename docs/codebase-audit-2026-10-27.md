@@ -47,12 +47,18 @@ The database advisors were read-only. No migrations, policies, roles, production
 
 ## Verification
 
-- Full automated suite: **358 passing tests**, including database/RLS, role hierarchy, account isolation, direct staff creation/password updates, guest-favourite import, public feedback, gallery, bilingual UI, reduced motion and idle recovery coverage.
-- New regression coverage includes streamed/forged-length request limits, split UTF-8 characters, timeout/abort cancellation, fresh property navigation, newer CMS withdrawal protection, false-404/sitemap recovery, notification read/write ordering, password clearing and real responsive image markup.
+- Full automated suite: **360 passing tests**, including database/RLS, role hierarchy, account isolation, direct staff creation/password updates, guest-favourite import, public feedback, gallery, bilingual UI, reduced motion and idle recovery coverage.
+- New regression coverage includes streamed/forged-length request limits, split UTF-8 characters, timeout/abort cancellation, fresh property navigation, newer CMS withdrawal protection, false-404/sitemap recovery, notification read/write ordering, password clearing and real responsive image markup. Cross-platform lockfile tests also check optional package versions and dependency completeness.
 - `npm run lint`: zero errors, 35 warnings described above.
 - `npm run build`: Vinext/Vite production build passes.
 - `npm run build:vercel`: Next.js production build passes and generates its route manifest.
 - `npm run typecheck` and `git diff --check`: pass.
-- Client-artifact/server-secret scan and production HTTP smoke checks are recorded with the release verification.
+- Client-artifact/server-secret scan: passes. macOS and Linux/x64 dependency-install dry runs: pass.
+
+### Deployment handoff
+
+The first automatic Vercel deployment of the audit commit failed during dependency installation (`Invalid Version`), before the application build. The generated lockfile contained incomplete records in optional WASM dependency branches. These records were resolved again from complete official registry metadata, and cross-platform lockfile checks now cover this failure.
+
+The application changes are already pushed in `a525f6c`. The final lockfile correction and tests are committed locally for the owner to push/deploy. No additional Vercel deployment was requested after the owner chose to handle publishing. Production HTTP verification of this release remains pending that deployment.
 
 Browser visual and interactive performance testing was unavailable in this session. Automated component tests and server-rendered HTML checks do not replace real-device layout, Lighthouse or accessibility testing.

@@ -46,7 +46,7 @@ SOFTWARE.
 
 Source: https://github.com/magicuidesign/magicui
 
-Shiny Button: https://magicui.design/docs/components/shiny-button and the official `apps/www/registry/magicui/shiny-button.tsx` (reviewed 2026-10-27). It follows the owner's ICUE People app `ShinyButton/ShinyButton.jsx` and CSS reference: transparent pill, cyan border sweep and the actual animated label mask. The reference spring runs through the site's existing Motion/LazyMotion provider, with native links and buttons and offscreen/reduced-motion handling.
+Shiny Button: https://magicui.design/docs/components/shiny-button and the official `apps/www/registry/magicui/shiny-button.tsx` (reviewed 2026-10-27). It follows the owner's ICUE People app `ShinyButton/ShinyButton.jsx` and CSS reference: transparent pill, cyan border sweep and the actual animated label mask. The reference spring runs through the site's existing Motion/LazyMotion provider. Mouse hover and visible keyboard focus trigger a single sweep; touch devices get one sweep every 60 seconds while visible. Native links and buttons, offscreen cleanup and reduced-motion handling are retained.
 
 ```text
 MIT License

@@ -61,7 +61,7 @@ Applied to project `duyiihsmaqfgwezmsnjs` on 25 October 2026. The existing two s
 
 For another existing project, apply [20261025055215_direct_staff_accounts_profiles_and_notifications.sql](../supabase/migrations/20261025055215_direct_staff_accounts_profiles_and_notifications.sql) once after the previous migrations. Fresh `setup.sql` includes it. It adds RLS-protected profile, notification and read-state tables, the avatar bucket, author links, strict hierarchy functions and activity triggers. Realtime publication updates are conditional on the host having `supabase_realtime` configured. Apply the follow-up activity deletion migration afterwards; fresh `setup.sql` includes both.
 
-The homepage links to `https://garyvisaservice.vercel.app/` in a new tab. Enquiries and customer feedback use distinct sidebar icons. Feedback and commission headings/sidebar labels have additional left spacing. All new account guidance, controls and notifications support English and Vietnamese.
+The homepage links to `https://visa.garyhome.vn/` in a new tab. Enquiries and customer feedback use distinct sidebar icons. Feedback and commission headings/sidebar labels have additional left spacing. All new account guidance, controls and notifications support English and Vietnamese.
 
 Applied to project `duyiihsmaqfgwezmsnjs` on 25 October 2026. For another project, the explicit temporary-password controls require [20261025080124_staff_temporary_password_controls.sql](../supabase/migrations/20261025080124_staff_temporary_password_controls.sql) after the migrations above; fresh `setup.sql` includes it.
 

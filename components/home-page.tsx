@@ -48,7 +48,7 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
             fitToText
           />])}</h1>
           <p>{language === "en" ? content.settings.hero_text_en : content.settings.hero_text_vi}</p>
-          <ShinyButton className="visa-service-link" href="https://garyvisaservice.vercel.app/" target="_blank" rel="noopener noreferrer"><PlaneTakeoff size={18}/>{t("Visa support · Gary Visa Service","Hỗ trợ thị thực · Gary Visa Service")}<ArrowUpRight size={16}/></ShinyButton>
+          <ShinyButton className="visa-service-link" href="https://visa.garyhome.vn/" target="_blank" rel="noopener noreferrer"><PlaneTakeoff size={18}/>{t("Visa support · Gary Visa Service","Hỗ trợ thị thực · Gary Visa Service")}<ArrowUpRight size={16}/></ShinyButton>
           <div className="hero-location"><MapPin size={17}/>{t("Rooted in Hanoi. Here for you.", "Am Hiểu Hà Nội. Đồng Hành Cùng Bạn.")}</div>
           <div className="hero-collection">
             <span className="collection-avatars" aria-hidden="true">{published.slice(0, 3).map(p => <ContentImage key={p.id} src={p.images[0] || "/images/apartments/hero.jpg"} alt="" width={36} height={36} sizes="36px" loading="lazy"/>)}</span>

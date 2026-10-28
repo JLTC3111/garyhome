@@ -6,6 +6,10 @@ import { fetchWithDeadline } from "./requests";
 let current: { url: string; key: string; client: SupabaseClient } | undefined;
 let publicCurrent: { url: string; key: string; client: SupabaseClient } | undefined;
 
+// Public connection settings only; resumable uploads authenticate with the
+// current user's JWT and Storage RLS, never a server credential.
+export function browserBackendConfig(client: SupabaseClient) { return current?.client === client ? { url: current.url, publishableKey: current.key } : null; }
+
 export function publicBrowserClient(url: string, key: string) {
   if (!publicCurrent || publicCurrent.url !== url || publicCurrent.key !== key) {
     publicCurrent = { url, key, client: createClient(url, key, {

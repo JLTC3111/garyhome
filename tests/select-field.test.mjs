@@ -39,6 +39,12 @@ function load(file) {
 }
 const { SelectField } = load(path.join(root, 'components/select-field.tsx'));
 const { SearchForm } = load(path.join(root, 'components/search-form.tsx'));
+test('property/post ID search is visible without expanding requirements in both rental forms',()=>{
+ for(const roomsFirst of [false,true]){
+  const html=renderToString(React.createElement(SearchForm,{roomsFirst,initial:{id:'GH-000005'}}));
+  assert.equal((html.match(/name="id"/g)||[]).length,1);assert.match(html,/class="search-field rental-id-field"/);assert.match(html,/aria-label="Apartment or post ID"/);assert.match(html,/value="GH-000005"/);assert.match(html,/aria-expanded="false"/);
+ }
+});
 const options = vi => [React.createElement('option', { key: '', value: '' }, vi ? 'Mọi khu vực' : 'Anywhere'),
   React.createElement('option', { key: 'tay-ho', value: 'tay-ho' }, 'Tây Hồ'),
   React.createElement('option', { key: 'disabled', value: 'disabled', disabled: true }, vi ? 'Chưa có' : 'Unavailable')];

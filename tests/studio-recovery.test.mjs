@@ -55,7 +55,7 @@ async function harness(t, options={}){
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
- const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{editorial_articles:structuredClone(fixture.editorial),enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
+ const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{editorial_articles:structuredClone(fixture.editorial),enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[],portal_guides:JSON.parse(fs.readFileSync(path.join(base,'data/portal-guides.json'),'utf8')).map(row=>({...row,created_at:'2026-10-28T00:00:00Z',updated_at:'2026-10-28T00:00:00Z'})),portal_guide_files:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
   const filters={},query={};
   query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
@@ -77,11 +77,11 @@ async function harness(t, options={}){
    resetPasswordForEmail:async(...input)=>{backend.authCalls.push({method:'reset',input});return {error:null};},
   },
   rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(['get_studio_notifications','mark_studio_notifications_read'].includes(name)&&backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='get_staff_profile')return Promise.resolve({data:{user_id:session?.user.id,display_name:'Test staff',avatar_path:backend.profilePaths?.get(session?.user.id)||'',password_change_reminder:backend.passwordReminder||false},error:null}).then(resolve,reject);if(name==='acknowledge_staff_password_reminder')backend.passwordReminder=false;if(name==='mark_studio_notifications_read')backend.notifications=backend.notifications?.map(n=>({...n,unread:false}));if(name==='get_studio_notifications')return Promise.resolve({data:{items:backend.notifications??[],unread_count:backend.notifications?.filter(n=>n.unread).length||0},error:null}).then(resolve,reject);if(name==='staff_photo_directory')return Promise.resolve({data:[],error:null}).then(resolve,reject);if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
-  storage:{from:()=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}})})},
+  storage:{from:bucket=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}}),remove:async paths=>{backend.helpRemoved??=[];backend.helpRemoved.push(...paths);return {data:[],error:null};},createSignedUrl:async(path,expires,options)=>{backend.helpSigned??=[];backend.helpSigned.push({bucket,path,expires,options});if(backend.helpSignedPending)await backend.helpSignedPending.promise;return {data:{signedUrl:'https://private.example.invalid/'+path+'?view='+String(!options?.download)},error:null};}})},
   from(table){
    let writing=false,payload,single=false,writeMethod;const filters={};const query={};
    for(const method of ['upsert','update','insert','delete'])query[method]=value=>{writing=true;writeMethod=method;payload=value;return query;};
-   query.eq=(key,value)=>{filters[key]=value;return query;};
+   query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
    for(const method of ['single','maybeSingle'])query[method]=()=>{single=true;return query;};
    for(const method of ['select','order','abortSignal','is','limit','or'])query[method]=()=>query;
    query.then=(resolve,reject)=>{
@@ -90,6 +90,21 @@ async function harness(t, options={}){
     if(writing&&table==='staff_profiles'){backend.profilePaths??=new Map();backend.profilePaths.set(payload.user_id,payload.avatar_path);}
     if(writing&&backend.writeErrors.has(table))return Promise.resolve({data:null,error:backend.writeErrors.get(table)}).then(resolve,reject);
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
+    if(writing&&table==='portal_guides'){
+     if(backend.role!=='owner')return Promise.resolve({data:null,error:{code:'42501'}}).then(resolve,reject);
+     const old=backend.rows.portal_guides.find(row=>row.id===filters.id);
+     if(writeMethod==='insert'){const row={id:crypto.randomUUID(),title_en:'',title_vi:'',summary_en:'',summary_vi:'',body_en:'',body_vi:'',audience:'staff',minimum_role:null,published:false,sort_order:0,files:[],created_at:new Date().toISOString(),updated_at:new Date().toISOString(),...payload};backend.rows.portal_guides.push(row);return Promise.resolve({data:row,error:null}).then(resolve,reject);}
+     if(!old||filters.updated_at&&old.updated_at!==filters.updated_at)return Promise.resolve({data:null,error:{code:'PGRST116'}}).then(resolve,reject);
+     if(writeMethod==='delete'){backend.rows.portal_guides=backend.rows.portal_guides.filter(row=>row.id!==old.id);return Promise.resolve({data:{id:old.id},error:null}).then(resolve,reject);}
+     Object.assign(old,payload,{updated_at:new Date().toISOString()});return Promise.resolve({data:structuredClone(old),error:null}).then(resolve,reject);
+    }
+    if(writing&&table==='portal_guide_files'){
+     if(backend.role!=='owner')return Promise.resolve({data:null,error:{code:'42501'}}).then(resolve,reject);
+     const guide=backend.rows.portal_guides.find(row=>row.id===(payload?.guide_id||backend.rows.portal_guide_files.find(file=>file.id===filters.id)?.guide_id));
+     if(writeMethod==='insert'){const file={...payload,created_at:new Date().toISOString()};backend.rows.portal_guide_files.push(file);guide.files.push(file);}
+     if(writeMethod==='delete'){guide.files=guide.files.filter(file=>file.id!==filters.id);backend.rows.portal_guide_files=backend.rows.portal_guide_files.filter(file=>file.id!==filters.id);}
+     guide.updated_at=new Date().toISOString();return Promise.resolve({data:{id:payload?.id||filters.id},error:null}).then(resolve,reject);
+    }
     if(writing&&table==='saved_homes'){
      const items=Array.isArray(payload)?payload:payload?[payload]:[];if(writeMethod==='upsert'||writeMethod==='insert')for(const item of items)if(!backend.rows.saved_homes.some(row=>row.user_id===item.user_id&&row.property_id===item.property_id))backend.rows.saved_homes.push(item);
      if(writeMethod==='delete')backend.rows.saved_homes=backend.rows.saved_homes.filter(row=>row.user_id!==filters.user_id||row.property_id!==filters.property_id);
@@ -98,6 +113,7 @@ async function harness(t, options={}){
     if(!writing&&backend.readErrors.has(table))return Promise.resolve({data:null,error:backend.readErrors.get(table)}).then(resolve,reject);
     let rows=structuredClone(backend.rows[table]??fixture[table]??[]);
     if(Array.isArray(rows)&&filters.user_id)rows=rows.filter(row=>row.user_id===filters.user_id);
+    if(table==='portal_guides'||table==='portal_guide_files')rows=rows.filter(row=>Object.entries(filters).every(([key,value])=>Array.isArray(value)?value.includes(row[key]):row[key]===value));
     if(single&&Array.isArray(rows))rows=rows[0]??null;
     const value=table==='team_members'?{data:backend.role?{role:backend.role}:null,error:backend.roleError?new Error('Offline'):null}:table==='site_settings'?{data:structuredClone(fixture.settings),error:null}:{data:writing?payload:rows,error:null};
     return Promise.resolve(value).then(resolve,reject);
@@ -107,6 +123,7 @@ async function harness(t, options={}){
  };
  const modules=new Map();
  function load(file){
+  if(file.endsWith('/lib/portal-help-upload.ts'))return {uploadHelpFile:async input=>{backend.helpUploads??=[];backend.helpUploads.push(input);input.onProgress(50);if(backend.helpUploadPending)await backend.helpUploadPending.promise;input.signal.throwIfAborted();input.onProgress(100);}};
   if(modules.has(file))return modules.get(file).exports;
   if(file.endsWith('.json'))return JSON.parse(fs.readFileSync(file,'utf8'));
   const loaded={exports:{}};modules.set(file,loaded);
@@ -1060,4 +1077,50 @@ test('password visibility can be enabled before typing and resets when an uncont
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Show password'}).props.onClick({preventDefault(){}}));assert.equal(input().props.type,'text');
  await act(async()=>input().props.onChange({target:{value:'An exact staff password'}}));assert.equal(input().props.type,'text');
  await act(async()=>input().props.onChange({target:{value:''}}));assert.equal(input().props.type,'password');
+});
+
+
+test('both signed-in portals expose bilingual help and customers have no upload controls',async t=>{
+ const h=await harness(t,{customer:true});
+ await act(async()=>{h.renderer.root.findAllByType('button').find(b=>b.children.includes('How to use')).props.onClick();await delay(5);});
+ const help=()=>h.renderer.root.findByProps({'aria-label':'How to use Gary Home'});
+ assert.ok(help().findAllByType('h3').some(n=>n.children.some(c=>c?.props?.children==='Find a home and save your favourites')));
+ assert.equal(help().findAllByType('input').some(n=>n.props.type==='file'),false);assert.equal(help().findAllByType('button').some(n=>n.children.includes('Add guide')),false);
+ const reads=h.backend.privateReads.filter(table=>table==='portal_guides').length;await act(async()=>h.site.setLanguage('vi'));
+ assert.ok(h.renderer.root.findByProps({'aria-label':'Hướng dẫn sử dụng Gary Home'}));assert.equal(h.backend.privateReads.filter(table=>table==='portal_guides').length,reads);
+});
+
+test('the owner creates, uploads and publishes a guide without losing a bilingual draft',async t=>{
+ const h=await harness(t,{page:'staff'});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Help & onboarding'}).props.onClick();await delay(5);});
+ await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('Manage guides')).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.props['aria-label']?.startsWith('Edit guide:')).props.onClick());
+ assert.equal(h.renderer.root.findByProps({'aria-label':'Upload guide files'}).props.disabled,true);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
+ await act(async()=>{h.renderer.root.findAllByType('button').find(b=>b.children.includes('Add guide')).props.onClick();await delay(5);});
+ const form=()=>h.renderer.root.findByProps({className:'enquiry-form help-editor-form'});
+ await act(async()=>{form().findByProps({name:'guide_title_en'}).props.onChange({target:{value:'A real owner walkthrough'}});form().findByProps({name:'guide_title_vi'}).props.onChange({target:{value:'Hướng dẫn của chủ sở hữu'}});form().findByProps({name:'guide_body_en'}).props.onChange({target:{value:'1. Open Listings and check the property ID.'}});form().findByProps({name:'guide_body_vi'}).props.onChange({target:{value:'1. Mở Tin đăng và kiểm tra mã tin.'}});});
+ await act(async()=>{h.site.setLanguage('vi');});assert.equal(form().findByProps({name:'guide_title_en'}).props.value,'A real owner walkthrough');
+ await act(async()=>{form().findByProps({'aria-label':'Tải tệp hướng dẫn'}).props.onChange({target:{files:[new File(['real-pdf-test'],'walkthrough.pdf',{type:'application/pdf'})],value:'selected'}});await delay(10);});
+ assert.equal(h.backend.helpUploads.length,1);assert.equal(h.backend.rows.portal_guide_files.length,1);assert.ok(h.backend.calls.find(c=>c.table==='portal_guide_files').payload.guide_version);
+ await act(async()=>{form().findAllByType('button').find(b=>b.children.includes('Xuất bản hướng dẫn')).props.onClick();await delay(5);});
+ assert.equal(h.renderer.root.findAllByProps({className:'help-editor-dialog'}).length,0);assert.equal(h.backend.rows.portal_guides.find(g=>g.title_en==='A real owner walkthrough').published,true);assert.match(JSON.stringify(h.renderer.toJSON()),/Đã lưu và xuất bản hướng dẫn/);
+});
+
+test('lower staff roles can read onboarding but never get its manager controls',async t=>{
+ const h=await harness(t,{page:'staff',role:'admin'});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Help & onboarding'}).props.onClick();await delay(5);});
+ const help=h.renderer.root.findByProps({'aria-label':'How to use Gary Home'});
+ assert.equal(help.findAllByType('button').some(b=>b.children.includes('Add guide')||b.children.includes('Manage guides')),false);
+ assert.equal(h.backend.calls.some(c=>['portal_guides','portal_guide_files'].includes(c.table)),false);
+});
+
+test('the help viewer signs private files on demand and clears them on role changes',async t=>{
+ const h=await harness(t,{page:'staff'}),guide=h.backend.rows.portal_guides.find(g=>g.audience==='staff');
+ guide.files=[{id:'help-pdf',guide_id:guide.id,storage_path:'owner/'+guide.id+'/help.pdf',mime_type:'application/pdf',original_name:'private-onboarding.pdf',size_bytes:100,created_at:'2026-10-28'}];
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Help & onboarding'}).props.onClick();await delay(5);});assert.equal(h.backend.helpSigned,undefined);
+ await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes(guide.title_en)).props.onClick());
+ await act(async()=>{h.renderer.root.findByProps({className:'help-file'}).props.onClick();await delay(5);});
+ assert.equal(h.backend.helpSigned.length,2);assert.ok(h.backend.helpSigned.every(call=>call.bucket==='portal-guides'&&call.expires===900));assert.match(h.renderer.root.findByType('iframe').props.src,/private.example.invalid/);const source=h.renderer.root.findByType('iframe').props.src;await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('iframe').props.src,source);assert.equal(h.backend.helpSigned.length,2);
+ h.backend.role='manager';await h.emit(authSession('owner'));assert.equal(h.renderer.root.findAllByProps({className:'help-media-dialog'}).length,0);
 });

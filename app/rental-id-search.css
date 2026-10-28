@@ -1,0 +1,5 @@
+.rental-search .search-fields{grid-template-columns:minmax(140px,1.1fr) minmax(150px,1.1fr) minmax(185px,1.2fr) minmax(145px,.9fr) minmax(140px,.8fr)}
+.rental-search .rental-id-field input{display:block;width:100%;min-width:0;min-height:44px;padding:11px 12px;border:1px solid #d5ddcd;border-radius:8px;background:#fbfbf7;color:#2d4d3b;font-family:var(--sans);font-size:13px;letter-spacing:.02em;box-shadow:inset 0 1px 2px #203f2a04}
+.rental-search .rental-id-field input:focus-visible{outline:2px solid #517149;outline-offset:2px}
+@media(max-width:1150px) and (min-width:641px){.rental-search .search-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.rental-search .search-submit{grid-column:1/-1}.rental-search-rooms-first .search-fields>.rental-room-field{grid-column:auto}.rental-search .search-fields>.rental-id-field{grid-column:auto}}
+@media(max-width:640px){.rental-search .search-fields{grid-template-columns:minmax(0,1fr)}.rental-search .search-fields>.rental-id-field{grid-column:1/-1}.rental-search .rental-id-field input{font-size:16px;min-height:48px}.rental-search .rental-id-field>span{font-size:10px}}

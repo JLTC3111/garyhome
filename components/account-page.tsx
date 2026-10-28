@@ -1,10 +1,11 @@
 "use client";
+import { PortalHelp, PortalHelpStart } from "./portal-help";
 import { PasswordInput } from "./password-input";
 import { SelectField } from "./select-field";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
-import { ArrowRight, ArrowUpRight, CalendarDays, Check, Heart, LayoutDashboard, LoaderCircle, LogOut, MessageSquare, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
+import { BookOpen, ArrowRight, ArrowUpRight, CalendarDays, Check, Heart, LayoutDashboard, LoaderCircle, LogOut, MessageSquare, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { SubmissionHistory } from "./submission-history";
 import { useSite } from "./site-context";
 import { AnimatedBackground } from "./motion-primitives/animated-background";
@@ -15,7 +16,7 @@ import { request } from "@/lib/requests";
 import { appointmentLabel, customerError, ENQUIRY_FIELDS, enquiryLabel } from "@/lib/customer-data";
 import type { CustomerEnquiry, CustomerProfile } from "@/lib/types";
 
-type AccountTab = "overview" | "saved" | "enquiries" | "viewings" | "profile" | "submissions";
+type AccountTab = "overview" | "saved" | "enquiries" | "viewings" | "profile" | "submissions" | "help";
 type Draft = { userId: string; value: CustomerProfile } | null;
 
 export function AccountPage() {
@@ -201,7 +202,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
     catch (error) { if (active.current) setError(customerError(error, language)); }
     finally { if (active.current) setBusy(""); }
   }
-  const tabs: [AccountTab, string, typeof Heart][] = [["overview", t("Overview", "Tổng quan"), LayoutDashboard], ["saved", t("Saved homes", "Nhà đã lưu"), Heart], ["enquiries", t("My enquiries", "Yêu cầu của tôi"), MessageSquare], ["viewings", t("My viewings", "Lịch xem nhà"), CalendarDays], ["profile", t("My details", "Thông tin của tôi"), UserRound], ["submissions", t("Feedback & help", "Phản hồi & hỗ trợ"), MessageSquare]];
+  const tabs: [AccountTab, string, typeof Heart][] = [["overview", t("Overview", "Tổng quan"), LayoutDashboard], ["saved", t("Saved homes", "Nhà đã lưu"), Heart], ["enquiries", t("My enquiries", "Yêu cầu của tôi"), MessageSquare], ["viewings", t("My viewings", "Lịch xem nhà"), CalendarDays], ["profile", t("My details", "Thông tin của tôi"), UserRound], ["submissions", t("Feedback & help", "Phản hồi & hỗ trợ"), MessageSquare], ["help", t("How to use", "Hướng dẫn sử dụng"), BookOpen]];
   const savedHomes = content.properties.filter(p => saved.includes(p.id) && p.status === "published");
   const viewings = enquiries.filter(e => e.kind === "viewing");
   const upcoming = viewings.filter(e => !e.cancelled_at && e.status !== "closed" && (!e.appointment_at || new Date(e.appointment_at).getTime() > now));
@@ -217,9 +218,11 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
       {error && <div className="form-error" role="alert">{error}</div>}
       {savedError && tab === "saved" && <div className="form-error" role="alert">{savedError}</div>}
       {tab === "submissions" && <SubmissionHistory/>}
+      {tab === "help" && <PortalHelp key={user.id} portal="customer"/>}
       {tab === "saved" && <div className="account-import"><p>{t("Browser favourites sync automatically after login. You can retry here if a connection was interrupted.", "Nhà yêu thích trên trình duyệt được tự động đồng bộ sau khi đăng nhập. Bạn có thể thử lại tại đây nếu kết nối bị gián đoạn.")}</p><button type="button" className="text-link" disabled={!!busy || !savedReady} onClick={() => void importShortlist()}>{busy === "import" ? t("Syncing…", "Đang đồng bộ…") : t("Sync browser favourites", "Đồng bộ nhà yêu thích trên trình duyệt")}<ArrowRight size={15}/></button></div>}
       {!loaded && loading && <div className="account-loading" role="status"><LoaderCircle size={20} className="spin"/>{t("Bringing your plans together…", "Đang tải kế hoạch của bạn…")}</div>}
       {tab === "overview" && <>
+        <PortalHelpStart open={() => setTab("help")}/>
         <div className="account-stats">{[[Heart, savedReady ? saved.length : "—", t("Homes you love", "Nhà bạn yêu thích"), "saved"], [CalendarDays, loaded ? upcoming.length : "—", t("Viewing plans", "Kế hoạch xem nhà"), "viewings"], [MessageSquare, loaded ? enquiries.length : "—", t("Conversations", "Cuộc trao đổi"), "enquiries"]].map(([Icon, count, label, target]) => { const Symbol = Icon as typeof Heart; return <button key={String(target)} onClick={() => setTab(target as AccountTab)}><Symbol size={21}/><strong>{typeof count === "number" ? <NumberTicker value={count}/> : String(count)}</strong><span>{String(label)}<ArrowUpRight size={15}/></span></button>; })}</div>
         <div className="account-plan-card"><div><div className="eyebrow">{t("YOUR NEXT MOVE", "BƯỚC TIẾP THEO")}</div><h3>{t("A viewing is a good beginning.", "Một buổi xem nhà, một khởi đầu tốt.")}</h3><p>{t("Find a place that feels right, request a date, and we’ll arrange the details with you.", "Chọn ngôi nhà phù hợp, gửi ngày bạn muốn xem và chúng tôi sẽ cùng bạn sắp xếp chi tiết.")}</p><Link className="text-link" href="/homes">{t("Find a home to visit", "Tìm nhà để ghé thăm")}<ArrowRight size={16}/></Link></div><CalendarDays size={66} strokeWidth={1}/></div>
         {upcoming.length > 0 && <div className="account-preview"><h3>{t("On your horizon", "Kế hoạch sắp tới")}</h3><EnquiryCards rows={upcoming.slice(0, 2)} busy={busy} cancel={cancelViewing}/></div>}

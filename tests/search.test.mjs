@@ -26,7 +26,7 @@ test('IDs, bathroom count, monthly price bounds and repeated amenities apply tog
  assert.equal(filterProperties([p],{...filters,amenity:'Balcony,Elevator'}).length,0);
  assert.equal(filterProperties([p],{id:'000123'}).length,1);
  assert.equal(filterProperties([p],{id:'one'}).length,1);
- assert.equal(filterProperties([p],{id:'123'}).length,0);
+ assert.equal(filterProperties([p],{id:'123'}).length,1);
  assert.equal(filterProperties([p],{min:'61'}).length,0);
 });
 test('rental type groups preserve legacy studios and villas and never expose a published sale',()=>{
@@ -49,4 +49,13 @@ test('requirements match legacy amenity spellings without inventing facilities o
  assert.deepEqual(filterProperties(homes,{amenity:'Pet,Gym,Barbecue,Outdoor shower,Lake view'}).map(p=>p.id),['matching']);
  assert.equal(filterProperties(homes,{amenity:'Sauna'}).length,0);
  assert.equal(amenityLabel('Barbeque','vi'),'BBQ / Khu nướng');assert.equal(amenityLabel('Outdoor Shower','vi'),'Vòi tắm ngoài trời');
+});
+
+
+test('visible ID search accepts padded, short, unhyphenated and pasted GH codes without partial matches',()=>{
+ const p={...home,id:'c6e53881-53a0-45cf-bdce-7fe020b0a610',listing_code:'GH-000005'};
+ for(const id of ['GH-000005','gh-000005',' GH 000005 ','GH000005','GH–000005','5','000005',p.id])assert.equal(filterProperties([p],{id}).length,1,id);
+ for(const id of ['GH-000006','GH-0000','GH-5x','not-a-post'])assert.equal(filterProperties([p],{id}).length,0,id);
+ assert.equal(filterProperties([{...p,status:'draft'}],{id:'GH-000005'}).length,0);
+ assert.equal(filterProperties([p],{id:'5',district:'ba-dinh'}).length,0);
 });

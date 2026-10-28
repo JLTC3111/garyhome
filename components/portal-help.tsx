@@ -5,9 +5,11 @@ import { useSite } from "./site-context";
 import { DeleteConfirmation } from "./delete-confirmation";
 import { PortalGuideEditor } from "./portal-guide-editor";
 import { PortalGuideMedia } from "./portal-guide-media";
-import { HELP_BUCKET, HELP_FIELDS, HELP_FILE_TYPES, helpFileSize, type HelpFile, type HelpGuide } from "@/lib/portal-help";
+import { PortalManual } from "./portal-manual";
+import { HELP_BUCKET, HELP_FIELDS, HELP_FILE_TYPES, helpFileSize, portalManual, type HelpFile, type HelpGuide } from "@/lib/portal-help";
 import starterGuides from "@/data/portal-guides.json";
 import { normalize } from "@/lib/property-search";
+import { request } from "@/lib/requests";
 
 export function PortalHelpStart({ open }: { open: () => void }) {
   const { t } = useSite();
@@ -21,31 +23,32 @@ export function PortalHelp({ portal }: { portal: "customer" | "staff" }) {
 }
 
 function HelpLibrary({ portal }: { portal: "customer" | "staff" }) {
-  const { user, client, staffRole, sessionPhase, accountTask, editorTask, t, language, demo, notice } = useSite();
-  const owner = portal === "staff" && staffRole === "owner" && !demo;
+  const { user, client, staffRole, sessionPhase, editorTask, t, language, demo, notice } = useSite();
+  const owner = portal === "staff" && staffRole === "owner" && !demo, userId = user?.id;
   const [guides, setGuides] = useState<HelpGuide[]>(demo ? starterGuides.map(row => ({ ...row, created_at: "", updated_at: "" })) as HelpGuide[] : []);
   const [loading, setLoading] = useState(!demo), [failed, setFailed] = useState(false), [error, setError] = useState("");
   const [query, setQuery] = useState(""), [manage, setManage] = useState(false), [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string | null>(null), [editing, setEditing] = useState<HelpGuide | null>(null);
   const [deleting, setDeleting] = useState<HelpGuide | null>(null), [media, setMedia] = useState<HelpFile | null>(null);
-  const active = useRef(true), sequence = useRef(0), heading = useRef<HTMLHeadingElement>(null);
+  const active = useRef(true), sequence = useRef(0), version = useRef(0), heading = useRef<HTMLHeadingElement>(null);
   const locale = language === "vi" ? "vi" : "en";
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const read = useCallback(async () => {
-    if (demo || !client || !user) return;
-    const generation = ++sequence.current;
+    if (demo || !client || !userId) return;
+    const generation = ++sequence.current, startedVersion = version.current;
     try {
-      const { data, error } = await accountTask((db, signal) => {
-        let request = db.from("portal_guides").select(HELP_FIELDS).order("sort_order").order("created_at").limit(200);
-        if (!owner) request = request.eq("published", true).in("audience", [portal, "both"]);
-        return request.abortSignal(signal);
+      // Not accountTask: its session check flips sessionPhase, which re-runs this read in a loop.
+      const { data, error } = await request(signal => {
+        let select = client.from("portal_guides").select(HELP_FIELDS).order("sort_order").order("created_at").limit(200);
+        if (!owner) select = select.eq("published", true).in("audience", [portal, "both"]);
+        return select.abortSignal(signal);
       });
       if (error) throw error;
-      if (!active.current || generation !== sequence.current) return;
+      if (!active.current || generation !== sequence.current || startedVersion !== version.current) return;
       setGuides((data || []) as unknown as HelpGuide[]); setFailed(false);
     } catch { if (active.current && generation === sequence.current) setFailed(true); }
     finally { if (active.current && generation === sequence.current) setLoading(false); }
-  }, [accountTask, client, demo, owner, portal, user]);
+  }, [client, demo, owner, portal, userId]);
   useEffect(() => {
     if (sessionPhase !== "ready" || demo) return;
     let cancelled = false;
@@ -55,10 +58,11 @@ function HelpLibrary({ portal }: { portal: "customer" | "staff" }) {
   useEffect(() => { if (selected) heading.current?.focus(); }, [selected]);
   const title = (guide: HelpGuide) => guide[`title_${locale}`] || t("Untitled guide", "Hướng dẫn chưa đặt tên");
   const selectedGuide = guides.find(guide => guide.id === selected);
+  const manual = portalManual(guides);
   const search = normalize(query).trim();
   const visible = guides.filter(guide => (owner && manage || guide.published && [portal, "both"].includes(guide.audience)) &&
     (!search || normalize(`${guide.title_en} ${guide.title_vi} ${guide.summary_en} ${guide.summary_vi} ${guide.body_en} ${guide.body_vi}`).includes(search)));
-  function update(guide: HelpGuide) { setGuides(rows => [...rows.filter(row => row.id !== guide.id), guide].sort((a, b) => a.sort_order - b.sort_order)); }
+  function update(guide: HelpGuide) { version.current++; setGuides(rows => [...rows.filter(row => row.id !== guide.id), guide].sort((a, b) => a.sort_order - b.sort_order)); }
   async function create() {
     if (!owner || busy) return; setBusy(true); setError("");
     try {
@@ -82,7 +86,7 @@ function HelpLibrary({ portal }: { portal: "customer" | "staff" }) {
         catch { cleanupFailed = true; }
       }
       if (!active.current) return;
-      setGuides(rows => rows.filter(row => row.id !== target.id)); setDeleting(null); if (selected === target.id) setSelected(null);
+      version.current++; setGuides(rows => rows.filter(row => row.id !== target.id)); setDeleting(null); if (selected === target.id) setSelected(null);
       if (cleanupFailed) setError(t("Guide deleted. Storage cleanup could not be confirmed; check the portal-guides bucket.", "Đã xóa hướng dẫn. Chưa xác nhận được dọn tệp; hãy kiểm tra kho portal-guides."));
       else notice(t("Guide deleted.", "Đã xóa hướng dẫn."));
     } catch { if (active.current) setError(t("Deletion could not be confirmed. Refresh before trying again.", "Chưa xác nhận được thao tác xóa. Làm mới trước khi thử lại.")); }
@@ -90,7 +94,8 @@ function HelpLibrary({ portal }: { portal: "customer" | "staff" }) {
   }
   if (!user && !demo) return null;
   return <section className="portal-help" aria-label={t("How to use Gary Home", "Hướng dẫn sử dụng Gary Home")}>
-    <header className="help-intro"><span className="help-intro-icon"><BookOpen size={25}/></span><div><h2>{t("A little guidance. A confident start.", "Hướng dẫn rõ ràng. Khởi đầu tự tin.")}</h2><p>{portal === "staff" ? t("Learn the Studio workflow, then revisit a guide whenever you need it.", "Làm quen với quy trình Studio và xem lại hướng dẫn bất cứ khi nào cần.") : t("Find homes, keep your shortlist and follow your requests with ease.", "Tìm nhà, lưu danh sách yêu thích và theo dõi yêu cầu dễ dàng.")}</p></div></header>
+    {manual && !selectedGuide ? <PortalManual key={userId + manual.file.id} file={manual.file}/> : <header className="help-intro"><span className="help-intro-icon"><BookOpen size={25}/></span><div><h2>{t("A little guidance. A confident start.", "Hướng dẫn rõ ràng. Khởi đầu tự tin.")}</h2><p>{portal === "staff" ? t("Learn the Studio workflow, then revisit a guide whenever you need it.", "Làm quen với quy trình Studio và xem lại hướng dẫn bất cứ khi nào cần.") : t("Find homes, keep your shortlist and follow your requests with ease.", "Tìm nhà, lưu danh sách yêu thích và theo dõi yêu cầu dễ dàng.")}</p></div></header>}
+    {manual && !selectedGuide && <div className="help-library-heading"><div><h3>{t("Explore the guides", "Khám phá hướng dẫn")}</h3><p>{t("Quick answers and step-by-step instructions, all in one place.", "Câu trả lời nhanh và hướng dẫn từng bước, cùng ở một nơi.")}</p></div><BookOpen size={23}/></div>}
     <div className="help-toolbar"><label className="help-search"><Search size={17}/><span className="sr-only">{t("Search guides", "Tìm hướng dẫn")}</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("Search guides…", "Tìm hướng dẫn…")}/></label><button type="button" className="text-link" disabled={loading || demo} onClick={() => { setLoading(true); void read(); }}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button>{owner && <><button type="button" className="button button-outline" aria-pressed={manage} onClick={() => { setManage(!manage); setSelected(null); }}><Settings2 size={16}/>{manage ? t("View library", "Xem thư viện") : t("Manage guides", "Quản lý hướng dẫn")}</button><button type="button" className="button" disabled={busy} onClick={() => void create()}><Plus size={16}/>{t("Add guide", "Thêm hướng dẫn")}</button></>}</div>
     {owner && manage && <p className="help-owner-note">{t("Only the owner can change this library. Drafts stay private; publish to make a guide visible to its selected audience.", "Chỉ chủ sở hữu được thay đổi thư viện. Bản nháp được giữ riêng; xuất bản để nhóm đã chọn xem hướng dẫn.")}</p>}
     {failed && <div className="form-error" role="alert">{t("The guide library could not be refreshed. Reconnect and try Refresh; any previously loaded guides are still shown.", "Chưa thể tải lại thư viện. Kết nối lại rồi chọn Làm mới; hướng dẫn đã tải vẫn được giữ.")}</div>}

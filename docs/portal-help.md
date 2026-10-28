@@ -4,6 +4,16 @@ Customers can open **Customer account → How to use**. Staff can open **Staff S
 
 Eleven editable starter guides cover portal navigation, customer favourites, property-ID search, enquiries/viewings, feedback and attribution, staff profile/password changes, listing/media work, customer care, publishing, team access and owner-managed guides. Customer and staff content is separated. Higher-level staff procedures can require a minimum role.
 
+## Main video walkthrough
+
+Both help pages feature `home_website_manual.mp4` above the written guides. The existing private upload was verified against the Desktop original (18,920,648 bytes; matching multipart checksum) and its guide is published for **Everyone signed in**. The original file is not copied into the public website or the Git repository.
+
+The custom player offers play/pause, a scrubber, 10-second skips, volume, playback speed and fullscreen (including native iPhone fullscreen where supported). It loads metadata only and never autoplays. Space/K, left/right arrows, M and F work while the player itself is focused; these shortcuts leave form inputs alone. Mobile controls wrap to fit smaller screens. Labels follow the portal language without restarting playback; the recording remains in its original language.
+
+The player obtains one 15-minute signed URL when the help page opens. Signing uses a bounded request with the already-ready session, preserving the session-loop fix in `portal-help.tsx`. If access expires while idle, **Reload video** renews it and retains the playhead, volume and speed. Signing out or changing account clears the viewer. Written guides and owner editing/upload controls continue to work below it.
+
+To replace the featured recording, use **Manage guides**, unpublish the manual, replace its video with a file named `home_website_manual.mp4`, keep its audience **Everyone signed in**, then republish. An unpublished or staff-only recording is never featured for everyone. This is existing library content; no new database migration or environment variable is needed.
+
 ## Owner workflow
 
 1. Sign in to Staff Studio as the **Owner**, then open **Help & onboarding**.
@@ -39,7 +49,7 @@ The migration `20261028085344_portal_help_and_onboarding.sql` is already applied
 - Files are opened on demand using **15-minute signed URLs**. Sharing such a URL grants temporary access until expiry; it is not DRM. The viewer clears on account/role changes, and new access checks use current membership.
 - No server/service key or additional environment variable is required by the frontend.
 
-Live verification confirmed 11 guides, seven staff guides, a private bucket, no anonymous table access, and correct owner/customer reads. Database policy tests additionally cover lower roles, revoked membership, unrelated broad Storage policies, stale upload versions, and attachment limits.
+Live verification confirmed the manual, attachment and Storage object are readable by a signed-in customer, while anonymous table access remains blocked. The bucket remains private. Database policy tests additionally cover lower roles, revoked membership, unrelated broad Storage policies, stale upload versions, and attachment limits.
 
 ## Apartment / post ID search
 

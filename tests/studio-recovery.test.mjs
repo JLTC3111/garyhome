@@ -116,7 +116,8 @@ async function harness(t, options={}){
     if(table==='portal_guides'||table==='portal_guide_files')rows=rows.filter(row=>Object.entries(filters).every(([key,value])=>Array.isArray(value)?value.includes(row[key]):row[key]===value));
     if(single&&Array.isArray(rows))rows=rows[0]??null;
     const value=table==='team_members'?{data:backend.role?{role:backend.role}:null,error:backend.roleError?new Error('Offline'):null}:table==='site_settings'?{data:structuredClone(fixture.settings),error:null}:{data:writing?payload:rows,error:null};
-    return Promise.resolve(value).then(resolve,reject);
+    // Instant mocks settle before React renders. Opt-in latency lets intermediate session phases commit, like a real network.
+    return (backend.latency&&!writing?delay(backend.latency).then(()=>value):Promise.resolve(value)).then(resolve,reject);
    };
    return query;
   },
@@ -1123,4 +1124,51 @@ test('the help viewer signs private files on demand and clears them on role chan
  await act(async()=>{h.renderer.root.findByProps({className:'help-file'}).props.onClick();await delay(5);});
  assert.equal(h.backend.helpSigned.length,2);assert.ok(h.backend.helpSigned.every(call=>call.bucket==='portal-guides'&&call.expires===900));assert.match(h.renderer.root.findByType('iframe').props.src,/private.example.invalid/);const source=h.renderer.root.findByType('iframe').props.src;await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('iframe').props.src,source);assert.equal(h.backend.helpSigned.length,2);
  h.backend.role='manager';await h.emit(authSession('owner'));assert.equal(h.renderer.root.findAllByProps({className:'help-media-dialog'}).length,0);
+});
+
+async function openHelpWithLatency(h,open){
+ h.backend.latency=5;
+ const reads=()=>(h.backend.privateReads??[]).filter(table=>table==='portal_guides').length;
+ const settle=async()=>{for(let i=0;i<8;i++)await act(async()=>{await delay(5);});};
+ await act(async()=>{open();});await settle();
+ const opened=reads();await settle();
+ assert.equal(opened,1);assert.equal(reads(),1);assert.equal(h.site.sessionPhase,'ready');
+ assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Loading your guides|Restoring your session/);
+ assert.ok(h.renderer.root.findAllByProps({className:'help-guide-card'}).length>0);
+}
+
+test('owner help loads guides once under network latency without cycling session recovery',async t=>{
+ const h=await harness(t,{page:'staff'});
+ await openHelpWithLatency(h,()=>h.renderer.root.findByProps({'aria-label':'Help & onboarding'}).props.onClick());
+});
+
+test('customer help loads guides once under network latency without cycling session recovery',async t=>{
+ const h=await harness(t,{customer:true});
+ await openHelpWithLatency(h,()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('How to use')).props.onClick());
+});
+
+function addManual(h,values={}){
+ const file={id:'manual-video',guide_id:'manual-guide',storage_path:'owner/manual-guide/manual.mp4',mime_type:'video/mp4',original_name:'home_website_manual.mp4',size_bytes:18920648,created_at:'2026-10-28T09:53:46Z'};
+ const guide={id:'manual-guide',title_en:'Full Manual Help',title_vi:'Hướng dẫn sử dụng toàn bộ',summary_en:'The website walkthrough',summary_vi:'Video hướng dẫn website',body_en:'',body_vi:'',audience:'both',minimum_role:null,published:true,sort_order:1000,files:[file],created_at:'2026-10-28T09:53:12Z',updated_at:'2026-10-28T09:55:23Z',...values};
+ h.backend.rows.portal_guides.push(guide);return guide;
+}
+
+for(const portal of ['customer','staff'])test(`${portal} help features the private manual immediately without restarting session recovery`,async t=>{
+ const h=await harness(t,portal==='customer'?{customer:true}:{page:'staff',role:'editor'});addManual(h);
+ await openHelpWithLatency(h,()=>portal==='customer'?h.renderer.root.findAllByType('button').find(b=>b.children.includes('How to use')).props.onClick():h.renderer.root.findByProps({'aria-label':'Help & onboarding'}).props.onClick());
+ assert.equal(h.renderer.root.findAllByProps({className:'portal-manual'}).length,1);assert.equal(h.renderer.root.findAllByType('video').length,1);assert.equal(h.backend.helpSigned.length,1);assert.equal(h.backend.helpSigned[0].bucket,'portal-guides');assert.equal(h.backend.helpSigned[0].expires,900);
+ const source=h.renderer.root.findByType('video').props.src;await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(h.renderer.root.findByType('video').props.src,source);assert.equal(h.backend.helpSigned.length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Video hướng dẫn sử dụng Gary Home/);assert.equal(h.site.sessionPhase,'ready');
+ await h.emit(authSession(portal==='customer'?'customer':'owner'));assert.equal(h.renderer.root.findByType('video').props.src,source);assert.equal(h.backend.helpSigned.length,1);
+});
+
+test('the featured manual respects publication and audience instead of exposing owner-only drafts',async t=>{
+ const h=await harness(t,{page:'staff'});addManual(h,{published:false});addManual(h,{id:'staff-only-manual',audience:'staff'});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Help & onboarding'}).props.onClick());assert.equal(h.renderer.root.findAllByProps({className:'portal-manual'}).length,0);assert.equal(h.backend.helpSigned?.length??0,0);
+});
+
+test('a pending manual access response cannot reopen the player after sign-out',async t=>{
+ const h=await harness(t,{customer:true});addManual(h);h.backend.helpSignedPending=deferred();
+ await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('How to use')).props.onClick());assert.equal(h.backend.helpSigned.length,1);
+ await h.emit(null);await act(async()=>h.backend.helpSignedPending.resolve());assert.equal(h.renderer.root.findAllByType('video').length,0);assert.equal(h.renderer.root.findAllByProps({className:'portal-manual'}).length,0);
 });

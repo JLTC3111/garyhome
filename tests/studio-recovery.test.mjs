@@ -922,7 +922,7 @@ test('the customer header never borrows a signed-in owner staff photo; About Us 
  for(const link of h.renderer.root.findAllByType('a').filter(n=>n.props.className?.includes('customer-login-link')))assert.equal(link.findAllByType('img').length,0);
  const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
  const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/services','/vinhomes','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Dịch vụ khác/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Other Services/);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Dịch vụ khác/);
  const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({id:'about-navigation-links'}).length,0);
 });
 test('the landlord page translates and submits through the private introduction API',async t=>{
@@ -990,8 +990,18 @@ test('a pending guest-favourite transfer never crosses into another account',asy
 
 test('About Us opens on desktop hover, closes outside its container and stays click-operated on touch',async t=>{
  const h=await harness(t,{guest:true,page:'header',path:'/'}),about=()=>h.renderer.root.findByProps({className:'about-navigation'}),trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});
- await act(async()=>about().props.onPointerEnter({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onPointerLeave({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>about().props.onPointerEnter({pointerType:'touch'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:null}));assert.equal(trigger().props['aria-expanded'],false);
+ await act(async()=>about().props.onPointerEnter({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onPointerLeave({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>about().props.onPointerEnter({pointerType:'touch'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:{}}));assert.equal(trigger().props['aria-expanded'],false);
  const nav=h.renderer.root.findByProps({id:'site-navigation'}),items=nav.children.filter(child=>typeof child!=='string');assert.equal(items[0].props.className,'district-navigation');assert.equal(items[1].props.className,'about-navigation');assert.ok(items[2].props.className.includes('header-feedback'));assert.equal(items[2].props.href,'/feedback');
+});
+
+test('touch blur keeps About links mounted until the visitor follows a destination',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/'}),about=()=>h.renderer.root.findByProps({className:'about-navigation'}),trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});
+ await act(async()=>trigger().props.onClick());
+ await act(async()=>about().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:null}));
+ assert.equal(trigger().props['aria-expanded'],true,'touch blur must not remove the tapped destination before click');
+ const links=about().findAllByType('a');assert.ok(links.length>0);
+ const destination=links.find(link=>link.props.href==='/contact');assert.ok(destination);
+ await act(async()=>destination.props.onClick());assert.equal(trigger().props['aria-expanded'],false);
 });
 
 test('area links retain their rental context through translation and enquiry submission',async t=>{

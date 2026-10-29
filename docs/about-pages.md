@@ -1,8 +1,8 @@
 # About Us navigation and editorial pages
 
-The bilingual header dropdown contains **Our Services**, **Tips & News**, **Contact** and **Landlords**. Contact has no separate header button. About Us, Apartments and Feedback use the same root navigation type size and weight on desktop and mobile. The former About Gary Home content has been removed; `/about` permanently redirects to `/services` for old bookmarks and is excluded from the sitemap.
+The bilingual header dropdown contains **Other Services**, **Tips & News**, **Contact** and **Landlords**. Contact has no separate header button. About Us, Apartments and Feedback use the same root navigation type size and weight on desktop and mobile. The former About Gary Home content has been removed; `/about` permanently redirects to `/services` for old bookmarks and is excluded from the sitemap.
 
-Our Services uses the approved Đặng Thai Mai living-room photo. It is different from the home hero in both URL and image content; changing the homepage hero in Studio no longer changes this page's photo.
+Other Services uses the approved Đặng Thai Mai living-room photo. It is different from the home hero in both URL and image content; changing the homepage hero in Studio no longer changes this page's photo.
 
 Tips & News contains three original bilingual news/explainer articles and the three existing rental guides. News lives in `lib/news-articles.ts`, guides in `lib/rental-guides.ts`, with combined routing, document titles, metadata, Article JSON-LD and sitemap coverage. Unknown slugs return 404. The articles show their actual Gary Home publication date, source links and labelled illustrative Gary Home rental photos. Existing guides remain undated. There are no copied competitor articles, invented bylines or fabricated market prices. This is a public editorial section; an article editor in Studio has not been added.
 

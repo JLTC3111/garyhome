@@ -70,4 +70,4 @@
 .rental-site-header .main-nav>a.header-feedback{display:inline-flex;align-items:center;justify-content:center;gap:9px;background:transparent;border:0;border-radius:8px;padding:11px 18px;color:var(--green);min-height:44px;text-decoration:none}
 .rental-site-header .main-nav>a.header-feedback:hover,.rental-site-header .main-nav>a.header-feedback:focus-visible{background:transparent;border-color:transparent;color:#223e2e}
 .about-dropdown::before{content:"";position:absolute;left:0;right:0;top:-18px;height:18px}
-@media(max-width:1200px){.rental-site-header .main-nav>a.header-feedback{margin-top:12px;justify-content:space-between}.about-dropdown::before{display:none}.mobile-nav-portals{grid-template-columns:1fr}}
+@media(max-width:1200px){.rental-site-header .main-nav>a.header-feedback{margin-top:0;justify-content:space-between;min-height:47px;padding:13px 5px;border-bottom:1px solid #f1eee5;border-radius:0;text-align:left}.about-dropdown::before{display:none}.mobile-nav-portals{grid-template-columns:1fr}}

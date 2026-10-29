@@ -14,6 +14,7 @@
 /.next/
 /.vinext/
 /out/
+/public/shared/gary-apps/v1/
 next-env.d.ts
 *.tsbuildinfo
 

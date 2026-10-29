@@ -6,6 +6,10 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "build:gary-apps": "node scripts/build-gary-apps.mjs",
+    "predev": "npm run build:gary-apps",
+    "prebuild": "npm run build:gary-apps",
+    "prebuild:vercel": "npm run build:gary-apps",
     "install:ci": "node scripts/install-ci.mjs",
     "dev": "node scripts/run-framework.mjs dev",
     "build": "node scripts/run-framework.mjs build",
@@ -48,6 +52,8 @@
     "zod": "4.6.6"
   },
   "devDependencies": {
+    "esbuild": "0.28.1",
+    "postcss": "8.5.23",
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
     "@electric-sql/pglite": "0.5.11",

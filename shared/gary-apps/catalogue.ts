@@ -2,7 +2,7 @@ export type GaryAppId = "home" | "jobs" | "visa";
 export type GaryLanguage = "en" | "vi";
 export type GaryCopy = { en: string; vi: string };
 export type GaryApp = {
-  id: GaryAppId; name: string; url: string; host: string;
+  id: GaryAppId; name: GaryCopy; url: string; host: string;
   headline: GaryCopy; description: GaryCopy; shortDescription: GaryCopy;
   services: { label: GaryCopy; path: string }[];
 };
@@ -10,7 +10,7 @@ export type GaryApp = {
 // Shared, public information only. Keep URLs here rather than in individual pages.
 export const GARY_APPS: readonly GaryApp[] = [
   {
-    id: "home", name: "Gary Home", url: "https://garyhome.vn/", host: "garyhome.vn",
+    id: "home", name: { en: "Gary Home", vi: "Tìm Nhà" }, url: "https://garyhome.vn/", host: "garyhome.vn",
     headline: { en: "Find a place to call home.", vi: "Tìm nơi để gọi là nhà." },
     description: { en: "Explore serviced apartments and rentals in Hanoi. Save your shortlist and arrange a viewing with the team.", vi: "Khám phá căn hộ dịch vụ và nhà cho thuê tại Hà Nội. Lưu danh sách yêu thích và sắp xếp lịch xem cùng đội ngũ." },
     shortDescription: { en: "Apartments, rentals & viewings in Hanoi", vi: "Căn hộ, nhà cho thuê & lịch xem tại Hà Nội" },
@@ -21,7 +21,7 @@ export const GARY_APPS: readonly GaryApp[] = [
     ],
   },
   {
-    id: "jobs", name: "Gary Jobs", url: "https://jobs.garyhome.vn/", host: "jobs.garyhome.vn",
+    id: "jobs", name: { en: "Gary Jobs", vi: "Tìm Việc" }, url: "https://jobs.garyhome.vn/", host: "jobs.garyhome.vn",
     headline: { en: "Find your next teaching role.", vi: "Tìm công việc giảng dạy tiếp theo." },
     description: { en: "Discover English-teaching opportunities across Vietnam, connect with the recruitment team and explore life beyond the classroom.", vi: "Khám phá cơ hội giảng dạy tiếng Anh khắp Việt Nam, kết nối đội ngũ tuyển dụng và tìm hiểu cuộc sống ngoài lớp học." },
     shortDescription: { en: "Teaching jobs, recruitment & life in Vietnam", vi: "Việc làm giảng dạy, tuyển dụng & cuộc sống Việt Nam" },
@@ -32,7 +32,7 @@ export const GARY_APPS: readonly GaryApp[] = [
     ],
   },
   {
-    id: "visa", name: "Gary Visa Service", url: "https://visa.garyhome.vn/", host: "visa.garyhome.vn",
+    id: "visa", name: { en: "Gary Visa Service", vi: "Dịch Vụ Visa" }, url: "https://visa.garyhome.vn/", host: "visa.garyhome.vn",
     headline: { en: "Get support for your next step.", vi: "Được hỗ trợ cho bước tiếp theo." },
     description: { en: "Find guidance on visas, work permits, residence cards and supporting documents for your plans in Vietnam.", vi: "Tìm sự hỗ trợ về visa, giấy phép lao động, thẻ tạm trú và hồ sơ cần thiết cho kế hoạch tại Việt Nam." },
     shortDescription: { en: "Visas, work permits & document support", vi: "Visa, giấy phép lao động & hỗ trợ hồ sơ" },

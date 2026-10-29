@@ -61,6 +61,7 @@ test('service links separate same-site navigation from new-tab external destinat
  const h=await harness(t,'directory');
  for(const link of h.renderer.root.findAllByType('a'))if(link.props.href.startsWith('/'))assert.equal(link.props.target,undefined);else{assert.equal(link.props.target,'_blank');assert.equal(link.props.rel,'noopener noreferrer');}
  await h.update({language:'vi',currentApp:'jobs'});const content=JSON.stringify(h.renderer.toJSON());assert.match(content,/Tìm việc làm/);assert.match(content,/Du lịch Việt Nam/);assert.match(content,/Hỗ trợ visa/);assert.match(content,/Tìm nơi để gọi là nhà/);
+ for(const name of ['Tìm Nhà','Tìm Việc','Dịch Vụ Visa'])assert.ok(content.includes(name),name);assert.doesNotMatch(content,/Gary (Home|Jobs|Visa Service)/);
  assert.ok(h.renderer.root.findAllByType('a').some(link=>link.props.href==='/#opportunities'));assert.ok(h.renderer.root.findAllByType('a').some(link=>link.props.href==='https://garyhome.vn/homes'));
 });
 
@@ -68,6 +69,7 @@ test('the apps menu preserves its open state through translation, closes outside
  const h=await harness(t);assert.equal(h.renderer.root.findByType('details').props.open,false);assert.equal(h.listeners.size,0);
  await h.toggle();assert.equal(h.renderer.root.findByType('summary').props['aria-expanded'],true);assert.equal(h.listeners.size,1);assert.equal(h.opens,1);
  await h.update({language:'vi'});assert.equal(h.renderer.root.findByType('details').props.open,true);assert.equal(h.renderer.root.findByType('summary').props['aria-label'],'Khám phá các trang và dịch vụ Gary');
+ const menu=JSON.stringify(h.renderer.toJSON());for(const name of ['Tìm Nhà','Tìm Việc','Dịch Vụ Visa'])assert.ok(menu.includes(name),name);
  await act(async()=>h.document.dispatchEvent(new Event('pointerdown')));assert.equal(h.renderer.root.findByType('details').props.open,false);assert.equal(h.listeners.size,0);
 });
 

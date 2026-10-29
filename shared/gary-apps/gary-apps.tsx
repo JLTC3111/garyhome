@@ -30,9 +30,9 @@ export function GaryAppsDirectory({ language, currentApp, className = "", render
       const Icon = appIcons[app.id];
       return <article key={app.id} className={`gary-app-card gary-app-${app.id}`} data-current={app.id === currentApp}>
         <div className="gary-app-card-top"><span className="gary-app-mark" aria-hidden="true"><Icon size={24} strokeWidth={1.6}/></span><span>{app.id === currentApp ? copy(language, "THIS SITE", "TRANG HIỆN TẠI") : app.host}</span></div>
-        <p className="gary-app-name">{app.name}</p><h3>{text(app.headline, language)}</h3><p className="gary-app-description">{text(app.description, language)}</p>
+        <p className="gary-app-name">{text(app.name, language)}</p><h3>{text(app.headline, language)}</h3><p className="gary-app-description">{text(app.description, language)}</p>
         <ul>{app.services.map((service, index) => <li key={index}><AppLink {...shared} app={app.id} path={service.path}><span>{text(service.label, language)}</span><ArrowUpRight size={15} aria-hidden="true"/></AppLink></li>)}</ul>
-        <AppLink {...shared} app={app.id} className="gary-app-visit">{copy(language, "Explore", "Khám phá")} {app.name}<ArrowRight size={16} aria-hidden="true"/></AppLink>
+        <AppLink {...shared} app={app.id} className="gary-app-visit">{copy(language, "Explore", "Khám phá")} {text(app.name, language)}<ArrowRight size={16} aria-hidden="true"/></AppLink>
       </article>;
     })}</div>
   </section>;
@@ -62,7 +62,7 @@ export function GaryAppsMenu({ language, currentApp, className = "", renderLink,
     <summary ref={trigger} aria-expanded={open} aria-controls={id} aria-label={copy(language, "Explore Gary apps and services", "Khám phá các trang và dịch vụ Gary")} onClick={event => { event.preventDefault(); if (!open) onOpen?.(); setOpen(!open); }}><LayoutGrid size={17} aria-hidden="true"/><span>{copy(language, "Our Platforms", "Dịch vụ Gary")}</span><ChevronDown size={12} className="gary-apps-chevron" aria-hidden="true"/></summary>
     <nav className="gary-apps-menu-panel" id={id} aria-label={copy(language, "Gary websites and services", "Các trang và dịch vụ Gary")}>
       <div className="gary-apps-menu-heading"><strong>{copy(language, "Three sites. Here for your next step.", "Ba trang. Đồng hành cùng bước tiếp theo.")}</strong><p>{copy(language, "Find the right place to start.", "Tìm nơi bắt đầu phù hợp với bạn.")}</p></div>
-      <ul>{GARY_APPS.map(app => { const Icon = appIcons[app.id]; return <li key={app.id}><AppLink {...shared} app={app.id} className={`gary-app-menu-item gary-app-${app.id}`} onClick={follow}><span className="gary-app-mark" aria-hidden="true"><Icon size={22}/></span><span><strong>{app.name}{app.id === currentApp && <small>{copy(language, "This site", "Trang hiện tại")}</small>}</strong><span>{text(app.shortDescription, language)}</span><small className="gary-app-menu-host">{app.host}</small></span><ArrowUpRight size={17} aria-hidden="true"/></AppLink></li>; })}</ul>
+      <ul>{GARY_APPS.map(app => { const Icon = appIcons[app.id]; return <li key={app.id}><AppLink {...shared} app={app.id} className={`gary-app-menu-item gary-app-${app.id}`} onClick={follow}><span className="gary-app-mark" aria-hidden="true"><Icon size={22}/></span><span><strong>{text(app.name, language)}{app.id === currentApp && <small>{copy(language, "This site", "Trang hiện tại")}</small>}</strong><span>{text(app.shortDescription, language)}</span><small className="gary-app-menu-host">{app.host}</small></span><ArrowUpRight size={17} aria-hidden="true"/></AppLink></li>; })}</ul>
       <div className="gary-apps-menu-travel"><Compass size={17} aria-hidden="true"/><AppLink {...shared} app="jobs" path="/#life" onClick={follow}>{copy(language, "Travel & life in Vietnam", "Du lịch & cuộc sống tại Việt Nam")}<ArrowUpRight size={14} aria-hidden="true"/></AppLink></div>
       <AppLink {...shared} app="home" path="/services#gary-services" className="gary-apps-menu-all" onClick={follow}>{copy(language, "See all services", "Xem tất cả dịch vụ")}<ArrowRight size={16} aria-hidden="true"/></AppLink>
     </nav>

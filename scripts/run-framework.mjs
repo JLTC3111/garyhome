@@ -18,6 +18,8 @@ if (managedLinux && command === "build") {
 const cli = new URL(managedLinux
   ? "../node_modules/vite/bin/vite.js"
   : "../node_modules/vinext/dist/cli.js", import.meta.url);
+// Match the documented Gary Home/Auth URLs and avoid other Vite previews on 5173.
+const hasPort = args.some(arg => arg === "--port" || arg === "-p" || arg.startsWith("--port="));
 process.argv = [process.execPath, fileURLToPath(cli), command,
-  ...(!managedLinux && command === "dev" ? ["--port", "5173"] : []), ...args];
+  ...(!managedLinux && command === "dev" && !hasPort ? ["--port", "3000"] : []), ...args];
 await import(cli.href);

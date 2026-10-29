@@ -22,6 +22,7 @@ import "./area-gallery.css";
 import "./shiny-button.css";
 import "./editorial-studio.css";
 import "./rental-id-search.css";
+import "../shared/gary-apps/styles.css";
 import { SiteProvider } from "@/components/site-context";
 import { InteractionProvider } from "@/components/interaction-provider";
 import { Header, Footer } from "@/components/site-shell";

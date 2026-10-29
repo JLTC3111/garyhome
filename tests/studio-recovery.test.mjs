@@ -1172,3 +1172,11 @@ test('a pending manual access response cannot reopen the player after sign-out',
  await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('How to use')).props.onClick());assert.equal(h.backend.helpSigned.length,1);
  await h.emit(null);await act(async()=>h.backend.helpSignedPending.resolve());assert.equal(h.renderer.root.findAllByType('video').length,0);assert.equal(h.renderer.root.findAllByProps({className:'portal-manual'}).length,0);
 });
+
+test('Gary apps follow the public-header language without opening authentication',async t=>{
+ const h=await harness(t,{page:'header',path:'/',guest:true});
+ const summary=()=>h.renderer.root.findAllByType('summary').find(node=>node.props['aria-label']===(h.site.language==='vi'?'Khám phá các trang và dịch vụ Gary':'Explore Gary apps and services'));
+ await act(async()=>summary().props.onClick({preventDefault(){}}));assert.equal(h.renderer.root.findAllByType('details').filter(node=>node.props.open).length,1);
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findAllByType('details').filter(node=>node.props.open).length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Việc làm giảng dạy, tuyển dụng/);
+ const links=h.renderer.root.findAllByType('a');assert.ok(links.some(node=>node.props.href==='https://jobs.garyhome.vn/'));assert.ok(links.some(node=>node.props.href==='https://visa.garyhome.vn/'));assert.equal(h.backend.authCalls.length,0);
+});

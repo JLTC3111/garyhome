@@ -15,6 +15,7 @@ import { ShinyButton } from "./magicui/shiny-button";
 import TechText from "./react-bits/tech-text";
 import { DistrictGallery } from "./district-gallery";
 import { VinhomesCollection } from "./vinhomes-collection";
+import { ServiceAppsSection } from "./service-apps";
 import { filterProperties } from "@/lib/property-search";
 import type { PublicFeedback } from "@/lib/submissions";
 export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:PublicFeedback[];feedbackUnavailable?:boolean}){
@@ -80,6 +81,7 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
   <VinhomesCollection/>
 
   <Activities reviews={reviews} reviewsUnavailable={feedbackUnavailable}/>
+  <ServiceAppsSection className="container section"/>
   <HomeFaq/>
   <section className="container rental-home-contact"><div><div className="eyebrow">GARY HOME</div><h2>{t("Let’s arrange your next viewing.","Cùng sắp xếp buổi xem nhà tiếp theo.")}</h2><p>{t("Send your preferred properties and let the team confirm availability and lease terms.","Gửi những căn nhà bạn quan tâm để đội ngũ xác nhận tình trạng và điều kiện thuê.")}</p></div><ShinyButton href="/contact">{t("Contact us","Liên hệ")}<ArrowUpRight size={18}/></ShinyButton></section>
  </>;

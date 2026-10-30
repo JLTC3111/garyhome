@@ -1,5 +1,7 @@
 import type { EditorialArticle } from "./editorial";
 export type Language = "en" | "vi";
+export type PriceCurrency = "USD" | "VND";
+export type ExchangeRate = { usdToVnd: number; updatedAt: string; nextUpdateAt: string; provider?: "vietcombank" | "exchange-rate-api"; basis?: "sell" | "reference" };
 export type Property = {
   id: string; slug: string; title_en: string; title_vi: string;
   listing_code?: string; author_id?: string | null;
@@ -9,7 +11,8 @@ export type Property = {
   location_en?: string; location_vi?: string;
   furnishings_en?: string; furnishings_vi?: string; seo_features?: string[];
   description_en: string; description_vi: string; district_slug: string;
-  address: string; price: number | null; currency: string;
+  address: string; price: number | null; price_max?: number | null; currency: string;
+  price_vnd?: number | null; price_vnd_max?: number | null;
   listing_type: "rent" | "sale"; property_type: string;
   bedrooms: number; bathrooms: number | null; area_sqm: number | null;
   amenities: string[]; images: string[]; featured: boolean;

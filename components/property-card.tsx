@@ -7,10 +7,11 @@ import { Heart, BedDouble, Bath, Expand, ArrowUpRight, MapPin, ChevronLeft, Chev
 import { useSite } from "./site-context";
 import { listingCode, propertyTitle, rentalTermLabel, typeLabel } from "@/lib/rentals";
 import type { Property } from "@/lib/types";
+import { formatPriceQuote, propertyPrice } from "@/lib/property-pricing";
 
 export function Price({property,large=false}:{property:Property;large?:boolean}) {
-  const {t,language}=useSite();const period=property.price_period||"month";
-  return <span className={`price ${large?"price-large":""}`}>{property.price!==null?<><strong>{property.currency==="USD"?"$":property.currency+" "}{property.price.toLocaleString(language==="vi"?"vi-VN":"en-US")}</strong><small> / {period==="night"?t("night","đêm"):period==="week"?t("week","tuần"):t("month","tháng")}</small></>:<strong className="price-request">{t("Price on request","Liên hệ giá")}</strong>}</span>;
+  const {t,language,currency,exchangeRate}=useSite();const period=property.price_period||"month",quote=propertyPrice(property,currency,exchangeRate),price=quote?formatPriceQuote(quote,language):null;
+  return <span className={`price ${large?"price-large":""}`}>{price!==null?<><strong className={quote?.currency==="VND"?"price-vnd":undefined} title={quote?.approximate?t("Approximate conversion","Giá quy đổi tham khảo"):undefined}>{price}</strong>{quote?.fallback&&<small className="price-currency-fallback">{quote.currency} · {t("entered price","giá đã nhập")}</small>}<small> / {period==="night"?t("night","đêm"):period==="week"?t("week","tuần"):t("month","tháng")}</small></>:<strong className="price-request">{t("Price on request","Liên hệ giá")}</strong>}</span>;
 }
 export function PropertyCard({property:p}:{property:Property}) {
   const {t,language,saved,toggleSaved,pendingSaved,content}=useSite();

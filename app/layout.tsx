@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 import { LANGUAGE_BOOTSTRAP, languageValue } from "@/lib/language";
+import { CURRENCY_COOKIE, currencyValue } from "@/lib/currency";
+import { getExchangeRate } from "@/lib/exchange-rate-server";
 import { loadPageContent, pageMetadata, siteUrl } from "@/lib/seo";
 import type { Metadata } from "next";
 import "./globals.css";
@@ -41,12 +43,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initial = await loadPageContent();
-  const initialLanguage=languageValue((await cookies()).get("gary-language")?.value);
+  const [content, exchangeRate] = await Promise.all([loadPageContent(), getExchangeRate()]);
+  const initial = { ...content, exchangeRate };
+  const preferences = await cookies();
+  const initialLanguage=languageValue(preferences.get("gary-language")?.value);
+  const initialCurrency=currencyValue(preferences.get(CURRENCY_COOKIE)?.value);
   return (
-    <html lang={initialLanguage}>
+    // The head bootstrap can add the temporary language-pending attribute before
+    // hydration. Limit this escape hatch to the intentional root attributes.
+    <html lang={initialLanguage} suppressHydrationWarning>
       <head><link rel="preload" href="/fonts/be-vietnam-pro-regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><script id="gary-language-bootstrap" dangerouslySetInnerHTML={{__html:LANGUAGE_BOOTSTRAP}}/><style>{`html[data-language-pending] body{visibility:hidden}`}</style></head>
-      <body><InteractionProvider><SiteProvider initial={initial} initialLanguage={initialLanguage}><DocumentTitle/><a className="skip-link" href="#main-content">{initialLanguage==="vi"?"Đến nội dung chính":"Skip to content"}</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></InteractionProvider></body>
+      <body><InteractionProvider><SiteProvider initial={initial} initialLanguage={initialLanguage} initialCurrency={initialCurrency}><DocumentTitle/><a className="skip-link" href="#main-content">{initialLanguage==="vi"?"Đến nội dung chính":"Skip to content"}</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></InteractionProvider></body>
     </html>
   );
 }

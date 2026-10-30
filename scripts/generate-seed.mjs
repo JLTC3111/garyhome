@@ -4,7 +4,7 @@ const properties=JSON.parse(await readFile(new URL('data/properties.json',root),
 const {neighbourhoods,settings}=JSON.parse(await readFile(new URL('data/site-content.json',root),'utf8'));
 // Keep this seed usable after the original schema as well as the full setup.
 // New rental columns get their safe defaults and source descriptions in migration.
-const rentalColumns=new Set(['published_at','listing_code','author_id','price_period','rental_term','overview_en','overview_vi','location_en','location_vi','furnishings_en','furnishings_vi','seo_features','whatsapp_phone','zalo_phone']);
+const rentalColumns=new Set(['price_vnd','price_vnd_max','price_max','published_at','listing_code','author_id','price_period','rental_term','overview_en','overview_vi','location_en','location_vi','furnishings_en','furnishings_vi','seo_features','whatsapp_phone','zalo_phone']);
 const legacy=record=>Object.fromEntries(Object.entries(record).filter(([key])=>!rentalColumns.has(key)));
 function sql(value){
   if(value===null)return 'null';

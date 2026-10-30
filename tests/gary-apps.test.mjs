@@ -69,7 +69,7 @@ test('the apps menu preserves its open state through translation, closes outside
  const h=await harness(t);assert.equal(h.renderer.root.findByType('details').props.open,false);assert.equal(h.listeners.size,0);
  await h.toggle();assert.equal(h.renderer.root.findByType('summary').props['aria-expanded'],true);assert.equal(h.listeners.size,1);assert.equal(h.opens,1);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Other Services/);
- await h.update({language:'vi'});assert.equal(h.renderer.root.findByType('details').props.open,true);assert.equal(h.renderer.root.findByType('summary').props['aria-label'],'Khám phá các trang và dịch vụ Gary');assert.match(JSON.stringify(h.renderer.toJSON()),/Other Services/);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Services|Dịch vụ Gary/);
+ await h.update({language:'vi'});assert.equal(h.renderer.root.findByType('details').props.open,true);assert.equal(h.renderer.root.findByType('summary').props['aria-label'],'Khám phá các trang và dịch vụ Gary');assert.match(JSON.stringify(h.renderer.toJSON()),/Dịch vụ khác/);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Services|Dịch vụ Gary/);
  const menu=JSON.stringify(h.renderer.toJSON());for(const name of ['Tìm Nhà','Tìm Việc','Dịch Vụ Visa'])assert.ok(menu.includes(name),name);
  await act(async()=>h.document.dispatchEvent(new Event('pointerdown')));assert.equal(h.renderer.root.findByType('details').props.open,false);assert.equal(h.listeners.size,0);
 });

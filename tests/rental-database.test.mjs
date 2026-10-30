@@ -13,7 +13,7 @@ test('the fresh-project setup includes every rental schema item and public sourc
  alter table storage.objects enable row level security;grant usage on schema auth,public,storage to anon,authenticated;
  alter default privileges in schema public grant all on tables to anon,authenticated;`);
  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
- await db.exec('set role anon');assert.equal((await db.query('select id,listing_code,author_id from public.properties')).rows.length,15);
+ await db.exec('set role anon');const properties=(await db.query('select id,listing_code,author_id,price_max from public.properties')).rows;assert.equal(properties.length,15);assert.ok(properties.every(p=>p.price_max===null));
  assert.equal((await db.query('select id from public.listing_authors')).rows.length,1);
  assert.equal((await db.query('select id from public.site_activities')).rows.length,18);
  assert.equal((await db.query("select image_url from public.site_activities where category='team'")).rows[0].image_url,'/images/ourteam/gary-home-team.png');
@@ -35,9 +35,25 @@ test('rental catalogue, public authors, media and carts enforce their real Postg
  await db.exec(await readFile(new URL('../supabase/migrations/20261022042327_customer_social_auth_staff_access.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/seed.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20261023093632_rental_catalogue_brand_and_authors.sql',import.meta.url),'utf8'));
+ const originalPrices=(await db.query('select id,price from public.properties order by id')).rows;
+ await db.exec(await readFile(new URL('../supabase/migrations/20261030065219_property_price_range.sql',import.meta.url),'utf8'));
+ assert.deepEqual((await db.query('select id,price from public.properties order by id')).rows,originalPrices);
  async function as(role='postgres',id=''){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role '+role);}
  const home=(await db.query('select id,listing_code from public.properties order by sort_order limit 1')).rows[0];
  let sale,draft;
+ await t.test('editors can save ranges, fixed prices and price on request; invalid ranges are rejected',async()=>{
+  await as('authenticated',owner);
+  const saved=(await db.query('update public.properties set price=600,price_max=800 where id=$1 returning price,price_max',[home.id])).rows[0];
+  assert.deepEqual(saved,{price:'600.00',price_max:'800.00'});
+  for(const [price,max] of [[900,800],[null,800],[600,-1],[600,'NaN']])await assert.rejects(db.query('update public.properties set price=$1,price_max=$2 where id=$3',[price,max,home.id]),error=>error.code==='23514');
+  await as('anon');assert.equal((await db.query('select price_max from public.properties where id=$1',[home.id])).rows[0].price_max,'800.00');
+  await assert.rejects(db.query('update public.properties set price_max=900 where id=$1',[home.id]));
+  await as('authenticated',alice);assert.equal((await db.query('update public.properties set price_max=900 where id=$1 returning id',[home.id])).rows.length,0);
+  await as('authenticated',owner);
+  await db.query('update public.properties set price=600,price_max=600 where id=$1',[home.id]);
+  await db.query('update public.properties set price=600,price_max=null where id=$1',[home.id]);
+  const unknown=(await db.query('update public.properties set price=null,price_max=null where id=$1 returning price,price_max',[home.id])).rows[0];assert.deepEqual(unknown,{price:null,price_max:null});
+ });
  await t.test('IDs are unique, permanent and assigned to future listings; lease lengths remain unconfirmed',async()=>{
   const rows=(await db.query('select listing_code,rental_term,author_id from public.properties')).rows;
   assert.equal(rows.length,15);assert.equal(new Set(rows.map(p=>p.listing_code)).size,15);assert.ok(rows.every(p=>/^GH-\d{6}$/.test(p.listing_code)&&p.rental_term==='on_request'&&p.author_id));

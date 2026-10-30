@@ -14,6 +14,7 @@ const require=createRequire(path.join(base,'package.json'));
 const fixture={...JSON.parse(fs.readFileSync(path.join(base,'data/site-content.json'),'utf8')),properties:JSON.parse(fs.readFileSync(path.join(base,'data/properties.json'),'utf8')),editorial:JSON.parse(fs.readFileSync(path.join(base,'data/editorial.json'),'utf8')),authors:[],activities:[]};
 const user=id=>({id,email:`${id}@example.invalid`,aud:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'});
 const authSession=id=>({user:user(id),access_token:'test-token',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer'});
+const currencyTestRate={usdToVnd:25000,updatedAt:new Date(Date.now()-3600000).toISOString(),nextUpdateAt:new Date(Date.now()+86400000).toISOString()};
 const deferred=()=>{let resolve;const promise=new Promise(yes=>{resolve=yes;});return {promise,resolve};};
 
 // Load the real TSX components into React's test renderer. Substitute only the
@@ -50,12 +51,13 @@ async function harness(t, options={}){
    if(body.action==='prepare')return Response.json({permit:'test-permit',expires:Date.now()+7200000,url:'https://unit-test.invalid',key:'public-test-key',files:body.files.map((file,i)=>({...file,id:'test-file-'+i,path:'test-submission/'+i+'.png',token:'scoped-token'}))});
    if(backend.landlordFinalError)return Response.json({error:'connection'},{status:503});return Response.json({ok:true,id:'test-submission'},{status:201});
   }
+  if(String(input)==='/api/exchange-rate')return Response.json({rate:backend.exchangeRate});
   if(String(input)==='/api/enquiries'){backend.enquiryPosts??=[];backend.enquiryPosts.push({data:JSON.parse(init.body),headers:new Headers(init.headers)});return Response.json({ok:true},{status:201});}
   if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return backend.passwordError?Response.json({message:'Auth unavailable'},{status:503}):Response.json({});}
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
- const backend={role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{editorial_articles:structuredClone(fixture.editorial),enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[],portal_guides:JSON.parse(fs.readFileSync(path.join(base,'data/portal-guides.json'),'utf8')).map(row=>({...row,created_at:'2026-10-28T00:00:00Z',updated_at:'2026-10-28T00:00:00Z'})),portal_guide_files:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
+ const backend={exchangeRate:Object.hasOwn(options,'exchangeRate')?options.exchangeRate:currencyTestRate,role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{editorial_articles:structuredClone(fixture.editorial),enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[],portal_guides:JSON.parse(fs.readFileSync(path.join(base,'data/portal-guides.json'),'utf8')).map(row=>({...row,created_at:'2026-10-28T00:00:00Z',updated_at:'2026-10-28T00:00:00Z'})),portal_guide_files:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
   const filters={},query={};
   query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
@@ -113,9 +115,11 @@ async function harness(t, options={}){
     if(!writing&&backend.readErrors.has(table))return Promise.resolve({data:null,error:backend.readErrors.get(table)}).then(resolve,reject);
     let rows=structuredClone(backend.rows[table]??fixture[table]??[]);
     if(Array.isArray(rows)&&filters.user_id)rows=rows.filter(row=>row.user_id===filters.user_id);
+    if(table==='properties'&&filters.listing_code)rows=rows.filter(row=>row.listing_code===filters.listing_code);
+    if(table==='properties'&&filters.id)rows=rows.filter(row=>row.id===filters.id);
     if(table==='portal_guides'||table==='portal_guide_files')rows=rows.filter(row=>Object.entries(filters).every(([key,value])=>Array.isArray(value)?value.includes(row[key]):row[key]===value));
     if(single&&Array.isArray(rows))rows=rows[0]??null;
-    const value=table==='team_members'?{data:backend.role?{role:backend.role}:null,error:backend.roleError?new Error('Offline'):null}:table==='site_settings'?{data:structuredClone(fixture.settings),error:null}:{data:writing?payload:rows,error:null};
+    const value=table==='team_members'?{data:backend.role?{role:backend.role}:null,error:backend.roleError?new Error('Offline'):null}:table==='site_settings'?{data:structuredClone(fixture.settings),error:null}:{data:writing?(table==='properties'&&writeMethod==='insert'?{...payload,listing_code:payload.listing_code||'GH-900001'}:payload):rows,error:null};
     // Instant mocks settle before React renders. Opt-in latency lets intermediate session phases commit, like a real network.
     return (backend.latency&&!writing?delay(backend.latency).then(()=>value):Promise.resolve(value)).then(resolve,reject);
    };
@@ -150,6 +154,7 @@ async function harness(t, options={}){
   :options.page==='property'?load(path.join(base,'components/property-detail.tsx')).PropertyDetail
   :options.page==='error'?load(path.join(base,'app/error.tsx')).default
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
+  :options.page==='homes'?load(path.join(base,'components/homes-page.tsx')).HomesPage
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
   :options.page==='staff'?load(path.join(base,'components/admin-page.tsx')).AdminPage
   :options.page==='contact'?load(path.join(base,'components/content-pages.tsx')).ContactPage
@@ -163,7 +168,7 @@ async function harness(t, options={}){
   if(renderer)await act(async()=>{renderer.unmount();});
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
- const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback',articles:options.editorialPageRows,slug:options.propertyPage?.slug,property:options.propertyPage,neighbourhood:options.propertyArea,retry:options.retry})));
+ const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError,exchangeRate:backend.exchangeRate}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback',articles:options.editorialPageRows,slug:options.propertyPage?.slug,property:options.propertyPage,neighbourhood:options.propertyArea,retry:options.retry})));
  await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage));await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
@@ -189,14 +194,16 @@ test('portal chooser identifies both destinations without changing authenticatio
 });
 
 test('fresh server property props synchronize a persistent layout before rendering or translating',async t=>{
- const property={...fixture.properties[0],id:'fresh-property',slug:'freshly-published-rental',bedrooms:4,price:1777,updated_at:'2026-10-27T09:00:00Z'};
+ const property={...fixture.properties[0],id:'fresh-property',slug:'freshly-published-rental',bedrooms:4,price:1777,price_max:2000,updated_at:'2026-10-27T09:00:00Z'};
  const h=await harness(t,{guest:true,page:'property',propertyPage:property,path:'/homes/'+property.slug});
  assert.match(h.renderer.root.findByType('h1').children.join(''),/4-bedroom/);
  assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);
+ assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('$1,777–$2,000')));
  assert.equal(h.site.content.properties.length,fixture.properties.length+1);
  assert.equal(h.renderer.root.findAllByProps({className:'enquiry-form customer-submission-form'}).length,1);
  await act(async()=>h.site.setLanguage('vi'));
  assert.match(h.renderer.root.findByType('h1').children.join(''),/4 phòng ngủ/);
+ assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('$1.777–$2.000')));
  assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);
 });
 
@@ -529,6 +536,142 @@ test('slow uploads preserve concurrent text edits and cannot attach photos to a 
  assert.equal(title().props.value,'');assert.equal(h.renderer.root.findByProps({className:'editor-photo-grid'}).children.length,0);
 });
 
+test('new listing price ranges survive translation, save both bounds and reopen for editing',async t=>{
+ const h=await harness(t);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'});
+ for(const [label,value] of [['Property title · English','Price range home'],['Property title · Vietnamese','Căn hộ khoảng giá'],['URL slug','price-range-home'],['Public location / street','Tây Hồ']]){
+  await act(async()=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input').props.onChange({target:{value}}));
+ }
+ const input=name=>form().findByProps({name});
+ assert.equal(input('price').props.value,'');assert.equal(input('price_max').props.value,'');
+ await act(async()=>input('price').props.onChange({target:{value:'600'}}));
+ await act(async()=>input('price_max').props.onChange({target:{value:'800'}}));
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(input('price').props.value,600);assert.equal(input('price_max').props.value,800);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Khoảng giá · USD/);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const saved=h.backend.calls.find(call=>call.table==='properties');assert.equal(saved.method,'insert');assert.equal(saved.payload.price,600);assert.equal(saved.payload.price_max,800);
+ assert.equal(h.site.content.properties.find(row=>row.slug==='price-range-home').price_max,800);
+ await act(async()=>h.site.setLanguage('en'));
+ const row=()=>h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(item=>item.children.includes('Price range home')));
+ assert.ok(row().findAllByType('td').some(node=>node.children.includes('$600–$800')));
+ await act(async()=>row().findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ assert.equal(input('price').props.value,600);assert.equal(input('price_max').props.value,800);
+ // Clearing only the upper bound saves a fixed price; clearing both saves price on request.
+ for(const price of [600,null]){
+  await act(async()=>input('price_max').props.onChange({target:{value:''}}));
+  await act(async()=>input('price').props.onChange({target:{value:price===null?'':String(price)}}));
+  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+  const write=h.backend.calls.filter(call=>call.table==='properties').at(-1);assert.equal(write.method,'update');assert.equal(write.payload.price,price);assert.equal(write.payload.price_max,null);
+  await act(async()=>row().findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ }
+});
+
+test('the listing editor blocks reversed and upper-only ranges before any database write',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),input=name=>form().findByProps({name});
+ await act(async()=>input('price').props.onChange({target:{value:'900'}}));
+ await act(async()=>input('price_max').props.onChange({target:{value:'800'}}));
+ assert.equal(input('price_max').props.min,900);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/To price must be equal/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Giá Đến phải lớn hơn/);
+ await act(async()=>input('price').props.onChange({target:{value:''}}));assert.equal(input('price').props.required,true);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Nhập giá Từ trước/);
+});
+
+test('staff can save VND-only or dual quotes and retain both currencies through language changes',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ const edit=()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick();await act(async()=>edit());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),input=name=>form().findByProps({name});
+ for(const [name,value] of [['price',''],['price_max',''],['price_vnd','15000000'],['price_vnd_max','20000000']])await act(async()=>input(name).props.onChange({target:{value}}));
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Khoảng giá · VND/);assert.equal(input('price_vnd').props.value,15000000);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ let write=h.backend.calls.filter(call=>call.table==='properties').at(-1);assert.equal(write.payload.price,null);assert.equal(write.payload.price_vnd,15000000);assert.equal(write.payload.price_vnd_max,20000000);
+ await act(async()=>h.site.setLanguage('en'));await act(async()=>edit());
+ await act(async()=>input('price').props.onChange({target:{value:'600'}}));await act(async()=>input('price_max').props.onChange({target:{value:'800'}}));
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ write=h.backend.calls.filter(call=>call.table==='properties').at(-1);assert.equal(write.payload.price,600);assert.equal(write.payload.price_vnd,15000000);
+});
+
+test('visitor currency choices persist, prefer entered prices and mark converted amounts',async t=>{
+ const property={...fixture.properties[0],price:600,price_max:800,price_vnd:16000000,price_vnd_max:21000000,updated_at:new Date().toISOString()};
+ const h=await harness(t,{guest:true,page:'property',propertyPage:property,storage:{'gary-currency':'VND'}});
+ const prices=()=>h.renderer.root.findAllByType('strong').flatMap(node=>node.children.filter(value=>typeof value==='string'));
+ assert.equal(h.site.currency,'VND');assert.ok(prices().includes('16,000,000–21,000,000 ₫'));
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('USD')).props.onClick());
+ assert.equal(h.stored.get('gary-currency'),'USD');assert.match(h.page.cookie,/gary-currency=USD/);assert.ok(prices().includes('$600–$800'));
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(h.site.currency,'USD');
+ await act(async()=>h.site.setContent(content=>({...content,properties:content.properties.map(row=>row.id===property.id?{...row,price:null,price_max:null}:row)})));
+ assert.ok(prices().includes('≈ $640–$840'));
+});
+
+test('an unavailable exchange rate shows the entered currency clearly and keeps the chosen preference',async t=>{
+ const property={...fixture.properties[0],price:null,price_vnd:15000000,updated_at:new Date().toISOString()};
+ const h=await harness(t,{guest:true,page:'property',propertyPage:property,exchangeRate:null});
+ assert.equal(h.site.currency,'USD');assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('15,000,000 ₫')));
+ assert.match(JSON.stringify(h.renderer.toJSON()),/entered price/);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/≈ 15/);
+});
+
+test('currency changes convert budget bounds without changing their meaning or the submitted currency',async t=>{
+ const h=await harness(t,{guest:true,page:'homes',url:'https://gary.example/homes?min=600&max=800',storage:{'gary-currency':'VND'}});
+ const input=name=>h.renderer.root.findAllByType('input').find(node=>node.props.name===name);
+ assert.equal(input('min').props.value,'15000000');assert.equal(input('max').props.value,'20000000');assert.equal(input('currency').props.value,'VND');
+ await act(async()=>h.site.setCurrency('USD'));assert.equal(input('min').props.value,'600');
+ await act(async()=>input('min').props.onChange({target:{value:'650'}}));await act(async()=>h.site.setCurrency('VND'));
+ assert.equal(input('min').props.value,'16250000');assert.equal(input('max').props.value,'20000000');
+ const event=new Event('storage');Object.assign(event,{key:'gary-currency',newValue:'USD'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.site.currency,'USD');assert.equal(input('min').props.value,'650');
+});
+
+test('editable listing IDs reject local duplicates and preserve drafts after a concurrent database collision',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),id=()=>form().findByProps({name:'listing_code'});
+ await act(async()=>id().props.onChange({target:{value:fixture.properties[1].listing_code}}));assert.equal(id().props['aria-invalid'],true);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);
+ await act(async()=>id().props.onChange({target:{value:'gh 888'}}));await act(async()=>id().props.onBlur());assert.equal(id().props.value,'GH-000888');
+ h.backend.writeErrors.set('properties',{code:'23505',message:'duplicate key value violates unique constraint "properties_listing_code_key"'});
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ assert.equal(id().props.value,'GH-000888');assert.match(JSON.stringify(h.renderer.toJSON()),/already in use/);
+ const write=h.backend.calls.find(call=>call.table==='properties');assert.equal(write.filters.updated_at,fixture.properties[0].updated_at);
+ h.backend.writeErrors.clear();await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.site.content.properties[0].listing_code,'GH-000888');
+});
+
+test('listing ID availability checks include current database drafts absent from a stale local list',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ h.backend.rows.properties=[...structuredClone(fixture.properties),{...fixture.properties[0],id:'other-draft',listing_code:'GH-000888',status:'draft'}];
+ const id=()=>h.renderer.root.findByProps({name:'listing_code'});await act(async()=>id().props.onChange({target:{value:'GH-000888'}}));
+ await act(async()=>{await delay(450);});assert.equal(id().props['aria-invalid'],true);assert.match(JSON.stringify(h.renderer.toJSON()),/already in use/);
+});
+
+test('a stale save keeps the draft and refreshes the saved version for reopening',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ const edit=()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick();await act(async()=>edit());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),title=()=>form().findAllByType('input').find(node=>node.props.maxLength===200);
+ await act(async()=>title().props.onChange({target:{value:'My unsaved draft'}}));
+ h.backend.rows.properties=structuredClone(fixture.properties);h.backend.rows.properties[0]={...h.backend.rows.properties[0],title_en:'Saved by another editor',updated_at:new Date().toISOString()};
+ h.backend.writeErrors.set('properties',{code:'PGRST116',message:'No matching version'});
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ assert.equal(title().props.value,'My unsaved draft');assert.equal(h.site.content.properties[0].title_en,'Saved by another editor');assert.match(JSON.stringify(h.renderer.toJSON()),/draft is still open/);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());await act(async()=>edit());assert.equal(title().props.value,'Saved by another editor');
+});
+
+test('a slow save preserves newer edits while advancing their version for the next save',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),title=()=>form().findAllByType('input').find(node=>node.props.maxLength===200);
+ const pending=deferred();h.backend.writes.set('properties',pending);
+ await act(async()=>title().props.onChange({target:{value:'Submitted title'}}));await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const submitted=h.backend.calls.find(call=>call.table==='properties').payload,stamp=new Date(Date.now()+1000).toISOString();
+ await act(async()=>title().props.onChange({target:{value:'Typed while saving'}}));await act(async()=>{pending.resolve({data:{...submitted,updated_at:stamp},error:null});await delay(5);});
+ assert.equal(title().props.value,'Typed while saving');h.backend.writes.delete('properties');
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const second=h.backend.calls.filter(call=>call.table==='properties').at(-1);assert.equal(second.filters.updated_at,stamp);assert.equal(second.payload.title_en,'Typed while saving');
+});
+
 test('customer profile drafts survive idle recovery and language changes without editor access',async t=>{
  const h=await harness(t,{customer:true});
  const button=label=>h.renderer.root.findAllByType('button').find(node=>node.children.includes(label));
@@ -681,6 +824,7 @@ test('a stale property editor updates its original record and cannot insert a li
  const target=h.site.content.properties[0].id;
  await act(async()=>h.renderer.root.findAllByType('button').find(n=>n.children.includes('Edit')).props.onClick());
  h.backend.writeErrors.set('properties',{code:'PGRST116',message:'No row found'});
+ h.backend.rows.properties=structuredClone(fixture.properties).filter(row=>row.id!==target);
  await act(async()=>h.site.setContent(c=>({...c,properties:c.properties.filter(p=>p.id!==target)})));
  await act(async()=>{await h.renderer.root.findByProps({className:'editor-form'}).props.onSubmit({preventDefault(){}});await delay(5);});
  const write=h.backend.calls.find(c=>c.table==='properties');assert.equal(write.method,'update');assert.equal(write.filters.id,target);
@@ -922,7 +1066,7 @@ test('the customer header never borrows a signed-in owner staff photo; About Us 
  for(const link of h.renderer.root.findAllByType('a').filter(n=>n.props.className?.includes('customer-login-link')))assert.equal(link.findAllByType('img').length,0);
  const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
  const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/services','/vinhomes','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Other Services/);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Dịch vụ khác/);
+ await act(async()=>h.site.setLanguage('vi'));assert.ok(h.renderer.root.findByProps({id:'about-navigation-links'}).findAllByType('a').some(link=>link.props.href==='/services'&&link.children.includes('Other Services')));
  const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({id:'about-navigation-links'}).length,0);
 });
 test('the landlord page translates and submits through the private introduction API',async t=>{

@@ -7,6 +7,24 @@ test('Vietnamese search works with and without diacritics',()=>{for(const q of [
 test('combined filters apply together and exclude unpriced homes within a budget',()=>{const homes=[home,{...home,id:'two',price:null},{...home,id:'three',district_slug:'ba-dinh'}];assert.deepEqual(filterProperties(homes,{district:'tay-ho',max:'600',beds:'2',amenity:'Balcony'}).map(x=>x.id),['one']);});
 test('draft, archived, rented, and sold listings stay out of search',()=>{const homes=[home,{...home,status:'draft'},{...home,status:'archived'},{...home,availability:'rented'},{...home,availability:'sold'}];assert.equal(filterProperties(homes,{}).length,1);});
 test('unknown prices stay last in either price order',()=>{const homes=[home,{...home,id:'unknown',price:null},{...home,id:'low',price:200}];assert.deepEqual(filterProperties(homes,{sort:'price-low'}).map(x=>x.id),['low','one','unknown']);assert.deepEqual(filterProperties(homes,{sort:'price-high'}).map(x=>x.id),['one','low','unknown']);});
+test('monthly budget filters include overlapping price ranges and their endpoints',()=>{
+ const ranged={...home,price:600,price_max:800};
+ for(const filters of [{min:'700',max:'750'},{min:'800'},{max:'600'},{min:'500',max:'900'}])assert.equal(filterProperties([ranged],filters).length,1);
+ for(const filters of [{min:'801'},{max:'599'}])assert.equal(filterProperties([ranged],filters).length,0);
+ assert.equal(filterProperties([{...ranged,price_period:'night'}],{min:'700'}).length,0);
+ assert.equal(filterProperties([{...ranged,price:null,price_max:null}],{max:'900'}).length,0);
+});
+test('currency budgets and sorting prefer entered prices and convert only missing quotes',()=>{
+ const rate={usdToVnd:25000,updatedAt:new Date(Date.now()-3600000).toISOString(),nextUpdateAt:new Date(Date.now()+86400000).toISOString()};
+ const dual={...home,id:'dual',price:600,price_vnd:16000000},vnd={...home,id:'vnd',price:null,price_vnd:17500000},usd={...home,id:'usd',price:700},unknown={...home,id:'unknown',price:null};
+ const pricing={currency:'VND',exchangeRate:rate},homes=[unknown,vnd,dual,usd];
+ assert.deepEqual(filterProperties([dual],{currency:'VND',max:'15000000'},pricing),[]);
+ assert.equal(filterProperties([dual],{currency:'USD',max:'600'},pricing).length,1);
+ assert.deepEqual(filterProperties(homes,{currency:'VND',min:'17000000',max:'18000000'},pricing).map(p=>p.id).sort(),['usd','vnd']);
+ assert.deepEqual(filterProperties(homes,{min:'650',max:'750'},pricing).map(p=>p.id).sort(),['usd','vnd']);
+ assert.deepEqual(filterProperties(homes,{sort:'price-low'},pricing).map(p=>p.id),['dual','vnd','usd','unknown']);
+ assert.equal(filterProperties([vnd],{currency:'USD',max:'1000'}).length,0);
+});
 test('sale searches never include rentals and no-match searches return an empty result',()=>{assert.equal(filterProperties([home],{listing:'sale'}).length,0);assert.equal(filterProperties([home],{q:'nonexistent'}).length,0);});
 
 test('retired duration parameters do not hide rentals in older bookmarks',()=>{

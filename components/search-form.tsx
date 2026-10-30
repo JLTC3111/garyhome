@@ -8,10 +8,15 @@ import { Disclosure } from "./motion-primitives/disclosure";
 import { SpotlightCard } from "./react-bits/spotlight-card";
 import { AMENITIES, amenityLabel, canonicalAmenity, RENTAL_TYPES, typeLabel } from "@/lib/rentals";
 import type { Filters } from "@/lib/property-search";
+import { convertBudget, currencyValue } from "@/lib/currency";
+import { CurrencySwitcher } from "./currency-switcher";
 
 function BudgetField({initial,advanced=false}:{initial:Filters;advanced?:boolean}){
-  const {t}=useSite();
-  return <div className={`rental-price-field ${advanced?"rental-advanced-budget":"search-field"}`}><span><Wallet size={15}/>{t("MONTHLY BUDGET · USD","NGÂN SÁCH THÁNG · USD")}</span><div><input name="min" type="number" min="0" step="any" defaultValue={initial.min||""} placeholder={t("Min","Từ")} aria-label={t("Minimum rental price in USD","Giá thuê tối thiểu (USD)")}/><span aria-hidden="true">—</span><input name="max" type="number" min="0" step="any" defaultValue={initial.max||""} placeholder={t("Max","Đến")} aria-label={t("Maximum rental price in USD","Giá thuê tối đa (USD)")}/></div></div>;
+  const {t,currency="USD",exchangeRate}=useSite();
+  const [budget,setBudget]=useState(()=>({currency:initial.min||initial.max?currencyValue(initial.currency):currency,min:initial.min||"",max:initial.max||""}));
+  const min=convertBudget(budget.min,budget.currency,currency,exchangeRate,"min"),max=convertBudget(budget.max,budget.currency,currency,exchangeRate,"max");
+  const view=min===null||max===null?budget:{currency,min,max};
+  return <div className={`rental-price-field ${advanced?"rental-advanced-budget":"search-field"}`}><input type="hidden" name="currency" value={view.currency}/><span><Wallet size={15}/>{t("MONTHLY BUDGET","NGÂN SÁCH THÁNG")} · {view.currency}</span><div><input name="min" type="number" min="0" step={view.currency==="VND"?"1":"0.01"} value={view.min} onChange={event=>setBudget({...view,min:event.target.value})} placeholder={t("Min","Từ")} aria-label={t("Minimum rental price in ","Giá thuê tối thiểu · ")+view.currency}/><span aria-hidden="true">—</span><input name="max" type="number" min="0" step={view.currency==="VND"?"1":"0.01"} value={view.max} onChange={event=>setBudget({...view,max:event.target.value})} placeholder={t("Max","Đến")} aria-label={t("Maximum rental price in ","Giá thuê tối đa · ")+view.currency}/></div></div>;
 }
 function BedroomField({initial,main=false}:{initial:Filters;main?:boolean}){
   const {t}=useSite();
@@ -38,7 +43,7 @@ export function SearchForm({compact=false,initial={},action="/homes",roomsFirst=
         <label className="search-field rental-id-field"><span><Hash size={15}/>{t("APARTMENT / POST ID","MÃ CĂN HỘ / BÀI ĐĂNG")}</span><input name="id" type="search" defaultValue={initial.id||""} placeholder="GH-000005" maxLength={80} autoComplete="off" spellCheck={false} aria-label={t("Apartment or post ID","Mã căn hộ hoặc bài đăng")}/></label>
         <button className="button search-submit" type="submit"><Search size={18}/>{t("Find a rental","Tìm nhà thuê")}<ArrowRight size={17}/></button>
       </div>
-      <div className="rental-search-secondary"><span className="rental-requirements-hint">{roomsFirst?t("Budget, pets, gym, BBQ & more in Custom Requirements","Ngân sách, thú cưng, phòng tập, BBQ… trong Nhu cầu riêng"):t("Pets, gym, BBQ, lake views & more in Custom Requirements","Thú cưng, phòng tập, BBQ, tầm nhìn hồ… trong Nhu cầu riêng")}</span></div>
+      <div className="rental-search-secondary"><span className="rental-requirements-hint">{roomsFirst?t("Budget, pets, gym, BBQ & more in Custom Requirements","Ngân sách, thú cưng, phòng tập, BBQ… trong Nhu cầu riêng"):t("Pets, gym, BBQ, lake views & more in Custom Requirements","Thú cưng, phòng tập, BBQ, tầm nhìn hồ… trong Nhu cầu riêng")}</span><CurrencySwitcher/></div>
       <Disclosure open={advanced} id={`${id}-panel`} labelledBy={`${id}-trigger`}><div className="rental-advanced" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();setAdvanced(false);trigger.current?.focus();}}}>
         {roomsFirst?<BudgetField initial={initial} advanced/>:<><BedroomField initial={initial}/><BathroomField initial={initial}/></>}
         <label>{t("Keyword / street","Từ khóa / tên đường")}<input name="q" defaultValue={initial.q||""} placeholder={t("A street or property detail","Tên đường hoặc đặc điểm nhà")} maxLength={200}/></label>

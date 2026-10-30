@@ -3,8 +3,9 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { emailLinkIssue, emailTokenLink, passwordLinkEvidence, type PasswordLink, type EmailLinkIssue, type EmailTokenLink } from "@/lib/password-actions";
-import type { Content, Enquiry, Language } from "@/lib/types";
+import type { Content, Enquiry, ExchangeRate, Language, PriceCurrency } from "@/lib/types";
 import { languageValue, persistLanguage } from "@/lib/language";
+import { CURRENCY_COOKIE, currencyValue, persistCurrency, usableExchangeRate } from "@/lib/currency";
 import { studioText } from "@/lib/studio-i18n";
 import { browserClient, publicBrowserClient } from "@/lib/browser-client";
 import { readPublishedContent } from "@/lib/public-content";
@@ -22,6 +23,7 @@ type Update<T> = T | ((previous: T) => T);
 type SiteContext = {
   content: Content; setContent: (content: Update<Content>) => void;
   language: Language; setLanguage: (l: Language) => void; t: (en: string, vi: string) => string;
+  currency: PriceCurrency; setCurrency: (currency: PriceCurrency) => void; exchangeRate: ExchangeRate | null;
   saved: string[]; toggleSaved: (id: string) => void;
   savedReady: boolean; savedError: string; pendingSaved: string[];
   importSaved: () => Promise<number>;
@@ -40,7 +42,7 @@ type SiteContext = {
   notice: (message: string) => void;
 };
 const Context = createContext<SiteContext | null>(null);
-export function SiteProvider({ children, initial, initialLanguage = "en" }: { children: ReactNode; initialLanguage?: Language; initial: { content: Content; configured: boolean; error: boolean } }) {
+export function SiteProvider({ children, initial, initialLanguage = "en", initialCurrency = "USD" }: { children: ReactNode; initialLanguage?: Language; initialCurrency?: PriceCurrency; initial: { content: Content; configured: boolean; error: boolean; exchangeRate?: ExchangeRate | null } }) {
   const router=useRouter(),routerRef=useRef(router);
   useEffect(()=>{routerRef.current=router;},[router]);
   const [passwordLink,setPasswordLink]=useState<PasswordLink|null>(null);
@@ -52,6 +54,35 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   const [backendError, setBackendError] = useState(initial.error);
   const [contentRecovering, setContentRecovering] = useState(false);
   const [language, updateLanguage] = useState<Language>(initialLanguage);
+  const [currency, updateCurrency] = useState<PriceCurrency>(initialCurrency);
+  const [exchangeRate, updateExchangeRate] = useState<ExchangeRate | null>(initial.exchangeRate ?? null);
+  const setCurrency = useCallback((value: PriceCurrency) => { updateCurrency(value); persistCurrency(value); }, []);
+  useLayoutEffect(() => {
+    let selected = initialCurrency;
+    try { const stored = localStorage.getItem(CURRENCY_COOKIE); if (stored === "USD" || stored === "VND") selected = stored; } catch { /* Optional storage. */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    updateCurrency(selected); persistCurrency(selected);
+  }, [initialCurrency]);
+  useEffect(() => {
+    let active = true, running = false;
+    const controller = new AbortController();
+    const refreshRate = async () => {
+      if (running || !navigator.onLine) return;
+      running = true;
+      try {
+        const response = await fetchWithDeadline("/api/exchange-rate", { signal: controller.signal, credentials: "omit" }, 8000);
+        if (response.ok) {
+          const { rate } = await response.json() as { rate?: ExchangeRate };
+          if (active && usableExchangeRate(rate)) updateExchangeRate(current => !current || Date.parse(rate.updatedAt) >= Date.parse(current.updatedAt) ? rate : current);
+        }
+      } catch { /* Entered prices remain available when conversions cannot refresh. */ }
+      finally { running = false; if (active) updateExchangeRate(current => usableExchangeRate(current) ? current : null); }
+    };
+    if (!usableExchangeRate(initial.exchangeRate)) void refreshRate();
+    const timer = setInterval(() => void refreshRate(), 3600000);
+    window.addEventListener("online", refreshRate);
+    return () => { active = false; controller.abort(); clearInterval(timer); window.removeEventListener("online", refreshRate); };
+  }, [initial.exchangeRate]);
   useLayoutEffect(() => {
     let selected=initialLanguage;
     try{const stored=localStorage.getItem("gary-language");if(stored==="en"||stored==="vi")selected=stored;}catch{/* Optional storage. */}
@@ -363,7 +394,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   }, [client, user?.id, sessionPhase]);
 
   useEffect(() => {
-    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") {const selected=languageValue(event.newValue);updateLanguage(selected);persistLanguage(selected);} };
+    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") {const selected=languageValue(event.newValue);updateLanguage(selected);persistLanguage(selected);} if(event.key===CURRENCY_COOKIE){const selected=currencyValue(event.newValue);updateCurrency(selected);persistCurrency(selected);} };
     window.addEventListener("storage", syncLanguage); return () => window.removeEventListener("storage", syncLanguage);
   }, []);
   useLayoutEffect(() => { document.documentElement.lang = language; }, [language]);
@@ -450,7 +481,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en" }: { ch
   },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
 
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ content, setContent, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

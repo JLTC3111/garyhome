@@ -1,0 +1,13 @@
+# Editable listing IDs
+
+Staff can edit the displayed listing ID on new and existing listings. A new listing can leave it blank for automatic assignment; an existing listing requires an ID. Short numbers and pasted `GH` codes normalize to the `GH-000123` format, with six to twelve digits. The internal UUID and property URL stay unchanged, preserving links, favourites and related records. Historical enquiry snapshots retain the code recorded at that time.
+
+The field checks the local catalogue immediately and checks current database records after a short pause when a code changes. Availability is advisory until Save. The existing unique constraint reserves codes across published, draft and archived listings. A conflict at save time keeps the editor open and explains that another ID is required. Regular customers do not gain listing write access.
+
+Migration `20261030075152_editable_listing_ids.sql` replaces the old immutable-code trigger with an invoker trigger in the private schema. Code assignments take a transaction-scoped advisory lock. Automatic IDs continue from the existing sequence, skip custom codes already reserved, and preserve numbers longer than six digits. Custom assignments and automatic assignment use the same lock, with the unique index as the final concurrency check. Untrusted roles must have current staff access before allocating an ID. No sequence reset or existing-code rewrite is performed.
+
+Every update receives a monotonically advancing timestamp from the database. The Studio submits the timestamp it originally read as a condition on the update. If another editor has saved first, the stale save affects zero rows, refreshes the catalogue's saved version, and leaves the unsaved draft open. The message explains how to copy edits before closing and reopening the listing to review the saved version. Writes are not automatically replayed or silently merged. A slow save also advances the timestamp of newer edits in the same open form, so those edits can be saved normally afterward.
+
+Verification used simultaneous authenticated sessions in an isolated PostgreSQL 17 database: two custom saves claiming one code produced one success and one `23505` rejection; an automatic save racing a custom reservation selected the next free code; and simultaneous edits using the same timestamp accepted one update and left the stale update affecting zero rows. Local database tests also cover VND validation, normalization, all-status uniqueness, seven-digit generation, timestamp ownership, public reads and staff-only writes.
+
+The migration is applied to project `duyiihsmaqfgwezmsnjs` and included in fresh setup. The frontend changes are available locally and have not been deployed.

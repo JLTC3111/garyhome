@@ -9,7 +9,8 @@ import { listingCode, propertyTitle, rentalTermLabel, typeLabel } from "@/lib/re
 import type { Property } from "@/lib/types";
 import { formatPriceQuote, propertyPrice } from "@/lib/property-pricing";
 
-export function Price({property,large=false}:{property:Property;large?:boolean}) {
+type PriceProperty = Pick<Property, "price" | "price_max" | "price_vnd" | "price_vnd_max" | "currency" | "price_period">;
+export function Price({property,large=false}:{property:PriceProperty;large?:boolean}) {
   const {t,language,currency,exchangeRate}=useSite();const period=property.price_period||"month",quote=propertyPrice(property,currency,exchangeRate),price=quote?formatPriceQuote(quote,language):null;
   return <span className={`price ${large?"price-large":""}`}>{price!==null?<><strong className={quote?.currency==="VND"?"price-vnd":undefined} title={quote?.approximate?t("Approximate conversion","Giá quy đổi tham khảo"):undefined}>{price}</strong>{quote?.fallback&&<small className="price-currency-fallback">{quote.currency} · {t("entered price","giá đã nhập")}</small>}<small> / {period==="night"?t("night","đêm"):period==="week"?t("week","tuần"):t("month","tháng")}</small></>:<strong className="price-request">{t("Price on request","Liên hệ giá")}</strong>}</span>;
 }

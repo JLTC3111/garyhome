@@ -79,7 +79,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
       finally { running = false; if (active) updateExchangeRate(current => usableExchangeRate(current) ? current : null); }
     };
     if (!usableExchangeRate(initial.exchangeRate)) void refreshRate();
-    const timer = setInterval(() => void refreshRate(), 3600000);
+    const timer = setInterval(() => void refreshRate(), 300000);
     window.addEventListener("online", refreshRate);
     return () => { active = false; controller.abort(); clearInterval(timer); window.removeEventListener("online", refreshRate); };
   }, [initial.exchangeRate]);

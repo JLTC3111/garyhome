@@ -1,0 +1,31 @@
+.site-preferences{position:relative;flex-shrink:0;color:var(--green)}
+.site-preferences-trigger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:1px solid #ced9c4;border-radius:50%;background:#eef2e7;color:var(--green);flex-shrink:0}
+.site-preferences-trigger:hover,.site-preferences-trigger[aria-expanded=true]{background:#e4ecdb;border-color:#b4c5a5}
+.site-preferences-trigger>svg{flex-shrink:0}
+.site-preferences-trigger:focus-visible,.site-preferences-panel button:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
+.site-preferences-panel{position:absolute;top:calc(100% + 10px);right:0;z-index:100;width:min(300px,calc(100vw - 40px));max-height:calc(100dvh - 160px);overflow-y:auto;overscroll-behavior:contain;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:15px;box-shadow:0 15px 45px #23372826;text-align:left}
+.site-preferences-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
+.site-preferences-heading>strong{font-size:13px;line-height:1.6}
+.site-preferences-heading>.icon-button{width:36px;height:36px;flex-shrink:0;border:1px solid var(--line);border-radius:50%}
+.site-preferences-panel fieldset{padding:0;margin:0;border:0;min-width:0}
+.site-preferences-panel fieldset+fieldset{margin-top:20px}
+.site-preferences-panel legend{padding:0;margin-bottom:9px;font-size:11px;color:var(--muted);font-weight:500}
+.site-preferences-options{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.site-preferences-options>button{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:12px;background:#fff;color:var(--green);white-space:nowrap}
+.site-preferences-options>button[aria-pressed=true]{background:#e6eddd;border-color:#aec39e;font-weight:600}
+.site-preferences-panel .currency-switcher{display:flex;width:100%;border-radius:10px;padding:4px;gap:4px}
+.site-preferences-panel .currency-switcher>button{flex:1;min-height:44px;font-size:12px;border-radius:7px}
+@media(max-width:1200px){.site-preferences-panel{right:-56px}}
+@media(max-width:680px){
+ .rental-site-header .header-inner{gap:12px}
+ .rental-site-header .header-actions{gap:8px}
+ .rental-site-header .rental-brand img{width:193px;height:57px}
+ .rental-site-header .rental-brand .brand-tagline{font-size:6px;letter-spacing:.1em}
+ .site-preferences-panel{right:-52px}
+}
+@media(max-width:350px){
+ .rental-site-header .header-inner{gap:8px}
+ .rental-site-header .header-actions{gap:4px}
+ .rental-site-header .rental-brand img{width:155px;height:46px}
+ .site-preferences-panel{right:-48px}
+}

@@ -61,9 +61,11 @@ body{background:var(--paper)}
 
 .property-price-currencies{display:grid;gap:20px;min-width:0}
 .property-price-currencies>p:last-child{margin:0;font-size:10px;line-height:1.6;color:var(--muted)}
-.currency-switcher{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:20px;flex-shrink:0;background:#f1f2e9;color:var(--navy)}
+.currency-switcher{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid #c9d5de;border-radius:20px;flex-shrink:0;background:#edf2f6;color:#29485a}
 .currency-switcher>button{min-height:30px;min-width:40px;padding:5px 8px;border-radius:16px;font-size:10px;font-weight:600;line-height:1.4}
-.currency-switcher>button[aria-pressed=true]{background:var(--navy);color:#fff}
+.currency-switcher>button:hover{background:#dce7ee}
+.currency-switcher>button[aria-pressed=true]{background:var(--navy-blue);color:#fffdf8}
+.currency-switcher>button[aria-pressed=true]:hover{background:#2a4b60}
 .currency-switcher>button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
 .rental-search-secondary>.currency-switcher{margin-left:auto}
 .detail-price-choice{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex-shrink:0;max-width:100%}

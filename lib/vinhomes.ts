@@ -8,13 +8,8 @@ export type VinhomesProject = {
   images: string[]; sourceNote: string;
 };
 
-// These are the owner's supplied photographs and rental notes, not live USD listings.
+// Keep the owner's supplied photographs and original VND rental quotes.
 export const vinhomesProjects: readonly VinhomesProject[] = suppliedProjects;
-export function projectRent(project: VinhomesProject, language: Language) {
-  return new Intl.NumberFormat(language === "vi" ? "vi-VN" : "en-GB", {
-    style: "currency", currency: "VND", maximumFractionDigits: 0,
-  }).format(project.rentVnd);
-}
 export function projectSummary(project: VinhomesProject, language: Language) {
   return [
     `${project.bedrooms}${project.bedroomPlus ? "+" : ""} ${language === "vi" ? "phòng ngủ" : "bedrooms"}`,

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, ChevronDown, Menu, X, Phone, MapPin, UserRound, ShieldCheck } from "lucide-react";
 import { useSite } from "./site-context";
-import { LanguageSwitcher } from "./language-switcher";
-import { CurrencySwitcher, CurrencyNotice } from "./currency-switcher";
+import { CurrencyNotice } from "./currency-switcher";
+import { SitePreferences } from "./site-preferences";
 import { BackNavigation } from "./back-navigation";
 import { FavouritesDropdown } from "./favourites-dropdown";
 import { FloatingContact } from "./listing-author";
@@ -15,7 +15,7 @@ import { ServiceAppsMenu } from "./service-apps";
 export function Brand({light=false}:{light?:boolean}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href="/" aria-label={t("Gary Home homepage","Trang chủ Gary Home")}><ContentImage src="/images/brand/gary-home-logo.png" alt="Gary Home" width={220} height={64} sizes="(max-width: 640px) 193px, 220px" loading="eager"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></Link>;}
 function HeaderPortals({mobile=false,onFollow}:{mobile?:boolean;onFollow:()=>void}){
  const {t}=useSite();
- return <><Link className={`customer-login-link ${mobile?"":"desktop-band-control"}`} href="/account" onClick={onFollow} aria-label={t("Customer account","Tài khoản khách hàng")}><UserRound size={mobile?18:12}/><span className="portal-full-label">{t("Customer account","Tài khoản khách hàng")}</span><span className="portal-short-label">{t("Customer","Khách hàng")}</span></Link><Link className={`staff-login-link ${mobile?"":"desktop-band-control"}`} href="/admin" onClick={onFollow} aria-label={t("Staff login","Đăng nhập nhân viên")}><ShieldCheck size={mobile?18:12}/><span className="portal-full-label">{t("Staff login","Đăng nhập nhân viên")}</span><span className="portal-short-label">{t("Staff","Nhân viên")}</span></Link></>;
+ return <><Link className={`customer-login-link ${mobile?"":"desktop-band-control"}`} href="/account" onClick={onFollow} aria-label={t("Customer Login","Đăng nhập khách hàng")}><UserRound size={mobile?18:14}/><span>{t("Customer Login","Đăng nhập khách hàng")}</span></Link><Link className={`staff-login-link ${mobile?"":"desktop-band-control"}`} href="/admin" onClick={onFollow} aria-label={t("Staff Login","Đăng nhập nhân viên")}><ShieldCheck size={mobile?18:14}/><span>{t("Staff Login","Đăng nhập nhân viên")}</span></Link></>;
 }
 export function Header(){
  const {t,content}=useSite(),path=usePathname();
@@ -31,7 +31,7 @@ export function Header(){
  if(path.startsWith("/admin"))return null;
  const aboutLinks=[["/services",t("Other Services","Other Services")],["/vinhomes",t("Vinhomes collection","Bộ sưu tập Vinhomes")],["/tips-and-news",t("Tips & News","Cẩm nang & tin tức")],["/contact",t("Contact","Liên hệ")],["/landlords",t("Landlords","Dành cho chủ nhà")]];
  return <header className="site-header rental-site-header" ref={header}>
-  <div className="top-strip"><div className="container rental-header-band"><div className="rental-band-contact"><BackNavigation/><a className="top-strip-phone" href={`tel:${content.settings.contact_phone.replace(/[^+\d]/g,"")}`}><Phone size={16}/><span>{content.settings.contact_phone}</span></a><LanguageSwitcher className="desktop-band-control"/><CurrencySwitcher className="desktop-band-control"/></div><div className="top-strip-actions"><ServiceAppsMenu className="gary-apps-menu--header" onFollow={close} onOpen={()=>setDropdown(null)}/><FavouritesDropdown onOpen={close}/><HeaderPortals onFollow={close}/></div></div></div>
+  <div className="top-strip"><div className="container rental-header-band"><div className="rental-band-contact"><BackNavigation/><a className="top-strip-phone" href={`tel:${content.settings.contact_phone.replace(/[^+\d]/g,"")}`}><Phone size={16}/><span>{content.settings.contact_phone}</span></a></div><div className="top-strip-actions"><ServiceAppsMenu className="gary-apps-menu--header" onFollow={close} onOpen={()=>setDropdown(null)}/><FavouritesDropdown onOpen={close}/><HeaderPortals onFollow={close}/></div></div></div>
   <div className="header-nav"><div className="container header-inner"><Brand/><nav className={open?"main-nav nav-open":"main-nav"} id="site-navigation" aria-label={t("Main navigation","Điều hướng chính")}>
    <div className="district-navigation"><button ref={districtTrigger} type="button" aria-expanded={dropdown==="districts"} aria-controls="apartment-districts" onClick={()=>setDropdown(dropdown==="districts"?null:"districts")}>{t("Apartments","Căn hộ")}<ChevronDown size={13}/></button>{dropdown==="districts"&&<div className="district-dropdown" id="apartment-districts"><Link href="/homes?type=Apartment" onClick={close}>{t("All apartments","Tất cả căn hộ")}<ArrowUpRight size={14}/></Link>{content.neighbourhoods.map(n=><Link key={n.slug} href={`/homes?type=Apartment&district=${n.slug}`} onClick={close}>{n.name}<ArrowUpRight size={13}/></Link>)}</div>}</div>
    <div className="about-navigation" onPointerEnter={event=>{if(event.pointerType==="mouse"&&!window.matchMedia?.("(max-width: 1200px)").matches)setDropdown("about");}} onPointerLeave={event=>{if(event.pointerType==="mouse")setDropdown(previous=>previous==="about"?null:previous);}} onBlur={event=>{if(event.relatedTarget&&!event.currentTarget.contains(event.relatedTarget as Node))setDropdown(previous=>previous==="about"?null:previous);}}><button ref={aboutTrigger} type="button" aria-expanded={dropdown==="about"} aria-controls="about-navigation-links" onClick={()=>setDropdown(dropdown==="about"?null:"about")} onKeyDown={event=>{if(event.key==="ArrowDown"){event.preventDefault();setDropdown("about");queueMicrotask(()=>aboutMenu.current?.querySelector<HTMLAnchorElement>("a")?.focus());}}}>{t("About Us","Về chúng tôi")}<ChevronDown size={13}/></button>
@@ -39,8 +39,8 @@ export function Header(){
    </div>
    <Link className="button button-small header-feedback" href="/feedback" onClick={close}>{t("Feedback","Phản hồi")}<ArrowUpRight size={15}/></Link>
    <div className="mobile-app-services"><ServiceAppsMenu onFollow={close} onOpen={()=>setDropdown(null)}/></div>
-   <div className="mobile-nav-tools"><div className="mobile-nav-portals"><HeaderPortals mobile onFollow={close}/></div><div className="mobile-nav-language"><span>{t("Language","Ngôn ngữ")}</span><LanguageSwitcher/></div><div className="mobile-nav-language"><span>{t("Price currency","Tiền tệ giá thuê")}</span><CurrencySwitcher/></div></div>
-  </nav><div className="header-actions"><button ref={menu} className="mobile-menu icon-button" type="button" aria-label={open?t("Close menu","Đóng menu"):t("Open menu","Mở menu")} aria-controls="site-navigation" aria-expanded={open} onClick={()=>{setOpen(!open);setDropdown(null);}}>{open?<X/>:<Menu/>}</button></div></div></div>
+   <div className="mobile-nav-tools"><div className="mobile-nav-portals"><HeaderPortals mobile onFollow={close}/></div></div>
+  </nav><div className="header-actions"><SitePreferences onOpen={close}/><button ref={menu} className="mobile-menu icon-button" type="button" aria-label={open?t("Close menu","Đóng menu"):t("Open menu","Mở menu")} aria-controls="site-navigation" aria-expanded={open} onClick={()=>{setOpen(!open);setDropdown(null);}}>{open?<X/>:<Menu/>}</button></div></div></div>
  </header>;
 }
 type FooterItem={href:string;label:string;icon?:typeof Phone};

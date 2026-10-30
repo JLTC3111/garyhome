@@ -66,10 +66,10 @@ test('district cards render native links without a motion-provider dependency an
  await p.unmount();assert.equal(p.callbacks.size,0);assert.ok(p.observers.every(o=>o.closed));assert.equal(listeners.size,0);
 });
 
-test('Vinhomes uses the supplied homes, original currency and local photos with no invented missing specifications',()=>{
- const load=loader({current:{}}),{vinhomesProjects,projectSummary,projectRent,enquiryContext}=load(path.join(root,'lib/vinhomes.ts'));
+test('Vinhomes keeps the supplied homes and local photos with no invented missing specifications',()=>{
+ const load=loader({current:{}}),{vinhomesProjects,projectSummary,enquiryContext}=load(path.join(root,'lib/vinhomes.ts'));
  assert.equal(vinhomesProjects.length,3);assert.equal(new Set(vinhomesProjects.map(p=>p.slug)).size,3);
- for(const project of vinhomesProjects){assert.ok(project.images.length>=7);assert.equal(new Set(project.images).size,project.images.length);for(const image of project.images)assert.ok(fs.existsSync(path.join(root,'public',image)),image);assert.ok(fs.existsSync(path.join(root,project.sourceNote)));assert.match(projectRent(project,'vi'),/₫/);}
+ for(const project of vinhomesProjects){assert.ok(project.images.length>=7);assert.equal(new Set(project.images).size,project.images.length);for(const image of project.images)assert.ok(fs.existsSync(path.join(root,'public',image)),image);assert.ok(fs.existsSync(path.join(root,project.sourceNote)));}
  const smart=vinhomesProjects.find(p=>p.slug==='smart-city');assert.equal(smart.reference,'GH202');assert.equal(smart.areaSqm,undefined);assert.equal(smart.bathrooms,undefined);assert.equal(smart.leaseMonths,undefined);assert.equal(smart.rentVnd,10500000);assert.equal(projectSummary(smart,'vi'),'1+ phòng ngủ');assert.ok(smart.images.every(p=>!p.includes('1793001532444')));
  assert.equal(enquiryContext('restaurant',null,'en'),'Restaurant opening consultancy');assert.equal(enquiryContext('office',null,'vi'),'Tư vấn mở văn phòng');assert.equal(enquiryContext(null,'smart-city','en'),'Vinhomes Smart City · S403 · GH202');assert.equal(enquiryContext('<script>',null,'en'),'');
 });

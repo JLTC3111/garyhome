@@ -56,6 +56,8 @@ button.language-toggle-light[data-squish-switch]{color:#fffef8}
 .vinhomes-card h3{font-size:31px;line-height:1.22;margin:13px 0 14px}
 .vinhomes-card p{font-size:12px;line-height:1.85;color:#586c50;margin-bottom:13px}
 .vinhomes-card .vinhomes-rent{font-size:15px;font-weight:600;color:var(--green)}
+.vinhomes-rent .price strong{font-size:16px}
+.vinhomes-currency-choice{margin-top:16px}
 .vinhomes-card-body>.text-link{margin-top:auto;padding-top:10px}
 .vinhomes-collection-note{margin-top:20px;font-size:11px;line-height:1.9;color:#5a6b52}
 .vinhomes-page .page-intro{max-width:800px}
@@ -69,7 +71,8 @@ button.language-toggle-light[data-squish-switch]{color:#fffef8}
 .vinhomes-project-facts dt{font-size:10px;line-height:1.7;color:#5b6e50;margin-bottom:7px}
 .vinhomes-project-facts dd{font-size:14px;line-height:1.8;color:#304d36;margin:0;font-weight:500}
 .vinhomes-project-enquiry{padding:27px;background:#eaf0e1;border:1px solid #d6e1c7;border-radius:15px}
-.vinhomes-project-enquiry>strong{font-size:23px;color:#314f3e;line-height:1.5}
+.vinhomes-project-enquiry>.price{display:block;white-space:normal}
+.vinhomes-project-enquiry>.price strong{font-size:23px;color:#314f3e;line-height:1.5}
 .vinhomes-project-enquiry>p{font-size:12px;line-height:1.9;color:#4f6744;margin:12px 0 20px}
 .vinhomes-project-enquiry>.button{font-size:12px;white-space:normal}
 /* Restaurant and office consultancy lives within the existing services page. */

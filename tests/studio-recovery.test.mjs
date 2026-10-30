@@ -155,6 +155,8 @@ async function harness(t, options={}){
   :options.page==='error'?load(path.join(base,'app/error.tsx')).default
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='homes'?load(path.join(base,'components/homes-page.tsx')).HomesPage
+  :options.page==='home'?load(path.join(base,'components/home-page.tsx')).HomePage
+  :options.page==='vinhomes'?load(path.join(base,'components/vinhomes-collection.tsx')).VinhomesPage
   :options.page==='header'?load(path.join(base,'components/site-shell.tsx')).Header
   :options.page==='staff'?load(path.join(base,'components/admin-page.tsx')).AdminPage
   :options.page==='contact'?load(path.join(base,'components/content-pages.tsx')).ContactPage
@@ -273,12 +275,31 @@ test('a customer opening staff login receives a customer return link without sta
  assert.match(JSON.stringify(h.renderer.toJSON()),/Mở cổng khách hàng/);
 });
 
-test('public navigation restores separate customer and staff controls with mobile access inside the menu',async t=>{
+test('public navigation labels both login destinations and keeps one preferences menu outside the mobile navigation',async t=>{
  const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),logins=band.findAllByType('a').filter(node=>['/account','/admin'].includes(node.props.href));
- assert.deepEqual(logins.map(n=>n.props.href),['/account','/admin']);assert.deepEqual(logins.map(n=>n.props['aria-label']),['Customer account','Staff login']);assert.ok(logins.every(n=>n.props.className.includes('desktop-band-control')));
- const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/account','/admin']);assert.equal(mobile.findAllByType('button').filter(n=>n.props.role==='switch').length,1);
+ assert.deepEqual(logins.map(n=>n.props.href),['/account','/admin']);assert.deepEqual(logins.map(n=>n.props['aria-label']),['Customer Login','Staff Login']);assert.ok(logins.every(n=>n.props.className.includes('desktop-band-control')));
+ assert.deepEqual(logins.map(n=>n.findByType('span').children.join('')),['Customer Login','Staff Login']);
+ const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/account','/admin']);assert.equal(mobile.findAllByType('button').length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'site-preferences-trigger'}).length,1);assert.equal(h.renderer.root.findByProps({id:'site-navigation'}).findAllByProps({className:'site-preferences'}).length,0);
  const toggle=()=>h.renderer.root.findAllByType('button').find(node=>node.props['aria-controls']==='site-navigation');await act(async()=>toggle().props.onClick());assert.equal(toggle().props['aria-expanded'],true);await act(async()=>mobile.findAllByType('a')[0].props.onClick());assert.equal(toggle().props['aria-expanded'],false);
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');await act(async()=>h.site.setLanguage('vi'));assert.equal(logins[0].props['aria-label'],'Tài khoản khách hàng');assert.equal(logins[1].props['aria-label'],'Đăng nhập nhân viên');assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');await h.emit(authSession('customer'));assert.equal(logins[0].props.href,'/account');assert.equal(logins[0].findAllByType('img').length,0);
+ assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');await act(async()=>h.site.setLanguage('vi'));assert.equal(logins[0].props['aria-label'],'Đăng nhập khách hàng');assert.equal(logins[1].props['aria-label'],'Đăng nhập nhân viên');assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');await h.emit(authSession('customer'));assert.equal(logins[0].props.href,'/account');assert.equal(logins[0].findAllByType('img').length,0);
+});
+
+test('the combined preferences menu changes and persists both choices independently and dismisses accessibly',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/'});
+ const preferences=()=>h.renderer.root.findByProps({className:'site-preferences-trigger'}),navigation=()=>h.renderer.root.findAllByType('button').find(node=>node.props['aria-controls']==='site-navigation');
+ assert.equal(preferences().props['aria-expanded'],false);assert.match(preferences().props['aria-label'],/English, USD/);
+ await act(async()=>navigation().props.onClick());assert.equal(navigation().props['aria-expanded'],true);
+ await act(async()=>preferences().props.onClick());assert.equal(navigation().props['aria-expanded'],false);assert.equal(preferences().props['aria-expanded'],true);
+ const panel=()=>h.renderer.root.findByProps({role:'dialog'});
+ await act(async()=>panel().findAllByType('button').find(node=>node.props.lang==='vi').props.onClick());
+ assert.equal(h.site.language,'vi');assert.equal(h.site.currency,'USD');assert.equal(h.stored.get('gary-language'),'vi');assert.match(preferences().props['aria-label'],/Tiếng Việt, USD/);
+ await act(async()=>panel().findAllByType('button').find(node=>node.children.includes('VND')).props.onClick());
+ assert.equal(h.site.currency,'VND');assert.equal(h.stored.get('gary-currency'),'VND');assert.match(h.page.cookie,/gary-currency=VND/);assert.match(preferences().props['aria-label'],/Tiếng Việt, VND/);
+ await act(async()=>h.browser.dispatchEvent(Object.assign(new Event('keydown',{cancelable:true}),{key:'Escape'})));
+ assert.equal(preferences().props['aria-expanded'],false);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);
+ await act(async()=>preferences().props.onClick());await act(async()=>h.page.dispatchEvent(new Event('pointerdown')));assert.equal(preferences().props['aria-expanded'],false);
+ await act(async()=>preferences().props.onClick());await act(async()=>panel().findAllByType('button').find(node=>node.props['aria-label']==='Đóng tùy chọn').props.onClick());assert.equal(preferences().props['aria-expanded'],false);
 });
 
 test('customer schema errors stay visible until a successful refresh loads real data',async t=>{
@@ -615,6 +636,32 @@ test('an unavailable exchange rate shows the entered currency clearly and keeps 
  const h=await harness(t,{guest:true,page:'property',propertyPage:property,exchangeRate:null});
  assert.equal(h.site.currency,'USD');assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('15,000,000 ₫')));
  assert.match(JSON.stringify(h.renderer.toJSON()),/entered price/);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/≈ 15/);
+});
+
+test('Vinhomes detail prices follow currency choices, retain original quotes and translate without changing amounts',async t=>{
+ const h=await harness(t,{guest:true,page:'vinhomes',path:'/vinhomes'});
+ const prices=()=>h.renderer.root.findAllByProps({className:'vinhomes-project-enquiry'}).map(node=>node.findByType('strong').children.join(''));
+ assert.deepEqual(prices(),['≈ $840','≈ $1,160','≈ $420']);
+ const choose=currency=>h.renderer.root.findAllByType('button').find(node=>node.children.includes(currency)).props.onClick();
+ await act(async()=>choose('VND'));assert.deepEqual(prices(),['21,000,000 ₫','29,000,000 ₫','10,500,000 ₫']);assert.equal(h.stored.get('gary-currency'),'VND');
+ await act(async()=>h.site.setLanguage('vi'));assert.deepEqual(prices(),['21.000.000 ₫','29.000.000 ₫','10.500.000 ₫']);assert.equal(h.site.currency,'VND');
+ await act(async()=>choose('USD'));assert.deepEqual(prices(),['≈ $840','≈ $1.160','≈ $420']);
+});
+
+test('Vinhomes retains its entered VND prices and labels the fallback during an exchange-rate outage',async t=>{
+ const h=await harness(t,{guest:true,page:'vinhomes',path:'/vinhomes',exchangeRate:null});
+ const prices=()=>h.renderer.root.findAllByProps({className:'vinhomes-project-enquiry'}).map(node=>node.findByType('strong').children.join(''));
+ assert.equal(h.site.currency,'USD');assert.deepEqual(prices(),['21,000,000 ₫','29,000,000 ₫','10,500,000 ₫']);assert.equal(h.renderer.root.findAllByProps({className:'price-currency-fallback'}).length,3);
+ await act(async()=>h.site.setCurrency('VND'));assert.equal(h.renderer.root.findAllByProps({className:'price-currency-fallback'}).length,0);assert.deepEqual(prices(),['21,000,000 ₫','29,000,000 ₫','10,500,000 ₫']);
+});
+
+test('homepage Vinhomes cards and the budget shortcut follow the saved currency while preserving budget URL units',async t=>{
+ const h=await harness(t,{guest:true,page:'home',path:'/',storage:{'gary-currency':'VND'}});
+ const prices=()=>h.renderer.root.findAllByProps({className:'vinhomes-rent'}).map(node=>node.findByType('strong').children.join(''));
+ const budget=()=>h.renderer.root.findAllByType('a').find(node=>node.props.href==='/homes?max=600&currency=USD');
+ assert.deepEqual(prices(),['21,000,000 ₫','29,000,000 ₫','10,500,000 ₫']);assert.equal(budget().children.join(''),'Under ≈ 15,000,000 ₫');
+ await act(async()=>h.renderer.root.findByProps({className:'currency-switcher vinhomes-currency-choice'}).findAllByType('button').find(node=>node.children.includes('USD')).props.onClick());
+ assert.deepEqual(prices(),['≈ $840','≈ $1,160','≈ $420']);assert.equal(budget().children.join(''),'Under $600');assert.equal(h.site.currency,'USD');
 });
 
 test('currency changes convert budget bounds without changing their meaning or the submitted currency',async t=>{

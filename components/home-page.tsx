@@ -17,9 +17,11 @@ import { DistrictGallery } from "./district-gallery";
 import { VinhomesCollection } from "./vinhomes-collection";
 import { ServiceAppsSection } from "./service-apps";
 import { filterProperties } from "@/lib/property-search";
+import { formatPropertyPrice } from "@/lib/property-pricing";
 import type { PublicFeedback } from "@/lib/submissions";
 export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:PublicFeedback[];feedbackUnavailable?:boolean}){
- const {content,t,language}=useSite();const rentals=filterProperties(content.properties,{}),featured=applyPropertyOrder(rentals,content.propertyOrders?.home).slice(0,6);
+ const {content,t,language,currency,exchangeRate}=useSite();const rentals=filterProperties(content.properties,{}),featured=applyPropertyOrder(rentals,content.propertyOrders?.home).slice(0,6);
+ const suggestedBudget=formatPropertyPrice({price:600,currency:"USD"},language,currency,exchangeRate);
  const published=rentals;
  const heading=(language==="vi"?content.settings.hero_title_vi:content.settings.hero_title_en).split("\n");
  return <>
@@ -64,7 +66,7 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
       </div>
       <div className="container hero-search">
         <SearchForm roomsFirst/>
-        <div className="popular-search"><span>{t("A little inspiration:", "Gợi ý cho bạn:")}</span><Link href="/homes?district=tay-ho">Tây Hồ</Link><span>·</span><Link href="/homes?district=ba-dinh">Ba Đình</Link><span>·</span><Link href="/homes?max=600">{t("Under $600", "Dưới $600")}</Link><span>·</span><Link href="/homes?amenity=Balcony">{t("A balcony, please", "Có ban công")}</Link></div>
+        <div className="popular-search"><span>{t("A little inspiration:", "Gợi ý cho bạn:")}</span><Link href="/homes?district=tay-ho">Tây Hồ</Link><span>·</span><Link href="/homes?district=ba-dinh">Ba Đình</Link><span>·</span><Link href="/homes?max=600&currency=USD">{t("Under", "Dưới")} {suggestedBudget}</Link><span>·</span><Link href="/homes?amenity=Balcony">{t("A balcony, please", "Có ban công")}</Link></div>
       </div>
     </section>
   <section className="section container rental-featured"><BlurFade className="section-heading"><div><div className="eyebrow">{t("AVAILABLE TO DISCOVER","KHÁM PHÁ NHÀ CHO THUÊ")}</div><h2>{t("Find your next rental in Hanoi.","Tìm nhà thuê tiếp theo tại Hà Nội.")}</h2><p>{t("Compare property details, keep your favourites and request a viewing.","So sánh thông tin, lưu yêu thích và đặt lịch xem nhà.")}</p></div><Link className="text-link" href="/homes">{t("View all rentals","Tất cả nhà cho thuê")}<ArrowUpRight size={18}/></Link></BlurFade><PropertyOrderControls scope="home" properties={rentals}/><div className="property-grid">{featured.map(p=><PropertyCard key={p.id} property={p}/>)}</div>{!featured.length&&<div className="empty-state"><h3>{t("Tell us what you’re looking for.","Chia sẻ nhu cầu tìm nhà của bạn.")}</h3><Link className="button" href="/contact">{t("Contact Gary Home","Liên hệ Gary Home")}<ArrowRight size={16}/></Link></div>}</section>

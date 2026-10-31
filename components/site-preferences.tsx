@@ -38,8 +38,8 @@ export function SitePreferences({ onOpen }: { onOpen?: () => void }) {
     </button>
     {open && <div id={id} ref={panel} className="site-preferences-panel" role="dialog" aria-modal="false" aria-label={label}>
       <div className="site-preferences-heading"><strong>{t("Language & currency", "Ngôn ngữ & tiền tệ")}</strong><button type="button" className="icon-button" aria-label={t("Close preferences", "Đóng tùy chọn")} onClick={close}><X size={17}/></button></div>
-      <fieldset><legend>{t("Price currency", "Tiền tệ giá thuê")}</legend><CurrencySwitcher/></fieldset>
       <fieldset><legend>{t("Language", "Ngôn ngữ")}</legend><RubberSegment className="site-preferences-options" items={[{value:"en",label:"English",lang:"en"},{value:"vi",label:"Tiếng Việt",lang:"vi"}]} value={language} onChange={value => setLanguage(value === "vi" ? "vi" : "en")} aria-label={t("Language", "Ngôn ngữ")}/></fieldset>
+      <fieldset><legend>{t("Price currency", "Loại Tiền")}</legend><CurrencySwitcher/></fieldset>
     </div>}
   </div>;
 }

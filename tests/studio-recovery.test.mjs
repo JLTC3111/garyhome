@@ -660,7 +660,7 @@ test('homepage Vinhomes cards and the budget shortcut follow the saved currency 
  const prices=()=>h.renderer.root.findAllByProps({className:'vinhomes-rent'}).map(node=>node.findByType('strong').children.join(''));
  const budget=()=>h.renderer.root.findAllByType('a').find(node=>node.props.href==='/homes?max=600&currency=USD');
  assert.deepEqual(prices(),['21,000,000 ₫','29,000,000 ₫','10,500,000 ₫']);assert.equal(budget().children.join(''),'Under ≈ 15,000,000 ₫');
- await act(async()=>h.renderer.root.findByProps({className:'currency-switcher vinhomes-currency-choice'}).findAllByType('button').find(node=>node.children.includes('USD')).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('div').find(node=>node.props.className?.split(' ').includes('vinhomes-currency-choice')).findAllByType('button').find(node=>node.children.includes('USD')).props.onClick());
  assert.deepEqual(prices(),['≈ $840','≈ $1,160','≈ $420']);assert.equal(budget().children.join(''),'Under $600');assert.equal(h.site.currency,'USD');
 });
 

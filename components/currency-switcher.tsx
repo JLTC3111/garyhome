@@ -1,13 +1,12 @@
 "use client";
 
 import { useSite } from "./site-context";
+import RubberSegment from "./react-bits/rubber-segment";
 import { EXCHANGE_RATE_SOURCE, VIETCOMBANK_RATE_SOURCE, usableExchangeRate } from "@/lib/currency";
 
 export function CurrencySwitcher({ className = "" }: { className?: string }) {
   const { currency, setCurrency, t } = useSite();
-  return <div className={`currency-switcher ${className}`} role="group" aria-label={t("Listing price currency", "Tiền tệ giá thuê")}>
-    {(["USD", "VND"] as const).map(value => <button type="button" key={value} aria-pressed={currency === value} onClick={() => setCurrency(value)}>{value}</button>)}
-  </div>;
+  return <RubberSegment className={`currency-switcher ${className}`.trim()} items={["USD", "VND"]} value={currency} onChange={value => setCurrency(value === "VND" ? "VND" : "USD")} aria-label={t("Listing price currency", "Loại Tiền")}/>;
 }
 
 export function CurrencyNotice() {

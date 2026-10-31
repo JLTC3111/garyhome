@@ -2,11 +2,13 @@
 
 This application includes adapted components from the following projects. Existing dependency licenses remain with their respective packages.
 
-## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards and Squish Switch
+## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards, Squish Switch and Rubber Segment
 
 Source: https://github.com/DavidHDev/react-bits
 
 Bounce Cards is adapted to accessible district links, responsive layouts and the original native spring model with position-based pointer picking. Squish Switch is adapted to a controlled bilingual toggle with CSS squash and stretch. Sources: https://reactbits.dev/components/bounce-cards and https://reactbits.dev/c/micro/squish-switch (reviewed 2026-10-26).
+
+Rubber Segment is adapted from the official TypeScript/CSS registry at https://reactbits.dev/r/RubberSegment-TS-CSS.json (reviewed 2026-10-31), documented at https://reactbits.dev/micro/rubber-segment. It retains the independent thumb-edge springs, stretch, squash, drag and keyboard interaction. The site adaptation adds a server-rendered selection fallback, native click/assistive activation, live reduced-motion cleanup, responsive soft sage/ivory styling and compatibility with the existing LazyMotion provider.
 
 The following notice is retained from the upstream `LICENSE.md` reviewed on 2026-10-22:
 

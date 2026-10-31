@@ -10,11 +10,8 @@
 .site-preferences-panel fieldset{padding:0;margin:0;border:0;min-width:0}
 .site-preferences-panel fieldset+fieldset{margin-top:20px}
 .site-preferences-panel legend{padding:0;margin-bottom:9px;font-size:11px;color:var(--muted);font-weight:500}
-.site-preferences-options{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.site-preferences-options>button{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:12px;background:#fff;color:var(--green);white-space:nowrap}
-.site-preferences-options>button[aria-pressed=true]{background:#e6eddd;border-color:#aec39e;font-weight:600}
-.site-preferences-panel .currency-switcher{display:flex;width:100%;border-radius:10px;padding:4px;gap:4px}
-.site-preferences-panel .currency-switcher>button{flex:1;min-height:44px;font-size:12px;border-radius:7px}
+.site-preferences-options{--segment-track:#eeece5;--segment-text:#5e6c64}
+.site-preferences-panel .rubber-segment{display:grid;width:100%;--segment-height:52px;--segment-font:12px;--segment-padding:12px}
 @media(max-width:1200px){.site-preferences-panel{right:-56px}}
 @media(max-width:680px){
  .rental-site-header .header-inner{gap:12px}

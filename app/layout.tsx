@@ -10,6 +10,7 @@ import "./portal-help.css";
 import "./interactions.css";
 import "./portal-access.css";
 import "./select.css";
+import "./rubber-segment.css";
 import "./rental.css";
 import "./customer-experience.css";
 import "./mobile-refinements.css";

@@ -61,19 +61,14 @@ body{background:var(--paper)}
 
 .property-price-currencies{display:grid;gap:20px;min-width:0}
 .property-price-currencies>p:last-child{margin:0;font-size:10px;line-height:1.6;color:var(--muted)}
-.currency-switcher{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid #c9d5de;border-radius:20px;flex-shrink:0;background:#edf2f6;color:#29485a}
-.currency-switcher>button{min-height:30px;min-width:40px;padding:5px 8px;border-radius:16px;font-size:10px;font-weight:600;line-height:1.4}
-.currency-switcher>button:hover{background:#dce7ee}
-.currency-switcher>button[aria-pressed=true]{background:var(--navy-blue);color:#fffdf8}
-.currency-switcher>button[aria-pressed=true]:hover{background:#2a4b60}
-.currency-switcher>button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.currency-switcher{--segment-track:#e9eee5;--segment-border:#d9e1d2;--segment-text:#5a6c5d;--segment-active-text:#254538;--segment-height:40px;--segment-font:11px;--segment-padding:12px;--segment-min:44px;flex-shrink:0}
 .rental-search-secondary>.currency-switcher{margin-left:auto}
 .detail-price-choice{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex-shrink:0;max-width:100%}
 .price-currency-fallback{display:block;color:var(--muted);font-size:10px}
 .rental-card-bottom .price .price-vnd{font-size:17px;line-height:1.4}
 .currency-notice{font-size:10px;line-height:1.8;padding:0 0 20px;color:inherit;opacity:.85}
 .currency-notice>a{text-decoration:underline;text-underline-offset:3px}
-@media(max-width:680px){.detail-price-choice{align-items:flex-start}.rental-search-secondary>.currency-switcher{margin-left:0}.rental-search-secondary{flex-wrap:wrap}.currency-switcher>button{min-height:36px;min-width:44px}.property-price-fields .form-row{gap:12px}.currency-notice{padding-top:15px}}
+@media(max-width:680px){.detail-price-choice{align-items:flex-start}.rental-search-secondary>.currency-switcher{margin-left:0}.rental-search-secondary{flex-wrap:wrap}.currency-switcher{--segment-height:52px}.property-price-fields .form-row{gap:12px}.currency-notice{padding-top:15px}}
 
 .property-listing-id-field{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:500}
 .property-listing-id-field .listing-id-conflict{color:#a13a32}

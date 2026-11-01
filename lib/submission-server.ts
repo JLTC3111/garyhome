@@ -1,6 +1,7 @@
 import { readJsonBody, BodyReadError } from "./request-body";
 import { publicSupabase } from "./server";
 import { assistanceInput, feedbackInput, validHelpDate } from "./submissions";
+import { savePublicIntake } from "./public-intake";
 
 // Best-effort instance limits supplement Postgres constraints and RLS.
 const requests=new Map<string,number[]>();
@@ -18,7 +19,8 @@ export async function submitCustomerInput(request:Request,kind:"feedback"|"assis
  if(!parsed.success)return fail("invalid",400);
  if("helped_on" in parsed.data&&!validHelpDate(parsed.data.helped_on))return fail("date",400);
  try{
-  if(token){const {data,error}=await db.auth.getUser(token);if(error||!data.user)return fail("session",401);}
+  let userId:string|null=null;
+  if(token){const {data,error}=await db.auth.getUser(token);if(error||!data.user)return fail("session",401);userId=data.user.id;}
   const ip=(process.env.VERCEL==="1"?request.headers.get("x-forwarded-for")?.split(",")[0]?.trim():request.headers.get("cf-connecting-ip"))||"local";
   const key=kind+":"+ip,now=Date.now();
   for(const [bucket,times] of requests)if(times.every(t=>now-t>600000))requests.delete(bucket);
@@ -26,8 +28,9 @@ export async function submitCustomerInput(request:Request,kind:"feedback"|"assis
   requests.set(key,[...recent,now]);
   // Zod strips caller-supplied user IDs, moderation status and attribution fields.
   const record:Record<string,unknown>={...parsed.data};delete record.website;
-  const {error}=await db.from(kind==="feedback"?"feedback_submissions":"property_assistance").insert(record);
+  const {data,error}=await savePublicIntake(request,kind,record,userId);
   if(error)return fail(["42P01","PGRST204"].includes(error.code||"")?"unavailable":"save",503);
+  if(!data)return fail("rate",429);
   return Response.json({ok:true},{status:201});
  }catch{return fail("connection",503);}
 }

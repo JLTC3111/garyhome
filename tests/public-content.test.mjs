@@ -9,12 +9,12 @@ import { fetchWithDeadline } from '../lib/requests.ts';
 
 const content={editorial:[],properties:[{id:'published-home',status:'published',images:[]}],neighbourhoods:[{slug:'tay-ho',image:''}],settings:{id:'main',hero_title_en:'Live data',hero_image:''},authors:[],activities:[],propertyOrders:{}};
 function database(fetch){return createClient('https://public-content-test.invalid','sb_publishable_test',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch}});}
-function responseFor(input){const table=new URL(input).pathname.split('/').at(-1);return Response.json(table==='site_settings'?content.settings:table==='listing_authors'?content.authors:table==='site_activities'?content.activities:table==='property_display_orders'?[]:table==='editorial_articles'?content.editorial:content[table]);}
+function responseFor(input){const url=new URL(input),table=url.pathname.split('/').at(-1),data=table==='site_settings'?content.settings:table==='listing_authors'?content.authors:table==='site_activities'?content.activities:table==='property_display_orders'?[]:table==='editorial_articles'?content.editorial:content[table];return Response.json(Array.isArray(data)?data.slice(Number(url.searchParams.get('offset')||0),Number(url.searchParams.get('offset')||0)+Number(url.searchParams.get('limit')||500)):data);}
 
 test('the real SDK loads only published homes and the main public settings',async()=>{
  const calls=[];
  const result=await readPublishedContent(database(async(input,init)=>{calls.push({url:new URL(input),method:init.method});return responseFor(input);}));
- assert.deepEqual(result,content);assert.equal(calls.length,7);assert.ok(calls.every(call=>call.method==='GET'));
+ assert.deepEqual(result,content);assert.equal(calls.length,9);assert.ok(calls.every(call=>call.method==='GET'));
  assert.equal(calls.find(call=>call.url.pathname.endsWith('/properties')).url.searchParams.get('status'),'eq.published');
  assert.equal(calls.find(call=>call.url.pathname.endsWith('/site_settings')).url.searchParams.get('id'),'eq.main');
 });
@@ -66,6 +66,26 @@ test('browser public recovery ignores stored staff tokens and login callback URL
  const db=loaded.exports.publicBrowserClient('https://public-content-test.invalid','sb_publishable_test');
  assert.equal((await db.auth.getSession()).data.session,null);
  assert.deepEqual(await readPublishedContent(db),content);
- assert.equal(storedReads.length,0);assert.equal(calls.length,7);
+ assert.equal(storedReads.length,0);assert.equal(calls.length,9);
  assert.ok(calls.every(call=>call.url.pathname.startsWith('/rest/v1/')&&call.headers.get('apikey')==='sb_publishable_test'&&!call.headers.get('authorization')?.includes('staff-private-token')));
+});
+
+test('published catalogue exhausts the real SDK ranges and propagates later-page failures',async()=>{
+ const homes=Array.from({length:1001},(_,id)=>({id:String(id).padStart(6,'0'),slug:'home-'+id,images:[]}));
+ const offsets=[];
+ const capped=database(async input=>{
+  const url=new URL(input);
+  if(!url.pathname.endsWith('/properties'))return responseFor(input);
+  const from=Number(url.searchParams.get('offset')||0);offsets.push(from);
+  assert.equal(url.searchParams.get('order'),'sort_order.asc,id.asc');
+  return Response.json(homes.slice(from,from+200));
+ });
+ assert.deepEqual((await readPublishedContent(capped)).properties,homes);
+ assert.deepEqual(offsets,[0,200,400,600,800,1000,1001]);
+ const failing=database(async input=>{
+  const url=new URL(input);
+  return url.pathname.endsWith('/properties')&&Number(url.searchParams.get('offset'))>0
+   ?Response.json({code:'42501',message:'Private failure'},{status:403}):responseFor(input);
+ });
+ await assert.rejects(readPublishedContent(failing),error=>error instanceof ContentReadError&&error.resource==='properties'&&error.code==='42501');
 });

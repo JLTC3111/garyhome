@@ -5,8 +5,6 @@ import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError, staffDataError, staffRequest } from "@/lib/staff-server";
 import { canManageRole,canManageStaff,canViewRole,type StaffAccount } from "@/lib/staff";
 
-import { setStaffTemporaryPassword } from "@/lib/staff-password-server";
-
 const headers = { "Cache-Control": "private, no-store" };
 const createAccount = z.object({ email:z.string().trim().toLowerCase().email().max(254),full_name:z.string().trim().min(2).max(120),role:z.enum(["admin","manager","editor"]),mode:z.enum(["create","assign"]).default("create"),replace_password:z.boolean().default(false),password:z.string().max(128).optional(),confirm_password:z.string().max(128).optional() }).superRefine((value,ctx)=>{if((value.mode==="create"||value.replace_password)&&(!value.password||value.password.length<12||value.password!==value.confirm_password))ctx.addIssue({code:"custom",message:"Use matching passwords of at least 12 characters."});});
 const editAccount = z.object({ user_id: z.string().uuid(), role: z.enum(["admin", "manager", "editor"]), active: z.boolean() });
@@ -41,14 +39,14 @@ export async function GET(request: Request) {
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
-  let created=false,accessAssigned=false,replacingPassword=false;
+  let created=false,accessAssigned=false,passwordPrepared=false;
   try {
     const result = await boundedRequest(async signal => {
       const { db, role } = await staffRequest(request, signal);
       const parsed = createAccount.safeParse(await body(request));
       if (!parsed.success) throw new StaffRequestError("Check the staff details and matching passwords of at least 12 characters.");
       const input = parsed.data;
-      replacingPassword=input.mode==="assign"&&input.replace_password;
+      const replacingPassword=input.mode==="assign"&&input.replace_password;
       if(input.mode==="assign"&&!input.replace_password&&(input.password||input.confirm_password))throw new StaffRequestError("Choose Set a temporary password to replace the existing password, or leave both password fields blank.",400,"password_choice_required");
       if(!canManageRole(role,input.role))throw new StaffRequestError("You can assign roles below your own level only.",403);
       // The RPC validates the allowed email domain, protected accounts, and the
@@ -68,8 +66,18 @@ export async function POST(request: Request) {
         created=true;
       }else{
         if(!found.data)throw new StaffRequestError("No account exists for this email. Choose Create new account.",404);
-        const confirmed=await admin.auth.admin.updateUserById(found.data,{email_confirm:true});
-        if(confirmed.error)throw new StaffRequestError("Couldn’t confirm this account. Refresh the team before trying again.",503);
+        const existing=await admin.auth.admin.getUserById(found.data);
+        if(existing.error||existing.data.user?.id!==found.data||existing.data.user.email?.toLowerCase()!==input.email)throw new StaffRequestError("Couldn’t verify the existing login. Refresh the team before trying again.",503);
+        if(replacingPassword){
+          // Establish trusted credentials before confirming a pending signup or
+          // granting access. Never activate a password supplied by a stranger.
+          signal.throwIfAborted();
+          const updated=await admin.auth.admin.updateUserById(found.data,{password:input.password!,email_confirm:true});
+          if(updated.error||updated.data.user?.id!==found.data||updated.data.user.email?.toLowerCase()!==input.email||!updated.data.user.email_confirmed_at)throw new StaffRequestError("Couldn’t confirm the temporary password. Staff access was not assigned. Check the account before trying again.",503,"staff_password_unconfirmed");
+          passwordPrepared=true;
+        }else if(!existing.data.user.email_confirmed_at){
+          throw new StaffRequestError("This login has not verified its email. Ask the staff member to confirm their email, or explicitly set a temporary password before assigning access.",409,"unverified_login");
+        }
       }
       // This second RPC checks permissions again after the Auth account write.
       // A revoked admin cannot use a delayed Auth response to grant access.
@@ -77,12 +85,16 @@ export async function POST(request: Request) {
       staffDataError(assigned.error);
       if(typeof assigned.data!=="string"||!assigned.data)throw new StaffRequestError("Staff access was not confirmed. Refresh the team before trying again.",409);
       accessAssigned=true;
-      if(replacingPassword)await setStaffTemporaryPassword(db,admin,assigned.data,input.password!,signal);
+      if(replacingPassword){
+        const reminder=await db.rpc("staff_temporary_password_request",{target_user_id:assigned.data,failed:false}).abortSignal(signal);
+        staffDataError(reminder.error);
+      }
       return {user_id:assigned.data,created,confirmed:true,...(replacingPassword?{password_set:true}:{})};
     });
     return Response.json(result, { status:result.created?201:200,headers });
   } catch (error) {
-    if(accessAssigned&&replacingPassword)return failure(new StaffRequestError("Staff access was assigned, but the temporary password was not confirmed. Use Set temporary password in the directory before sharing credentials.",409,"staff_access_assigned_password_unconfirmed"));
+    if(accessAssigned&&passwordPrepared)return failure(new StaffRequestError("Staff access and the temporary password were saved, but the password-change reminder was not confirmed. Refresh the team before continuing.",409,"staff_access_assigned_reminder_unconfirmed"));
+    if(passwordPrepared)return failure(new StaffRequestError("The temporary password was saved, but staff access was not confirmed. Refresh and assign the existing login to finish.",409,"staff_password_saved_access_unconfirmed"));
     return failure(created?new StaffRequestError("The account was created, but staff access was not confirmed. Refresh and use Assign existing login to finish assigning its role.",409):error);
   }
 }

@@ -13,6 +13,7 @@ test('the fresh-project setup includes every rental schema item and public sourc
  alter table storage.objects enable row level security;grant usage on schema auth,public,storage to anon,authenticated;
  alter default privileges in schema public grant all on tables to anon,authenticated;`);
  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
+ assert.equal((await db.query('select count(*)::int as count from public.neighbourhoods')).rows[0].count,11,'fresh setup includes the complete district catalogue');
  await db.exec('set role anon');const properties=(await db.query('select id,listing_code,author_id,price_max from public.properties')).rows;assert.equal(properties.length,15);assert.ok(properties.every(p=>p.price_max===null));
  assert.equal((await db.query('select id from public.listing_authors')).rows.length,1);
  assert.equal((await db.query('select id from public.site_activities')).rows.length,18);

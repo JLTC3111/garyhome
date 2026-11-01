@@ -10,7 +10,7 @@ test('feedback moderation and private assistance attribution enforce consent and
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,created_at timestamptz default now());alter table storage.objects enable row level security;
- grant usage on schema auth,public,storage to anon,authenticated;alter default privileges in schema public grant all on tables to anon,authenticated;`);
+ grant usage on schema auth,public,storage to anon,authenticated,service_role;alter default privileges in schema public grant all on tables to anon,authenticated;`);
  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
  const users={};let i=0;
  for(const role of ['owner','admin','manager','editor','customer','other','disabled','foreign','unconfirmed']){
@@ -21,12 +21,18 @@ test('feedback moderation and private assistance attribution enforce consent and
  }
  const property=(await db.query("select id from public.properties where status='published' limit 1")).rows[0].id;
  const draft=(await db.query("insert into public.properties(slug,title_en,title_vi,district_slug,address,status)values('private-assistance-test','Private','Nháp','tay-ho','Hanoi','draft')returning id")).rows[0].id;
- async function as(role,id=''){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role '+role);}
- const feedback=(publish=false)=>db.query("insert into public.feedback_submissions(name,email,rating,message,property_id,consent,publish_consent)values('A Customer','customer@example.invalid',4,'A useful and honest experience.',$1,true,$2)",[property,publish]);
- const assistance=()=>db.query("insert into public.property_assistance(property_id,name,email,helper_name,channel,helped_where,helped_on,consent)values($1,'A Customer','customer@example.invalid','Named Helper','in_person','Hanoi office',current_date-1,true)",[property]);
+ const helpedOn=(await db.query('select (current_date-1)::text as day')).rows[0].day;
+ let currentRole='postgres',currentUser='';
+ async function as(role,id=''){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role '+role);currentRole=role;currentUser=id;}
+ async function trusted(channel,details){const role=currentRole,user=currentUser;try{await as('service_role');return await db.query('select submit_public_intake($1,$2,$3,$4::jsonb) as id',[channel,'a'.repeat(64),user||null,JSON.stringify(details)]);}finally{await as(role,user);}}
+ const feedback=(publish=false,changes={})=>trusted('feedback',{name:'A Customer',email:'customer@example.invalid',rating:4,message:'A useful and honest experience.',property_id:property,consent:true,publish_consent:publish,...changes});
+ const assistance=(changes={})=>trusted('assistance',{property_id:property,name:'A Customer',email:'customer@example.invalid',helper_name:'Named Helper',channel:'in_person',helped_where:'Hanoi office',helped_on:helpedOn,consent:true,...changes});
  let guestReview,privateReview,ownReview,report;
  await t.test('guests submit without gaining access to private records or choosing workflow fields',async()=>{
-  await as('anon');await feedback(true);await assistance();
+  await as('anon');
+  await assert.rejects(db.query("insert into public.feedback_submissions(name,email,rating,message,consent)values('A Customer','customer@example.invalid',4,'A direct submission is blocked',true)"),e=>e.code==='42501');
+  await assert.rejects(db.query("insert into public.property_assistance(property_id,name,email,helper_name,channel,helped_where,helped_on,consent)values($1,'A Customer','customer@example.invalid','Named Helper','phone','Hanoi',current_date-1,true)",[property]),e=>e.code==='42501');
+  await feedback(true);await assistance();
   await assert.rejects(db.query('select * from public.feedback_submissions'));await assert.rejects(db.query('select * from public.property_assistance'));
   await assert.rejects(db.query("insert into public.feedback_submissions(name,email,rating,message,consent,status) values('Bad','bad@example.invalid',5,'Trying to approve myself',true,'approved')"));
   await assert.rejects(db.query("insert into public.feedback_submissions(user_id,name,email,rating,message,consent) values($1,'Bad','bad@example.invalid',5,'Trying to claim identity',true)",[users.other]));
@@ -61,8 +67,9 @@ test('feedback moderation and private assistance attribution enforce consent and
   await as('authenticated',users.manager);await assert.rejects(db.query("select public.review_property_assistance($1,'verified',$2,'Wrong','')",[report,users.disabled]));
  });
  await t.test('private property IDs and future assistance dates cannot be submitted',async()=>{
-  await as('anon');await assert.rejects(db.query("insert into public.feedback_submissions(name,email,rating,message,property_id,consent) values('Test','test@example.invalid',5,'A private property review',$1,true)",[draft]));
-  await assert.rejects(db.query("insert into public.property_assistance(property_id,name,email,helper_name,channel,helped_where,helped_on,consent) values($1,'Test','test@example.invalid','Helper','phone','Hanoi',current_date+2,true)",[property]));
+  await as('anon');await assert.rejects(feedback(false,{property_id:draft}),e=>e.code==='23514');
+  const future=(await db.query('select (current_date+2)::text as day')).rows[0].day;
+  await assert.rejects(assistance({helped_on:future}),e=>e.code==='23514');
  });
  await t.test('withdrawing owned feedback also removes its public copy',async()=>{
   await as('authenticated',users.admin);await db.query("select public.moderate_feedback($1,'approved','')",[ownReview]);

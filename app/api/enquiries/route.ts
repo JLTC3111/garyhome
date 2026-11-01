@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { publicSupabase } from "@/lib/server";
 import { readJsonBody, BodyReadError } from "@/lib/request-body";
+import { savePublicIntake } from "@/lib/public-intake";
 
 const enquiry = z.object({
   name: z.string().trim().min(2).max(120), email: z.string().trim().email().max(254),
@@ -21,10 +22,12 @@ export async function POST(request: Request) {
   if (authorization && !token) return Response.json({ error: "Please sign in again before sending this request." }, { status: 401 });
   const db = publicSupabase(token);
   if (!db) return Response.json({ error: "Online requests are not connected yet. Please call or email the team." }, { status: 503 });
+  let userId: string | null = null;
   if (token) {
     try {
       const { data, error } = await db.auth.getUser(token);
       if (error || !data.user) return Response.json({ error: "Please sign in again before sending this request." }, { status: 401 });
+      userId = data.user.id;
     } catch { return Response.json({ error: "Couldn’t verify your account. Reconnect before sending this request." }, { status: 503 }); }
   }
   let input: unknown;
@@ -47,7 +50,10 @@ export async function POST(request: Request) {
   requests.set(ip, [...recent, now]);
   const record = parsed.data;
   delete record.website;
-  const { error } = await db.from("enquiries").insert(record);
-  if (error) return Response.json({ error: "We couldn’t save your request. Please try again or contact the team directly." }, { status: 500 });
-  return Response.json({ ok: true }, { status: 201 });
+  try {
+    const { data, error } = await savePublicIntake(request, "enquiry", record, userId);
+    if (error) return Response.json({ error: "We couldn’t save your request. Please try again or contact the team directly." }, { status: 503 });
+    if (!data) return Response.json({ error: "Please wait a few minutes before sending another request." }, { status: 429 });
+    return Response.json({ ok: true }, { status: 201 });
+  } catch { return Response.json({ error: "We couldn’t confirm your request. Check with the team before trying again." }, { status: 503 }); }
 }

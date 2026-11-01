@@ -3,6 +3,7 @@ import type { Content } from "./types";
 import { contentAssets } from "./content-assets.ts";
 import { propertyOrders } from "./property-order.ts";
 import { request } from "./requests.ts";
+import { readAllRows } from "./pagination.ts";
 
 export class ContentReadError extends Error {
   readonly resource: string;
@@ -22,18 +23,24 @@ export class ContentReadError extends Error {
 export async function readPublishedContent(db: SupabaseClient, upstream?: AbortSignal): Promise<Content> {
   return request(async deadline => {
     const signal = upstream ? AbortSignal.any([upstream, deadline]) : deadline;
-    const [properties, neighbourhoods, settings, authors, activities, orders, articles] = await Promise.all([
-      db.from("properties").select("*").eq("status", "published").eq("listing_type","rent").in("availability",["available","on_request"]).order("sort_order").abortSignal(signal),
-      db.from("neighbourhoods").select("*").order("sort_order").abortSignal(signal),
-      db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
-      db.from("listing_authors").select("*").eq("published",true).order("sort_order").abortSignal(signal),
-      db.from("site_activities").select("*").eq("published",true).order("sort_order").abortSignal(signal),
-      db.from("property_display_orders").select("scope,property_ids").abortSignal(signal),
-      db.from("editorial_articles").select("*").eq("status","published").order("published_on",{ascending:false,nullsFirst:false}).abortSignal(signal),
-    ]);
-    for (const [resource, result] of [["properties", properties], ["neighbourhoods", neighbourhoods], ["site_settings", settings], ["listing_authors",authors], ["site_activities",activities],["property_display_orders",orders],["editorial_articles",articles]] as const) {
-      if (result.error) throw new ContentReadError(resource, result.status, result.error.code);
+    async function list<T>(resource: string, query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { code: string } | null; status: number }>) {
+      const data = await readAllRows(async (from, to) => {
+        const result = await query(from, to);
+        if (result.error) throw new ContentReadError(resource, result.status, result.error.code);
+        return result;
+      });
+      return { data, error: null };
     }
+    const [properties, neighbourhoods, settings, authors, activities, orders, articles] = await Promise.all([
+      list("properties", (from,to) => db.from("properties").select("*").eq("status", "published").eq("listing_type","rent").in("availability",["available","on_request"]).order("sort_order").order("id").range(from,to).abortSignal(signal)),
+      list("neighbourhoods", (from,to) => db.from("neighbourhoods").select("*").order("sort_order").order("slug").range(from,to).abortSignal(signal)),
+      db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
+      list("listing_authors", (from,to) => db.from("listing_authors").select("*").eq("published",true).order("sort_order").order("id").range(from,to).abortSignal(signal)),
+      list("site_activities", (from,to) => db.from("site_activities").select("*").eq("published",true).order("sort_order").order("id").range(from,to).abortSignal(signal)),
+      list("property_display_orders", (from,to) => db.from("property_display_orders").select("scope,property_ids").order("scope").range(from,to).abortSignal(signal)),
+      list("editorial_articles", (from,to) => db.from("editorial_articles").select("*").eq("status","published").order("published_on",{ascending:false,nullsFirst:false}).order("id").range(from,to).abortSignal(signal)),
+    ]);
+    if (settings.error) throw new ContentReadError("site_settings", settings.status, settings.error.code);
     if (!Array.isArray(properties.data) || !Array.isArray(neighbourhoods.data) || !settings.data) {
       throw new ContentReadError("response", 200, "INVALID_CONTENT");
     }

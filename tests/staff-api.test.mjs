@@ -6,13 +6,13 @@ const require=createRequire(import.meta.url),base=path.resolve(import.meta.dirna
 const owner='00000000-0000-4000-8000-000000000001',target='00000000-0000-4000-8000-000000000002',password='A private temporary password';
 const rank=role=>({owner:4,admin:3,manager:2,editor:1}[role]||0);
 function endpoint(options={}){
- const state={role:'owner',valid:true,existing:null,secret:true,members:[],profiles:[],rpc:[],creates:[],confirms:[],resets:[],secretReads:0,...options};
+ const state={role:'owner',valid:true,existing:null,secret:true,members:[],profiles:[],rpc:[],creates:[],confirms:[],resets:[],reads:[],trace:[],storedPassword:'Existing private password',secretReads:0,...options};
  const user={id:owner,email:'owner@protonmail.com',email_confirmed_at:'2026-10-01',user_metadata:{role:'owner'}};
  const client={auth:{getUser:async token=>({data:{user:state.valid&&token==='valid-token'?user:null},error:null}),resetPasswordForEmail:async(email,options)=>{state.resets.push({email,options});return {error:state.resetError||null};}},from(table){
   const q={};for(const name of ['select','eq','in','abortSignal','single','maybeSingle'])q[name]=()=>q;
   q.then=(resolve,reject)=>Promise.resolve({data:table==='team_members'?(state.role?{role:state.role}:null):table==='staff_profiles'?state.profiles:{email_domains:['garyhome.com','icue.vn','gmail.com']},error:null}).then(resolve,reject);return q;
  },rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){
-  state.rpc.push({name,args});let value={data:null,error:null};
+  state.rpc.push({name,args});state.trace.push(name);let value={data:null,error:null};
   if(name==='find_staff_account')value=state.protected?{data:null,error:{code:'42501'}}:['garyhome.com','icue.vn','gmail.com'].includes(args.target_email.split('@')[1])?{data:state.existing,error:null}:{data:null,error:{code:'23514'}};
   if(name==='assign_staff_account')value=rank(state.role)>rank(args.assigned_role)?{data:state.existing||target,error:null}:{data:null,error:{code:'42501'}};
   if(name==='set_staff_access')value=state.protected?{data:null,error:{code:'42501'}}:{data:args.target_user_id,error:null};
@@ -22,7 +22,7 @@ function endpoint(options={}){
   if(name==='list_staff_accounts')value={data:state.members,error:null};
   return Promise.resolve(value).then(resolve,reject);
  }};return q;}};
- const admin={auth:{admin:{createUser:async input=>{state.creates.push(input);if(state.createError)return {data:{user:null},error:state.createErrorCode?{code:state.createErrorCode}:new Error('Auth creation failed')};state.existing=target;if(state.revokeDuringCreate)state.role=null;return {data:{user:{id:target}},error:null};},updateUserById:async(id,input)=>{state.confirms.push({id,input});return {data:{user:{id:state.mismatchedAuthId||id,email:state.resetTarget||'assigned@gmail.com',email_confirmed_at:state.unconfirmedAuth?null:'2026-10-01'}},error:state.confirmError||state.passwordConfirmError&&input.password?new Error('Unconfirmed'):null};}}}};
+ const admin={auth:{admin:{createUser:async input=>{state.creates.push(input);if(state.createError)return {data:{user:null},error:state.createErrorCode?{code:state.createErrorCode}:new Error('Auth creation failed')};state.existing=target;if(state.revokeDuringCreate)state.role=null;return {data:{user:{id:target}},error:null};},getUserById:async id=>{state.reads.push(id);state.trace.push('getUserById');return {data:{user:{id:state.mismatchedLookupId||id,email:state.existingEmail||'staff@gmail.com',email_confirmed_at:state.pendingAccount?null:'2026-10-01'}},error:state.lookupError?new Error('Unavailable'):null};},updateUserById:async(id,input)=>{state.confirms.push({id,input});state.trace.push('updateUserById');const error=state.confirmError||state.passwordConfirmError&&input.password?new Error('Unconfirmed'):null;if(!error){if(input.password)state.storedPassword=input.password;if(input.email_confirm)state.pendingAccount=false;if(state.revokeDuringPassword)state.role=null;}return {data:{user:{id:state.mismatchedAuthId||id,email:state.existingEmail||(state.reads.length?'staff@gmail.com':state.resetTarget||'assigned@gmail.com'),email_confirmed_at:state.unconfirmedAuth?null:'2026-10-01'}},error};}}}};
  const server={publicSupabase:()=>client,staffAdminClient:()=>{state.secretReads++;return state.secret?admin:null;}};
  const modules=new Map();function load(file){if(file.endsWith('/lib/server.ts'))return server;if(modules.has(file))return modules.get(file).exports;const result={exports:{}};modules.set(file,result);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
   const dependency=id=>{if(id==='@/lib/requests')return requests;if(id.startsWith('.')||id.startsWith('@/')){const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);return load(target.endsWith('.ts')?target:target+'.ts');}return require(id);};
@@ -54,9 +54,9 @@ test('new staff are created with the entered password and confirmed email, with 
  assert.deepEqual(h.state.rpc.map(c=>c.name),['find_staff_account','assign_staff_account']);assert.equal(h.state.rpc[1].args.assigned_role,'manager');
  const body=await response.json();assert.deepEqual(body,{user_id:target,created:true,confirmed:true});assert.ok(!JSON.stringify(body).includes(password));assert.deepEqual(h.state.resets,[]);
 });
-test('an existing login is assigned and confirmed without replacing its password or sending onboarding email',async()=>{
+test('a verified existing login is assigned without any Auth write or password replacement',async()=>{
  const h=endpoint({existing:target}),response=await h.send('POST',{mode:'assign',password:undefined,confirm_password:undefined});assert.equal(response.status,200);
- assert.deepEqual(h.state.confirms,[{id:target,input:{email_confirm:true}}]);assert.equal(h.state.creates.length,0);assert.equal(h.state.resets.length,0);assert.equal((await response.json()).created,false);
+ assert.deepEqual(h.state.confirms,[]);assert.deepEqual(h.state.reads,[target]);assert.equal(h.state.storedPassword,'Existing private password');assert.equal(h.state.creates.length,0);assert.equal(h.state.resets.length,0);assert.equal((await response.json()).created,false);
 });
 test('create and assign modes reject mismatched account state without duplicate accounts',async()=>{
  const existing=endpoint({existing:target});assert.equal((await existing.send()).status,409);assert.equal(existing.state.creates.length,0);
@@ -117,13 +117,13 @@ test('existing-login conflicts provide a recoverable code without creating a dup
  const h=endpoint({existing:target}),r=await h.send();assert.equal(r.status,409);assert.equal((await r.json()).code,'existing_login');assert.equal(h.state.creates.length,0);assert.equal(h.state.confirms.length,0);
  const race=endpoint({createError:true,createErrorCode:'email_exists'}),conflict=await race.send();assert.equal(conflict.status,409);assert.equal((await conflict.json()).code,'existing_login');assert.equal(race.state.rpc.some(x=>x.name==='assign_staff_account'),false);
 });
-test('restoring an existing login can explicitly set the entered temporary password after fresh role assignment',async()=>{
+test('restoring an existing login establishes its temporary password before fresh role assignment',async()=>{
  const h=endpoint({existing:target}),r=await h.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});assert.equal(r.status,200);
- assert.deepEqual(h.state.rpc.map(x=>x.name),['find_staff_account','assign_staff_account','staff_temporary_password_request']);assert.deepEqual(h.state.confirms.map(x=>x.input),[{email_confirm:true},{password,email_confirm:true}]);assert.equal(h.state.creates.length,0);assert.equal(h.state.resets.length,0);assert.deepEqual(await r.json(),{user_id:target,created:false,confirmed:true,password_set:true});
+ assert.deepEqual(h.state.rpc.map(x=>x.name),['find_staff_account','assign_staff_account','staff_temporary_password_request']);assert.deepEqual(h.state.confirms.map(x=>x.input),[{password,email_confirm:true}]);assert.ok(h.state.trace.indexOf('updateUserById')<h.state.trace.indexOf('assign_staff_account'));assert.equal(h.state.creates.length,0);assert.equal(h.state.resets.length,0);assert.deepEqual(await r.json(),{user_id:target,created:false,confirmed:true,password_set:true});
 });
-test('existing-password replacement needs explicit consent and reports partial assignment without claiming password success',async()=>{
+test('existing-password replacement needs explicit consent and a failed password update never assigns access',async()=>{
  const preserve=endpoint({existing:target}),rejected=await preserve.send('POST',{mode:'assign',password,confirm_password:password});assert.equal(rejected.status,400);assert.equal((await rejected.json()).code,'password_choice_required');assert.deepEqual(preserve.state.confirms,[]);
- const failure=endpoint({existing:target,passwordConfirmError:true}),r=await failure.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});assert.equal(r.status,409);const body=await r.json();assert.equal(body.code,'staff_access_assigned_password_unconfirmed');assert.ok(!body.password_set);assert.ok(!JSON.stringify(body).includes(password));assert.ok(failure.state.rpc.some(x=>x.name==='assign_staff_account'));assert.equal(failure.state.rpc.at(-1).args.failed,true);
+ const failure=endpoint({existing:target,passwordConfirmError:true}),r=await failure.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});assert.equal(r.status,503);const body=await r.json();assert.equal(body.code,'staff_password_unconfirmed');assert.ok(!body.password_set);assert.ok(!JSON.stringify(body).includes(password));assert.equal(failure.state.rpc.some(x=>x.name==='assign_staff_account'),false);assert.equal(failure.state.storedPassword,'Existing private password');
 });
 
 test('the team directory includes peers and lower roles and filters higher roles before sending a response',async()=>{
@@ -134,4 +134,39 @@ test('the team directory includes peers and lower roles and filters higher roles
 });
 test('read-only directory access never permits staff to call any team management or password endpoint',async()=>{
  const h=endpoint({role:'editor'});for(const method of ['POST','PATCH','DELETE'])assert.equal((await h.send(method,method==='POST'?{}:{user_id:target,role:'editor',active:false})).status,403);assert.equal((await h.sendReset()).status,403);assert.equal((await h.sendPassword()).status,403);assert.deepEqual(h.state.creates,[]);assert.deepEqual(h.state.confirms,[]);assert.deepEqual(h.state.resets,[]);assert.equal(h.state.secretReads,0);
+});
+
+
+test('unconfirmed pre-registered logins cannot retain their untrusted password while gaining staff access',async()=>{
+ const h=endpoint({existing:target,pendingAccount:true}),response=await h.send('POST',{mode:'assign'});
+ assert.equal(response.status,409);assert.equal((await response.json()).code,'unverified_login');
+ assert.deepEqual(h.state.confirms,[]);assert.equal(h.state.pendingAccount,true);assert.equal(h.state.storedPassword,'Existing private password');
+ assert.equal(h.state.rpc.some(x=>x.name==='assign_staff_account'),false);
+});
+test('an unconfirmed login receives trusted replacement credentials before confirmation and staff assignment',async()=>{
+ const h=endpoint({existing:target,pendingAccount:true}),response=await h.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});
+ assert.equal(response.status,200);assert.equal(h.state.storedPassword,password);assert.equal(h.state.pendingAccount,false);
+ assert.deepEqual(h.state.confirms,[{id:target,input:{password,email_confirm:true}}]);
+ assert.deepEqual(h.state.trace,['find_staff_account','getUserById','updateUserById','assign_staff_account','staff_temporary_password_request']);
+ assert.equal((await response.json()).password_set,true);
+});
+test('failed or unverified credential results cannot assign staff access to a pending login',async()=>{
+ for(const options of [{passwordConfirmError:true},{mismatchedAuthId:owner},{existingEmail:'another@gmail.com'},{unconfirmedAuth:true},{lookupError:true},{mismatchedLookupId:owner}]){
+  const h=endpoint({existing:target,pendingAccount:true,...options}),response=await h.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});
+  assert.equal(response.status,503);assert.equal(h.state.rpc.some(x=>x.name==='assign_staff_account'),false);
+  if(options.passwordConfirmError){assert.equal(h.state.pendingAccount,true);assert.equal(h.state.storedPassword,'Existing private password');}
+  if(options.lookupError||options.mismatchedLookupId||options.existingEmail)assert.deepEqual(h.state.confirms,[]);
+ }
+});
+test('revocation after a trusted password replacement prevents assignment and reports the actual partial outcome',async()=>{
+ const h=endpoint({existing:target,pendingAccount:true,revokeDuringPassword:true}),response=await h.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});
+ assert.equal(response.status,409);assert.equal((await response.json()).code,'staff_password_saved_access_unconfirmed');
+ assert.equal(h.state.storedPassword,password);assert.equal(h.state.pendingAccount,false);
+ assert.equal(h.state.rpc.some(x=>x.name==='staff_temporary_password_request'),false);
+});
+test('a reminder failure reports that trusted credentials and access were saved without claiming a password failure',async()=>{
+ const h=endpoint({existing:target,pendingAccount:true,passwordTargetError:{code:'42501'}}),response=await h.send('POST',{mode:'assign',replace_password:true,password,confirm_password:password});
+ assert.equal(response.status,409);const body=await response.json();assert.equal(body.code,'staff_access_assigned_reminder_unconfirmed');
+ assert.equal(h.state.storedPassword,password);assert.equal(h.state.pendingAccount,false);assert.ok(h.state.rpc.some(x=>x.name==='assign_staff_account'));
+ assert.ok(!JSON.stringify(body).includes(password));
 });

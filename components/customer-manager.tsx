@@ -5,14 +5,18 @@ import { ArrowUpRight, CalendarDays, Check, LoaderCircle, Mail, MessageSquare, P
 import { useSite } from "./site-context";
 import { CUSTOMER_STAGES, customerError, customerSummaries, enquiryLabel, hanoiDay, type CustomerSummary } from "@/lib/customer-data";
 import { request } from "@/lib/requests";
+import { readAllRows } from "@/lib/pagination";
 import { normalize } from "@/lib/property-search";
 import type { CustomerProfile, CustomerRecord, Enquiry } from "@/lib/types";
 
-export function CustomerManager({ openEnquiry }: { openEnquiry: (enquiry: Enquiry) => void }) {
-  const { t, client, user, editor, sessionPhase, editorTask, language, enquiries, content, notice, demo } = useSite();
+export function CustomerManager({ openEnquiry, draft: editing, setDraft: setEditing }: {
+  openEnquiry: (enquiry: Enquiry) => void;
+  draft: CustomerSummary | null;
+  setDraft: (next: CustomerSummary | null | ((previous: CustomerSummary | null) => CustomerSummary | null)) => void;
+}) {
+  const { t, client, user, editor, sessionPhase, editorTask, language, enquiries, content, notice, demo, refresh } = useSite();
   const [profiles, setProfiles] = useState<CustomerProfile[]>([]), [records, setRecords] = useState<CustomerRecord[]>([]);
   const [query, setQuery] = useState(""), [stage, setStage] = useState(""), [dueOnly, setDueOnly] = useState(false);
-  const [editing, setEditing] = useState<CustomerSummary | null>(null);
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [today, setToday] = useState(hanoiDay);
   const active = useRef(true), sequence = useRef(0), version = useRef(0);
@@ -20,27 +24,30 @@ export function CustomerManager({ openEnquiry }: { openEnquiry: (enquiry: Enquir
   const identity = useRef(userId), locale = useRef(language);
   useEffect(() => { identity.current = userId; locale.current = language; }, [userId, language]);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
-  const load = useCallback(async () => {
+  const load = useCallback(async (refreshEnquiries = false) => {
     if (!client || !userId || !editor || demo) return;
     const id = userId, read = ++sequence.current, startedVersion = version.current;
     setLoading(true);
     try {
       const [p, r] = await request(signal => Promise.all([
-        client.from("customer_profiles").select("*").order("updated_at", { ascending: false }).abortSignal(signal),
-        client.from("customer_records").select("*").order("updated_at", { ascending: false }).abortSignal(signal),
+        readAllRows<CustomerProfile>((from,to)=>client.from("customer_profiles").select("*").order("updated_at", { ascending: false }).order("user_id").range(from,to).abortSignal(signal)),
+        readAllRows<CustomerRecord>((from,to)=>client.from("customer_records").select("*").order("updated_at", { ascending: false }).order("customer_key").range(from,to).abortSignal(signal)),
+        refreshEnquiries ? refresh() : Promise.resolve(),
       ]));
       if (!active.current || read !== sequence.current || identity.current !== id || version.current !== startedVersion) return;
-      if (p.error || r.error) throw p.error || r.error;
-      setProfiles(p.data as CustomerProfile[]); setRecords(r.data as CustomerRecord[]); setToday(hanoiDay()); setError("");
+      setProfiles(p); setRecords(r); setToday(hanoiDay()); setError("");
     } catch (error) { if (active.current && identity.current === id && read === sequence.current) setError(customerError(error, locale.current)); }
     finally { if (active.current && read === sequence.current) setLoading(false); }
-  }, [client, userId, editor, demo]);
+  }, [client, userId, editor, demo, refresh]);
   useEffect(() => {
     let cancelled = false;
     if (sessionPhase === "ready") queueMicrotask(() => { if (!cancelled) void load(); });
     return () => { cancelled = true; };
   }, [sessionPhase, load]);
   const customers = customerSummaries(profiles, enquiries, records);
+  // Refresh the selected conversation history without replacing editable CRM
+  // fields. A temporarily absent record keeps the history that opened its draft.
+  const editingEnquiries = editing ? customers.find(customer => customer.customer_key === editing.customer_key)?.enquiries ?? editing.enquiries : [];
   const due = (customer: CustomerRecord) => customer.stage !== "closed" && !!customer.follow_up_on && customer.follow_up_on <= today;
   const filtered = customers.filter(customer => (!stage || customer.stage === stage) && (!dueOnly || due(customer)) && normalize(`${customer.name} ${customer.email} ${customer.phone}`).includes(normalize(query).trim()));
   const stageLabel = (value: string) => ({ new: t("New lead", "Khách mới"), contacted: t("In conversation", "Đang trao đổi"), viewing: t("Viewing", "Đang xem nhà"), tenant: t("Tenant", "Khách thuê"), closed: t("Closed", "Đã hoàn tất") }[value] ?? value);
@@ -71,7 +78,7 @@ export function CustomerManager({ openEnquiry }: { openEnquiry: (enquiry: Enquir
   }
   return <div className="customer-manager">
     <div className="customer-metrics"><button className={!dueOnly ? "selected" : ""} onClick={() => setDueOnly(false)}><Users size={20}/><strong>{customers.length}</strong><span>{t("Customers & leads", "Khách hàng & khách tiềm năng")}</span></button><button className={dueOnly ? "selected" : ""} onClick={() => setDueOnly(!dueOnly)}><CalendarDays size={20}/><strong>{customers.filter(due).length}</strong><span>{t("Follow-ups due", "Cần liên hệ lại")}</span></button><button onClick={() => { setStage(stage === "tenant" ? "" : "tenant"); setDueOnly(false); }}><UserRound size={20}/><strong>{customers.filter(customer => customer.stage === "tenant").length}</strong><span>{t("Tenants", "Khách thuê")}</span></button></div>
-    <div className="customer-toolbar"><div><h2>{t("People, well looked after.", "Chăm sóc từng khách hàng.")}</h2><p>{t("Customer accounts, guest enquiries and your own contacts, together.", "Tài khoản khách hàng, yêu cầu của khách và danh bạ riêng, tại một nơi.")}</p></div><div><button className="text-link" disabled={loading || busy || demo} onClick={() => void load()}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button><button className="button button-small" onClick={addCustomer}><Plus size={16}/>{t("Add customer", "Thêm khách hàng")}</button></div></div>
+    <div className="customer-toolbar"><div><h2>{t("People, well looked after.", "Chăm sóc từng khách hàng.")}</h2><p>{t("Customer accounts, guest enquiries and your own contacts, together.", "Tài khoản khách hàng, yêu cầu của khách và danh bạ riêng, tại một nơi.")}</p></div><div><button className="text-link" disabled={loading || busy || demo} onClick={() => void load(true)}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button><button className="button button-small" onClick={addCustomer}><Plus size={16}/>{t("Add customer", "Thêm khách hàng")}</button></div></div>
     {demo && <div className="form-info">{t("Customer records in this preview are kept in memory for this visit. Live records require the connected customer portal.", "Hồ sơ xem trước chỉ được giữ trong bộ nhớ cho lượt truy cập này. Hồ sơ thực tế cần kết nối cổng khách hàng.")}</div>}
     {error && <div className="form-error" role="alert">{error}</div>}
     <div className={`customer-workspace ${editing ? "has-detail" : ""}`}><section className="admin-panel customer-directory">
@@ -86,7 +93,7 @@ export function CustomerManager({ openEnquiry }: { openEnquiry: (enquiry: Enquir
       <div className="form-row"><label>{t("Stage", "Giai đoạn")}<SelectField value={editing.stage} onValueChange={value => patch("stage", value)}>{CUSTOMER_STAGES.map(value => <option value={value} key={value}>{stageLabel(value)}</option>)}</SelectField></label><label>{t("Next follow-up", "Ngày liên hệ lại")}<input type="date" value={editing.follow_up_on ?? ""} onChange={e => patch("follow_up_on", e.target.value || null)}/></label></div>
       <label>{t("Internal notes", "Ghi chú nội bộ")}<textarea value={editing.notes} rows={5} maxLength={8000} onChange={e => patch("notes", e.target.value)} placeholder={t("Preferences, next steps, a note for the team…", "Nhu cầu, bước tiếp theo, ghi chú cho đội ngũ…")}/><small>{t("Only the team can see these notes and follow-up dates.", "Chỉ đội ngũ có thể xem ghi chú và ngày liên hệ lại.")}</small></label>
       {editing.profile && <div className="customer-preferences"><h3>{t("From their profile", "Từ hồ sơ khách hàng")}</h3>{editing.profile.preferred_district && <p><strong>{t("Neighbourhood:", "Khu vực:")}</strong> {content.neighbourhoods.find(n => n.slug === editing.profile?.preferred_district)?.name ?? editing.profile.preferred_district}</p>}{(editing.profile.budget_min !== null || editing.profile.budget_max !== null) && <p><strong>{t("Monthly budget:", "Ngân sách tháng:")}</strong> ${editing.profile.budget_min ?? "…"} – ${editing.profile.budget_max ?? "…"}</p>}{editing.profile.move_in_date && <p><strong>{t("Move-in:", "Chuyển vào:")}</strong> {editing.profile.move_in_date}</p>}{editing.profile.preferences && <p className="customer-preference-text">{editing.profile.preferences}</p>}</div>}
-      {editing.enquiries.length > 0 && <div className="customer-history"><h3>{t("Their conversations", "Lịch sử trao đổi")}</h3>{editing.enquiries.map(enquiry => <button type="button" key={enquiry.id} onClick={() => openEnquiry({ ...enquiry })}><MessageSquare size={15}/><span><strong>{enquiryLabel(enquiry, language)}</strong><small>{enquiry.message.slice(0, 100)}</small></span><ArrowUpRight size={14}/></button>)}</div>}
+      {editingEnquiries.length > 0 && <div className="customer-history"><h3>{t("Their conversations", "Lịch sử trao đổi")}</h3>{editingEnquiries.map(enquiry => <button type="button" key={enquiry.id} onClick={() => openEnquiry({ ...enquiry })}><MessageSquare size={15}/><span><strong>{enquiryLabel(enquiry, language)}</strong><small>{enquiry.message.slice(0, 100)}</small></span><ArrowUpRight size={14}/></button>)}</div>}
       <button className="button" disabled={busy}>{busy ? <LoaderCircle size={16} className="spin"/> : <Check size={16}/>} {t("Save customer", "Lưu khách hàng")}</button>
       </form></section>}
     </div>

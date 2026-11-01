@@ -15,6 +15,7 @@ import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/ses
 import { customerError, ENQUIRY_FIELDS } from "@/lib/customer-data";
 import { contentAssets } from "@/lib/content-assets";
 import { propertyOrders } from "@/lib/property-order";
+import { readAllRows } from "@/lib/pagination";
 import { readBrowserFavourites,claimBrowserFavourites,acknowledgeBrowserFavourites,releaseBrowserFavouriteClaim } from "@/lib/favourites";
 import { isPublicRental } from "@/lib/rentals";
 import type { StaffRole,StaffProfile } from "@/lib/staff";
@@ -196,25 +197,25 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     if (refreshFlight.current?.generation === generation) return refreshFlight.current.promise;
     const promise = (async () => {
       const [p, n, s, a, act, e, orders, articles] = await request(signal => Promise.all([
-        db.from("properties").select("*").order("sort_order").abortSignal(signal),
-        db.from("neighbourhoods").select("*").order("sort_order").abortSignal(signal),
+        readAllRows((from,to)=>db.from("properties").select("*").order("sort_order").order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("neighbourhoods").select("*").order("sort_order").order("slug").range(from,to).abortSignal(signal)),
         db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
-        db.from("listing_authors").select("*").order("sort_order").abortSignal(signal),
-        db.from("site_activities").select("*").order("sort_order").abortSignal(signal),
-        db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes,read_at,read_by,property_code,property_address)`).order("created_at", { ascending: false }).abortSignal(signal),
-        db.from("property_display_orders").select("scope,property_ids").abortSignal(signal),
-        db.from("editorial_articles").select("*").order("updated_at",{ascending:false}).abortSignal(signal),
+        readAllRows((from,to)=>db.from("listing_authors").select("*").order("sort_order").order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("site_activities").select("*").order("sort_order").order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes,read_at,read_by,property_code,property_address)`).order("created_at", { ascending: false }).order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("property_display_orders").select("scope,property_ids").order("scope").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("editorial_articles").select("*").order("updated_at",{ascending:false}).order("id").range(from,to).abortSignal(signal)),
       ]));
       const current = sessionRef.current?.state;
       if (current?.generation !== generation || !current.editor || current.user?.id !== state.user?.id) return;
-      if (p.error || n.error || s.error || e.error || a.error || act.error || orders.error || articles.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
+      if (s.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
       // A slow background read must not overwrite a save that completed meanwhile.
       if (startedVersion !== version.current) return;
-      updateContent(contentAssets({ editorial:articles.data||[], properties: p.data, neighbourhoods: n.data, settings: s.data, authors:a.data||[],activities:act.data||[],propertyOrders:propertyOrders(orders.data) } as Content));
-      initialRef.current = contentAssets({ editorial:(articles.data||[]).filter(row=>row.status==="published"), properties: p.data.filter(isPublicRental), neighbourhoods: n.data, settings: s.data,authors:(a.data||[]).filter(row=>row.published),activities:(act.data||[]).filter(row=>row.published),propertyOrders:propertyOrders(orders.data) } as Content);
+      updateContent(contentAssets({ editorial:articles, properties: p, neighbourhoods: n, settings: s.data, authors:a,activities:act,propertyOrders:propertyOrders(orders) } as Content));
+      initialRef.current = contentAssets({ editorial:articles.filter(row=>row.status==="published"), properties: p.filter(isPublicRental), neighbourhoods: n, settings: s.data,authors:a.filter(row=>row.published),activities:act.filter(row=>row.published),propertyOrders:propertyOrders(orders) } as Content);
       publicContentNeeded.current = false;
       setBackendError(false);
-      updateEnquiries(e.data.map(row => {
+      updateEnquiries(e.map(row => {
         const { enquiry_notes, ...enquiry } = row;
         type PrivateNotes=Pick<Enquiry,"notes"|"read_at"|"read_by"|"property_code"|"property_address">;
         const privateNotes = enquiry_notes as unknown as PrivateNotes | PrivateNotes[] | null;
@@ -382,10 +383,9 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     if (!client || !user || sessionPhase !== "ready") return;
     let active = true;
     const identity = user.id, generation = snapshotRef.current.generation, startedVersion = savedVersion.current;
-    void request(signal => client.from("saved_homes").select("property_id").eq("user_id", identity).abortSignal(signal))
-      .then(({ data, error }) => {
+    void request(signal => readAllRows<{property_id:string}>((from,to)=>client.from("saved_homes").select("property_id").eq("user_id", identity).order("property_id").range(from,to).abortSignal(signal)))
+      .then(data => {
         if (!active || snapshotRef.current.generation !== generation || startedVersion !== savedVersion.current) return;
-        if (error) { setSavedError(customerError(error, language)); return; }
         setSaved((data ?? []).map(row => row.property_id as string)); setSavedAccount(identity); setSavedError("");
       }).catch(error => { if (active) setSavedError(customerError(error, language)); });
     return () => { active = false; };
@@ -439,11 +439,21 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
       const stored=readBrowserFavourites(localStorage),valid=new Set(content.properties.filter(isPublicRental).map(property=>property.id));
       const candidates=stored.filter(id=>valid.has(id)).slice(0,100);if(!candidates.length){setGuestImportError(false);return 0;}
       const ids=claimBrowserFavourites(localStorage,identity,candidates);if(!ids.length)return 0;
-      const existing=new Set(saved),additions=ids.filter(id=>!existing.has(id));savedVersion.current++;
-      if(additions.length){const {error}=await accountTask((db,signal,userId)=>db.from("saved_homes").upsert(additions.map(property_id=>({user_id:userId,property_id})),{onConflict:"user_id,property_id",ignoreDuplicates:true}).select("property_id").abortSignal(signal));if(error)throw error;}
-      if(snapshotRef.current.user?.id!==identity||snapshotRef.current.generation!==generation)throw new Error("Your account changed during this request.");
-      savedVersion.current++;setSaved(previous=>[...new Set([...previous,...ids])]);
-      acknowledgeBrowserFavourites(localStorage,identity,ids);setGuestImportError(false);return additions.length;
+      const existing=new Set(saved),additions=ids.filter(id=>!existing.has(id));
+      // Existing favourites may be removed while other guest homes import. Only
+      // reserve actual additions; merging the whole captured list revives deletes.
+      if(additions.some(id=>savedFlight.current.has(identity+":"+id)))throw new Error("Saved homes are updating. Retry Sync when they finish.");
+      for(const id of additions)savedFlight.current.add(identity+":"+id);
+      setPendingSaved(previous=>[...new Set([...previous,...additions])]);savedVersion.current++;
+      try{
+        if(additions.length){const {error}=await accountTask((db,signal,userId)=>db.from("saved_homes").upsert(additions.map(property_id=>({user_id:userId,property_id})),{onConflict:"user_id,property_id",ignoreDuplicates:true}).select("property_id").abortSignal(signal));if(error)throw error;}
+        if(snapshotRef.current.user?.id!==identity||snapshotRef.current.generation!==generation)throw new Error("Your account changed during this request.");
+        savedVersion.current++;setSaved(previous=>[...new Set([...previous,...additions])]);
+        acknowledgeBrowserFavourites(localStorage,identity,ids);setGuestImportError(false);return additions.length;
+      }finally{
+        for(const id of additions)savedFlight.current.delete(identity+":"+id);
+        if(snapshotRef.current.user?.id===identity&&snapshotRef.current.generation===generation)setPendingSaved(previous=>previous.filter(id=>!additions.includes(id)));
+      }
     })();guestImportFlights.current.set(key,task);
     try{return await task;}finally{if(guestImportFlights.current.get(key)===task)guestImportFlights.current.delete(key);}
   }
@@ -467,10 +477,10 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
       if(editor)void refreshStaffProfile().catch(()=>{});
       const state=snapshotRef.current,actor=state.user?.id,generation=state.generation;
       void request(async signal=>{
-        let query=client.from("listing_authors").select("*");if(!editor)query=query.eq("published",true);
-        return await query.order("sort_order").abortSignal(signal);
-      }).then(({data,error})=>{
-        if(!active||error||snapshotRef.current.user?.id!==actor||snapshotRef.current.generation!==generation||!Array.isArray(data))return;
+        return await readAllRows((from,to)=>{let query=client.from("listing_authors").select("*");if(!editor)query=query.eq("published",true);
+          return query.order("sort_order").order("id").range(from,to).abortSignal(signal);});
+      }).then(data=>{
+        if(!active||snapshotRef.current.user?.id!==actor||snapshotRef.current.generation!==generation||!Array.isArray(data))return;
         version.current++;updateContent(previous=>({...previous,authors:data}));initialRef.current={...initialRef.current,authors:data.filter(a=>a.published)};
       }).catch(()=>{});
       window.dispatchEvent(new Event("gary-staff-directory-changed"));

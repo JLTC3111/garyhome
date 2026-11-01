@@ -10,7 +10,7 @@ test('assigned Gmail staff, enquiry reads and protected deletion use current dat
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,created_at timestamptz default now());alter table storage.objects enable row level security;
- grant usage on schema auth,public,storage to anon,authenticated;alter default privileges in schema public grant all on tables to anon,authenticated;`);
+ grant usage on schema auth,public,storage to anon,authenticated,service_role;alter default privileges in schema public grant all on tables to anon,authenticated;`);
  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
  const ids={};let next=0;
  for(const name of ['owner','admin','admin2','manager','editor','gmail','unassigned','customer','pending','disabled']){
@@ -19,7 +19,7 @@ test('assigned Gmail staff, enquiry reads and protected deletion use current dat
   await db.query('insert into auth.users(id,email,email_confirmed_at)values($1,$2,$3)',[id,email,name==='pending'?null:new Date().toISOString()]);
   if(!['gmail','unassigned','customer','pending','disabled'].includes(name))await db.query('insert into public.team_members(user_id,role,email,bootstrap_owner)values($1,$2,$3,$4)',[id,name==='admin2'?'admin':name,email,name==='owner']);
  }
- async function as(name){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[ids[name]||'']);await db.exec('set role '+(name==='anon'?'anon':name==='root'?'postgres':'authenticated'));}
+ async function as(name){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[ids[name]||'']);await db.exec('set role '+(name==='anon'?'anon':name==='root'?'postgres':name==='service_role'?'service_role':'authenticated'));}
  const one=async(sql,args=[])=>(await db.query(sql,args)).rows[0];
  const denied=promise=>assert.rejects(promise,error=>error.code==='42501');
  const property=(await one("select id,listing_code,address from public.properties where status='published' and listing_type='rent' limit 1"));
@@ -29,7 +29,10 @@ test('assigned Gmail staff, enquiry reads and protected deletion use current dat
   await as('unassigned');assert.equal((await one('select private.is_editor() as allowed')).allowed,false);
   await denied(db.query("select public.assign_staff_account('unassigned@gmail.com','Self appointed','admin')"));
   await as('owner');await db.query("select public.assign_staff_account('GMAIL@GMAIL.COM','Gmail colleague','editor')");
-  await db.query("select public.assign_staff_account('pending@gmail.com','Pending colleague','editor')");
+  await assert.rejects(db.query("select public.assign_staff_account('pending@gmail.com','Pending colleague','editor')"),error=>error.code==='23514');
+  // Existing pre-migration assignments can still have a pending mailbox and
+  // need a recovery link, but new assignments must verify email ownership first.
+  await as('root');await db.query("insert into public.team_members(user_id,role,email,display_name)values($1,'editor','pending@gmail.com','Pending colleague')",[ids.pending]);await as('owner');
   await db.query("select public.assign_staff_account('disabled@gmail.com','Disabled colleague','editor')");
   await db.query("select public.set_staff_access($1,'editor',false)",[ids.disabled]);
   await assert.rejects(db.query("select public.assign_staff_account('outsider@elsewhere.invalid','Unapproved domain','editor')"));
@@ -42,7 +45,8 @@ test('assigned Gmail staff, enquiry reads and protected deletion use current dat
  });
 
  await t.test('reading an enquiry records the first reader without changing status or concurrent staff notes',async()=>{
-  await as('customer');enquiry=(await one("insert into public.enquiries(property_id,name,email,message,consent)values($1,'A Customer','customer@gmail.com','Please arrange a viewing',true)returning id",[property.id])).id;
+  await as('customer');await denied(db.query("insert into public.enquiries(property_id,name,email,message,consent)values($1,'A Customer','customer@gmail.com','Please arrange a viewing',true)",[property.id]));
+  await as('service_role');enquiry=(await one('select submit_public_intake($1,$2,$3,$4::jsonb) as id',['enquiry','a'.repeat(64),ids.customer,JSON.stringify({property_id:property.id,name:'A Customer',email:'customer@gmail.com',message:'Please arrange a viewing',consent:true})])).id;await as('customer');
   await denied(db.query('select public.mark_enquiry_read($1)',[enquiry]));
   await as('editor');await db.query("select public.save_customer_enquiry($1,'contacted','Existing internal follow-up',null,'We will call you')",[enquiry]);
   const first=(await one('select public.mark_enquiry_read($1) as result',[enquiry])).result;
@@ -66,7 +70,7 @@ test('assigned Gmail staff, enquiry reads and protected deletion use current dat
 
  await t.test('admin listing deletion preserves enquiry and commission evidence while clearing favourites and manual card order',async()=>{
   await as('customer');await db.query('insert into public.saved_homes(property_id)values($1)',[property.id]);
-  await db.query("insert into public.property_assistance(property_id,name,email,helper_name,channel,helped_where,helped_on,consent)values($1,'A Customer','customer@gmail.com','Gmail colleague','in_person','Hanoi office',current_date-1,true)",[property.id]);
+  const day=(await one('select (current_date-1)::text as day')).day;await as('service_role');await db.query('select submit_public_intake($1,$2,$3,$4::jsonb)',['assistance','a'.repeat(64),ids.customer,JSON.stringify({property_id:property.id,name:'A Customer',email:'customer@gmail.com',helper_name:'Gmail colleague',channel:'in_person',helped_where:'Hanoi office',helped_on:day,consent:true})]);await as('customer');
   report=(await one('select id from public.property_assistance')).id;
   await as('admin');await db.query("select public.review_property_assistance($1,'verified',$2,'Gmail colleague','Viewing checked')",[report,ids.gmail]);
   await db.query("insert into public.property_display_orders(scope,property_ids)values('home',array[$1]::uuid[])on conflict(scope)do update set property_ids=excluded.property_ids",[property.id]);

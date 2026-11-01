@@ -7,7 +7,7 @@ test('direct staff roles, profile photos and persistent activity obey fresh data
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,created_at timestamptz default now());alter table storage.objects enable row level security;
- grant usage on schema auth,public,storage to anon,authenticated;alter default privileges in schema public grant all on tables to anon,authenticated;`);
+ grant usage on schema auth,public,storage to anon,authenticated,service_role;alter default privileges in schema public grant all on tables to anon,authenticated;`);
  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
  const ids={},emails={};let next=0;
  for(const name of ['owner','admin','admin2','manager','manager2','staff','customer','pending','unassigned']){
@@ -15,7 +15,7 @@ test('direct staff roles, profile photos and persistent activity obey fresh data
   await db.query('insert into auth.users(id,email,email_confirmed_at)values($1,$2,$3)',[id,emails[name],name==='pending'?null:new Date().toISOString()]);
   if(!['customer','pending','unassigned'].includes(name))await db.query('insert into public.team_members(user_id,role,email,display_name,bootstrap_owner)values($1,$2,$3,$4,$5)',[id,name==='admin2'?'admin':name==='manager2'?'manager':name==='staff'?'editor':name,emails[name],name+' team',name==='owner']);
  }
- const as=async(name)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[ids[name]||'']);await db.exec('set role '+(name==='root'?'postgres':name==='anon'?'anon':'authenticated'));};
+ const as=async(name)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[ids[name]||'']);await db.exec('set role '+(name==='root'?'postgres':name==='anon'?'anon':name==='service_role'?'service_role':'authenticated'));};
  const one=async(sql,args=[])=>(await db.query(sql,args)).rows[0];
  const denied=p=>assert.rejects(p,e=>e.code==='42501');
  const assign=(name,role)=>db.query('select public.assign_staff_account($1,$2,$3) as id',[emails[name],name+' assigned',role]);
@@ -40,9 +40,9 @@ test('direct staff roles, profile photos and persistent activity obey fresh data
   await denied(db.query('select public.remove_staff_access($1)',[ids.staff]));
   await db.query("select public.set_staff_access($1,'editor',true)",[ids.customer]);
  });
- await t.test('a pending mailbox can be assigned but cannot use staff tools until verified',async()=>{
-  await as('owner');await assign('pending','editor');await as('pending');assert.equal((await one('select private.is_editor() as allowed')).allowed,false);await denied(db.query('select public.get_staff_profile()'));await denied(db.query('select public.get_studio_notifications()'));
-  await as('root');await db.query('update auth.users set email_confirmed_at=now() where id=$1',[ids.pending]);await as('pending');assert.equal((await one('select private.is_editor() as allowed')).allowed,true);
+ await t.test('a pending mailbox must be verified before existing credentials can receive staff access',async()=>{
+  await as('owner');await assert.rejects(assign('pending','editor'),error=>error.code==='23514');await as('pending');assert.equal((await one('select private.is_editor() as allowed')).allowed,false);await denied(db.query('select public.get_staff_profile()'));await denied(db.query('select public.get_studio_notifications()'));
+  await as('root');await db.query('update auth.users set email_confirmed_at=now() where id=$1',[ids.pending]);await as('owner');await assign('pending','editor');await as('pending');assert.equal((await one('select private.is_editor() as allowed')).allowed,true);
  });
  await t.test('new accounts have a password reminder which only they can clear; profile reads cannot select another user',async()=>{
   await as('staff');let profile=(await one('select public.get_staff_profile() as data')).data;assert.equal(profile.user_id,ids.staff);assert.equal(profile.password_change_reminder,true);
@@ -79,10 +79,13 @@ test('direct staff roles, profile photos and persistent activity obey fresh data
   await denied(db.query('delete from public.studio_notifications'));
  });
  await t.test('new enquiries, feedback and assistance create staff notifications without exposing customer messages or email',async()=>{
-  await as('root');const property=(await one("select id from public.properties where status='published' limit 1")).id;
-  await as('anon');await db.query("insert into public.enquiries(name,email,message,consent)values('Guest Name','guest@example.invalid','Private customer message',true)");
-  await db.query("insert into public.feedback_submissions(name,email,rating,message,consent)values('Guest Name','guest@example.invalid',4,'Private review message',true)");
-  await db.query("insert into public.property_assistance(property_id,name,email,helper_name,channel,helped_where,helped_on,consent)values($1,'Guest Name','guest@example.invalid','Named helper','phone','Hanoi',current_date,true)",[property]);
+  await as('root');const property=(await one("select id from public.properties where status='published' limit 1")).id,day=(await one('select current_date::text as day')).day;
+  await as('anon');await denied(db.query("insert into public.enquiries(name,email,message,consent)values('Guest Name','guest@example.invalid','Private customer message',true)"));
+  await as('service_role');const intake=(channel,details)=>db.query('select submit_public_intake($1,$2,null,$3::jsonb)',[channel,'a'.repeat(64),JSON.stringify(details)]);
+  await intake('enquiry',{name:'Guest Name',email:'guest@example.invalid',message:'Private customer message',consent:true});
+  await intake('feedback',{name:'Guest Name',email:'guest@example.invalid',rating:4,message:'Private review message',consent:true});
+  await intake('assistance',{property_id:property,name:'Guest Name',email:'guest@example.invalid',helper_name:'Named helper',channel:'phone',helped_where:'Hanoi',helped_on:day,consent:true});
+  await as('anon');
   await denied(db.query('select public.get_studio_notifications()'));
   await as('staff');const visible=await notifications();assert.ok(visible.items.some(n=>n.category==='enquiry'));assert.ok(visible.items.some(n=>n.category==='feedback'));assert.ok(!visible.items.some(n=>n.category==='commission'));assert.ok(!JSON.stringify(visible).includes('guest@example.invalid'));assert.ok(!JSON.stringify(visible).includes('Private customer message'));
   await as('manager');assert.ok((await notifications()).items.some(n=>n.category==='commission'));

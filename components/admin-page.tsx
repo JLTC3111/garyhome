@@ -30,7 +30,7 @@ import { canDeleteContent, canViewTeam, canReorderProperties } from "@/lib/staff
 import { StaffProfileButton,StaffPasswordReminder } from "./staff-profile";
 import { StudioNotifications } from "./studio-notifications";
 import { DeleteConfirmation } from "./delete-confirmation";
-import { hanoiInput } from "@/lib/customer-data";
+import { hanoiInput, type CustomerSummary } from "@/lib/customer-data";
 import type { Enquiry, Neighbourhood, Property, Settings } from "@/lib/types";
 
 type Tab="landlords"|"overview"|"properties"|"enquiries"|"customers"|"media"|"neighbourhoods"|"settings"|"team"|"rental-content"|"feedback"|"assistance"|"news"|"tips"|"help";
@@ -45,6 +45,7 @@ export function AdminPage() {
   const [editing,setEditing]=useState<Property|null>(null);const [newPropertyId,setNewPropertyId]=useState<string|null>(null);const [area,setArea]=useState<Neighbourhood|null>(null);const [newArea,setNewArea]=useState(false);const [lead,setLead]=useState<Enquiry|null>(null);
   const [settingsDraft,setSettingsDraft]=useState<Settings|null>(null);
   const [teamDraft,setTeamDraft]=useState(emptyTeamDraft);
+  const [customerDraft,setCustomerDraft]=useState<CustomerSummary|null>(null);
   const [pendingDelete,setPendingDelete]=useState<{kind:"property"|"enquiry";id:string;label:string}|null>(null),[deleteError,setDeleteError]=useState("");
   const reading=useRef(new Set<string>());
   const visibleTabs=tabs.filter(([id])=>id!=="media"&&(id!=="team"||!demo&&canViewTeam(site.staffRole))&&(id!=="assistance"||!demo&&canReorderProperties(site.staffRole)));
@@ -73,8 +74,8 @@ export function AdminPage() {
   useLayoutEffect(()=>{
     // Clear private workspace state before a different account can paint it.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPendingDelete(null);setDeleteError("");setBusy(false);setError("");reading.current.clear();if(accountId){if(lastAccount.current && lastAccount.current!==accountId){setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setError("");}lastAccount.current=accountId;}},[accountId]);
-  async function signOut(){if(!client)return;setAuthBusy(true);setError("");try{const {error}=await request(()=>client.auth.signOut());if(error)throw error;setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());}catch(e){setError(e instanceof Error?e.message:"Couldn’t sign out.");}finally{setAuthBusy(false);}}
+    setPendingDelete(null);setDeleteError("");setBusy(false);setError("");reading.current.clear();if(accountId){if(lastAccount.current && lastAccount.current!==accountId){setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);setError("");}lastAccount.current=accountId;}},[accountId]);
+  async function signOut(){if(!client)return;setAuthBusy(true);setError("");try{const {error}=await request(()=>client.auth.signOut());if(error)throw error;setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);}catch(e){setError(e instanceof Error?e.message:"Couldn’t sign out.");}finally{setAuthBusy(false);}}
   useEffect(()=>{const handler=(e:KeyboardEvent)=>{if(e.key==="Escape"){setEditing(null);setArea(null);setLead(null);}};window.addEventListener("keydown",handler);return ()=>window.removeEventListener("keydown",handler);},[]);
   async function signIn(e:FormEvent<HTMLFormElement>) {
     e.preventDefault();if(!ready||!client)return;setAuthBusy(true);setError("");const form=new FormData(e.currentTarget);
@@ -179,7 +180,7 @@ export function AdminPage() {
   {tab==="rental-content"&&<RentalContentManager key={user?.id||"preview"} upload={upload}/>}
   {(tab==="feedback"||tab==="assistance")&&<SubmissionManager kind={tab}/>}
   {tab==="team"&&canViewTeam(site.staffRole)&&<TeamManager key={(user?.id||"preview")+"-"+site.staffRole} draft={teamDraft} setDraft={setTeamDraft}/>}
-  {tab==="customers"&&<CustomerManager openEnquiry={openLead}/>}
+  {tab==="customers"&&<CustomerManager key={user?.id||"preview"} openEnquiry={openLead} draft={customerDraft} setDraft={setCustomerDraft}/>}
   {tab==="neighbourhoods"&&<div className="admin-area-grid">{content.neighbourhoods.map(n=><article className="admin-panel" key={n.slug}><img src={n.image} alt={n.name}/><div><h2>{n.name}</h2><p>{language==="vi"?n.tagline_vi||n.tagline_en:n.tagline_en}</p><button className="button button-outline button-small" onClick={()=>{setNewArea(false);setArea({...n});setError("");}}>{text("Edit neighbourhood")}<ArrowRight size={16}/></button></div></article>)}</div>}
   {tab==="media"&&<><div className="form-info">{text("Upload and reorder photos in a property’s editor. The first photo is its cover. JPG, PNG, WebP, and AVIF are supported, up to 8 MB (")}{demo?text("2 MB in this browser preview"):text("private editor uploads")}).</div><div className="admin-media-grid">{content.properties.flatMap(p=>p.images.map((src,i)=>({src,p,i}))).map(({src,p,i})=><button key={p.id+"-"+i} onClick={()=>{setNewPropertyId(null);setEditing({...p,images:[...p.images]});setError("");}}><img src={src} alt={language==="vi"?p.title_vi||p.title_en:p.title_en} loading="lazy"/><span><strong>{language==="vi"?p.title_vi||p.title_en:p.title_en}</strong><small>{i===0?text("Cover photo"):text("Photo {number}",{number:i+1})}</small></span></button>)}</div></>}
   {tab==="settings"&&<SettingsForm settings={settingsDraft||content.settings} onChange={next=>setSettingsDraft(previous=>typeof next==="function"?next(previous||content.settings):next)} onSave={saveSettings} upload={upload} busy={busy}/>}

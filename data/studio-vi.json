@@ -544,5 +544,14 @@
   "News articles": "Bài tin tức",
   "Rental tips": "Cẩm nang thuê nhà",
   "Listing workspace": "Quản lý tin đăng",
-  "Help & onboarding": "Hướng dẫn & hội nhập"
+  "Help & onboarding": "Hướng dẫn & hội nhập",
+  "Staff access assigned. The verified login password is unchanged.": "Đã cấp quyền nhân viên. Mật khẩu của tài khoản đã xác minh được giữ nguyên.",
+  "Only verified logins can keep their existing password. Customer history is preserved.": "Chỉ tài khoản đã xác minh email mới được giữ mật khẩu hiện tại. Lịch sử khách hàng được giữ nguyên.",
+  "Choose Assign existing login for a verified login, or explicitly set a temporary password before assigning an unverified login.": "Chọn Cấp quyền tài khoản hiện có cho tài khoản đã xác minh, hoặc chủ động đặt mật khẩu tạm trước khi cấp quyền cho tài khoản chưa xác minh.",
+  "A replacement password is saved before staff access is assigned. For an existing staff member, use Set temporary password in the directory if needed.": "Mật khẩu thay thế được lưu trước khi cấp quyền nhân viên. Với nhân viên hiện có, hãy dùng Đặt mật khẩu tạm trong danh sách nếu cần.",
+  "Couldn’t verify the existing login. Refresh the team before trying again.": "Chưa xác minh được tài khoản hiện có. Hãy làm mới danh sách đội ngũ trước khi thử lại.",
+  "Couldn’t confirm the temporary password. Staff access was not assigned. Check the account before trying again.": "Chưa xác nhận được mật khẩu tạm. Chưa cấp quyền nhân viên. Hãy kiểm tra tài khoản trước khi thử lại.",
+  "This login has not verified its email. Ask the staff member to confirm their email, or explicitly set a temporary password before assigning access.": "Tài khoản này chưa xác minh email. Hãy yêu cầu nhân viên xác nhận email hoặc chủ động đặt mật khẩu tạm trước khi cấp quyền.",
+  "Staff access and the temporary password were saved, but the password-change reminder was not confirmed. Refresh the team before continuing.": "Đã lưu quyền nhân viên và mật khẩu tạm, nhưng chưa xác nhận được lời nhắc đổi mật khẩu. Hãy làm mới danh sách đội ngũ trước khi tiếp tục.",
+  "The temporary password was saved, but staff access was not confirmed. Refresh and assign the existing login to finish.": "Đã lưu mật khẩu tạm nhưng chưa xác nhận được quyền nhân viên. Hãy làm mới và cấp quyền tài khoản hiện có để hoàn tất."
 }

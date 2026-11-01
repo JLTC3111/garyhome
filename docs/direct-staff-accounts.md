@@ -25,7 +25,7 @@ The Auth account and database assignment are separate operations. If the account
 
 ## Assign an existing login
 
-Choose **Assign existing login** for an email that already exists in Supabase. It confirms the email and assigns a permitted lower role while preserving the person's current password and customer history. The mode does not overwrite an existing customer's credentials. Password inputs are shown only for new accounts. Existing staff can change their password in their profile; the directory's optional **Send password link** remains available for recovery.
+Choose **Assign existing login** for an email that already exists in Supabase. Keeping the existing password requires an already verified email; this path makes no Auth changes and preserves customer history. An unconfirmed signup cannot receive staff access while retaining its existing password. Ask the staff member to verify their mailbox, or explicitly choose **Set a new temporary password for this existing login**. Replacement establishes the entered password and confirms the email together before the role is assigned. A failed or unverified password result stops the assignment. Existing staff can change their password in their profile; the directory's optional **Send password link** remains available for recovery.
 
 ## Existing staff who cannot sign in
 
@@ -72,7 +72,7 @@ Applied to project `duyiihsmaqfgwezmsnjs` on 25 October 2026. For another projec
 
 The form now keeps action errors separate from directory-loading errors, so a background refresh cannot erase an unsuccessful creation message. For an existing email it offers **Assign and keep existing password** or **Assign and set temporary password**. The second option retains the entered password locally and shows an explicit replacement choice before the final submit. Existing credentials are never silently ignored or replaced.
 
-When replacement is selected, the server confirms the Auth email, assigns a permitted lower role, rechecks the target through the guarded temporary-password helper and sets the supplied password. If assignment succeeds but the password update cannot be confirmed, the response reports that partial outcome and loads the directory; it never reports password success. Password fields have a labelled visibility toggle, stay out of the parent draft and are masked again after clearing or changing setup mode.
+When replacement is selected, the server verifies the existing Auth account, then saves the supplied password and email confirmation in one Auth update before assigning a permitted lower role through a fresh database permission check. If the password update fails, no access assignment is attempted. If credentials are saved but assignment fails, the response reports that exact partial outcome; refresh before finishing the assignment. A separate reminder failure reports that the password and access were saved. Password fields have a labelled visibility toggle, stay out of the parent draft and are masked again after clearing or changing setup mode.
 
 A live Supabase Auth check on 25 October 2026 created a disposable confirmed account, verified email/password sign-in, deleted that account, and confirmed that no disposable accounts remained. No real team member's credentials were changed by that check. HTTP transport was used because the local Node fetch transport could not reach the service. The role and partial-failure boundaries are tested separately in the API/database suites.
 

@@ -59,7 +59,8 @@ async function harness(t, options={}){
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
  const backend={exchangeRate:Object.hasOwn(options,'exchangeRate')?options.exchangeRate:currencyTestRate,role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{editorial_articles:structuredClone(fixture.editorial),enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[],portal_guides:JSON.parse(fs.readFileSync(path.join(base,'data/portal-guides.json'),'utf8')).map(row=>({...row,created_at:'2026-10-28T00:00:00Z',updated_at:'2026-10-28T00:00:00Z'})),portal_guide_files:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
-  const filters={},query={};
+  const filters={},query={};let range;
+  query.range=(from,to)=>{range=[from,to];return query;};
   query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
   for(const method of ['select','order','abortSignal','single','limit'])query[method]=()=>query;
   query.then=(resolve,reject)=>(async()=>{
@@ -67,6 +68,7 @@ async function harness(t, options={}){
    if(backend.publicPending)await backend.publicPending.promise;
    let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:table==='property_display_orders'?[]:table==='editorial_articles'?backend.publicRows.editorial||[]:backend.publicRows[table]);
    if(table==='properties')data=data.filter(row=>row.status===filters.status);
+   if(range&&Array.isArray(data))data=data.slice(range[0],Math.min(range[1]+1,range[0]+(options.rowCap??Infinity)));
    return backend.publicError?{data:null,error:{code:'',message:'Temporary network failure'},status:0}:{data,error:null,status:200};
   })().then(resolve,reject);
   return query;
@@ -81,14 +83,16 @@ async function harness(t, options={}){
   rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(['get_studio_notifications','mark_studio_notifications_read'].includes(name)&&backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='get_staff_profile')return Promise.resolve({data:{user_id:session?.user.id,display_name:'Test staff',avatar_path:backend.profilePaths?.get(session?.user.id)||'',password_change_reminder:backend.passwordReminder||false},error:null}).then(resolve,reject);if(name==='acknowledge_staff_password_reminder')backend.passwordReminder=false;if(name==='mark_studio_notifications_read')backend.notifications=backend.notifications?.map(n=>({...n,unread:false}));if(name==='get_studio_notifications')return Promise.resolve({data:{items:backend.notifications??[],unread_count:backend.notifications?.filter(n=>n.unread).length||0},error:null}).then(resolve,reject);if(name==='staff_photo_directory')return Promise.resolve({data:[],error:null}).then(resolve,reject);if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
   storage:{from:bucket=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}}),remove:async paths=>{backend.helpRemoved??=[];backend.helpRemoved.push(...paths);return {data:[],error:null};},createSignedUrl:async(path,expires,options)=>{backend.helpSigned??=[];backend.helpSigned.push({bucket,path,expires,options});if(backend.helpSignedPending)await backend.helpSignedPending.promise;return {data:{signedUrl:'https://private.example.invalid/'+path+'?view='+String(!options?.download)},error:null};}})},
   from(table){
-   let writing=false,payload,single=false,writeMethod;const filters={};const query={};
+   let writing=false,payload,single=false,writeMethod,range;const filters={};const query={};
+   query.range=(from,to)=>{range=[from,to];return query;};
+   const applyRange=result=>!writing&&range&&Array.isArray(result.data)?{...result,data:result.data.slice(range[0],Math.min(range[1]+1,range[0]+(options.rowCap??Infinity)))}:result;
    for(const method of ['upsert','update','insert','delete'])query[method]=value=>{writing=true;writeMethod=method;payload=value;return query;};
    query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
    for(const method of ['single','maybeSingle'])query[method]=()=>{single=true;return query;};
    for(const method of ['select','order','abortSignal','is','limit','or'])query[method]=()=>query;
    query.then=(resolve,reject)=>{
     if(writing)backend.calls.push({table,payload,method:writeMethod,filters});
-    if(!writing){backend.privateReads??=[];backend.privateReads.push(table);}
+    if(!writing){backend.privateReads??=[];backend.privateReads.push(table);if(range){backend.privateRanges??=[];backend.privateRanges.push({table,from:range[0],to:range[1]});}}
     if(writing&&table==='staff_profiles'){backend.profilePaths??=new Map();backend.profilePaths.set(payload.user_id,payload.avatar_path);}
     if(writing&&backend.writeErrors.has(table))return Promise.resolve({data:null,error:backend.writeErrors.get(table)}).then(resolve,reject);
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
@@ -111,7 +115,7 @@ async function harness(t, options={}){
      const items=Array.isArray(payload)?payload:payload?[payload]:[];if(writeMethod==='upsert'||writeMethod==='insert')for(const item of items)if(!backend.rows.saved_homes.some(row=>row.user_id===item.user_id&&row.property_id===item.property_id))backend.rows.saved_homes.push(item);
      if(writeMethod==='delete')backend.rows.saved_homes=backend.rows.saved_homes.filter(row=>row.user_id!==filters.user_id||row.property_id!==filters.property_id);
     }
-    if(backend.pending.has(table))return backend.pending.get(table).promise.then(resolve,reject);
+    if(backend.pending.has(table))return backend.pending.get(table).promise.then(applyRange).then(resolve,reject);
     if(!writing&&backend.readErrors.has(table))return Promise.resolve({data:null,error:backend.readErrors.get(table)}).then(resolve,reject);
     let rows=structuredClone(backend.rows[table]??fixture[table]??[]);
     if(Array.isArray(rows)&&filters.user_id)rows=rows.filter(row=>row.user_id===filters.user_id);
@@ -121,7 +125,7 @@ async function harness(t, options={}){
     if(single&&Array.isArray(rows))rows=rows[0]??null;
     const value=table==='team_members'?{data:backend.role?{role:backend.role}:null,error:backend.roleError?new Error('Offline'):null}:table==='site_settings'?{data:structuredClone(fixture.settings),error:null}:{data:writing?(table==='properties'&&writeMethod==='insert'?{...payload,listing_code:payload.listing_code||'GH-900001'}:payload):rows,error:null};
     // Instant mocks settle before React renders. Opt-in latency lets intermediate session phases commit, like a real network.
-    return (backend.latency&&!writing?delay(backend.latency).then(()=>value):Promise.resolve(value)).then(resolve,reject);
+    return (backend.latency&&!writing?delay(backend.latency).then(()=>value):Promise.resolve(value)).then(applyRange).then(resolve,reject);
    };
    return query;
   },
@@ -431,7 +435,7 @@ test('a failed server reload automatically recovers public listings and clears t
  assert.equal(h.site.backendError,false);
  assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);
  assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
- assert.equal(h.backend.publicCalls.length,7);
+ assert.equal(h.backend.publicCalls.length,10);
  assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='properties').filters,{status:'published',listing_type:'rent',availability:['available','on_request']});
  assert.equal(h.site.user,null);
 });
@@ -456,7 +460,7 @@ test('an offline reload waits for the online event before recovering public cont
  const h=await harness(t,{guest:true,publicOnly:true,initialError:true,offline:true});
  assert.equal(h.site.backendError,true);assert.equal(h.backend.publicCalls.length,0);
  await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(10);});
- assert.equal(h.backend.publicCalls.length,7);assert.equal(h.site.backendError,false);
+ assert.equal(h.backend.publicCalls.length,10);assert.equal(h.site.backendError,false);
 });
 
 test('Studio refresh clears the fallback warning and a late public read cannot replace drafts or unsaved edits',async t=>{
@@ -489,7 +493,7 @@ test('healthy public reloads and session recovery do not make redundant content 
 
 test('public listing recovery does not wait for a stalled login session',async t=>{
  const gate=deferred(),h=await harness(t,{customer:true,publicOnly:true,initialError:true,authPending:gate});
- assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,7);
+ assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.backendError,false);assert.equal(h.backend.publicCalls.length,10);
  gate.resolve({data:{session:authSession('customer')},error:null});
  await act(async()=>{await delay(5);});assert.equal(h.site.sessionPhase,'ready');
 });
@@ -957,7 +961,7 @@ test('existing staff assignments preserve their login and recovery email remains
  await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Pending Staff'}});});
  await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'pending@gmail.com'}});});
  await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
- assert.match(JSON.stringify(h.renderer.toJSON()),/existing login password is unchanged/);assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET').length,0);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/verified login password is unchanged/);assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET').length,0);
  assert.equal(h.backend.teamRows.length,2);assert.equal(h.backend.teamCalls.filter(c=>c.method==='POST').length,1);
  const pending=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('pending@gmail.com')));
  const resend=pending.findAllByType('button').find(n=>n.props.className==='text-link team-reset-action');assert.equal(resend.props.disabled,false);assert.ok(resend.children.includes('Send password link'));
@@ -1380,4 +1384,66 @@ test('Gary apps follow the public-header language without opening authentication
  await act(async()=>summary().props.onClick({preventDefault(){}}));assert.equal(h.renderer.root.findAllByType('details').filter(node=>node.props.open).length,1);
  await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findAllByType('details').filter(node=>node.props.open).length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Việc làm giảng dạy, tuyển dụng/);
  const links=h.renderer.root.findAllByType('a');assert.ok(links.some(node=>node.props.href==='https://jobs.garyhome.vn/'));assert.ok(links.some(node=>node.props.href==='https://visa.garyhome.vn/'));assert.equal(h.backend.authCalls.length,0);
+});
+
+
+test('a late guest import keeps a newer favourite removal and reserves only imported additions',async t=>{
+ const [a,b]=fixture.properties.slice(0,2).map(p=>p.id),h=await harness(t,{guest:true,customer:true,publicOnly:true,storage:{'gary-saved':JSON.stringify([a,b])}});
+ h.backend.rows.saved_homes=[{user_id:'customer',property_id:a}];
+ const waiting=deferred();h.backend.writes.set('saved_homes',waiting);
+ await h.emit(authSession('customer'));await act(async()=>{await delay(10);});
+ assert.ok(h.site.saved.includes(a));assert.ok(!h.site.saved.includes(b));assert.deepEqual(h.site.pendingSaved,[b]);
+ const before=h.backend.calls.length;await act(async()=>h.site.toggleSaved(b));assert.equal(h.backend.calls.length,before,'pending import must not race another upsert');
+ h.backend.writes.delete('saved_homes');
+ await act(async()=>{h.site.toggleSaved(a);await delay(15);});assert.ok(!h.site.saved.includes(a));
+ await act(async()=>{waiting.resolve({data:[{property_id:b}],error:null});await delay(15);});
+ assert.deepEqual(h.site.saved,[b]);assert.deepEqual(h.site.pendingSaved,[]);assert.equal(h.stored.get('gary-saved'),undefined);
+ assert.ok(!h.backend.rows.saved_homes.some(row=>row.property_id===a));
+});
+
+test('CRM drafts survive same-account reauthentication but clear on explicit sign-out or another account',async t=>{
+ const h=await harness(t);
+ const openCustomers=async()=>{await act(async()=>{h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(10);});};
+ const detail=()=>h.renderer.root.findByProps({className:'admin-panel customer-detail'});
+ const add=async value=>{await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('Add customer')).props.onClick());await act(async()=>detail().findAllByType('input')[0].props.onChange({target:{value}}));};
+ await openCustomers();await add('Unsaved CRM draft');
+ await h.emit(null);await h.emit(authSession('owner'));assert.equal(detail().findAllByType('input')[0].props.value,'Unsaved CRM draft');
+ await h.emit(null);await h.emit(authSession('another-owner'));assert.equal(h.renderer.root.findAllByProps({className:'admin-panel customer-detail'}).length,0);
+ await add('Another private draft');
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Sign out'}).props.onClick();await delay(10);});
+ await h.emit(authSession('another-owner'));assert.equal(h.renderer.root.findAllByProps({className:'admin-panel customer-detail'}).length,0);
+});
+
+test('Customers Refresh loads newly arrived enquiry-only contacts as well as profiles and CRM records',async t=>{
+ const h=await harness(t);await act(async()=>{h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(10);});
+ h.backend.rows.enquiries=[{id:'new-enquiry',property_id:null,name:'New Guest Customer',email:'new@example.invalid',phone:'',message:'Please contact me about a rental',preferred_date:null,kind:'contact',consent:true,status:'new',created_at:'2026-11-01T00:00:00Z',user_id:null,appointment_at:null,customer_update:'',cancelled_at:null,enquiry_notes:[]}];
+ await act(async()=>{h.renderer.root.findByProps({className:'customer-toolbar'}).findAllByType('button').find(b=>b.children.includes('Refresh')).props.onClick();await delay(15);});
+ assert.equal(h.site.enquiries.length,1);assert.ok(h.renderer.root.findAll(n=>n.type==='strong'&&n.children.includes('New Guest Customer')).length);
+ assert.ok(h.backend.privateReads.includes('customer_profiles'));assert.ok(h.backend.privateReads.includes('customer_records'));
+});
+
+test('Studio and customer directory load past the API row cap without dropping later rows',async t=>{
+ const h=await harness(t,{rowCap:1});
+ h.backend.rows.properties=fixture.properties.slice(0,3);h.backend.rows.enquiries=[0,1,2].map(i=>({id:'page-enquiry-'+i,property_id:null,name:'Guest '+i,email:'guest'+i+'@example.invalid',phone:'',message:'A private enquiry',kind:'contact',consent:true,status:'new',created_at:'2026-11-01T00:00:00Z',user_id:null,enquiry_notes:[]}));
+ h.backend.rows.customer_profiles=[0,1,2].map(i=>({user_id:'page-profile-'+i,full_name:'Profile '+i,email:'profile'+i+'@example.invalid',phone:'',updated_at:'2026-11-01T00:00:00Z'}));
+ h.backend.rows.customer_records=[0,1,2].map(i=>({customer_key:'manual:'+i,user_id:null,name:'Record '+i,email:'record'+i+'@example.invalid',phone:'',stage:'new',follow_up_on:null,notes:'',updated_at:'2026-11-01T00:00:00Z'}));
+ await act(async()=>{await h.site.refresh();await delay(5);});assert.equal(h.site.content.properties.length,3);assert.equal(h.site.enquiries.length,3);
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(15);});
+ assert.equal(h.renderer.root.findAll(n=>n.type==='button'&&typeof n.props.className==='string'&&n.props.className.startsWith('customer-row ')).length,9);
+ for(const table of ['properties','enquiries','customer_profiles','customer_records'])assert.ok(h.backend.privateRanges.some(call=>call.table===table&&call.from===3),table+' reads through the terminating empty page');
+});
+
+
+test('Customers Refresh updates a selected conversation history without replacing unsaved CRM notes',async t=>{
+ const h=await harness(t);
+ const first={id:'selected-enquiry-1',property_id:null,name:'Selected Guest',email:'selected@example.invalid',phone:'',message:'First conversation',preferred_date:null,kind:'contact',consent:true,status:'new',created_at:'2026-11-01T00:00:00Z',user_id:null,appointment_at:null,customer_update:'',cancelled_at:null,enquiry_notes:[]};
+ h.backend.rows.enquiries=[first];await act(async()=>{await h.site.refresh();h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(10);});
+ await act(async()=>h.renderer.root.findAll(n=>n.type==='button'&&typeof n.props.className==='string'&&n.props.className.startsWith('customer-row '))[0].props.onClick());
+ const detail=()=>h.renderer.root.findByProps({className:'admin-panel customer-detail'});
+ await act(async()=>detail().findAllByType('textarea')[0].props.onChange({target:{value:'Keep this unsaved note'}}));
+ assert.equal(detail().findByProps({className:'customer-history'}).findAllByType('button').length,1);
+ h.backend.rows.enquiries.push({...first,id:'selected-enquiry-2',message:'Another conversation',created_at:'2026-11-01T01:00:00Z'});
+ await act(async()=>{h.renderer.root.findByProps({className:'customer-toolbar'}).findAllByType('button').find(b=>b.children.includes('Refresh')).props.onClick();await delay(15);});
+ assert.equal(detail().findByProps({className:'customer-history'}).findAllByType('button').length,2);
+ assert.equal(detail().findAllByType('textarea')[0].props.value,'Keep this unsaved note');
 });

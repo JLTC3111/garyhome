@@ -71,8 +71,8 @@ test('requirements match legacy amenity spellings without inventing facilities o
 
 
 test('visible ID search accepts padded, short, unhyphenated and pasted GH codes without partial matches',()=>{
- const p={...home,id:'c6e53881-53a0-45cf-bdce-7fe020b0a610',listing_code:'GH-000005'};
- for(const id of ['GH-000005','gh-000005',' GH 000005 ','GH000005','GH–000005','5','000005',p.id])assert.equal(filterProperties([p],{id}).length,1,id);
+ const p={...home,id:'c6e53881-53a0-45cf-bdce-7fe020b0a610',listing_code:'GH-05'};
+ for(const id of ['GH-05','gh-05','GH-000005','gh-000005',' GH 000005 ','GH000005','GH–000005','5','000005',p.id])assert.equal(filterProperties([p],{id}).length,1,id);
  for(const id of ['GH-000006','GH-0000','GH-5x','not-a-post'])assert.equal(filterProperties([p],{id}).length,0,id);
  assert.equal(filterProperties([{...p,status:'draft'}],{id:'GH-000005'}).length,0);
  assert.equal(filterProperties([p],{id:'5',district:'ba-dinh'}).length,0);

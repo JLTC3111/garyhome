@@ -11,7 +11,7 @@ export type Property = {
   location_en?: string; location_vi?: string;
   furnishings_en?: string; furnishings_vi?: string; seo_features?: string[];
   description_en: string; description_vi: string; district_slug: string;
-  address: string; price: number | null; price_max?: number | null; currency: string;
+  address: string; map_address?: string | null; price: number | null; price_max?: number | null; currency: string;
   price_vnd?: number | null; price_vnd_max?: number | null;
   listing_type: "rent" | "sale"; property_type: string;
   bedrooms: number; bathrooms: number | null; area_sqm: number | null;

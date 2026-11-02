@@ -29,17 +29,17 @@ test('dual-currency prices, editable codes and concurrent-edit versions enforce 
     value=(await db.query('select price,price_max from public.properties where id=$1',[row.id])).rows[0];assert.deepEqual(value,{price:'600.00',price_max:'800.00'});
   });
   await t.test('custom IDs normalize, rename existing listings and reserve codes across all statuses',async()=>{
-    assert.equal(row.listing_code,'GH-000090');
+    assert.equal(row.listing_code,'GH-90');
     await assert.rejects(insert('duplicate-draft','90'),error=>error.code==='23505');
-    const renamed=(await db.query("update public.properties set listing_code='gh-91' where id=$1 returning id,listing_code",[row.id])).rows[0];assert.deepEqual(renamed,{id:row.id,listing_code:'GH-000091'});
-    const other=(await insert('reused-id-after-rename','GH-000090')).rows[0];assert.notEqual(other.id,row.id);
+    const renamed=(await db.query("update public.properties set listing_code='gh-91' where id=$1 returning id,listing_code",[row.id])).rows[0];assert.deepEqual(renamed,{id:row.id,listing_code:'GH-91'});
+    const other=(await insert('reused-id-after-rename','GH-90')).rows[0];assert.notEqual(other.id,row.id);
     await assert.rejects(db.query('update public.properties set listing_code=$1 where id=$2',[other.listing_code,row.id]),error=>error.code==='23505');
     for(const code of ['GH-abc','1234567890123',''])await assert.rejects(db.query('update public.properties set listing_code=$1 where id=$2',[code,row.id]),error=>error.code==='23514');
   });
   await t.test('automatic assignment skips custom reservations and never truncates seven-digit IDs',async()=>{
     await as();const next=Number((await db.query('select last_value from public.property_listing_code_seq')).rows[0].last_value)+1;
     await as('authenticated',owner);await insert('reserved-auto-code',String(next));
-    assert.equal((await insert('automatic-after-reservation')).rows[0].listing_code,'GH-'+String(next+1).padStart(6,'0'));
+    assert.equal((await insert('automatic-after-reservation')).rows[0].listing_code,'GH-'+String(next+1).padStart(2,'0'));
     await as();await db.exec("select setval('public.property_listing_code_seq',999999,true)");await as('authenticated',owner);
     assert.equal((await insert('automatic-seven-digits')).rows[0].listing_code,'GH-1000000');
   });
@@ -56,4 +56,44 @@ test('dual-currency prices, editable codes and concurrent-edit versions enforce 
     await assert.rejects(db.query("update public.properties set listing_code='GH-000099' where id=$1",[row.id]));
     await as('authenticated',customer);assert.equal((await db.query("update public.properties set price_vnd=1,listing_code='GH-000099' where id=$1 returning id",[row.id])).rows.length,0);
   });
+});
+
+test('short ID upgrade preserves existing numbers, property links, favourites and enquiry snapshots',async t=>{
+  const db=new PGlite();t.after(()=>db.close());
+  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create schema storage;
+    create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}');
+    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+    create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+    create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,created_at timestamptz default now());
+    alter table storage.objects enable row level security;grant usage on schema auth,public,storage to anon,authenticated;
+    alter default privileges in schema public grant all on tables to anon,authenticated;`);
+  const migration=await readFile(new URL('../supabase/migrations/20261102065952_short_listing_ids.sql',import.meta.url),'utf8');
+  const setup=await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8');
+  const boundary=setup.indexOf('-- Migration: 20261102065952_short_listing_ids.sql');assert.ok(boundary>0);
+  await db.exec(setup.slice(0,boundary));
+  const customer='00000000-0000-4000-8000-000000000009';
+  await db.query("insert into auth.users(id,email,email_confirmed_at)values($1,'short-id@example.invalid',now())",[customer]);
+  const before=(await db.query('select id,slug,listing_code from public.properties order by id')).rows;
+  const home=before[0];
+  await db.query('insert into public.saved_homes(user_id,property_id)values($1,$2)',[customer,home.id]);
+  const enquiry=(await db.query("insert into public.enquiries(property_id,name,email,message,kind,consent)values($1,'ID upgrade test','short-id@example.invalid','Please arrange a viewing.','viewing',true)returning id",[home.id])).rows[0];
+  await db.query('insert into public.enquiry_notes(enquiry_id,property_code)values($1,$2)',[enquiry.id,home.listing_code]);
+  const sequenceBefore=(await db.query('select last_value,is_called from public.property_listing_code_seq')).rows[0];
+
+  // A noncanonical legacy row must never silently steal another listing's number.
+  await db.exec('alter table public.properties disable trigger properties_assign_listing_code');
+  const duplicate=(await db.query("insert into public.properties(slug,title_en,title_vi,district_slug,address,listing_code)values('duplicate-number','Duplicate','Trùng','tay-ho','Tây Hồ',$1)returning id",['GH-0'+home.listing_code.slice(3)])).rows[0];
+  await db.exec('alter table public.properties enable trigger properties_assign_listing_code');
+  await assert.rejects(db.exec(migration),/duplicate numbers/);await db.exec('rollback');
+  await db.query('delete from public.properties where id=$1',[duplicate.id]);
+
+  await db.exec(migration);
+  const after=(await db.query('select id,slug,listing_code from public.properties order by id')).rows;
+  assert.deepEqual(after,before.map(row=>({...row,listing_code:'GH-'+String(Number(row.listing_code.slice(3))).padStart(2,'0')})));
+  assert.deepEqual((await db.query('select last_value,is_called from public.property_listing_code_seq')).rows[0],sequenceBefore);
+  assert.equal((await db.query('select property_id from public.saved_homes where user_id=$1',[customer])).rows[0].property_id,home.id);
+  assert.deepEqual((await db.query('select e.property_id,n.property_code from public.enquiries e join public.enquiry_notes n on n.enquiry_id=e.id where e.id=$1',[enquiry.id])).rows[0],{property_id:home.id,property_code:home.listing_code});
+  await db.exec("select setval('public.property_listing_code_seq',99,true)");
+  assert.equal((await db.query("insert into public.properties(slug,title_en,title_vi,district_slug,address)values('hundredth-id','Hundredth','Một trăm','tay-ho','Tây Hồ')returning listing_code")).rows[0].listing_code,'GH-100');
+  await assert.rejects(db.query("insert into public.properties(slug,title_en,title_vi,district_slug,address,listing_code)values('padded-duplicate','Duplicate','Trùng','tay-ho','Tây Hồ',$1)",[home.listing_code]),error=>error.code==='23505');
 });

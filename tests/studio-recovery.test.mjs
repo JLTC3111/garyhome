@@ -684,18 +684,18 @@ test('editable listing IDs reject local duplicates and preserve drafts after a c
  const form=()=>h.renderer.root.findByProps({className:'editor-form'}),id=()=>form().findByProps({name:'listing_code'});
  await act(async()=>id().props.onChange({target:{value:fixture.properties[1].listing_code}}));assert.equal(id().props['aria-invalid'],true);
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);
- await act(async()=>id().props.onChange({target:{value:'gh 888'}}));await act(async()=>id().props.onBlur());assert.equal(id().props.value,'GH-000888');
+ await act(async()=>id().props.onChange({target:{value:'gh 888'}}));await act(async()=>id().props.onBlur());assert.equal(id().props.value,'GH-888');
  h.backend.writeErrors.set('properties',{code:'23505',message:'duplicate key value violates unique constraint "properties_listing_code_key"'});
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
- assert.equal(id().props.value,'GH-000888');assert.match(JSON.stringify(h.renderer.toJSON()),/already in use/);
+ assert.equal(id().props.value,'GH-888');assert.match(JSON.stringify(h.renderer.toJSON()),/already in use/);
  const write=h.backend.calls.find(call=>call.table==='properties');assert.equal(write.filters.updated_at,fixture.properties[0].updated_at);
- h.backend.writeErrors.clear();await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.site.content.properties[0].listing_code,'GH-000888');
+ h.backend.writeErrors.clear();await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.site.content.properties[0].listing_code,'GH-888');
 });
 
 test('listing ID availability checks include current database drafts absent from a stale local list',async t=>{
  const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
- h.backend.rows.properties=[...structuredClone(fixture.properties),{...fixture.properties[0],id:'other-draft',listing_code:'GH-000888',status:'draft'}];
- const id=()=>h.renderer.root.findByProps({name:'listing_code'});await act(async()=>id().props.onChange({target:{value:'GH-000888'}}));
+ h.backend.rows.properties=[...structuredClone(fixture.properties),{...fixture.properties[0],id:'other-draft',listing_code:'GH-888',status:'draft'}];
+ const id=()=>h.renderer.root.findByProps({name:'listing_code'});await act(async()=>id().props.onChange({target:{value:'GH-888'}}));
  await act(async()=>{await delay(450);});assert.equal(id().props['aria-invalid'],true);assert.match(JSON.stringify(h.renderer.toJSON()),/already in use/);
 });
 

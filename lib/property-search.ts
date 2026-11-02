@@ -3,12 +3,12 @@ import { currencyValue } from "./currency.ts";
 import { propertyPrice } from "./property-pricing.ts";
 import { newestFirst } from "./property-order.ts";
 import { canonicalAmenity, isPublicRental, listingCode } from "./rentals.ts";
+import { normalizeListingId } from "./listing-id.ts";
 export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; currency?: string; beds?: string; baths?: string; amenity?: string; listing?: string; id?: string; sort?: string };
 export function normalize(value: string) { return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g,"d"); }
 export function normalizePropertyId(value: string) {
   const id = value.trim().toUpperCase().replace(/[\u2010-\u2015\u2212]/g, "-");
-  const number = id.match(/^(?:GH[\s-]*)?(\d{1,12})$/)?.[1];
-  return number ? "GH-" + number.replace(/^0+(?=\d)/, "").padStart(6, "0") : id;
+  return normalizeListingId(id) ?? id;
 }
 export function readFilters(params:Pick<URLSearchParams,"entries"|"getAll">):Filters {
   const result=Object.fromEntries(params.entries());delete result.term;delete result.period;const amenities=params.getAll("amenity");

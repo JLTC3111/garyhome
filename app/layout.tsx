@@ -23,6 +23,8 @@ import "./about-pages.css";
 import "./collection-motion.css";
 import "./area-gallery.css";
 import "./shiny-button.css";
+import "./swipe-row.css";
+import "./lattice-loader.css";
 import "./editorial-studio.css";
 import "./rental-id-search.css";
 import "./site-preferences.css";
@@ -46,7 +48,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const [content, exchangeRate] = await Promise.all([loadPageContent(), getExchangeRate()]);
-  const initial = { ...content, exchangeRate };
+  const initial = { ...content, exchangeRate, publicOrigin: siteUrl() };
   const preferences = await cookies();
   const initialLanguage=languageValue(preferences.get("gary-language")?.value);
   const initialCurrency=currencyValue(preferences.get(CURRENCY_COOKIE)?.value);

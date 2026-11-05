@@ -66,10 +66,11 @@ test('every public, customer and staff route has a title in the selected languag
 
 test('property titles use current CMS translations and never expose unavailable or private listings', () => {
   const route = '/homes/home-by-the-lake';
-  assert.equal(documentTitle(route, 'en', [property]), '2-bedroom apartment for rent in Tây Hồ · 80 m² · Balcony | Gary Home');
-  assert.equal(documentTitle(route, 'vi', [property]), 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
-  assert.equal(documentTitle(route, 'vi', [{ ...property, title_vi: '  ' }]), 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
-  assert.equal(documentTitle(route, 'vi', [{ ...property, bedrooms: 3 }]), 'Căn hộ 3 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
+  assert.equal(documentTitle(route, 'en', [property]), 'A home by the lake | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [property]), 'Tổ ấm bên hồ | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [{ ...property, title_vi: '  ' }]), 'A home by the lake | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [{ ...property, bedrooms: 3 }]), 'Tổ ấm bên hồ | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [{ ...property, title_en: '', title_vi: '' }]), 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
   for (const change of [{ status: 'draft' }, { status: 'archived' }, { availability: 'rented' }, { availability: 'sold' }]) {
     assert.equal(documentTitle(route, 'vi', [{ ...property, ...change }]), 'Không tìm thấy căn nhà | Gary Home');
   }
@@ -131,9 +132,9 @@ test('language, navigation and CMS changes update the tab without remounting a c
   pathname = '/admin'; await h.redraw();
   assert.equal(h.page.title, 'Cổng nhân viên · Gary Home Studio | Gary Home');
   pathname = '/homes/home-by-the-lake'; await h.redraw();
-  assert.equal(h.page.title, 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
-  site = { ...site, content: { properties: [{ ...property, bedrooms: 3 }] } }; await h.redraw();
-  assert.equal(h.page.title, 'Căn hộ 3 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
+  assert.equal(h.page.title, 'Tổ ấm bên hồ | Gary Home');
+  site = { ...site, content: { properties: [{ ...property, title_vi: 'Căn hộ hướng hồ - CHO PHÉP THÚ CƯNG' }] } }; await h.redraw();
+  assert.equal(h.page.title, 'Căn hộ hướng hồ - CHO PHÉP THÚ CƯNG | Gary Home');
   assert.equal(h.renderer.root.findByType('input').props.value, 'Unsaved viewing notes');
   assert.equal(h.mounts, 1);
   assert.equal(h.observers.filter(observer => !observer.disconnected).length, 1);

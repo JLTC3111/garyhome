@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { PublicUrlField } from "./public-url-field";
 import Link from "next/link";
 import { ArrowUpRight, Plus, Save, Trash2, Upload, X, RefreshCw } from "lucide-react";
 import { useSite } from "./site-context";
@@ -10,11 +11,11 @@ import { articleText, editorialIssue, editorialSeed, validEditorialUrl, type Edi
 
 const blankSection = (): EditorialSection => ({ heading_en: "", heading_vi: "", body_en: "", body_vi: "" });
 const editorialMessages = {
-  slug: ["Enter a unique URL slug using lowercase letters, numbers and hyphens.", "Nhập đường dẫn duy nhất gồm chữ thường, số và dấu gạch ngang."],
+  slug: ["Enter a complete article URL on this website, for example https://garyhome.vn/tips-and-news/renting-in-hanoi.", "Nhập đường dẫn bài viết đầy đủ trên website này, ví dụ https://garyhome.vn/tips-and-news/renting-in-hanoi."],
   image: ["Use a local image path or an http/https image URL.", "Dùng đường dẫn ảnh trên website hoặc địa chỉ ảnh http/https."],
   sources: ["Each source needs a title and an http/https link. Remove unused sources.", "Mỗi nguồn cần tên và liên kết http/https. Xóa nguồn chưa dùng."],
   publish: ["Before publishing, complete both languages, at least one section, and a cover photo and date for news.", "Trước khi đăng, hoàn thành hai ngôn ngữ, ít nhất một mục; tin tức cần ảnh bìa và ngày đăng."],
-  duplicate: ["That URL slug is already used. Choose another.", "Đường dẫn đã được dùng. Vui lòng chọn đường dẫn khác."],
+  duplicate: ["That article URL is already used. Choose another.", "Đường dẫn đã được dùng. Vui lòng chọn đường dẫn khác."],
   stale: ["This article changed elsewhere. Your draft is kept. Refresh the list, then reopen the article to load its saved version.", "Bài viết đã thay đổi ở nơi khác. Bản nháp vẫn được giữ. Tải lại danh sách rồi mở lại bài viết để lấy bản đã lưu."],
   save: ["Couldn’t save the article. Your draft is kept; check your connection and try again.", "Chưa thể lưu bài viết. Bản nháp vẫn được giữ; kiểm tra kết nối rồi thử lại."],
   delete: ["Couldn’t confirm deletion. Refresh the article before trying again.", "Chưa thể xác nhận xóa. Tải lại bài viết trước khi thử lại."],
@@ -82,7 +83,7 @@ export function EditorialManager({ kind, upload }: { kind: EditorialKind; upload
     <div className="editorial-columns"><div className="admin-panel editorial-list" role="group" aria-label={t("Editorial items", "Danh sách bài viết")}>{rows.map(row => <button key={row.id} type="button" aria-pressed={article?.id === row.id} disabled={busy} onClick={() => { setDrafts(previous => ({ ...previous, [kind]: structuredClone(row) })); setError(null); }}><strong>{articleText(row, "title", language) || t("Untitled draft", "Bản nháp chưa đặt tên")}</strong><span>{t(row.status === "published" ? "Published" : "Draft", row.status === "published" ? "Đã đăng" : "Bản nháp")}</span><small>/tips-and-news/{row.slug}</small></button>)}{!rows.length && <p>{t("No articles yet. Create a draft to begin.", "Chưa có bài viết. Tạo bản nháp để bắt đầu.")}</p>}</div>
     <div className="admin-panel editorial-editor">{article ? <form className="editor-form" onSubmit={event => { event.preventDefault(); void save(); }}>
       <header><h2>{t(kind === "news" ? "News article" : "Rental tip", kind === "news" ? "Bài tin tức" : "Cẩm nang thuê nhà")}</h2>{article.status === "published" && rows.some(row => row.id === article.id) && <Link className="text-link" target="_blank" href={`/tips-and-news/${article.slug}`}>{t("View published article", "Xem bài đã đăng")}<ArrowUpRight size={15}/></Link>}</header>
-      <label>{t("URL slug", "Đường dẫn bài viết")}<input name="article_slug" required maxLength={180} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={article.slug} onChange={event => change({ slug: event.target.value })}/><small>{t("Changing this changes the public link.", "Thay đổi mục này sẽ đổi liên kết công khai.")}</small></label>
+      <PublicUrlField kind="article" name="article_slug" value={article.slug} onChange={slug=>change({slug})}/>
       {(["en", "vi"] as const).map(lang => <fieldset key={lang}><legend>{lang === "en" ? t("English", "Tiếng Anh") : t("Vietnamese", "Tiếng Việt")}</legend><label>{t("Title", "Tiêu đề")}<input name={`article_title_${lang}`} maxLength={240} value={article[`title_${lang}`]} onChange={event => change({ [`title_${lang}`]: event.target.value })}/></label><label>{t("Summary", "Tóm tắt")}<textarea name={`article_summary_${lang}`} rows={3} maxLength={700} value={article[`summary_${lang}`]} onChange={event => change({ [`summary_${lang}`]: event.target.value })}/></label>{kind === "news" && <label>{t("Category", "Chuyên mục")}<input maxLength={100} value={article[`category_${lang}`]} onChange={event => change({ [`category_${lang}`]: event.target.value })}/></label>}</fieldset>)}
       <label>{t("Cover image URL", "Đường dẫn ảnh bìa")}<input value={article.image_url} maxLength={2000} onChange={event => change({ image_url: event.target.value })}/></label>
       {article.image_url && validEditorialUrl(article.image_url,true) && <img className="editorial-cover-preview" src={article.image_url} alt={t("Article cover preview", "Xem trước ảnh bìa")}/>}

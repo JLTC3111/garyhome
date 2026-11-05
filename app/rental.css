@@ -73,6 +73,16 @@ body{background:var(--paper)}
 .property-listing-id-field{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:500}
 .property-listing-id-field .listing-id-conflict{color:#a13a32}
 .property-listing-id-field input[aria-invalid=true]{border-color:#a13a32}
+.property-slug-field .slug-field-error{color:#a13a32}
+.property-slug-field input[aria-invalid=true]{border-color:#a13a32}
+.field-validation-error{display:block;color:#a13a32;font-size:12px;line-height:1.6}
+input[data-form-invalid=true],textarea[data-form-invalid=true],select[data-form-invalid=true]{border-color:#a13a32}
+.property-video{margin:24px 0;max-width:100%;overflow:hidden;border:1px solid #d9e1d2;border-radius:12px;background:#10241b}
+.property-video video{width:100%;max-height:70vh}
+.property-video-field{display:grid;gap:12px;min-width:0}
+.property-video-field .property-video{margin:0}
+.property-video-field .form-info{margin:0}
+.property-video-field>.button{justify-self:start}
 
 .property-map{margin-top:22px;border:1px solid #d9e1d2;background:#f5f7f1;overflow:hidden;min-width:0}
 .property-map-caption{padding:16px 18px}

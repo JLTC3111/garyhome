@@ -27,6 +27,9 @@ export function rentalTermLabel(term: Property["rental_term"], language: Languag
 }
 export function listingCode(p: Pick<Property,"id"|"listing_code">) { return p.listing_code || p.id; }
 export function propertyTitle(p: Property, language: Language, district?: string, withFeatures = true) {
+  const authored = (language === "vi" ? p.title_vi : p.title_en)?.trim()
+    || (language === "vi" ? p.title_en : p.title_vi)?.trim();
+  if (authored) return authored;
   const location = district || p.address;
   const type = typeLabel(p.property_type, language);
   const commercial=p.property_type==="Office & Restaurant";

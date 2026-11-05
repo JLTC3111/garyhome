@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
 import { useSite } from "./site-context";
+import { LatticeLoader } from "./react-bits/lattice-loader";
 import { useStudioText } from "./use-studio-text";
 import { PortalSwitcher } from "./portal-access";
 import { emailLinkIdentity, setAccountPassword } from "@/lib/password-actions";
@@ -56,7 +57,7 @@ function PasswordResetBody({invitation,expectedUser}:{invitation:boolean;expecte
       <div className="eyebrow">{staffPortal?t("GARY HOME · STAFF SETUP","GARY HOME · THIẾT LẬP NHÂN VIÊN"):t("GARY HOME · ACCOUNT SECURITY","GARY HOME · BẢO MẬT TÀI KHOẢN")}</div>
       <h1>{title}</h1>
       {success?<div className="password-access-success"><p role="status">{t("Your password is ready. You can continue to your account.","Mật khẩu đã sẵn sàng. Bạn có thể tiếp tục đến tài khoản.")}</p><Link className="button" href={portalPath}>{staffPortal?t("Open staff Studio","Mở Studio nhân viên"):t("Open customer account","Mở tài khoản khách hàng")}<ArrowRight size={17}/></Link></div>
-      :!ready?<p className="password-access-status" role="status"><LoaderCircle size={18} className="spin"/>{t("Checking your email link…","Đang kiểm tra liên kết email…")}</p>
+      :!ready?<p className="password-access-status"><LatticeLoader label={t("Checking your email link…","Đang kiểm tra liên kết email…")}/></p>
       :passwordLinkIssue||!emailVerification&&!verified?<>
         <p role="alert">{passwordLinkIssue==="expired"?t("This one-time link has expired or has already been used. Request a fresh link below, then open the newest email.","Liên kết dùng một lần đã hết hạn hoặc đã được sử dụng. Hãy yêu cầu liên kết mới bên dưới và mở email mới nhất."):passwordLinkIssue?t("Request a fresh password link below. Your password has not been changed.","Hãy yêu cầu liên kết mật khẩu mới bên dưới. Mật khẩu của bạn chưa bị thay đổi."):accountChanged?t("Your account changed. Open the email link again before continuing.","Tài khoản đã thay đổi. Hãy mở lại liên kết email trước khi tiếp tục."):invitation?t("Open the staff invitation link sent to your assigned email to set your password. If it no longer works, request a new password link below.","Hãy mở liên kết mời gửi đến email đã được cấp quyền để đặt mật khẩu. Nếu không còn dùng được, hãy yêu cầu liên kết mật khẩu mới bên dưới."):t("Open the password reset link from your email first, or request a new one below.","Hãy mở liên kết đặt lại mật khẩu trong email hoặc yêu cầu liên kết mới bên dưới.")}</p>
         <form className="enquiry-form password-resend-form" onSubmit={resend}>

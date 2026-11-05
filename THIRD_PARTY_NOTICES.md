@@ -2,13 +2,17 @@
 
 This application includes adapted components from the following projects. Existing dependency licenses remain with their respective packages.
 
-## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards, Squish Switch and Rubber Segment
+## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards, Squish Switch, Rubber Segment, Swipe Row and Lattice Loader
 
 Source: https://github.com/DavidHDev/react-bits
 
 Bounce Cards is adapted to accessible district links, responsive layouts and the original native spring model with position-based pointer picking. Squish Switch is adapted to a controlled bilingual toggle with CSS squash and stretch. Sources: https://reactbits.dev/components/bounce-cards and https://reactbits.dev/c/micro/squish-switch (reviewed 2026-10-26).
 
 Rubber Segment is adapted from the official TypeScript/CSS registry at https://reactbits.dev/r/RubberSegment-TS-CSS.json (reviewed 2026-10-31), documented at https://reactbits.dev/micro/rubber-segment. It retains the independent thumb-edge springs, stretch, squash, drag and keyboard interaction. The site adaptation adds a server-rendered selection fallback, native click/assistive activation, live reduced-motion cleanup, responsive soft sage/ivory styling and compatibility with the existing LazyMotion provider.
+
+Swipe Row is adapted from the official TypeScript/CSS source at https://github.com/DavidHDev/react-bits/tree/main/src/ts-default/Micro/SwipeRow (reviewed 2026-11-05). It retains the action rail, rubber resistance, full-swipe commit, spring snapping and keyboard actions. The toast adaptation adds localized labels, variable message height, live reduced-motion support, cancellation without dismissal, accessible close controls and paused expiry during interaction.
+
+Lattice Loader is adapted from the official TypeScript/CSS source at https://github.com/DavidHDev/react-bits/tree/main/src/ts-default/Micro/LatticeLoader (reviewed 2026-11-05). It retains the lattice patterns, staggered cell animation and completion/error marks. The session-loading adaptation uses translated visible status text, compact responsive sizing, a static reduced-motion fallback and no elapsed-time polling.
 
 The following notice is retained from the upstream `LICENSE.md` reviewed on 2026-10-22:
 

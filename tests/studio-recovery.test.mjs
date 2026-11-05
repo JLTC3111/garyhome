@@ -175,7 +175,7 @@ async function harness(t, options={}){
   for(const [key,descriptor] of descriptors){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}
  });
  const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError,exchangeRate:backend.exchangeRate}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback',articles:options.editorialPageRows,slug:options.propertyPage?.slug,property:options.propertyPage,neighbourhood:options.propertyArea,retry:options.retry})));
- await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage));await delay(10);});
+ await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage),options.createNodeMock?{createNodeMock:options.createNodeMock}:undefined);await delay(10);});
  await act(async()=>{await delay(5);});
  assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
  const emit=async(next)=>{await act(async()=>{session=next;callback?.(next?'TOKEN_REFRESHED':'SIGNED_OUT',next);await delay(5);});};
@@ -200,15 +200,15 @@ test('portal chooser identifies both destinations without changing authenticatio
 });
 
 test('fresh server property props synchronize a persistent layout before rendering or translating',async t=>{
- const property={...fixture.properties[0],id:'fresh-property',slug:'freshly-published-rental',bedrooms:4,price:1777,price_max:2000,updated_at:'2026-10-27T09:00:00Z'};
+ const property={...fixture.properties[0],id:'fresh-property',slug:'freshly-published-rental',title_en:'4-bedroom rental · PETS ALLOWED · LAKE VIEW',title_vi:'Nhà 4 phòng ngủ · Cho phép thú cưng · Hướng hồ',bedrooms:4,price:1777,price_max:2000,updated_at:'2026-10-27T09:00:00Z'};
  const h=await harness(t,{guest:true,page:'property',propertyPage:property,path:'/homes/'+property.slug});
- assert.match(h.renderer.root.findByType('h1').children.join(''),/4-bedroom/);
+ assert.equal(h.renderer.root.findByType('h1').children.join(''),property.title_en);
  assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);
  assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('$1,777–$2,000')));
  assert.equal(h.site.content.properties.length,fixture.properties.length+1);
  assert.equal(h.renderer.root.findAllByProps({className:'enquiry-form customer-submission-form'}).length,1);
  await act(async()=>h.site.setLanguage('vi'));
- assert.match(h.renderer.root.findByType('h1').children.join(''),/4 phòng ngủ/);
+ assert.equal(h.renderer.root.findByType('h1').children.join(''),property.title_vi);
  assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('$1.777–$2.000')));
  assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);
 });
@@ -561,12 +561,47 @@ test('slow uploads preserve concurrent text edits and cannot attach photos to a 
  assert.equal(title().props.value,'');assert.equal(h.renderer.root.findByProps({className:'editor-photo-grid'}).children.length,0);
 });
 
+test('listing URL format errors explain the rule, translate and clear after correction without changing a published URL',async t=>{
+ const validityMessages=[],nativeSlug={setCustomValidity:message=>validityMessages.push(message)};
+ const h=await harness(t,{createNodeMock:element=>element.type==='input'&&element.props.name==='slug'?nativeSlug:null});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),slug=()=>form().findByProps({name:'slug'});
+ const alerts=()=>form().findAllByProps({role:'alert'});
+ const invalidEvent={preventDefault(){},currentTarget:{setCustomValidity(){}},target:{setCustomValidity(){}}};
+ assert.equal(slug().props.required,true);assert.equal(alerts().length,0);
+ assert.equal(validityMessages.at(-1),'Enter the complete URL, for example https://garyhome.vn/homes/apartment-in-tay-ho.');
+ assert.ok(slug().props['aria-describedby']);assert.match(JSON.stringify(h.renderer.toJSON()),/apartment-in-tay-ho/);
+ await act(async()=>slug().props.onInvalid(invalidEvent));
+ assert.equal(slug().props['aria-invalid'],true);assert.match(alerts().map(node=>node.children.join('')).join(' '),/Enter the complete URL, for example https:\/\/garyhome\.vn\/homes\/apartment-in-tay-ho\./);
+ const entered='https://garyhome.vn/homes/Căn hộ Tây Hồ';
+ await act(async()=>slug().props.onChange({target:{value:entered}}));await act(async()=>slug().props.onBlur());
+ assert.equal(slug().props.value,entered);assert.equal(slug().props['aria-invalid'],true);
+ assert.match(alerts().map(node=>node.children.join('')).join(' '),/lowercase letters without accents.*single hyphens/);
+ assert.equal(validityMessages.at(-1),alerts()[0].children.join(''));
+ const input=slug();await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(slug(),input);assert.equal(slug().props.value,entered);
+ assert.match(alerts().map(node=>node.children.join('')).join(' '),/chữ thường không dấu, số/);
+ assert.match(alerts().map(node=>node.children.join('')).join(' '),/dấu gạch nối đơn/);
+ assert.equal(validityMessages.at(-1),alerts()[0].children.join(''));
+ await act(async()=>slug().props.onChange({target:{value:'https://garyhome.vn/homes/apartment-in-tay-ho'}}));
+ assert.equal(slug().props['aria-invalid'],false);assert.equal(alerts().length,0);assert.equal(slug().props.value,'https://garyhome.vn/homes/apartment-in-tay-ho');
+ assert.equal(validityMessages.at(-1),'');
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);
+ await act(async()=>h.site.setLanguage('en'));
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ const savedSlug=slug().props.value;assert.equal(savedSlug,'https://garyhome.vn/homes/'+fixture.properties[0].slug);
+ await act(async()=>slug().props.onBlur());await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(slug().props.value,savedSlug);assert.equal(slug().props['aria-invalid'],false);assert.equal(alerts().length,0);
+});
+
 test('new listing price ranges survive translation, save both bounds and reopen for editing',async t=>{
  const h=await harness(t);
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
  const form=()=>h.renderer.root.findByProps({className:'editor-form'});
- for(const [label,value] of [['Property title · English','Price range home'],['Property title · Vietnamese','Căn hộ khoảng giá'],['URL slug','price-range-home'],['Public location / street','Tây Hồ']]){
+ for(const [label,value] of [['Property title · English','Price range home'],['Property title · Vietnamese','Căn hộ khoảng giá'],['Listing URL','https://garyhome.vn/homes/price-range-home'],['Public location / street','Tây Hồ']]){
   await act(async()=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input').props.onChange({target:{value}}));
  }
  const input=name=>form().findByProps({name});
@@ -577,7 +612,7 @@ test('new listing price ranges survive translation, save both bounds and reopen 
  assert.equal(input('price').props.value,600);assert.equal(input('price_max').props.value,800);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Khoảng giá · USD/);
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
- const saved=h.backend.calls.find(call=>call.table==='properties');assert.equal(saved.method,'insert');assert.equal(saved.payload.price,600);assert.equal(saved.payload.price_max,800);
+ const saved=h.backend.calls.find(call=>call.table==='properties');assert.equal(saved.method,'insert');assert.equal(saved.payload.price,600);assert.equal(saved.payload.price_max,800);assert.equal(saved.payload.author_id,'owner');assert.equal(h.site.content.authors.find(row=>row.id==='owner').staff_user_id,'owner');
  assert.equal(h.site.content.properties.find(row=>row.slug==='price-range-home').price_max,800);
  await act(async()=>h.site.setLanguage('en'));
  const row=()=>h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(item=>item.children.includes('Price range home')));
@@ -1240,13 +1275,13 @@ test('gallery sections separate feedback screenshots and retain a feedback draft
 });
 
 test('news drafts survive language and session refresh, save privately and clear from public content after sign-out',async t=>{
- const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'News articles'}).props.onClick());await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('New article')).props.onClick());const form=h.renderer.root.findByType('form');await act(async()=>{form.findByProps({name:'article_slug'}).props.onChange({target:{value:'private-editorial-ui-test'}});form.findByProps({name:'article_title_en'}).props.onChange({target:{value:'Private unfinished news draft'}});});
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'News articles'}).props.onClick());await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('New article')).props.onClick());const form=h.renderer.root.findByType('form');await act(async()=>{form.findAllByType('input').find(input=>input.props.name==='article_slug').props.onChange({target:{value:'https://garyhome.vn/tips-and-news/private-editorial-ui-test'}});form.findByProps({name:'article_title_en'}).props.onChange({target:{value:'Private unfinished news draft'}});});
  await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findByType('form'),form);assert.equal(form.findByProps({name:'article_title_en'}).props.value,'Private unfinished news draft');await act(async()=>{await h.site.refresh();await delay(5);});assert.equal(form.findByProps({name:'article_title_en'}).props.value,'Private unfinished news draft');
  await act(async()=>{form.props.onSubmit({preventDefault(){}});await delay(10);});const saved=h.backend.calls.filter(c=>c.table==='editorial_articles').at(-1);assert.equal(saved.method,'insert');assert.equal(saved.payload.status,'draft');assert.equal(saved.payload.kind,'news');assert.ok(h.site.content.editorial.some(row=>row.slug==='private-editorial-ui-test'));await h.emit(null);assert.ok(h.site.content.editorial.every(row=>row.status==='published'));assert.ok(!h.site.content.editorial.some(row=>row.slug==='private-editorial-ui-test'));
 });
 
 test('rental-tip edits made during a slow save remain a draft with the latest concurrency timestamp',async t=>{
- const h=await harness(t,{role:'manager'});await act(async()=>h.renderer.root.findByProps({'aria-label':'Rental tips'}).props.onClick());await act(async()=>h.renderer.root.findByProps({className:'admin-panel editorial-list'}).findAllByType('button')[0].props.onClick());const form=()=>h.renderer.root.findByType('form');assert.ok(!form().findAllByType('button').some(b=>b.children.includes('Delete article')));const current=h.site.content.editorial.find(row=>row.slug===form().findByProps({name:'article_slug'}).props.value),pending=deferred(),stamp='2026-10-26T18:00:00.123456Z';h.backend.writes.set('editorial_articles',pending);
+ const h=await harness(t,{role:'manager'});await act(async()=>h.renderer.root.findByProps({'aria-label':'Rental tips'}).props.onClick());await act(async()=>h.renderer.root.findByProps({className:'admin-panel editorial-list'}).findAllByType('button')[0].props.onClick());const form=()=>h.renderer.root.findByType('form');assert.ok(!form().findAllByType('button').some(b=>b.children.includes('Delete article')));const current=h.site.content.editorial.find(row=>'https://garyhome.vn/tips-and-news/'+row.slug===form().findAllByType('input').find(input=>input.props.name==='article_slug').props.value),pending=deferred(),stamp='2026-10-26T18:00:00.123456Z';h.backend.writes.set('editorial_articles',pending);
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});await act(async()=>form().findByProps({name:'article_title_en'}).props.onChange({target:{value:'A newer unsaved rental tip title'}}));await act(async()=>{pending.resolve({data:{...current,updated_at:stamp},error:null});await delay(10);});assert.equal(form().findByProps({name:'article_title_en'}).props.value,'A newer unsaved rental tip title');h.backend.writes.delete('editorial_articles');await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});const calls=h.backend.calls.filter(c=>c.table==='editorial_articles');assert.equal(calls.length,2);assert.equal(calls[1].filters.updated_at,stamp);assert.equal(calls[1].payload.title_en,'A newer unsaved rental tip title');
 });
 
@@ -1446,4 +1481,18 @@ test('Customers Refresh updates a selected conversation history without replacin
  await act(async()=>{h.renderer.root.findByProps({className:'customer-toolbar'}).findAllByType('button').find(b=>b.children.includes('Refresh')).props.onClick();await delay(15);});
  assert.equal(detail().findByProps({className:'customer-history'}).findAllByType('button').length,2);
  assert.equal(detail().findAllByType('textarea')[0].props.value,'Keep this unsaved note');
+});
+
+test('Lattice Loader marks active session recovery while drafts stay editable, translates, and stops offline or after recovery',async t=>{
+ const h=await harness(t);await h.editSettings('Draft kept during connection recovery');
+ const draft=h.renderer.root.findAllByType('textarea')[0],pending=deferred();h.backend.sessionRead=pending;
+ let restoring;await act(async()=>{restoring=h.site.reconnect();await delay(5);});
+ assert.equal(h.site.sessionPhase,'recovering');assert.equal(h.renderer.root.findAllByType('textarea')[0],draft);
+ const banner=()=>h.renderer.root.findByProps({className:'session-banner'});
+ assert.equal(banner().findByProps({className:'lattice-loader'}).props['aria-busy'],true);
+ assert.equal(draft.props.disabled,undefined);assert.equal(draft.props.value,'Draft kept during connection recovery');
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(banner().toJSON?.()??h.renderer.toJSON()),/Đang khôi phục phiên/);
+ await act(async()=>{h.network.onLine=false;h.browser.dispatchEvent(new Event('offline'));});assert.equal(h.site.sessionPhase,'offline');assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);assert.equal(draft.props.value,'Draft kept during connection recovery');
+ h.backend.sessionRead=null;pending.resolve({data:{session:authSession('owner')},error:null});await act(async()=>{await restoring;});
+ await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(5);});assert.equal(h.site.sessionPhase,'ready');assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);assert.equal(draft.props.value,'Draft kept during connection recovery');
 });

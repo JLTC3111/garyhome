@@ -55,12 +55,24 @@ test('rental type groups preserve legacy studios and villas and never expose a p
  assert.equal(filterProperties(homes,{}).length,3);
 });
 test('generated titles use recorded facts and confirmed features without inventing area or commercial bedrooms',()=>{
- const p={...home,area_sqm:null,bathrooms:null,seo_features:['Lake view','Balcony']};
+ const p={...home,title_en:'',title_vi:'',area_sqm:null,bathrooms:null,seo_features:['Lake view','Balcony']};
  assert.match(propertyTitle(p,'en','Tây Hồ'),/^2-bedroom apartment for rent in Tây Hồ · Balcony$/);
  assert.match(propertyTitle({...p,area_sqm:80},'vi','Tây Hồ'),/2 phòng ngủ.*80 m²/);
  assert.doesNotMatch(propertyTitle({...p,property_type:'Office & Restaurant',bedrooms:0},'en'),/studio|bedroom/);
  assert.doesNotMatch(propertyTitle({...p,property_type:'Studio',bedrooms:0},'en'),/studio studio/i);
  assert.equal(listingCode({id:'full-real-uuid'}),'full-real-uuid');
+});
+test('authored listing titles retain street, pets and lake-view details in each language on cards and detail pages',()=>{
+ const title_en='3 Bedroom Apartment for Rent in Tay Ho, Hanoi - 160m² on Quang Khanh Street - PETS ALLOWED - LAKE VIEW';
+ const title_vi='Căn hộ 3 phòng ngủ cho thuê tại Tây Hồ, Hà Nội - 160m² phố Quảng Khánh - CHO PHÉP THÚ CƯNG - HƯỚNG HỒ';
+ const p={...home,title_en,title_vi,bedrooms:3,area_sqm:160,amenities:[],seo_features:[]};
+ for(const withFeatures of [false,true]){
+  assert.equal(propertyTitle(p,'en','Tây Hồ',withFeatures),title_en);
+  assert.equal(propertyTitle(p,'vi','Tây Hồ',withFeatures),title_vi);
+ }
+ assert.equal(propertyTitle({...p,title_en:'  '+title_en+'  '},'en','Tây Hồ'),title_en);
+ assert.equal(propertyTitle({...p,title_vi:'  '},'vi','Tây Hồ'),title_en);
+ assert.equal(propertyTitle({...p,title_en:''},'en','Tây Hồ'),title_vi);
 });
 test('requirements match legacy amenity spellings without inventing facilities or weakening all-selected matching',()=>{
  const homes=[{...home,id:'matching',amenities:['Pet-friendly','Gym','BBQ','Outdoor Shower','Lakeview']},{...home,id:'partial',amenities:['Pet friendly','Gym']}];

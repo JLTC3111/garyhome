@@ -18,6 +18,13 @@ test('legacy CMS paths normalize without changing content identity or external u
  const content={properties:[{id:'unchanged',images:['/images/hero.jpg','https://media.example/p.jpg']}],neighbourhoods:[{slug:'tay-ho',image:'/images/area-tay-ho.jpg'}],settings:{hero_image:'/images/hero.jpg'},activities:[{id:'photo',image_url:'/images/activities/feedback-2.jpg'}]};
  const next=contentAssets(content);assert.equal(next.properties[0].id,'unchanged');assert.deepEqual(next.properties[0].images,['/images/apartments/hero.jpg','https://media.example/p.jpg']);assert.equal(content.properties[0].images[0],'/images/hero.jpg');assert.equal(next.activities[0].image_url,'/images/activities/activity-2.jpg');
 });
+test('legacy image aliases keep original filename metadata attached after normalization',()=>{
+ const external='https://media.example/p.jpg',inline='inline:'+'a'.repeat(32);
+ const content={properties:[{id:'unchanged',images:['/images/hero.jpg',external],image_filenames:{'/images/hero.jpg':'Original hero.JPEG',[external]:'Căn hộ - photo.jpg',[inline]:'Preview photo.png'}}],neighbourhoods:[],settings:{hero_image:'/images/hero.jpg'}};
+ const next=contentAssets(content),names=next.properties[0].image_filenames;
+ assert.equal(names['/images/apartments/hero.jpg'],'Original hero.JPEG');assert.equal(names[external],'Căn hộ - photo.jpg');assert.equal(names[inline],'Preview photo.png');
+ assert.equal(content.properties[0].image_filenames['/images/hero.jpg'],'Original hero.JPEG');assert.equal(names['/images/hero.jpg'],undefined);
+});
 test('provided photos and review screenshots remain in separate activity categories',()=>{
  const rows=read('activities');assert.equal(rows.filter(a=>a.category==='customers'&&a.media_kind==='photo').length,16);assert.equal(rows.filter(a=>a.category==='feedback'&&a.media_kind==='screenshot').length,1);assert.ok(rows.find(a=>a.image_url==='/images/feedback/1.jpg'));
  const team=rows.filter(a=>a.category==='team');assert.equal(team.length,1);assert.equal(team[0].image_url,'/images/ourteam/gary-home-team.png');assert.equal(team[0].published,true);

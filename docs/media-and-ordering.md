@@ -2,6 +2,12 @@
 
 The rental search now has a bilingual **Find Your Rental / Tìm nhà cho thuê** heading. The established cream/green theme, hero composition and single Favourites shortlist are retained.
 
+## Listing image uploads — 6 November 2026
+
+Listing image and MP4 uploads use TUS with 6 MiB chunks, automatic network retry, actual byte progress and cancellation. A progressing upload can continue beyond two minutes; only 120 seconds without progress stops it and offers a retry. Failed-file retries resume the same destination using an upload URL kept in tab memory and scoped to the signed-in user. Normal page and account requests retain their shorter deadlines. The file bytes determine the supported image type, so valid JPEG/PNG/WebP/AVIF files with missing browser MIME information still upload correctly. Storage uses unique generated keys; original filenames do not determine permissions or object paths.
+
+The listing editor shows full filenames, including extensions, below the thumbnails and names the affected file when an upload fails. Original basenames are stored in `properties.image_filenames` and follow cover changes, removal and reopening. Existing uploads without recorded originals display their complete stored URL filename and are explicitly labelled “Stored filename”; unrecoverable original names are never inferred from a listing title. Browser-preview image names use compact metadata keys instead of duplicating large data URLs.
+
 ## Supplied media and reorganized paths
 
 - All moved apartment, cover, area and activity paths are mapped to the actual files. The `feeback` folder typo is corrected to `feedback`. Existing image bytes are preserved; no listing pictures or feedback text were generated.

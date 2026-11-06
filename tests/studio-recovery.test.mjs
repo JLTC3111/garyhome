@@ -13,6 +13,7 @@ const base=path.resolve(import.meta.dirname,'..');
 const require=createRequire(path.join(base,'package.json'));
 const fixture={...JSON.parse(fs.readFileSync(path.join(base,'data/site-content.json'),'utf8')),properties:JSON.parse(fs.readFileSync(path.join(base,'data/properties.json'),'utf8')),editorial:JSON.parse(fs.readFileSync(path.join(base,'data/editorial.json'),'utf8')),authors:[],activities:[]};
 const user=id=>({id,email:`${id}@example.invalid`,aud:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'});
+const jpegFile=(name='3-bedroom-apartment-tay-ho-1-2-3.JPG',type='')=>new File([new Uint8Array([255,216,255,224,0,16,74,70,73,70,0,1])],name,{type});
 const authSession=id=>({user:user(id),access_token:'test-token',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer'});
 const currencyTestRate={usdToVnd:25000,updatedAt:new Date(Date.now()-3600000).toISOString(),nextUpdateAt:new Date(Date.now()+86400000).toISOString()};
 const deferred=()=>{let resolve;const promise=new Promise(yes=>{resolve=yes;});return {promise,resolve};};
@@ -54,6 +55,7 @@ async function harness(t, options={}){
   if(String(input)==='/api/exchange-rate')return Response.json({rate:backend.exchangeRate});
   if(String(input)==='/api/enquiries'){backend.enquiryPosts??=[];backend.enquiryPosts.push({data:JSON.parse(init.body),headers:new Headers(init.headers)});return Response.json({ok:true},{status:201});}
   if(String(input).endsWith('/auth/v1/user')){backend.passwordCalls.push({headers:new Headers(init.headers),body:JSON.parse(init.body)});return backend.passwordError?Response.json({message:'Auth unavailable'},{status:503}):Response.json({});}
+  if(String(input)==='/api/config'&&options.configPending)await options.configPending.promise;
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
@@ -94,7 +96,10 @@ async function harness(t, options={}){
     if(writing)backend.calls.push({table,payload,method:writeMethod,filters});
     if(!writing){backend.privateReads??=[];backend.privateReads.push(table);if(range){backend.privateRanges??=[];backend.privateRanges.push({table,from:range[0],to:range[1]});}}
     if(writing&&table==='staff_profiles'){backend.profilePaths??=new Map();backend.profilePaths.set(payload.user_id,payload.avatar_path);}
-    if(writing&&backend.writeErrors.has(table))return Promise.resolve({data:null,error:backend.writeErrors.get(table)}).then(resolve,reject);
+    if(writing&&backend.writeErrors.has(table)){
+     const failure=backend.writeErrors.get(table),error=Array.isArray(failure)?failure.shift():failure;
+     if(error)return Promise.resolve({data:null,error}).then(resolve,reject);
+    }
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
     if(writing&&table==='portal_guides'){
      if(backend.role!=='owner')return Promise.resolve({data:null,error:{code:'42501'}}).then(resolve,reject);
@@ -120,6 +125,7 @@ async function harness(t, options={}){
     let rows=structuredClone(backend.rows[table]??fixture[table]??[]);
     if(Array.isArray(rows)&&filters.user_id)rows=rows.filter(row=>row.user_id===filters.user_id);
     if(table==='properties'&&filters.listing_code)rows=rows.filter(row=>row.listing_code===filters.listing_code);
+    if(table==='properties'&&filters.slug)rows=rows.filter(row=>row.slug===filters.slug);
     if(table==='properties'&&filters.id)rows=rows.filter(row=>row.id===filters.id);
     if(table==='portal_guides'||table==='portal_guide_files')rows=rows.filter(row=>Object.entries(filters).every(([key,value])=>Array.isArray(value)?value.includes(row[key]):row[key]===value));
     if(single&&Array.isArray(rows))rows=rows[0]??null;
@@ -132,6 +138,12 @@ async function harness(t, options={}){
  };
  const modules=new Map();
  function load(file){
+  if(file.endsWith('/lib/listing-file-upload.ts'))return {LISTING_UPLOAD_IDLE_MS:120000,uploadListingFile:async input=>{
+   backend.imageUploads??=[];backend.imageUploads.push({bucket:input.bucket,path:input.path,file:input.file,options:{metadata:{original_filename:input.originalFilename}}});
+   input.onProgress?.({bytes:0,total:input.file.size,percent:0,startedAt:Date.now(),lastActivityAt:Date.now(),retrying:false});
+   const result=await backend.upload.promise;input.signal?.throwIfAborted();if(result.error)throw result.error;
+   return 'https://uploads.example.invalid/'+input.path;
+  }};
   if(file.endsWith('/lib/portal-help-upload.ts'))return {uploadHelpFile:async input=>{backend.helpUploads??=[];backend.helpUploads.push(input);input.onProgress(50);if(backend.helpUploadPending)await backend.helpUploadPending.promise;input.signal.throwIfAborted();input.onProgress(100);}};
   if(modules.has(file))return modules.get(file).exports;
   if(file.endsWith('.json'))return JSON.parse(fs.readFileSync(file,'utf8'));
@@ -141,8 +153,8 @@ async function harness(t, options={}){
    if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
    if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(){},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
-   if(id==='@supabase/supabase-js')return {createClient:()=>({storage:{from:()=>({uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
-   if(id==='@/lib/browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient};
+   if(id==='@supabase/supabase-js')return {createClient:(_url,_key,options)=>({storage:{from:bucket=>({upload:async(path,file,uploadOptions)=>{backend.imageUploads??=[];backend.imageUploads.push({bucket,path,file,options:uploadOptions,clientOptions:options});return backend.upload.promise;},getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}}),uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
+   if(id==='@/lib/browser-client'||id==='./browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient,browserBackendConfig:()=>({url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'})};
    if(id.startsWith('.')||id.startsWith('@/')){
     const target=id.startsWith('@/')?path.join(base,id.slice(2)):path.resolve(path.dirname(file),id);
     const resolved=[target,target+'.tsx',target+'.ts',target+'.json'].find(x=>fs.existsSync(x)&&fs.statSync(x).isFile());
@@ -177,7 +189,7 @@ async function harness(t, options={}){
  const render=showPage=>React.createElement(SiteProvider,{initial:{content:structuredClone(fixture),configured:true,error:!!options.initialError,exchangeRate:backend.exchangeRate}},React.createElement(React.Fragment,null,React.createElement(Probe),options.publicOnly||!showPage?null:React.createElement(Page,{invitation:options.page==='invite'||options.page==='callback',articles:options.editorialPageRows,slug:options.propertyPage?.slug,property:options.propertyPage,neighbourhood:options.propertyArea,retry:options.retry})));
  await act(async()=>{renderer=TestRenderer.create(render(!options.deferPage),options.createNodeMock?{createNodeMock:options.createNodeMock}:undefined);await delay(10);});
  await act(async()=>{await delay(5);});
- assert.equal(site.editor,!options.customer&&!options.guest&&!options.offline);
+ assert.equal(site.editor,!options.authPending&&!options.configPending&&!options.customer&&!options.guest&&!options.offline);
  const emit=async(next)=>{await act(async()=>{session=next;callback?.(next?'TOKEN_REFRESHED':'SIGNED_OUT',next);await delay(5);});};
  const editSettings=async(value)=>{
   await act(async()=>{renderer.root.findByProps({'aria-label':'Site settings'}).props.onClick();});
@@ -549,51 +561,131 @@ test('slow uploads preserve concurrent text edits and cannot attach photos to a 
  const input=()=>h.renderer.root.findAllByType('input').find(input=>input.props.type==='file'&&input.props.multiple);
  await act(async()=>{add().props.onClick();});
  let uploading;h.backend.upload=deferred();
- await act(async()=>{uploading=input().props.onChange({target:{files:[{type:'image/jpeg',size:1000}]}});await delay(5);});
+ await act(async()=>{uploading=input().props.onChange({target:{files:[jpegFile()]}});await delay(5);});
  await act(async()=>{title().props.onChange({target:{value:'Typed while uploading'}});});
  h.backend.upload.resolve({data:{path:'photo'},error:null});await act(async()=>{await uploading;});
  assert.equal(title().props.value,'Typed while uploading');assert.equal(h.renderer.root.findByProps({className:'editor-photo-grid'}).children.length,1);
  h.backend.upload=deferred();
- await act(async()=>{uploading=input().props.onChange({target:{files:[{type:'image/jpeg',size:1000}]}});await delay(5);});
+ await act(async()=>{uploading=input().props.onChange({target:{files:[jpegFile()]}});await delay(5);});
  await act(async()=>{h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick();});
  await act(async()=>{add().props.onClick();});
  h.backend.upload.resolve({data:{path:'late-photo'},error:null});await act(async()=>{await uploading;});
  assert.equal(title().props.value,'');assert.equal(h.renderer.root.findByProps({className:'editor-photo-grid'}).children.length,0);
 });
 
-test('listing URL format errors explain the rule, translate and clear after correction without changing a published URL',async t=>{
- const validityMessages=[],nativeSlug={setCustomValidity:message=>validityMessages.push(message)};
- const h=await harness(t,{createNodeMock:element=>element.type==='input'&&element.props.name==='slug'?nativeSlug:null});
+test('new listing URLs follow the final title, remain stable through translation and save without URL entry',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),url=()=>form().findByProps({name:'listing_url'});
+ const field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+ assert.equal(url().props.readOnly,true);assert.notEqual(url().props.required,true);assert.equal(url().props.onChange,undefined);
+ assert.equal(form().findAllByProps({name:'slug'}).length,0);assert.equal(form().findAllByProps({role:'alert'}).length,0);
+ await act(async()=>field('Property title · English').props.onChange({target:{value:'3 Bedroom Apartment — PETS ALLOWED / LAKE VIEW'}}));
+ assert.equal(url().props.value,'https://garyhome.vn/homes/3-bedroom-apartment-pets-allowed-lake-view');
+ await act(async()=>field('Property title · English').props.onChange({target:{value:'3 Bedroom Apartment in Tay Ho — PETS ALLOWED / LAKE VIEW'}}));
+ await act(async()=>field('Property title · Vietnamese').props.onChange({target:{value:'Căn hộ 3 phòng ngủ Tây Hồ — Cho phép thú cưng'}}));
+ await act(async()=>field('Public location / street').props.onChange({target:{value:'Tây Hồ'}}));
+ const finalUrl='https://garyhome.vn/homes/3-bedroom-apartment-in-tay-ho-pets-allowed-lake-view',sameInput=url();
+ assert.equal(url().props.value,finalUrl);await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(url(),sameInput);assert.equal(url().props.value,finalUrl);assert.match(JSON.stringify(h.renderer.toJSON()),/Căn hộ 3 phòng ngủ Tây Hồ/);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ const saved=h.backend.calls.find(call=>call.table==='properties');assert.equal(saved.method,'insert');
+ assert.equal(saved.payload.slug,'3-bedroom-apartment-in-tay-ho-pets-allowed-lake-view');assert.equal(saved.payload.title_en,'3 Bedroom Apartment in Tay Ho — PETS ALLOWED / LAKE VIEW');
+});
+
+test('automatic listing URLs use Vietnamese when English is blank and choose an available suffix',async t=>{
+ const h=await harness(t),occupied={...fixture.properties[0],id:'already-used-title-url',slug:'can-ho-dep-o-tay-ho',title_en:'Another listing'};
+ h.backend.rows.properties=[...structuredClone(fixture.properties),occupied];await act(async()=>h.site.setContent(previous=>({...previous,properties:[...previous.properties,occupied]})));
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
- const form=()=>h.renderer.root.findByProps({className:'editor-form'}),slug=()=>form().findByProps({name:'slug'});
- const alerts=()=>form().findAllByProps({role:'alert'});
- const invalidEvent={preventDefault(){},currentTarget:{setCustomValidity(){}},target:{setCustomValidity(){}}};
- assert.equal(slug().props.required,true);assert.equal(alerts().length,0);
- assert.equal(validityMessages.at(-1),'Enter the complete URL, for example https://garyhome.vn/homes/apartment-in-tay-ho.');
- assert.ok(slug().props['aria-describedby']);assert.match(JSON.stringify(h.renderer.toJSON()),/apartment-in-tay-ho/);
- await act(async()=>slug().props.onInvalid(invalidEvent));
- assert.equal(slug().props['aria-invalid'],true);assert.match(alerts().map(node=>node.children.join('')).join(' '),/Enter the complete URL, for example https:\/\/garyhome\.vn\/homes\/apartment-in-tay-ho\./);
- const entered='https://garyhome.vn/homes/Căn hộ Tây Hồ';
- await act(async()=>slug().props.onChange({target:{value:entered}}));await act(async()=>slug().props.onBlur());
- assert.equal(slug().props.value,entered);assert.equal(slug().props['aria-invalid'],true);
- assert.match(alerts().map(node=>node.children.join('')).join(' '),/lowercase letters without accents.*single hyphens/);
- assert.equal(validityMessages.at(-1),alerts()[0].children.join(''));
- const input=slug();await act(async()=>h.site.setLanguage('vi'));
- assert.equal(slug(),input);assert.equal(slug().props.value,entered);
- assert.match(alerts().map(node=>node.children.join('')).join(' '),/chữ thường không dấu, số/);
- assert.match(alerts().map(node=>node.children.join('')).join(' '),/dấu gạch nối đơn/);
- assert.equal(validityMessages.at(-1),alerts()[0].children.join(''));
- await act(async()=>slug().props.onChange({target:{value:'https://garyhome.vn/homes/apartment-in-tay-ho'}}));
- assert.equal(slug().props['aria-invalid'],false);assert.equal(alerts().length,0);assert.equal(slug().props.value,'https://garyhome.vn/homes/apartment-in-tay-ho');
- assert.equal(validityMessages.at(-1),'');
- assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),url=()=>form().findByProps({name:'listing_url'});
+ const field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+ await act(async()=>field('Property title · Vietnamese').props.onChange({target:{value:'Căn hộ đẹp ở Tây Hồ'}}));
+ assert.equal(url().props.value,'https://garyhome.vn/homes/can-ho-dep-o-tay-ho-2');
+ await act(async()=>field('Property title · English').props.onChange({target:{value:'Can ho dep o Tay Ho'}}));
+ await act(async()=>field('Public location / street').props.onChange({target:{value:'Tây Hồ'}}));
+ assert.equal(url().props.value,'https://garyhome.vn/homes/can-ho-dep-o-tay-ho-2');
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ assert.equal(h.backend.calls.find(call=>call.table==='properties').payload.slug,'can-ho-dep-o-tay-ho-2');
+});
+
+test('published listing title edits preserve the existing URL while never-published drafts follow their final title',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ const original=fixture.properties[0],row=title=>h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(strong=>strong.children.includes(title)));
+ await act(async()=>row(original.title_en).findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),url=()=>form().findByProps({name:'listing_url'});
+ const field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+ assert.equal(url().props.readOnly,true);assert.equal(url().props.value,'https://garyhome.vn/homes/'+original.slug);
+ await act(async()=>field('Property title · English').props.onChange({target:{value:'Updated published title with PETS ALLOWED and LAKE VIEW'}}));
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(url().props.value,'https://garyhome.vn/homes/'+original.slug);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').at(-1).payload.slug,original.slug);
  await act(async()=>h.site.setLanguage('en'));
- await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
- await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
- const savedSlug=slug().props.value;assert.equal(savedSlug,'https://garyhome.vn/homes/'+fixture.properties[0].slug);
- await act(async()=>slug().props.onBlur());await act(async()=>h.site.setLanguage('vi'));
- assert.equal(slug().props.value,savedSlug);assert.equal(slug().props['aria-invalid'],false);assert.equal(alerts().length,0);
+ const draft={...original,id:'never-published-url-draft',listing_code:'GH-900002',status:'draft',published_at:null,slug:'old-manually-entered-draft-url',title_en:'Unpublished draft title',images:[...original.images]};
+ h.backend.rows.properties=[...structuredClone(fixture.properties),draft];await act(async()=>h.site.setContent(previous=>({...previous,properties:[...previous.properties,draft]})));
+ await act(async()=>row(draft.title_en).findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ await act(async()=>field('Property title · English').props.onChange({target:{value:'Final draft title — LAKE VIEW'}}));
+ assert.equal(url().props.value,'https://garyhome.vn/homes/final-draft-title-lake-view');
+ const publication=form().findAllByType('label').find(node=>node.children.includes('Publication status')).findAll(node=>typeof node.props.onValueChange==='function')[0];
+ await act(async()=>publication.props.onValueChange('published'));assert.equal(url().props.value,'https://garyhome.vn/homes/final-draft-title-lake-view');
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').at(-1).payload.slug,'final-draft-title-lake-view');
+});
+
+test('automatic listing URL saving avoids a database title collision absent from the local list',async t=>{
+ const h=await harness(t),occupied={...fixture.properties[0],id:'server-only-url-collision',slug:'stale-database-title'};
+ h.backend.rows.properties=[...structuredClone(fixture.properties),occupied];
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+ for(const [label,value] of [['Property title · English','Stale database title'],['Property title · Vietnamese','Tiêu đề mới'],['Public location / street','Tây Hồ']])await act(async()=>field(label).props.onChange({target:{value}}));
+ assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://garyhome.vn/homes/stale-database-title');
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ assert.equal(h.backend.calls.find(call=>call.table==='properties').payload.slug,'stale-database-title-2');
+});
+
+test('a concurrent automatic URL collision retries with a suffix and saves one listing',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+ for(const [label,value] of [['Property title · English','Concurrent title URL'],['Property title · Vietnamese','Tiêu đề đồng thời'],['Public location / street','Tây Hồ']])await act(async()=>field(label).props.onChange({target:{value}}));
+ h.backend.writeErrors.set('properties',[{code:'23505',message:'duplicate key value violates unique constraint "properties_slug_key"',details:'Key (slug)=(concurrent-title-url) already exists.'}]);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ const writes=h.backend.calls.filter(call=>call.table==='properties');assert.equal(writes.length,2);assert.deepEqual(writes.map(call=>call.payload.slug),['concurrent-title-url','concurrent-title-url-2']);
+ assert.equal(writes[0].payload.id,writes[1].payload.id);assert.equal(h.site.content.properties.filter(row=>row.title_en==='Concurrent title URL').length,1);assert.equal(h.site.content.properties.find(row=>row.title_en==='Concurrent title URL').slug,'concurrent-title-url-2');
+});
+
+test('a new automatic listing URL does not retry a listing ID uniqueness failure',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+ for(const [label,value] of [['Property title · English','Listing ID conflict home'],['Property title · Vietnamese','Tin đăng trùng mã'],['Public location / street','Tây Hồ']])await act(async()=>field(label).props.onChange({target:{value}}));
+ await act(async()=>form().findByProps({name:'listing_code'}).props.onChange({target:{value:'GH-999888'}}));
+ h.backend.writeErrors.set('properties',{code:'23505',message:'duplicate key value violates unique constraint "properties_listing_code_key"'});
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,1);assert.equal(field('Property title · English').props.value,'Listing ID conflict home');
+ assert.match(JSON.stringify(form().findAllByProps({role:'alert'}).map(node=>node.children)),/already in use/);
+ assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://garyhome.vn/homes/listing-id-conflict-home');
+});
+
+test('a title edited during first publication keeps its draft and the URL assigned by the completed save',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+ for(const [label,value] of [['Property title · English','First published title'],['Property title · Vietnamese','Tiêu đề tin đăng'],['Public location / street','Tây Hồ']])await act(async()=>field(label).props.onChange({target:{value}}));
+ await act(async()=>form().findByProps({'aria-label':'External photo URL'}).props.onChange({target:{value:'https://example.invalid/cover.jpg'}}));
+ await act(async()=>form().findByProps({className:'image-url-input'}).findByType('button').props.onClick());
+ const publication=form().findAllByType('label').find(node=>node.children.includes('Publication status')).findAll(node=>typeof node.props.onValueChange==='function')[0];
+ await act(async()=>publication.props.onValueChange('published'));
+ const pending=deferred();h.backend.writes.set('properties',pending);
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const submitted=h.backend.calls.find(call=>call.table==='properties').payload;assert.equal(submitted.slug,'first-published-title');
+ await act(async()=>field('Property title · English').props.onChange({target:{value:'Edited after publish click'}}));
+ await act(async()=>{pending.resolve({data:{...submitted,listing_code:'GH-900001',updated_at:'2026-11-06T10:00:00.123456Z'},error:null});await delay(10);});
+ assert.equal(field('Property title · English').props.value,'Edited after publish click');
+ assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://garyhome.vn/homes/first-published-title');
+ h.backend.writes.delete('properties');await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ const saved=h.backend.calls.filter(call=>call.table==='properties').at(-1).payload;assert.equal(saved.slug,'first-published-title');assert.equal(saved.title_en,'Edited after publish click');
 });
 
 test('new listing price ranges survive translation, save both bounds and reopen for editing',async t=>{
@@ -601,7 +693,7 @@ test('new listing price ranges survive translation, save both bounds and reopen 
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
  const form=()=>h.renderer.root.findByProps({className:'editor-form'});
- for(const [label,value] of [['Property title · English','Price range home'],['Property title · Vietnamese','Căn hộ khoảng giá'],['Listing URL','https://garyhome.vn/homes/price-range-home'],['Public location / street','Tây Hồ']]){
+ for(const [label,value] of [['Property title · English','Price range home'],['Property title · Vietnamese','Căn hộ khoảng giá'],['Public location / street','Tây Hồ']]){
   await act(async()=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input').props.onChange({target:{value}}));
  }
  const input=name=>form().findByProps({name});
@@ -1495,4 +1587,78 @@ test('Lattice Loader marks active session recovery while drafts stay editable, t
  await act(async()=>{h.network.onLine=false;h.browser.dispatchEvent(new Event('offline'));});assert.equal(h.site.sessionPhase,'offline');assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);assert.equal(draft.props.value,'Draft kept during connection recovery');
  h.backend.sessionRead=null;pending.resolve({data:{session:authSession('owner')},error:null});await act(async()=>{await restoring;});
  await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(5);});assert.equal(h.site.sessionPhase,'ready');assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);assert.equal(draft.props.value,'Draft kept during connection recovery');
+});
+
+
+test('cold configuration loading shows the Lattice banner and Studio gate before a session identity is known',async t=>{
+ const pending=deferred(),h=await harness(t,{guest:true,path:'/admin',url:'https://gary.example/admin',configPending:pending});
+ assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.user,null);assert.equal(h.site.ready,false);
+ const banner=()=>h.renderer.root.findByProps({className:'session-banner'}),gate=()=>h.renderer.root.findByProps({className:'admin-loading'});
+ const bannerLoader=banner().findByProps({className:'lattice-loader'}),gateLoader=gate().findByProps({className:'lattice-loader'});
+ assert.equal(bannerLoader.props['aria-busy'],true);assert.equal(gateLoader.props['aria-busy'],true);
+ assert.equal(h.renderer.root.findAllByType('form').length,0,'The sign-in form must not flash while the saved session is unknown.');
+ const english=banner().findByProps({className:'lattice-loader__label'}).children.join('');
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(banner().findByProps({className:'lattice-loader'}),bannerLoader);assert.equal(gate().findByProps({className:'lattice-loader'}),gateLoader);
+ const vietnamese=banner().findByProps({className:'lattice-loader__label'}).children.join('');assert.notEqual(vietnamese,english);assert.match(vietnamese,/Đang/);
+ await act(async()=>{pending.resolve();await delay(10);});
+ assert.equal(h.site.sessionPhase,'ready');assert.equal(h.site.user,null);assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);assert.equal(h.renderer.root.findAllByProps({className:'admin-loading'}).length,0);
+ assert.equal(h.renderer.root.findAllByType('form').length,1);assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);
+});
+
+test('cold saved-session restoration keeps the Lattice loader visible until the owner workspace is verified',async t=>{
+ const pending=deferred(),h=await harness(t,{path:'/admin',url:'https://gary.example/admin',authPending:pending});
+ assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.user,null);assert.equal(h.site.ready,false);
+ assert.equal(h.renderer.root.findByProps({className:'session-banner'}).findByProps({className:'lattice-loader'}).props['aria-busy'],true);
+ assert.equal(h.renderer.root.findByProps({className:'admin-loading'}).findByProps({className:'lattice-loader'}).props['aria-busy'],true);
+ assert.equal(h.renderer.root.findAllByType('form').length,0);
+ h.backend.sessionRead=null;await act(async()=>{pending.resolve({data:{session:authSession('owner')},error:null});await delay(10);});
+ assert.equal(h.site.sessionPhase,'ready');assert.equal(h.site.user.id,'owner');assert.equal(h.site.editor,true);assert.equal(h.site.ready,true);
+ assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);assert.equal(h.renderer.root.findAllByProps({className:'admin-loading'}).length,0);assert.equal(h.renderer.root.findAllByProps({className:'admin-shell'}).length,1);
+});
+
+test('admin image uploads retain full original names through cover changes, removal, saving and reopening',async t=>{
+ const h=await harness(t,{role:'admin'});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),photos=()=>form().findByProps({className:'editor-photo-grid'});
+ const picker=()=>form().findAllByType('input').find(node=>node.props.type==='file'&&node.props.multiple);
+ const names=['3-bedroom-apartment-tay-ho-1-2-3.JPG','Căn hộ Tây Hồ (Lake View) 02.jpg'];
+ const captions=()=>photos().findAllByType('figcaption').map(node=>node.findAllByType('span').at(-1).children.join(''));
+ for(const name of names){
+  h.backend.upload=deferred();const target={files:[jpegFile(name)],value:'selected'};let pending;
+  await act(async()=>{pending=picker().props.onChange({target});await delay(5);});assert.equal(target.value,'');
+  assert.ok(form().findAllByProps({role:'status'}).some(node=>node.children.join('').includes(name)));
+  await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});
+ }
+ assert.deepEqual(captions(),names);assert.equal(h.backend.imageUploads.length,2);
+ for(const [index,upload] of h.backend.imageUploads.entries()){assert.equal(upload.bucket,'property-media');assert.match(upload.path,/^properties\/[0-9a-f-]+\.jpg$/);assert.equal(upload.file.type,'image/jpeg');assert.equal(upload.options.metadata.original_filename,names[index]);}
+ await act(async()=>photos().findByProps({'aria-label':'Make photo 2 cover'}).props.onClick());assert.deepEqual(captions(),[names[1],names[0]]);
+ await act(async()=>photos().findByProps({'aria-label':'Remove photo 2'}).props.onClick());assert.deepEqual(captions(),[names[1]]);
+ for(const [label,value] of [['Property title · English','Image filename QA'],['Property title · Vietnamese','Kiểm tra tên ảnh'],['Public location / street','Tây Hồ']])await act(async()=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input').props.onChange({target:{value}}));
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
+ const saved=h.backend.calls.find(call=>call.table==='properties').payload;assert.equal(saved.images.length,1);assert.deepEqual(Object.values(saved.image_filenames),[names[1]]);assert.equal(saved.image_filenames[saved.images[0]],names[1]);
+ const row=h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(strong=>strong.children.includes('Image filename QA')));
+ await act(async()=>row.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());assert.deepEqual(captions(),[names[1]]);
+});
+
+test('a timed-out image identifies its full name and can be selected again without losing the draft',async t=>{
+ const h=await harness(t,{role:'admin'});await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),picker=()=>form().findAllByType('input').find(node=>node.props.type==='file'&&node.props.multiple);
+ const name='3-bedroom-apartment-tay-ho-lake-view-03.JPG',file=jpegFile(name);let pending;
+ h.backend.upload=deferred();await act(async()=>{pending=picker().props.onChange({target:{files:[file],value:'selected'}});await delay(5);});
+ await act(async()=>{h.backend.upload.resolve({data:null,error:{name:'RequestTimeoutError',message:'The request timed out.'}});await pending;});
+ const error=()=>form().findByProps({className:'form-error image-upload-error'});assert.equal(error().findByType('strong').children.join(''),name);assert.match(error().findByType('span').children.join(''),/upload timed out/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(error().findByType('span').children.join(''),/hết thời gian chờ/);assert.equal(error().findByType('strong').children.join(''),name);
+ h.backend.upload=deferred();await act(async()=>{pending=picker().props.onChange({target:{files:[file],value:'selected'}});await delay(5);});
+ await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});
+ assert.equal(form().findAllByProps({className:'form-error image-upload-error'}).length,0);assert.equal(form().findByProps({className:'editor-photo-grid'}).children.length,1);
+});
+
+test('closing the listing editor stops the remaining files in an image upload batch',async t=>{
+ const h=await harness(t);await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const picker=h.renderer.root.findAllByType('input').find(node=>node.props.type==='file'&&node.props.multiple);h.backend.upload=deferred();let pending;
+ await act(async()=>{pending=picker.props.onChange({target:{files:[jpegFile('first.JPG'),jpegFile('second.JPG')],value:'selected'}});await delay(5);});
+ assert.equal(h.backend.imageUploads.length,1);await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
+ await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});assert.equal(h.backend.imageUploads.length,1);
 });

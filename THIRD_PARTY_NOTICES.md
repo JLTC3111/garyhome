@@ -2,7 +2,7 @@
 
 This application includes adapted components from the following projects. Existing dependency licenses remain with their respective packages.
 
-## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards, Squish Switch, Rubber Segment, Swipe Row and Lattice Loader
+## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards, Squish Switch, Rubber Segment, Swipe Row, Lattice Loader and Counter
 
 Source: https://github.com/DavidHDev/react-bits
 
@@ -13,6 +13,8 @@ Rubber Segment is adapted from the official TypeScript/CSS registry at https://r
 Swipe Row is adapted from the official TypeScript/CSS source at https://github.com/DavidHDev/react-bits/tree/main/src/ts-default/Micro/SwipeRow (reviewed 2026-11-05). It retains the action rail, rubber resistance, full-swipe commit, spring snapping and keyboard actions. The toast adaptation adds localized labels, variable message height, live reduced-motion support, cancellation without dismissal, accessible close controls and paused expiry during interaction.
 
 Lattice Loader is adapted from the official TypeScript/CSS source at https://github.com/DavidHDev/react-bits/tree/main/src/ts-default/Micro/LatticeLoader (reviewed 2026-11-05). It retains the lattice patterns, staggered cell animation and completion/error marks. The session-loading adaptation uses translated visible status text, compact responsive sizing, a static reduced-motion fallback and no elapsed-time polling.
+
+Counter is adapted from the official TypeScript/CSS source at https://github.com/DavidHDev/react-bits/tree/main/src/ts-default/Components/Counter (reviewed 2026-11-06). It retains the odometer digit springs and adds a live reduced-motion fallback. Listing uploads use it for actual progress, elapsed time and the inactivity countdown.
 
 The following notice is retained from the upstream `LICENSE.md` reviewed on 2026-10-22:
 

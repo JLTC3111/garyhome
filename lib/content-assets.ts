@@ -4,7 +4,8 @@ const paths:Record<string,string>=aliases;
 export function assetPath(value:string){return paths[value]||value;}
 // Normalize stored/older CMS URLs while the reorganized assets are deployed.
 export function contentAssets(content:Content):Content{return {...content,
- properties:content.properties.map(p=>({...p,images:p.images.map(assetPath)})),
+ properties:content.properties.map(p=>({...p,images:p.images.map(assetPath),
+  ...(p.image_filenames?{image_filenames:Object.fromEntries(Object.entries(p.image_filenames).map(([src,name])=>[assetPath(src),name]))}:{})})),
  neighbourhoods:content.neighbourhoods.map(n=>({...n,image:assetPath(n.image)})),
  settings:{...content.settings,hero_image:assetPath(content.settings.hero_image)},
  ...(content.authors?{authors:content.authors.map(a=>({...a,portrait_url:assetPath(a.portrait_url)}))}:{}),

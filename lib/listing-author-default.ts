@@ -41,7 +41,7 @@ export async function resolveListingAuthor({ authorId, authors, user, staffProfi
   let displayName = staffProfile?.display_name.trim() || "";
   if (!displayName && !demo) {
     const profile = await editorTask((db, signal) => db.rpc("get_staff_profile").abortSignal(signal));
-    if (profile.error || !profile.data?.display_name?.trim()) throw new Error("Couldn’t load your listing profile. Reconnect and save again. Your draft is still open.");
+    if (profile.error || !profile.data || typeof profile.data.display_name !== "string") throw new Error("Couldn’t load your listing profile. Reconnect and save again. Your draft is still open.");
     displayName = profile.data.display_name.trim();
   }
   const author: ListingAuthor = {
@@ -50,7 +50,9 @@ export async function resolveListingAuthor({ authorId, authors, user, staffProfi
     id: userId, slug: `staff-${userId}`, staff_user_id: userId,
     display_name: (displayName || "Gary Home staff").slice(0, 120),
     bio_en: "", bio_vi: "", portrait_url: "", phone: "", whatsapp_phone: "", zalo_phone: "", email: "",
-    is_placeholder: false, published: true, sort_order: 0, updated_at: new Date().toISOString(),
+    // Existing staff accounts, including bootstrap owners, may have no name.
+    // Keep the staff link without publishing a login email as their name.
+    is_placeholder: !displayName, published: true, sort_order: 0, updated_at: new Date().toISOString(),
   };
   if (demo) return { authorId: author.id, author };
   const result = await editorTask((db, signal) => db.from("listing_authors").insert(author).select("*").abortSignal(signal).single());

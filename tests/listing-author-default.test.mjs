@@ -6,6 +6,16 @@ const profile=(changes={})=>({id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',staff_us
 function backend(reads=[],write={data:null,error:null}) {
  const calls=[];return {calls,editorTask:async run=>run({from(table){const call={table,filters:{}};calls.push(call);const query={select(){return query;},eq(key,value){call.filters[key]=value;return query;},order(){return query;},limit(){return query;},abortSignal(){return query;},maybeSingle:async()=>reads.shift()||{data:null,error:null},insert(value){call.insert=value;return query;},single:async()=>write.data==='inserted'?{data:call.insert,error:null}:write};return query;}},new AbortController().signal)};
 }
+function withStaffProfileResponse(db,response) {
+ const runTask=db.editorTask;
+ return {...db,editorTask:run=>runTask((client,signal)=>run({
+  ...client,
+  rpc(name){
+   assert.equal(name,'get_staff_profile');
+   return {abortSignal:async()=>response};
+  },
+ },signal))};
+}
 test('new listings default to the signed-in linked profile, or automatic own profile, while guests use company contact',()=>{
  assert.equal(defaultListingAuthorId([],null),null);assert.equal(defaultListingAuthorId([],user.id),CURRENT_STAFF_AUTHOR);
  assert.equal(defaultListingAuthorId([profile(),profile({id:'published',published:true})],user.id),'published');
@@ -24,8 +34,34 @@ test('concurrent profile creation recovers the already saved linked profile',asy
 });
 
 test('a profile still loading at first save is fetched before creating the named author',async()=>{
- const db=backend([],{data:'inserted'}),original=db.editorTask;
- db.editorTask=run=>original((client,signal)=>run({...client,rpc(name){assert.equal(name,'get_staff_profile');return {abortSignal:async()=>({data:{display_name:'Actual signed-in staff'},error:null})};}},signal));
+ const db=withStaffProfileResponse(backend([],{data:'inserted'}),{data:{display_name:'Actual signed-in staff'},error:null});
  const result=await resolveListingAuthor({authorId:CURRENT_STAFF_AUTHOR,authors:[],user,staffProfile:null,demo:false,...db});
  assert.equal(result.author.display_name,'Actual signed-in staff');
+});
+
+test('verified staff with an empty display name can save under their own linked placeholder profile',async t=>{
+ for(const display_name of ['', '   '])await t.test(JSON.stringify(display_name),async()=>{
+  const db=withStaffProfileResponse(backend([],{data:'inserted'}),{data:{display_name},error:null});
+  const result=await resolveListingAuthor({authorId:CURRENT_STAFF_AUTHOR,authors:[],user,staffProfile:null,demo:false,...db});
+  assert.equal(result.authorId,user.id);
+  assert.equal(result.author.staff_user_id,user.id);
+  assert.equal(result.author.display_name,'Gary Home staff');
+  assert.equal(result.author.is_placeholder,true);
+  for(const key of ['email','phone','whatsapp_phone','zalo_phone'])assert.equal(result.author[key],'');
+  assert.equal(db.calls.filter(call=>call.insert).length,1);
+ });
+});
+
+test('failed or missing staff profile reads still block author creation',async t=>{
+ const failures=[
+  ['RPC error',{data:null,error:{code:'42501',message:'Staff access required'}}],
+  ['missing profile',{data:null,error:null}],
+  ['missing display name',{data:{},error:null}],
+ ];
+ for(const [name,response] of failures)await t.test(name,async()=>{
+  const db=withStaffProfileResponse(backend([],{data:'inserted'}),response);
+  await assert.rejects(resolveListingAuthor({authorId:CURRENT_STAFF_AUTHOR,authors:[],user,staffProfile:null,demo:false,...db}),
+   /Couldn’t load your listing profile\. Reconnect and save again\. Your draft is still open\./);
+  assert.equal(db.calls.filter(call=>call.insert).length,0);
+ });
 });

@@ -15,7 +15,7 @@ export type Property = {
   price_vnd?: number | null; price_vnd_max?: number | null;
   listing_type: "rent" | "sale"; property_type: string;
   bedrooms: number; bathrooms: number | null; area_sqm: number | null;
-  amenities: string[]; images: string[]; video_url?: string | null; featured: boolean;
+  amenities: string[]; images: string[]; image_filenames?: Record<string,string>; video_url?: string | null; featured: boolean;
   status: "published" | "draft" | "archived";
   availability: "on_request" | "available" | "rented" | "sold";
   published_at?: string|null; source_url: string | null; sort_order: number; created_at: string; updated_at: string;

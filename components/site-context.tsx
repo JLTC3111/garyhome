@@ -41,7 +41,7 @@ type SiteContext = {
   emailVerification:{type:PasswordLink["type"];busy:boolean;failed:boolean}|null;
   verifyEmailLink:()=>Promise<void>;
   sessionPhase: SessionPhase; reconnect: () => Promise<void>;
-  editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>) => Promise<T>;
+  editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>, timeoutMs?: number | null) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
   enquiries: Enquiry[]; setEnquiries: (list: Update<Enquiry[]>) => void; refresh: () => Promise<void>;
   notice: (message: string) => void;
@@ -240,7 +240,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     await publicRecovery;
   }, [refresh, recoverPublicContent]);
 
-  const editorTask = useCallback(async <T,>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>): Promise<T> => {
+  const editorTask = useCallback(async <T,>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>, timeoutMs: number | null = 20000): Promise<T> => {
     const expectedGeneration = snapshotRef.current.generation;
     if (!activeUserId || snapshotRef.current.user?.id !== activeUserId) throw new Error("Your account changed. Sign in again before continuing.");
     if (!sessionRef.current) await connectRef.current();
@@ -248,7 +248,8 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     if (!recovery || !db || !await recovery.recover()) throw new Error("Reconnect and verify your editor access before saving. Your edits are still here.");
     const { generation, user } = recovery.state;
     if (generation !== expectedGeneration || user?.id !== activeUserId) throw new Error("Your account changed during this request. Check the current data before continuing.");
-    const result = await request(signal => operation(db, signal));
+    // Resumable media owns its inactivity watchdog; JSON requests keep a total deadline.
+    const result = timeoutMs === null ? await operation(db, new AbortController().signal) : await request(signal => operation(db, signal), timeoutMs);
     if (recovery.state.generation !== generation || recovery.state.user?.id !== user?.id || !recovery.state.editor) {
       throw new Error("Your account changed during this request. Check the current data before continuing.");
     }
@@ -493,9 +494,10 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     return()=>{active=false;window.removeEventListener("gary-staff-profile-changed",changed);if(channel)void client.removeChannel(channel);};
   },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
 
+  const sessionLoading = sessionPhase === "checking" || sessionPhase === "recovering";
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
   return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://garyhome.vn", content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
-    {initial.configured && ["offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status">{sessionPhase === "recovering" ? <LatticeLoader label={studioText(sessionMessage, language)} announce={false}/> : studioText(sessionMessage, language)}{sessionPhase !== "recovering" && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
+    {initial.configured && ["checking", "offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status" aria-busy={sessionLoading}>{sessionLoading ? <LatticeLoader label={studioText(sessionMessage, language)} announce={false}/> : studioText(sessionMessage, language)}{!sessionLoading && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}
     <FormValidationMessages language={language}/>{children}{toast && <SwipeToast key={toast} duration={4500} dismiss={() => setToast("")} dismissLabel={studioText("Dismiss notification", language)} actionsLabel={language === "vi" ? "Thao tác thông báo" : "Notification actions"} releaseLabel={language === "vi" ? "Thả tay để đóng thông báo" : "Release to dismiss"}>{studioText(toast, language)}</SwipeToast>}

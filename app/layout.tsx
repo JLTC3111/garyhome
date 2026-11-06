@@ -25,6 +25,8 @@ import "./area-gallery.css";
 import "./shiny-button.css";
 import "./swipe-row.css";
 import "./lattice-loader.css";
+import "./counter.css";
+import "./editor-drawer.css";
 import "./editorial-studio.css";
 import "./rental-id-search.css";
 import "./site-preferences.css";

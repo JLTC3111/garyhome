@@ -83,6 +83,15 @@ input[data-form-invalid=true],textarea[data-form-invalid=true],select[data-form-
 .property-video-field .property-video{margin:0}
 .property-video-field .form-info{margin:0}
 .property-video-field>.button{justify-self:start}
+.editor-photo-card{margin:0;min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:6px;background:white}
+.editor-photo-preview{position:relative}
+.editor-photo-preview img{display:block;width:100%;height:125px;object-fit:cover}
+.editor-photo-order{position:absolute;left:7px;top:7px;font-size:9px;padding:3px 6px;background:#ffffffee;border-radius:3px}
+.editor-photo-actions{position:absolute;right:6px;bottom:6px;display:flex;gap:5px}
+.editor-photo-filename{display:grid;gap:4px;padding:10px;white-space:normal;overflow-wrap:anywhere;line-height:1.5;font-size:11px}
+.editor-photo-filename>span:first-child{font-size:10px;color:var(--muted)}
+.image-upload-filename,.image-upload-error strong,.admin-media-grid .media-filename{white-space:normal;overflow-wrap:anywhere;line-height:1.6}
+.image-upload-error{display:grid;gap:6px}
 
 .property-map{margin-top:22px;border:1px solid #d9e1d2;background:#f5f7f1;overflow:hidden;min-width:0}
 .property-map-caption{padding:16px 18px}

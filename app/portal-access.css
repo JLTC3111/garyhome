@@ -40,7 +40,6 @@
 .admin-auth-intro h1 em{font-weight:400;color:#b9d2de}
 .admin-auth-intro p{font-size:14px;max-width:390px}
 .admin-login>.portal-switcher{margin-bottom:32px}
-.admin-login .admin-lock{color:#35546b;background:#e7eef2}
 .admin-login>.eyebrow{color:#4b687a}
 .staff-access-note{display:flex;align-items:flex-start;gap:10px;padding:15px 16px;background:#eef2f5;border-radius:7px;margin-top:25px;color:#50697a}
 .staff-access-note>svg{margin-top:3px}
@@ -101,6 +100,7 @@ html{scroll-padding-top:144px}
   .portal-switcher>a{flex:1;font-size:11px;padding:10px 9px;gap:7px;min-height:44px}
   .account-auth-card h2{font-size:34px}
   .admin-login>.portal-switcher{margin-bottom:27px}
+  .admin-auth-intro .eyebrow,.admin-auth-intro h1 br,.admin-auth-intro h1 em{display:none}
   .admin-auth-intro h1{font-size:40px}
   .portal-access-heading h1{font-size:40px}
   .portal-access-card{padding:28px 24px}

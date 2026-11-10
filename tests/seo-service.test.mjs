@@ -11,7 +11,7 @@ const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirna
 const origin='https://garyhome.vn',runId='20000000-0000-4000-8000-000000000002';
 const finding=(id,severity,category='technical')=>({id,severity,category,title:id,explanation:'Observed evidence',recommendation:'Review the route.'});
 function page(url,inspectionStatus='inspected') {return {url,finalUrl:url,language:'en',status:inspectionStatus==='inspected'?200:0,indexable:inspectionStatus==='inspected',inspectionStatus,content:{score:100,findings:[finding('content-title','passed','content')]},technical:{score:100,findings:[finding('technical-http','passed')]},responseMs:12,bytes:1024};}
-function crawlState() {return {version:1,analysisVersion:2,status:'running',startedAt:1000,updatedAt:1000,config:{allowedOrigins:[origin],maxUrls:500,maxDepth:4,concurrency:2,requestIntervalMs:1000,timeoutMs:10000,maxDurationMs:900000,scope:'site',languages:['en','vi']},queue:[{kind:'page',url:origin+'/next',language:'vi',depth:0,attempts:2}],pages:[page(origin+'/observed')],skippedUrls:[],visited:[],canonicalUrls:[],robots:{},hostNextAt:{},sitemapUrls:[],linkChecks:{},requests:1};}
+function crawlState() {return {version:1,analysisVersion:3,status:'running',startedAt:1000,updatedAt:1000,config:{allowedOrigins:[origin],maxUrls:500,maxDepth:4,concurrency:2,requestIntervalMs:1000,timeoutMs:10000,maxDurationMs:900000,scope:'site',languages:['en','vi']},queue:[{kind:'page',url:origin+'/next',language:'vi',depth:0,attempts:2}],pages:[page(origin+'/observed')],skippedUrls:[],visited:[],canonicalUrls:[],robots:{},hostNextAt:{},sitemapUrls:[],linkChecks:{},requests:1};}
 function serviceHarness(options={}) {
  const record={id:runId,created_at:'2026-11-10T09:00:00Z',status:options.status||'running',state:structuredClone(options.state||crawlState())};
  const calls={claims:[],saved:[],resumed:[],advanced:[],created:[],compared:0,network:0};
@@ -76,7 +76,7 @@ test('explicit resume starts a new bounded segment while preserving original tim
   const h=serviceHarness({state,status:'incomplete'});const resumed=await h.resumeAudit(runId),saved=h.calls.resumed[0].state;
   assert.equal(h.calls.resumed.length,1);assert.equal(saved.status,'queued');assert.equal(saved.startedAt,500000);assert.equal(saved.originalStartedAt,1000);
   assert.deepEqual(saved.resumeHistory,[{startedAt:1000,finishedAt:192000,reason:'Checkpoint failed'}]);
-  assert.equal(saved.finishedAt,undefined);assert.equal(saved.stopReason,undefined);assert.equal(saved.error,undefined);assert.equal(saved.analysisVersion,2);
+  assert.equal(saved.finishedAt,undefined);assert.equal(saved.stopReason,undefined);assert.equal(saved.error,undefined);assert.equal(saved.analysisVersion,3);
   assert.deepEqual(saved.pages.map(page=>page.url),[origin+'/observed']);assert.equal(saved.pages[0].content.score,100);
   assert.equal(saved.queue.filter(task=>task.url===origin+'/failed').length,1,'failed row is requeued once even if already pending');
   assert.ok(saved.queue.some(task=>task.url===origin+'/blocked'));assert.ok(saved.queue.every(task=>task.attempts===0));
@@ -118,8 +118,8 @@ test('stored summaries weight evaluated checks and omit failed inspections rathe
  const unknown={...page(origin+'/unknown','failed'),content:{score:100,findings:[finding('fabricated','passed','content')]},technical:{score:0,findings:[finding('invented-critical','critical')]}};
  state.pages=[first,second,unknown];
  const summary=auditSummary(state);
- assert.equal(summary.content_score,25);assert.equal(summary.technical_score,20);assert.equal(summary.critical_count,1);assert.equal(summary.score_basis,'evaluated-checks-v2');
- assert.deepEqual(summary.coverage,{inspected:2,passed:1,failed:1,skipped:0,pending:1,skippedUrls:0});
+ assert.equal(summary.content_score,25);assert.equal(summary.technical_score,20);assert.equal(summary.critical_count,1);assert.equal(summary.score_basis,'evaluated-checks-v3');
+ assert.deepEqual(Object.fromEntries(['inspected','passed','failed','skipped','pending','skippedUrls'].map(key=>[key,summary.coverage[key]])),{inspected:2,passed:1,failed:1,skipped:0,pending:1,skippedUrls:0});assert.equal(summary.coverage.issues,1);assert.equal(summary.coverage.duplicateObservations,0);
  state.pages=[unknown];state.queue=[];const empty=auditSummary(state);assert.equal(empty.content_score,null);assert.equal(empty.technical_score,null);assert.equal(empty.critical_count,0);
 });
 
@@ -129,7 +129,7 @@ test('resuming legacy parser evidence re-evaluates successful pages before assig
  state.canonicalUrls=[`en:${origin}/observed`];state.linkChecks={[origin+'/observed']:{status:200}};
  const h=serviceHarness({state,status:'failed'});await h.resumeAudit(runId);
  const saved=h.calls.resumed[0].state;
- assert.equal(saved.analysisVersion,2);assert.deepEqual(saved.pages,[]);
+ assert.equal(saved.analysisVersion,3);assert.deepEqual(saved.pages,[]);
  assert.ok(saved.queue.some(task=>task.url===origin+'/observed'));
  assert.deepEqual(saved.canonicalUrls,[]);assert.deepEqual(saved.linkChecks,{});
  assert.match(saved.resumeHistory[0].reason,/Legacy parser/);

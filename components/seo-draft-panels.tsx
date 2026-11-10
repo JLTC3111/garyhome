@@ -1,4 +1,5 @@
 "use client";
+import { localizedPath } from "@/lib/localized-routes";
 import { SeoEditorPanel } from "./seo-editor-panel";
 import { useSite } from "./site-context";
 import { propertySeoText, siteDescription } from "@/lib/seo-text";
@@ -12,7 +13,7 @@ export function PropertySeoPanel({ property }: { property: Property }) {
   return <SeoEditorPanel key={property.id} inputs={(["en", "vi"] as const).map(language => {
     const heading = propertyTitle(property, language, area?.name);
     return {
-      url: new URL(`/homes/${property.slug}`, publicOrigin).href, language,
+      url: new URL(localizedPath(`/homes/${property.slug}`, language), publicOrigin).href, language,
       ...propertySeoText(property, language, area?.name),
       text: [language === "vi" ? property.overview_vi || property.description_vi : property.overview_en || property.description_en,
         language === "vi" ? property.location_vi || area?.description_vi : property.location_en || area?.description_en,
@@ -29,7 +30,7 @@ export function PropertySeoPanel({ property }: { property: Property }) {
 export function HomepageSeoPanel({ settings }: { settings: Settings }) {
   const { publicOrigin, t } = useSite();
   return <SeoEditorPanel inputs={(["en", "vi"] as const).map(language => ({
-    url: publicOrigin + "/", language, title: documentTitle("/", language, []) || "Gary Home",
+    url: new URL(localizedPath("/", language), publicOrigin).href, language, title: documentTitle("/", language, []) || "Gary Home",
     description: siteDescription(language),
     text: language === "vi" ? settings.hero_text_vi : settings.hero_text_en,
     headings: [{ level: 1, text: language === "vi" ? settings.hero_title_vi : settings.hero_title_en }],

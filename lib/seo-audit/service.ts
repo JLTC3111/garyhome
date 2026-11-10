@@ -39,7 +39,7 @@ export async function resumeAudit(runId:string) {
   const state=normalizeAuditState(loaded.data.state);
   const {allowedOrigins}=auditEnvironment();
   if(state.config.allowedOrigins.some(origin=>!allowedOrigins.includes(origin)))throw new Error("Audit domains changed. Start a fresh scan with the current configuration.");
-  const legacy=state.analysisVersion!==2;
+  const legacy=state.analysisVersion!==3;
   state.originalStartedAt ||= state.startedAt;
   state.resumeHistory ||= [];
   state.resumeHistory.push({startedAt:state.startedAt,finishedAt:state.finishedAt,reason:(legacy?"Legacy parser: re-evaluate recorded pages. ":"")+(state.stopReason||state.error||state.status)});
@@ -54,7 +54,7 @@ export async function resumeAudit(runId:string) {
   for(const task of state.queue) task.attempts=0;
   state.robots={};state.visited=state.visited.filter(key=>!key.startsWith("robots:"));
   state.startedAt=Date.now();state.updatedAt=state.startedAt;delete state.finishedAt;delete state.stopReason;delete state.error;
-  state.status="queued";state.analysisVersion=2;
+  state.status="queued";state.analysisVersion=3;
   return resumeAuditRecord(db,runId,state);
 }
 

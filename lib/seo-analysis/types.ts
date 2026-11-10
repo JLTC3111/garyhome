@@ -3,6 +3,7 @@ export type Category = "content" | "technical";
 export type Finding = {
   id: string; category: Category; severity: Severity; title: string;
   explanation: string; recommendation: string; evidence?: string;
+  messageKey?: string; messageValues?: Record<string, string | number | string[]>;
 };
 export type AnalysisReport = { score: number | null; findings: Finding[] };
 export type ContentInput = {

@@ -28,6 +28,8 @@ import "./lattice-loader.css";
 import "./counter.css";
 import "./editor-drawer.css";
 import "./editorial-studio.css";
+import "./seo.css";
+import "../components/seo-editor-panel.css";
 import "./rental-id-search.css";
 import "./site-preferences.css";
 import "../shared/gary-apps/styles.css";

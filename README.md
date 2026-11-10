@@ -125,3 +125,7 @@ The current direct staff-account workflow, strict role hierarchy, profile photos
 Landlord introductions support private photos/PDF plans and a Studio review queue under **Customer care → Introduced properties**, with status, assignment, internal notes and draft-listing conversion. See [landlord-introductions.md](docs/landlord-introductions.md) for the migration, permissions and upload maintenance. About Us links Services, Tips & News, Contact and Landlords; [about-pages.md](docs/about-pages.md) covers the bilingual editorial pages and their sources.
 
 Published customer reviews now feed the homepage Feedback tab automatically. The header uses a single `/login` portal chooser, and guest favourites merge after login. See [feedback-navigation-and-favourites.md](docs/feedback-navigation-and-favourites.md) for the flow and verification.
+
+### SEO analysis
+
+Studio includes live bilingual Content SEO reviews and a separate published-site SEO Audit dashboard with durable history, page rescans, crawl limits and optional weekly scheduling. See [setup, architecture and reporting limits](docs/seo-analysis.md).

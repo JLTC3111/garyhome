@@ -1353,7 +1353,7 @@ test('Vinhomes enquiries carry the exact apartment reference and still require a
 test('Studio groups listings and galleries under rentals and separates assistance and editorial work',async t=>{
  const h=await harness(t),nav=h.renderer.root.findByProps({className:'branched-menu studio-branched-menu'});
  const children=label=>nav.findByProps({'aria-label':label}).parent.findAllByType('button').map(n=>n.props['data-id']).filter(Boolean);
- assert.deepEqual(children('Rentals & content'),['properties','landlords','neighbourhoods','rental-content']);assert.deepEqual(children('Customer care'),['enquiries','customers','feedback']);assert.deepEqual(children('Assistance & publishing'),['assistance','news','tips']);
+ assert.deepEqual(children('Rentals & content'),['properties','landlords','neighbourhoods','rental-content']);assert.deepEqual(children('Customer care'),['enquiries','customers','feedback']);assert.deepEqual(children('Assistance & publishing'),['seo','assistance','news','tips']);
  assert.equal(nav.findAllByProps({'data-id':'media'}).length,0);
  await act(async()=>nav.findByProps({'aria-label':'Listings'}).props.onClick());const workspace=h.renderer.root.findByProps({'aria-label':'Listing workspace'});await act(async()=>workspace.findAllByType('button')[1].props.onClick());assert.ok(h.renderer.root.findByProps({className:'admin-media-grid'}));assert.equal(nav.findByProps({'aria-label':'Listings'}).props['aria-current'],'page');
  await act(async()=>h.site.setLanguage('vi'));assert.equal(h.renderer.root.findAllByProps({'aria-label':'Hỗ trợ & biên tập'}).length,1);assert.equal(h.renderer.root.findAllByProps({'aria-label':'Thành viên & thư viện'}).length,1);

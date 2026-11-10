@@ -1,0 +1,43 @@
+import { report, type ContentInput, type Finding } from "./types.ts";
+const clean = (s: string) => s.normalize("NFKC").toLocaleLowerCase().replace(/\s+/gu, " ").trim();
+function segments(text: string, language: string, granularity: "word" | "sentence") {
+  try { return [...new Intl.Segmenter(language, { granularity }).segment(text)].filter(s => granularity === "sentence" || s.isWordLike).map(s => s.segment); }
+  catch { return text.split(granularity === "word" ? /\s+/u : /[.!?。！？]+/u).filter(Boolean); }
+}
+export function contentStatistics(input: ContentInput) {
+  const words = segments(input.text, input.language || "en", "word"), sentences = segments(input.text, input.language || "en", "sentence");
+  return { words: words.length, sentences: sentences.length, paragraphs: input.text.split(/\n\s*\n/u).filter(s => s.trim()).length };
+}
+export function analyzeContent(input: ContentInput) {
+  const findings: Finding[] = [];
+  const add = (id: string, severity: Finding["severity"], title: string, explanation: string, recommendation: string, evidence?: string) => findings.push({ id, category: "content", severity, title, explanation, recommendation, ...(evidence ? { evidence } : {}) });
+  const title = input.title.trim(), description = input.description.trim(), text = input.text.trim();
+  add("content-title", title ? "passed" : "warning", title ? "Title is present" : "Add a descriptive title", "A title helps readers understand the page before opening it.", title ? "Check that the title describes this specific page accurately." : "Write a unique title that names the topic and purpose of this page.");
+  if (title && /^(home|page|untitled|article|trang chủ|bài viết)(\s*[|–—-].*)?$/iu.test(title)) add("content-title-specific", "recommendation", "Make the title more specific", "This title is generic; the subject may be unclear in search results.", "Name the service, location or question that the page addresses.", title);
+  if ([...title].length > 65) add("content-title-preview", "recommendation", "Review title truncation", "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.", "Use the desktop and mobile previews and put the distinguishing topic near the beginning.", `${[...title].length} characters`);
+  add("content-description", description ? "passed" : "warning", description ? "Description is present" : "Add a useful description", "The description is a candidate search snippet. Search engines may choose different text.", description ? "Confirm the summary matches the page and helps a reader decide whether to visit." : "Summarize what a visitor will find, using the page's actual content.");
+  if ([...description].length > 170) add("content-description-preview", "recommendation", "Review description truncation", "Snippet space varies by device and query; this description may be shortened.", "Put essential information first. Do not remove useful detail solely to meet a character target.");
+  add("content-body", text ? "passed" : "warning", text ? "Main content is present" : "Add the main content", "Readers need visible content that answers the purpose of the page.", text ? "Review accuracy, originality and whether the reader's main question is answered." : "Add useful page content before publishing.");
+  const h1 = input.headings.filter(h => h.level === 1 && h.text.trim());
+  add("content-heading", h1.length ? "passed" : "warning", h1.length ? "Main heading is present" : "Add a clear main heading", "A visible main heading gives readers the page's subject.", h1.length ? "Keep the heading descriptive and consistent with the title." : "Add a main heading that accurately describes this page.");
+  const skipped = input.headings.some((h, i) => i > 0 && h.level > input.headings[i - 1].level + 1), empty = input.headings.some(h => !h.text.trim());
+  add("content-heading-order", skipped || empty ? "warning" : "passed", skipped || empty ? "Review heading structure" : "Heading structure is consistent", "Empty headings or jumps in heading levels can make a document harder to navigate.", skipped || empty ? "Fill empty headings and nest subsections in a logical order." : "Use headings to describe each section's subject.");
+  if (h1.length > 1) add("content-multiple-h1", "recommendation", "Review multiple main headings", "Multiple H1 headings are allowed, but the primary topic should remain clear.", "Check that readers can identify the page's main subject.");
+  const missingAlt = input.images.filter(image => image.alt === null && !image.decorative), genericAlt = input.images.filter(image => image.alt && /^(image|photo|picture|img|ảnh|hình ảnh|article cover photo|cover photo|ảnh bìa bài viết)(\s*\d+)?$/iu.test(image.alt.trim()));
+  if (input.images.length) {
+    add("content-image-alt", missingAlt.length ? "warning" : "passed", missingAlt.length ? "Images lack an alt attribute" : "Image alt attributes are present", "Informative images need a text alternative. An empty alt attribute is valid for decorative images.", missingAlt.length ? "Describe informative images and use an explicit empty alt attribute for decorative images." : "Check that each description conveys the image's purpose; decorative images may use empty alt text.", missingAlt.map(i => i.src).slice(0, 3).join("\n"));
+    if (genericAlt.length) add("content-image-alt-quality", "recommendation", "Replace generic image descriptions", "Generic words do not convey the information shown in an image.", "Describe what matters in the image without adding unrelated keywords.", genericAlt.map(i => i.alt).join(", "));
+  }
+  const internal = input.links.filter(link => { try { const target = new URL(link.href, input.url), page = new URL(input.url); return target.origin === page.origin && (target.pathname !== page.pathname || target.search !== page.search); } catch { return false; } });
+  if (!internal.length) add("content-internal-links", "recommendation", "Consider relevant internal links", "Contextual links can help readers discover related information. Every page does not need a fixed number.", "Link to related services, articles or listings where it helps the reader.");
+  else { const unclear = internal.filter(l => !l.text.trim() || /^(click here|here|read more|more|xem thêm|tại đây)$/iu.test(l.text.trim())); add("content-link-text", unclear.length ? "warning" : "passed", unclear.length ? "Review internal link labels" : "Internal links have descriptive labels", "Link text should explain the destination when read in context. Icon and image links also need an accessible name.", unclear.length ? "Use destination-specific text or an accessible image description." : "Keep links relevant to the surrounding content.", unclear.map(l => l.href).slice(0, 3).join("\n")); }
+  const paragraphs = text.split(/\n\s*\n/u).map(clean).filter(p => p.length > 80), repeated = paragraphs.find((p, i) => paragraphs.indexOf(p) !== i);
+  if (repeated) add("content-repeated-paragraph", "warning", "Repeated paragraph detected", "An identical paragraph appears more than once in the main content.", "Review whether the repeated passage is intentional; consolidate accidental duplication.", repeated.slice(0, 180));
+  const stats = contentStatistics(input);
+  if (text) add("content-readability", "recommendation", "Review clarity and relevance", `Detected ${stats.words} language-aware word segments and ${stats.sentences} sentences. These counts are context, not quality or ranking scores.`, "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.");
+  if (input.focusKeyword?.trim()) {
+    const keyword = clean(input.focusKeyword), areas = [["title", title], ["description", description], ["headings", input.headings.map(h => h.text).join(" ")], ["main content", text]].filter(([, value]) => !clean(value).includes(keyword)).map(([name]) => name);
+    add("content-focus-topic", "recommendation", areas.length ? "Review focus topic coverage" : "Focus phrase appears in key areas", areas.length ? `The exact focus phrase is absent from: ${areas.join(", ")}. Synonyms and inflections may still express the topic well.` : "The exact phrase occurs in the title, description, headings and main content. This does not establish relevance or search intent.", "Use the topic naturally where helpful. Avoid forced repetition and keyword density targets.", input.focusKeyword.trim());
+  }
+  return report(findings);
+}

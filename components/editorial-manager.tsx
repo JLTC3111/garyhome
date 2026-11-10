@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { SeoEditorPanel } from "./seo-editor-panel";
 import { PublicUrlField } from "./public-url-field";
 import Link from "next/link";
 import { ArrowUpRight, Plus, Save, Trash2, Upload, X, RefreshCw } from "lucide-react";
@@ -23,7 +24,7 @@ const editorialMessages = {
   load: ["Couldn’t refresh the list. Your draft is kept.", "Chưa thể tải lại danh sách. Bản nháp vẫn được giữ."],
 } as const;
 export function EditorialManager({ kind, upload }: { kind: EditorialKind; upload: (file: File) => Promise<string> }) {
-  const { content, setContent, language, t, demo, editorTask, staffRole, notice, refresh } = useSite();
+  const { content, setContent, language, t, demo, editorTask, staffRole, notice, refresh, publicOrigin } = useSite();
   const [drafts, setDrafts] = useState<Partial<Record<EditorialKind, EditorialArticle | null>>>({});
   const [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false);
   const [error, setError] = useState<{ id: string; code: keyof typeof editorialMessages } | null>(null);
@@ -97,6 +98,14 @@ export function EditorialManager({ kind, upload }: { kind: EditorialKind; upload
       {article.sections.map((part, index) => <fieldset className="editorial-section-fields" key={index}><legend>{t(`Section ${index + 1}`, `Mục ${index + 1}`)}</legend>{(["en", "vi"] as const).map(lang => <div key={lang}><label>{t(lang === "en" ? "Heading · English" : "Heading · Vietnamese", lang === "en" ? "Tiêu đề mục · Tiếng Anh" : "Tiêu đề mục · Tiếng Việt")}<input name={`section_${index}_heading_${lang}`} maxLength={240} value={part[`heading_${lang}`]} onChange={event => section(index, { [`heading_${lang}`]: event.target.value })}/></label><label>{t(lang === "en" ? "Text · English" : "Text · Vietnamese", lang === "en" ? "Nội dung · Tiếng Anh" : "Nội dung · Tiếng Việt")}<textarea name={`section_${index}_body_${lang}`} rows={6} maxLength={12000} value={part[`body_${lang}`]} onChange={event => section(index, { [`body_${lang}`]: event.target.value })}/></label></div>)}<button type="button" className="text-link" onClick={() => change({ sections: article.sections.filter((_, i) => i !== index) })}><X size={15}/>{t("Remove section", "Xóa mục")}</button></fieldset>)}
       <button type="button" className="text-link" disabled={article.sections.length >= 12} onClick={() => change({ sections: [...article.sections, blankSection()] })}><Plus size={16}/>{t("Add section", "Thêm mục")}</button>
       <fieldset><legend>{t("Sources & further reading", "Nguồn & đọc thêm")}</legend>{article.sources.map((source, index) => <div className="editorial-source" key={index}><label>{t("Source title", "Tên nguồn")}<input maxLength={300} value={source.title} onChange={event => change({ sources: article.sources.map((s, i) => i === index ? { ...s, title: event.target.value } : s) })}/></label><label>{t("Source URL", "Liên kết nguồn")}<input type="url" maxLength={2000} value={source.url} onChange={event => change({ sources: article.sources.map((s, i) => i === index ? { ...s, url: event.target.value } : s) })}/></label><button type="button" className="text-link" onClick={() => change({ sources: article.sources.filter((_, i) => i !== index) })}><X size={15}/>{t("Remove source", "Xóa nguồn")}</button></div>)}<button type="button" className="text-link" disabled={article.sources.length >= 12} onClick={() => change({ sources: [...article.sources, { title: "", url: "" }] })}><Plus size={16}/>{t("Add source", "Thêm nguồn")}</button></fieldset>
+      <SeoEditorPanel key={article.id} inputs={(["en", "vi"] as const).map(lang => ({
+        url: `${publicOrigin}/tips-and-news/${article.slug}`,
+        language: lang, title: article[`title_${lang}`] ? `${article[`title_${lang}`]} | Gary Home` : "",
+        description: article[`summary_${lang}`], text: [article[`summary_${lang}`], ...article.sections.map(s => s[`body_${lang}`])].join("\n\n"),
+        headings: [{ level: 1, text: article[`title_${lang}`] }, ...article.sections.map(s => ({ level: 2, text: s[`heading_${lang}`] }))],
+        links: article.sources.map(s => ({ href: s.url, text: s.title })),
+        images: article.image_url ? [{ src: article.image_url, alt: lang === "vi" ? "Ảnh bìa bài viết" : "Article cover photo" }] : [],
+      }))} note={t("Uses the article title, summary and sections that the public page renders. The public site currently switches languages on the same URL; the audit inspects each supported language response separately.", "Phân tích tiêu đề, tóm tắt và các mục mà trang công khai hiển thị. Website hiện chuyển ngôn ngữ trên cùng URL; kiểm tra kỹ thuật xem từng phản hồi ngôn ngữ riêng.")}/>
       <label>{t("Publication", "Trạng thái đăng")}<SelectField value={article.status} onValueChange={value => change({ status: value as EditorialArticle["status"] })}><option value="draft">{t("Draft · private", "Bản nháp · riêng tư")}</option><option value="published">{t("Published · visible on site", "Đã đăng · hiển thị trên website")}</option></SelectField></label>
       {issue && <div className="form-error" role="alert">{issue}</div>}
       <div className="editorial-save-actions"><button type="submit" className="button" disabled={busy || uploading}><Save size={16}/>{busy ? t("Saving…", "Đang lưu…") : t("Save article", "Lưu bài viết")}</button>{rows.some(row => row.id === article.id) && canDeleteContent(staffRole) && <button type="button" className="button button-outline button-danger-outline" disabled={busy} onClick={() => { setError(null); setDeleting(article); }}><Trash2 size={16}/>{t("Delete article", "Xóa bài viết")}</button>}</div>

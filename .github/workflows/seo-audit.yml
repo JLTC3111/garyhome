@@ -1,0 +1,49 @@
+name: Weekly SEO audit runner
+on:
+  # Check due dates daily; storage permits one scheduled full audit per week.
+  schedule:
+    - cron: '10 2 * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: seo-audit-runner
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Advance the durable SEO audit
+        env:
+          SEO_SITE_URL: ${{ secrets.SEO_SITE_URL }}
+          SEO_CRON_SECRET: ${{ secrets.SEO_CRON_SECRET }}
+        shell: python
+        run: |
+          import json, os, time, urllib.request
+          from urllib.parse import urlparse
+          base = os.environ.get('SEO_SITE_URL', '').rstrip('/')
+          secret = os.environ.get('SEO_CRON_SECRET', '')
+          parsed = urlparse(base)
+          if parsed.scheme != 'https' or not parsed.netloc or parsed.path or not secret:
+              raise SystemExit('Configure SEO_SITE_URL and SEO_CRON_SECRET repository secrets.')
+          deadline = time.monotonic() + 17 * 60
+          failures = 0
+          while time.monotonic() < deadline:
+              req = urllib.request.Request(base + '/api/cron/seo', data=b'{}', method='POST',
+                  headers={'Authorization': 'Bearer ' + secret, 'Content-Type': 'application/json'})
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as response:
+                      result = json.load(response)
+                  failures = 0
+              except Exception:
+                  failures += 1
+                  if failures >= 3:
+                      raise SystemExit('The SEO worker could not be reached. Inspect the Studio report and deployment configuration.')
+                  time.sleep(10)
+                  continue
+              if not result.get('active'):
+                  print('No due or active SEO audit remains.')
+                  break
+              time.sleep(2)
+          else:
+              raise SystemExit('SEO runner deadline reached. Inspect the persisted incomplete audit in Studio.')

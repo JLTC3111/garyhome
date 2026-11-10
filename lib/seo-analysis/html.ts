@@ -14,12 +14,71 @@ function attributes(tag: string) {
   return result;
 }
 function absolute(value: string, base: string) { try { return new URL(value, base).href; } catch { return value; } }
+const tokenPattern = /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<(script|style|template|noscript)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?(?:<\/\1\s*>|$)|<(?:[^>"']|"[^"]*"|'[^']*')*>|[^<]+/gi;
+type HtmlToken = { text: string; start: number; end: number };
+function tokenize(html: string): HtmlToken[] {
+  return [...html.matchAll(tokenPattern)].map(match => ({ text: match[0], start: match.index, end: match.index + match[0].length }));
+}
+function tagName(token: string) { return token.match(/^<\/?\s*([a-z0-9:-]+)/i)?.[1]?.toLowerCase(); }
+/** Resolve only observed React Suspense replacements into an existing main
+ * boundary. Scripts are treated as inert evidence; no JavaScript is run.
+ * Without this step, streamed sections arrive outside the closed main element
+ * and are mistaken for an empty page, although the browser inserts them there.
+ */
+function restoreStreamedMain(html: string) {
+  const pairs = tokenize(html).filter(token => /^<script\b/i.test(token.text)).flatMap(token =>
+    [...token.text.matchAll(/\$RC\(\s*["'](B:[a-zA-Z0-9:_-]+)["']\s*,\s*["'](S:[a-zA-Z0-9:_-]+)["']\s*\)/g)].map(match => ({ boundary: match[1], segment: match[2] })),
+  ).slice(0, 64);
+  const done = new Set<string>();
+  // Parent replacements expose nested placeholders to main; resolve them in
+  // further passes regardless of the order in which segments were streamed.
+  for (let pass = 0; pass < 8; pass++) {
+    let changed = false;
+    for (const pair of pairs) {
+      if (done.has(pair.boundary)) continue;
+      const tokens = tokenize(html);
+      let main = 0, boundaryIndex = -1, segmentIndex = -1;
+      for (let index = 0; index < tokens.length; index++) {
+        const token = tokens[index].text, name = tagName(token), closing = /^<\//.test(token);
+        if (name === "main") main = Math.max(0, main + (closing ? -1 : 1));
+        if (main && name === "template" && !closing && attributes(token.match(/^<(?:[^>"']|"[^"]*"|'[^']*')*>/)?.[0] || "").id === pair.boundary) boundaryIndex = index;
+        if (name === "div" && !closing) { const attrs = attributes(token); if (attrs.id === pair.segment && Object.hasOwn(attrs, "hidden")) segmentIndex = index; }
+      }
+      if (boundaryIndex < 0 || segmentIndex < 0) continue;
+      const opening = boundaryIndex - 1;
+      if (opening < 0 || !/^<!--\$(?:\?|~)?-->$/.test(tokens[opening].text)) continue;
+      let closeBoundary = -1, nesting = 0;
+      for (let index = boundaryIndex + 1; index < tokens.length; index++) {
+        if (/^<!--\$(?:\?|~|!)?-->$/.test(tokens[index].text)) nesting++;
+        else if (tokens[index].text === "<!--/$-->") { if (!nesting) { closeBoundary = index; break; } nesting--; }
+      }
+      let closeSegment = -1, depth = 1;
+      for (let index = segmentIndex + 1; index < tokens.length; index++) {
+        if (tagName(tokens[index].text) !== "div" || /^<(script|style|template|noscript)\b/i.test(tokens[index].text)) continue;
+        depth += /^<\//.test(tokens[index].text) ? -1 : /\/\s*>$/.test(tokens[index].text) ? 0 : 1;
+        if (!depth) { closeSegment = index; break; }
+      }
+      if (closeBoundary < 0 || closeSegment < 0) continue;
+      const content = html.slice(tokens[segmentIndex].end, tokens[closeSegment].start);
+      const replacements = [
+        { start: tokens[opening].start, end: tokens[closeBoundary].end, value: `<!--$-->${content}<!--/$-->` },
+        { start: tokens[segmentIndex].start, end: tokens[closeSegment].end, value: "" },
+      ].sort((a, b) => b.start - a.start);
+      if (replacements[0].start < replacements[1].end) continue;
+      for (const replacement of replacements) html = html.slice(0, replacement.start) + replacement.value + html.slice(replacement.end);
+      done.add(pair.boundary); changed = true;
+    }
+    if (!changed) break;
+  }
+  return html;
+}
 // Small inert HTML tokenizer: raw script/style bodies are never treated as
 // markup, quoted > characters are retained, and no code or network is executed.
 // This inspects server HTML, not a browser's repaired/rendered DOM.
 export function parseHtml(html: string, url: string): ParsedDocument {
+  html = restoreStreamedMain(html);
   const doc: ParsedDocument = { url, title: "", description: "", text: "", headings: [], links: [], images: [], canonical: [], robots: [], hreflang: [], jsonLd: [], titleCount: 0, descriptionCount: 0, htmlLanguage: "", viewport: null };
-  const tokens = html.match(/<!--[\s\S]*?(?:-->|$)|<![^>]*>|<(script|style|template|noscript)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?(?:<\/\1\s*>|$)|<(?:[^>"']|"[^"]*"|'[^']*')*>|[^<]+/gi) || [];
+  const tokens = html.match(tokenPattern) || [];
   let inTitle = false, heading: { level: number; text: string } | null = null, link: { href: string; text: string } | null = null;
   let mainDepth = 0, excludedDepth = 0, mainFound = false;
   const mainHeadings: ParsedDocument["headings"] = [];

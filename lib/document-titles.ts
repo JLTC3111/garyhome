@@ -1,3 +1,4 @@
+import { unlocalizedPath } from "./localized-routes.ts";
 import type { Language, Property, Neighbourhood } from "./types";
 import { isPublicRental, propertyTitle } from "./rentals.ts";
 
@@ -29,7 +30,7 @@ const pageTitles: Record<string, readonly [string, string]> = {
 export function documentTitle(pathname: string | null, language: Language, properties: readonly TitleProperty[],neighbourhoods: readonly Pick<Neighbourhood,"slug"|"name">[] = [], articles?: readonly EditorialArticle[]): string | null {
   // The router can briefly have no pathname while restoring a route.
   if (pathname === null) return null;
-  const path = pathname.replace(/\/+$/, "") || "/";
+  const path = unlocalizedPath(pathname).replace(/\/+$/, "") || "/";
   const vi = language === "vi";
   if (path === "/") return vi ? "Căn hộ dịch vụ cho thuê tại Hà Nội | Gary Home" : "Serviced apartments in Hanoi for rent | Gary Home";
   const page = pageTitles[path];

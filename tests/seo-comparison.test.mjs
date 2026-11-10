@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compareAuditMetadata } from '../lib/seo-audit/compare.ts';
-const page = (url, language = 'en', overrides = {}) => ({ url, finalUrl: url, canonical: url, language, indexable: true, title: 'Renting in Hanoi', description: 'Practical rental advice.', content: { score: 100, findings: [{ id: 'title', category: 'content', severity: 'passed' }] }, technical: { score: 100, findings: [] }, ...overrides });
+const page = (url, language = 'en', overrides = {}) => ({ url, finalUrl: url, canonical: url, language, status: 200, indexable: true, title: 'Renting in Hanoi', description: 'Practical rental advice.', content: { score: 100, findings: [{ id: 'title', category: 'content', severity: 'passed' }] }, technical: { score: 100, findings: [] }, ...overrides });
 test('duplicate metadata comparisons isolate languages, canonical aliases and private indexing intentions', () => {
   const first = page('https://garyhome.vn/a');
   const state = { pages: [first, page(first.url, 'vi'), page('https://garyhome.vn/alias', 'en', { canonical: first.url }), page('https://garyhome.vn/private', 'en', { indexable: false })] };

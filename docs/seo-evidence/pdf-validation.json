@@ -1,0 +1,10 @@
+{
+  "artifact": "output/pdf/gary-home-seo-remediation.pdf",
+  "pages": 4,
+  "format": "A4",
+  "renderer": "CoreGraphics/CoreText; verified with Poppler",
+  "visual_review": "All four rendered pages inspected: no clipping, overlap, missing glyphs or split comparison table.",
+  "sections": 7,
+  "form_fields": false,
+  "javascript": false
+}

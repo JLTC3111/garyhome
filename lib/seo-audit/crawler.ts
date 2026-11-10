@@ -6,32 +6,36 @@ import { parseHtml } from "../seo-analysis/html.ts";
 import { analyzeContent } from "../seo-analysis/content.ts";
 import { analyzeTechnical, hasNoindex } from "../seo-analysis/technical.ts";
 import type { AnalysisReport, Finding } from "../seo-analysis/types.ts";
+import { localizedRoute, localizedPath, isPublicPagePath } from "../localized-routes.ts";
 
 export type CrawlConfig = {
   allowedOrigins: string[]; maxUrls?: number; maxDepth?: number; concurrency?: number;
   requestIntervalMs?: number; timeoutMs?: number; maxDurationMs?: number;
-  scope?: "site" | "page"; languages?: string[];
+  scope?: "site" | "page"; languages?: string[]; languageMode?: "cookie" | "url";
 };
 type Config = Required<CrawlConfig>;
-export type CrawlTask = { kind: "robots" | "sitemap" | "page" | "link"; url: string; depth: number; language?: string; source?: string; attempts?: number };
+export type CrawlTask = { kind: "robots" | "sitemap" | "page" | "link"; url: string; depth: number; language?: string; source?: string; attempts?: number; lastStatus?: number; resumeUrl?: string; redirects?: string[] };
 type RobotsRule = { path: string; allow: boolean };
 type RobotsRecord = { allowed: boolean; rules: RobotsRule[]; delayMs: number; fetched: boolean; error?: string };
 export type AuditPage = {
   url: string; finalUrl: string; status: number; language: string; indexable: boolean; canonical?: string;
   content: AnalysisReport; technical: AnalysisReport; responseMs: number; bytes: number;
+  inspectionStatus?: "inspected" | "failed" | "skipped"; crawlError?: string; attempts?: number;
   title?: string; description?: string; hreflang?: { language: string; href: string }[]; links?: string[];
 };
 export type CrawlState = {
-  version: 1; status: "queued" | "running" | "completed" | "incomplete" | "failed";
+  version: 1; analysisVersion?: 2; originalStartedAt?: number; resumeHistory?: { startedAt: number; finishedAt?: number; reason?: string }[]; status: "queued" | "running" | "completed" | "incomplete" | "failed";
   startedAt: number; updatedAt: number; finishedAt?: number; config: Config; queue: CrawlTask[];
   pages: AuditPage[]; skippedUrls: { url: string; reason: string }[]; omittedSkipped?: number;
   visited: string[]; canonicalUrls: string[]; robots: Record<string, RobotsRecord>;
   hostNextAt: Record<string, number>; sitemapUrls: string[]; linkChecks: Record<string, { status: number; finalUrl: string }>;
-  requests: number; error?: string;
+  requests: number; error?: string; stopReason?: string; transportMode?: "pinned" | "trusted-fetch";
+  diagnostics?: { url: string; kind: CrawlTask["kind"] | "worker"; reason: string; attempts: number; at: number }[];
 };
 type AdvanceOptions = {
   fetch?: typeof fetch; now?: () => number; sleep?: (ms: number) => Promise<void>; budgetMs?: number;
   resolveHost?: (hostname: string) => Promise<string[]>;
+  transportMode?: "pinned" | "trusted-fetch";
 };
 const USER_AGENT = "GaryHomeSEO/1.0";
 const EXCLUDED = /(?:^|\/)(?:admin|account|auth|login|logout|sign-?in|sign-?up|api|preview|private|staging|saved|cart|_next|\.well-known)(?:\/|$)/i;
@@ -39,6 +43,8 @@ const ASSET = /\.(?:avif|bmp|css|csv|docx?|eot|gif|gz|ico|jpe?g|js|json|map|mp[3
 const MAX_BODY = 2 * 1024 * 1024;
 const MAX_LINK_CHECKS = 100;
 const MAX_REQUESTS = 2000;
+const MAX_ATTEMPTS = 3;
+const IRRELEVANT_EXTERNAL = /(?:^|\.)(?:facebook\.com|fb\.com|instagram\.com|twitter\.com|x\.com|tiktok\.com|linkedin\.com|wa\.me|whatsapp\.com|zalo\.me|zalo\.com|google-analytics\.com|googletagmanager\.com|doubleclick\.net)$/i;
 const cap = (value: number | undefined, fallback: number, min: number, max: number) => Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value!))) : fallback;
 
 /** Literal addresses and DNS answers are checked before every request, including every redirect hop. */
@@ -47,7 +53,7 @@ export function isPublicAddress(address: string): boolean {
   if (isIP(ip) === 4) {
     const [a, b] = ip.split(".").map(Number);
     const [, , c] = ip.split(".").map(Number);
-    return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && (b === 168 || b === 0 || b === 2) || a === 100 && b >= 64 && b <= 127 || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
+    return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && (b === 168 || b === 0) || a === 100 && b >= 64 && b <= 127 || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
   }
   if (isIP(ip) === 6) {
     // IPv4 mapped, transition, local, multicast and documentation ranges are not crawl targets.
@@ -82,6 +88,15 @@ function skip(state: CrawlState, url: string, reason: string) {
   if (state.skippedUrls.length < 1000) state.skippedUrls.push({ url, reason });
   else state.omittedSkipped = (state.omittedSkipped || 0) + 1;
 }
+function diagnostic(state: CrawlState, task: CrawlTask, reason: string, now: number) {
+  const entries = state.diagnostics ??= [];
+  if (entries.length < 1000) entries.push({ url: task.url, kind: task.kind, reason, attempts: (task.attempts || 0) + 1, at: now });
+}
+function uninspected(task: CrawlTask, reason: string, inspectionStatus: "failed" | "skipped", attempts = (task.attempts || 0) + 1): AuditPage {
+  return { url: task.url, finalUrl: task.url, status: task.lastStatus || 0, language: task.language || "und", indexable: false,
+    inspectionStatus, crawlError: reason, attempts,
+    content: { score: null, findings: [] }, technical: { score: null, findings: [] }, responseMs: 0, bytes: 0 };
+}
 function push(state: CrawlState, task: CrawlTask) {
   const url = normalizeCrawlUrl(task.url, undefined, task.kind === "link" || task.kind === "robots");
   if (!url) { skip(state, task.url, "Unsafe or unsupported URL"); return; }
@@ -89,6 +104,8 @@ function push(state: CrawlState, task: CrawlTask) {
   if (task.kind === "page" || task.kind === "sitemap") {
     if (!state.config.allowedOrigins.includes(new URL(url).origin)) { skip(state, url, "Outside configured domains"); return; }
   }
+  if (task.kind === "link" && !state.config.allowedOrigins.includes(new URL(url).origin) && (IRRELEVANT_EXTERNAL.test(new URL(url).hostname) || /(?:^|\/)(?:share|sharer|intent|login|oauth|authorize)(?:[./]|$)/i.test(new URL(url).pathname))) { skip(state, url, "Irrelevant external social, authentication, sharing or tracking destination"); return; }
+  if (task.kind === "link" && (state.linkChecks[url] || state.queue.some(item => item.kind === "page" && item.url === url))) return;
   if ((task.kind === "page" || task.kind === "link") && isExcludedUrl(url)) { skip(state, url, "Excluded route or static asset"); return; }
   if (task.depth > state.config.maxDepth) { skip(state, url, "Maximum crawl depth reached"); return; }
   const key = keyFor(task);
@@ -98,8 +115,19 @@ function push(state: CrawlState, task: CrawlTask) {
   if (state.queue.length >= 2000) { skip(state, url, "Discovery queue limit reached"); return; }
   state.queue.push(task);
 }
-function pushPages(state: CrawlState, url: string, depth: number, source?: string) {
-  for (const language of state.config.languages) push(state, { kind: "page", url, depth, language, source });
+function pushPages(state: CrawlState, url: string, depth: number, source?: string, sourceLanguage?: string) {
+  if (state.config.languageMode === "url") {
+    const target = new URL(url), explicit = localizedRoute(target.pathname);
+    const language = explicit?.language || (sourceLanguage === "vi" ? "vi" : "en"), knownPublicPath = isPublicPagePath(target.pathname);
+    // Existing Metadata API canonicals omit search/filter/contact UI state.
+    // Consolidate only known app pages, never arbitrary query-driven endpoints.
+    if (knownPublicPath && target.search && !isExcludedUrl(target.href)) {
+      skip(state, target.href, "UI query variant consolidated to the preferred public page; this query URL was not separately fetched.");
+      target.search = "";
+    }
+    if (!explicit && knownPublicPath) target.pathname = localizedPath(target.pathname, language);
+    push(state, { kind: "page", url: target.href, depth, language, source });
+  } else for (const language of state.config.languages) push(state, { kind: "page", url, depth, language, source });
 }
 export function createCrawl(input: CrawlConfig, seeds: string[], now = Date.now()): CrawlState {
   const allowedOrigins = [...new Set(input.allowedOrigins.map(value => normalizeCrawlUrl(value)).filter((value): value is string => !!value).map(value => new URL(value).origin))];
@@ -108,10 +136,11 @@ export function createCrawl(input: CrawlConfig, seeds: string[], now = Date.now(
     allowedOrigins, maxUrls: cap(input.maxUrls, 500, 1, 500), maxDepth: cap(input.maxDepth, 4, 0, 4),
     concurrency: cap(input.concurrency, 2, 1, 2), requestIntervalMs: cap(input.requestIntervalMs, 1000, 1000, 60_000),
     timeoutMs: cap(input.timeoutMs, 10_000, 100, 10_000), maxDurationMs: cap(input.maxDurationMs, 900_000, 1000, 900_000),
+    languageMode: input.languageMode === "url" ? "url" : "cookie",
     scope: input.scope === "page" ? "page" : "site", languages: [...new Set(input.languages?.filter(language => /^[a-z]{2,3}(?:-[a-zA-Z]{2,8})?$/.test(language)) || ["en"])].slice(0,10),
   };
   if (!config.languages.length) config.languages = ["en"];
-  const state: CrawlState = { version: 1, status: "queued", startedAt: now, updatedAt: now, config, queue: [], pages: [], skippedUrls: [], visited: [], canonicalUrls: [], robots: {}, hostNextAt: {}, sitemapUrls: [], linkChecks: {}, requests: 0 };
+  const state: CrawlState = { version: 1, analysisVersion: 2, status: "queued", startedAt: now, updatedAt: now, config, queue: [], pages: [], skippedUrls: [], visited: [], canonicalUrls: [], robots: {}, hostNextAt: {}, sitemapUrls: [], linkChecks: {}, requests: 0 };
   for (const origin of allowedOrigins) push(state, { kind: "robots", url: origin + "/robots.txt", depth: 0 });
   if (config.scope === "site") for (const origin of allowedOrigins) push(state, { kind: "sitemap", url: origin + "/sitemap.xml", depth: 0 });
   for (const seed of seeds) pushPages(state, seed, 0);
@@ -162,13 +191,22 @@ function appendFinding(report: AnalysisReport, finding: Finding) {
   report.score = applicable.length ? Math.round(100 * applicable.filter(item => item.severity === "passed").length / applicable.length) : null;
 }
 class DeferredRequest extends Error {
-  readonly nextAt: number;
-  constructor(nextAt: number) { super("Server requested a later retry"); this.nextAt = nextAt; }
+  readonly nextAt: number; readonly status: number;
+  constructor(nextAt: number, status: number) { super(`HTTP ${status}; server requested a later retry`); this.nextAt = nextAt; this.status = status; }
+}
+function retryable(error: unknown) {
+  const value = error as { name?: string; code?: string; message?: string };
+  return value?.name === "AbortError" || /ECONN|EAI_AGAIN|ENOTFOUND|ETIMEDOUT|EPIPE|UND_ERR|network|fetch failed|socket|DNS|premature|connection (?:closed|reset)/i.test(`${value?.code || ""} ${value?.message || ""}`);
 }
 class CrawlLimit extends Error {}
 class NeedsRobots extends Error {
-  readonly origin: string;
-  constructor(origin: string) { super("Redirect target needs robots.txt verification"); this.origin = origin; }
+  readonly origin: string; readonly url: string; readonly redirects: string[];
+  constructor(origin: string, url: string, redirects: string[]) { super("Redirect target needs robots.txt verification"); this.origin = origin; this.url = url; this.redirects = redirects; }
+}
+function scheduleRobots(state: CrawlState, origin: string, task: CrawlTask) {
+  const index = state.queue.findIndex(item => item.kind === "robots" && new URL(item.url).origin === origin);
+  const robotsTask = index >= 0 ? state.queue.splice(index, 1)[0] : { kind: "robots" as const, url: origin + "/robots.txt", depth: 0 };
+  state.queue.unshift(task); state.queue.unshift(robotsTask);
 }
 function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -187,7 +225,7 @@ function pinnedFetch(url: string, init: RequestInit, addresses: string[]): Promi
       request = transport(url, {
         method: "GET", agent: false, headers: Object.fromEntries(new Headers(init.headers)), signal: init.signal || undefined,
         lookup: (_hostname, options, callback) => {
-          const selected = addresses.map(address => ({ address, family: isIP(address) }));
+          const selected = addresses.map(address => ({ address, family: isIP(address) })).sort((a, b) => a.family - b.family);
           if (options.all) callback(null, selected);
           else callback(null, selected[0].address, selected[0].family);
         },
@@ -230,40 +268,43 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
   if (!["queued", "running"].includes(state.status)) return state;
   const now = options.now || Date.now, sleep = options.sleep || (ms => new Promise(resolve => setTimeout(resolve, ms))), fetcher = options.fetch;
   const resolveHost = options.resolveHost || (async hostname => (await lookup(hostname, { all: true, verbatim: true })).map(item => item.address));
+  const trustedFetch = options.transportMode === "trusted-fetch";
+  if (trustedFetch && !fetcher) throw new Error("Trusted fetch transport must be explicitly supplied by the server runtime.");
+  state.transportMode = trustedFetch ? "trusted-fetch" : "pinned";
   const chunkEnd = now() + cap(options.budgetMs, 12_000, 100, 60_000), auditEnd = state.startedAt + state.config.maxDurationMs;
   state.status = "running";
   const allowed = (url: string) => state.config.allowedOrigins.includes(new URL(url).origin);
   async function request(task: CrawlTask) {
-    let current = task.url;
-    const redirects: string[] = [], started = now(); let throttledMs = 0;
-    for (let hop = 0; hop <= 5; hop++) {
+    let current = task.resumeUrl || task.url;
+    const redirects: string[] = [...(task.redirects || [])], started = now(); let throttledMs = 0;
+    for (let hop = redirects.length; hop <= 5; hop++) {
       const normalized = normalizeCrawlUrl(current, undefined, task.kind === "link" || task.kind === "robots");
       if (!normalized) throw new Error("Unsafe redirect target");
       const url = new URL(normalized);
+      if (trustedFetch && !allowed(normalized)) throw new Error("External destination not inspected: this runtime has no DNS-pinned external transport.");
       if (EXCLUDED.test(decodeURIComponent(url.pathname))) throw new Error("Request reaches an excluded route");
       if (task.kind !== "link" && task.kind !== "robots" && !allowed(normalized)) throw new Error("Redirect leaves configured domains");
       if (task.kind === "robots" && url.origin !== new URL(task.url).origin && !(new URL(task.url).protocol === "http:" && url.protocol === "https:" && url.hostname === new URL(task.url).hostname)) throw new Error("robots.txt redirects outside its origin");
       if ((task.kind === "page" || task.kind === "link") && isExcludedUrl(normalized)) throw new Error("Redirect reaches an excluded route or asset");
-      if (task.kind !== "robots" && !state.robots[url.origin]) throw new NeedsRobots(url.origin);
+      if (task.kind !== "robots" && !state.robots[url.origin]) throw new NeedsRobots(url.origin, normalized, redirects);
       if (task.kind !== "robots" && !robotsAllows(state.robots[url.origin], normalized)) throw new Error("Blocked by robots.txt or robots.txt unavailable");
       const waitMs = Math.max(0, (state.hostNextAt[url.host] || 0) - now());
       if (now() + waitMs + 100 >= Math.min(chunkEnd, auditEnd)) throw new CrawlLimit("Chunk budget exhausted");
       if (waitMs) { const waitStarted = now(); await sleep(waitMs); throttledMs += now() - waitStarted; }
       if (state.requests >= MAX_REQUESTS) throw new CrawlLimit("Maximum request limit reached");
-      const remaining = Math.min(chunkEnd, auditEnd) - now();
-      const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), Math.min(state.config.timeoutMs, remaining));
+      const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), Math.min(state.config.timeoutMs, auditEnd - now()));
       try {
         // Validation fails closed if this deployment cannot resolve DNS. No request is made with an unchecked address.
-        const addresses = isIP(url.hostname.replace(/^\[|\]$/g, "")) ? [url.hostname.replace(/^\[|\]$/g, "")] : await abortable(resolveHost(url.hostname), controller.signal);
-        if (!addresses.length || addresses.some(address => !isPublicAddress(address))) throw new Error("Target resolves to a private or reserved address");
+        const addresses = trustedFetch ? [] : isIP(url.hostname.replace(/^\[|\]$/g, "")) ? [url.hostname.replace(/^\[|\]$/g, "")] : await abortable(resolveHost(url.hostname), controller.signal);
+        if (!trustedFetch && (!addresses.length || addresses.some(address => !isPublicAddress(address)))) throw new Error("Target resolves to a private or reserved address");
         state.hostNextAt[url.host] = now() + Math.max(state.config.requestIntervalMs, state.robots[url.origin]?.delayMs || 0);
         state.requests++;
-        const init: RequestInit = { redirect: "manual", cache: "no-store", credentials: "omit", signal: controller.signal, headers: { "User-Agent": USER_AGENT, "Accept-Encoding": "identity", Accept: task.kind === "sitemap" ? "application/xml,text/xml" : "text/html,text/plain;q=0.9,*/*;q=0.1", ...(task.language && allowed(normalized) ? { "Accept-Language": task.language, Cookie: "gary-language=" + task.language } : {}) } };
+        const init: RequestInit = { redirect: "manual", cache: "no-store", credentials: "omit", signal: controller.signal, headers: { "User-Agent": USER_AGENT, "Accept-Encoding": "identity", Accept: task.kind === "sitemap" ? "application/xml,text/xml" : "text/html,text/plain;q=0.9,*/*;q=0.1", ...(task.language && state.config.languageMode !== "url" && allowed(normalized) ? { "Accept-Language": task.language, Cookie: "gary-language=" + task.language } : {}) } };
         const response = await abortable(fetcher ? fetcher(normalized, init) : pinnedFetch(normalized, init, addresses), controller.signal);
-        if (response.status === 429 || response.status === 503) {
-          const retry = response.headers.get("retry-after"), seconds = retry && /^\d+$/.test(retry) ? Number(retry) * 1000 : retry ? Date.parse(retry) - now() : 30_000;
+        if ([408, 425, 429, 500, 502, 503, 504].includes(response.status)) {
+          const retry = response.headers.get("retry-after"), seconds = retry && /^\d+$/.test(retry) ? Number(retry) * 1000 : retry ? Date.parse(retry) - now() : Math.min(10_000, 1000 * 2 ** (task.attempts || 0));
           const nextAt = now() + Math.max(state.config.requestIntervalMs, Number.isFinite(seconds) ? seconds : 30_000);
-          state.hostNextAt[url.host] = nextAt; await response.body?.cancel(); throw new DeferredRequest(nextAt);
+          state.hostNextAt[url.host] = nextAt; await response.body?.cancel(); throw new DeferredRequest(nextAt, response.status);
         }
         if ([301, 302, 303, 307, 308].includes(response.status)) {
           const location = response.headers.get("location"); await response.body?.cancel();
@@ -284,8 +325,9 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
     if (index < 0) break;
     const [task] = state.queue.splice(index, 1), key = keyFor(task), origin = new URL(task.url).origin;
     if (state.visited.includes(key)) continue;
+    if (trustedFetch && !allowed(task.url)) { skip(state, task.url, "External destination not inspected: this runtime has no DNS-pinned external transport."); state.visited.push(key); continue; }
     if (task.kind !== "robots" && !state.robots[origin]) {
-      state.queue.unshift(task); state.queue.unshift({ kind: "robots", url: origin + "/robots.txt", depth: 0 }); continue;
+      scheduleRobots(state, origin, task); continue;
     }
     if (task.kind === "page") {
       const uniqueUrls = new Set(state.pages.map(page => page.url));
@@ -293,15 +335,10 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
       if (state.canonicalUrls.includes(`${task.language}:${task.url}`)) { skip(state, task.url, "Canonical URL already inspected for this language"); state.visited.push(key); continue; }
     }
     if (task.kind !== "robots" && !robotsAllows(state.robots[origin], task.url)) {
-      const record = state.robots[origin], reason = record?.error || "Blocked by robots.txt";
+      const reason = state.robots[origin]?.error || "Blocked by robots.txt";
       skip(state, task.url, reason); state.visited.push(key);
-      if (task.kind === "page") {
-        const unavailable = !record?.fetched || /unavailable|HTTP (?:5\d\d|429)/i.test(reason);
-        const finding = unavailable
-          ? reportFinding("robots-unverified", "Page was not fetched because robots.txt was unavailable", reason, "Restore robots.txt availability, then rescan. Indexability and page metadata remain unverified.")
-          : reportFinding("robots-blocked", "Public page is blocked by robots.txt", "The applicable robots.txt rules prevent this audit crawler from fetching the published URL. Page metadata and actual search indexability were not inspected.", "Review whether this public URL should be crawlable. Adjust robots.txt only if the restriction is unintended, then rescan.", "critical");
-        state.pages.push({ url: task.url, finalUrl: task.url, status: 0, language: task.language || "und", indexable: false, content: { score: null, findings: [] }, technical: { score: 0, findings: [finding] }, responseMs: 0, bytes: 0 });
-      }
+      diagnostic(state, task, reason, now());
+      if (task.kind === "page") state.pages.push(uninspected(task, reason, state.robots[origin]?.error ? "failed" : "skipped", 0));
       continue;
     }
     try {
@@ -328,23 +365,29 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
         const isHtml = !type || /text\/html|application\/xhtml\+xml/i.test(type);
         // Keep the HTTP result even if an error page is plain text; referring pages still need its status.
         state.linkChecks[task.url] = { status: result.response.status, finalUrl: result.finalUrl };
-        const document = parseHtml(isHtml ? result.text : "", result.finalUrl), canonical = document.canonical[0] ? normalizeCrawlUrl(document.canonical[0], result.finalUrl) : undefined;
-        const technical = analyzeTechnical({ document, status: result.response.status, finalUrl: result.finalUrl, redirects: result.redirects, responseMs: result.responseMs, bytes: result.bytes, xRobotsTag: result.response.headers.get("x-robots-tag") || undefined, robotsAllowed: true });
-        const page: AuditPage = { url: task.url, finalUrl: result.finalUrl, status: result.response.status, language: task.language || document.language || document.htmlLanguage || "und", indexable: isHtml && result.response.ok && !hasNoindex(document.robots, result.response.headers.get("x-robots-tag") || undefined), ...(canonical ? { canonical } : {}), title: document.title, description: document.description, hreflang: document.hreflang, content: isHtml ? analyzeContent(document) : { score: null, findings: [] }, technical, responseMs: result.responseMs, bytes: result.bytes };
-        if (!isHtml) appendFinding(technical, reportFinding("response-content-type", "Public page did not return HTML", `HTTP ${result.response.status}; Content-Type: ${type}`, "Check the destination and content negotiation for this published page."));
-        if (task.language && document.htmlLanguage && document.htmlLanguage.split("-")[0] !== task.language.split("-")[0]) appendFinding(technical, reportFinding("language-response", "Published language differs from the requested variant", `Requested ${task.language}; server-rendered HTML declares ${document.htmlLanguage}.`, "Check the language cookie, localized routing, and server-rendered lang attribute."));
+        if ([401, 403].includes(result.response.status)) {
+          state.pages.push(uninspected({ ...task, lastStatus: result.response.status }, `HTTP ${result.response.status}; page access was denied to the audit request.`, "failed"));
+          continue;
+        }
+        const document = parseHtml(isHtml && result.response.ok ? result.text : "", result.finalUrl), canonical = document.canonical[0] ? normalizeCrawlUrl(document.canonical[0], result.finalUrl) : undefined;
+        const technical: AnalysisReport = isHtml && result.response.ok
+          ? analyzeTechnical({ document, status: result.response.status, finalUrl: result.finalUrl, redirects: result.redirects, responseMs: result.responseMs, bytes: result.bytes, xRobotsTag: result.response.headers.get("x-robots-tag") || undefined, robotsAllowed: true })
+          : { score: result.response.ok ? null : 0, findings: result.response.ok ? [] : [reportFinding("technical-http", "Published URL returned an HTTP error", `The audit received HTTP ${result.response.status} from ${result.finalUrl}. The error response body is not evaluated as the intended page content.`, "Restore the page or update its published links and sitemap entry.", "critical")] };
+        const page: AuditPage = { inspectionStatus: "inspected", attempts: (task.attempts || 0) + 1, url: task.url, finalUrl: result.finalUrl, status: result.response.status, language: task.language || document.language || document.htmlLanguage || "und", indexable: isHtml && result.response.ok && !hasNoindex(document.robots, result.response.headers.get("x-robots-tag") || undefined), ...(canonical ? { canonical } : {}), title: document.title, description: document.description, hreflang: document.hreflang, content: isHtml && result.response.ok ? analyzeContent(document) : { score: null, findings: [] }, technical, responseMs: result.responseMs, bytes: result.bytes };
+        if (!isHtml && result.response.ok) appendFinding(technical, reportFinding("response-content-type", "Public page did not return HTML", `HTTP ${result.response.status}; Content-Type: ${type}`, "Check the destination and content negotiation for this published page."));
+        if (result.response.ok && task.language && document.htmlLanguage && document.htmlLanguage.split("-")[0] !== task.language.split("-")[0]) appendFinding(technical, reportFinding("language-response", "Published language differs from the requested variant", `Requested ${task.language}; server-rendered HTML declares ${document.htmlLanguage}.`, "Check the language cookie, localized routing, and server-rendered lang attribute."));
         state.pages.push(page);
         // A canonical declaration is a hint, not proof that its target was fetched.
         // Mark only the actual response URL inspected, preserving queued canonical-target verification.
         if (allowed(result.finalUrl)) state.canonicalUrls.push(`${task.language}:${result.finalUrl}`);
         state.linkChecks[task.url] = { status: result.response.status, finalUrl: result.finalUrl };
         if (state.config.scope === "site") {
-          if (canonical && allowed(canonical) && canonical !== task.url) pushPages(state, canonical, task.depth + 1, task.url);
-          for (const alternate of document.hreflang) { const url = normalizeCrawlUrl(alternate.href, result.finalUrl); if (url && allowed(url)) pushPages(state, url, task.depth + 1, task.url); }
+          if (canonical && allowed(canonical) && canonical !== task.url) pushPages(state, canonical, task.depth + 1, task.url, task.language);
+          for (const alternate of document.hreflang) { const url = normalizeCrawlUrl(alternate.href, result.finalUrl); if (url && allowed(url)) pushPages(state, url, task.depth + 1, task.url, task.language); }
         }
         for (const link of document.links) {
           const url = normalizeCrawlUrl(link.href, result.finalUrl, true); if (!url || url === result.finalUrl) continue;
-          if (allowed(url) && state.config.scope === "site") pushPages(state, url, task.depth + 1, task.url);
+          if (allowed(url) && state.config.scope === "site") pushPages(state, url, task.depth + 1, task.url, task.language);
           else push(state, { kind: "link", url, depth: 0, source: task.url });
         }
         // Save only relevant link URLs for post-crawl status reconciliation, never full HTML.
@@ -352,28 +395,33 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
       }
     } catch (error) {
       if (error instanceof CrawlLimit) { state.queue.unshift(task); break; }
-      if (error instanceof NeedsRobots) { state.queue.unshift(task); state.queue.unshift({ kind: "robots", url: error.origin + "/robots.txt", depth: 0 }); continue; }
-      if (error instanceof DeferredRequest && (task.attempts || 0) < 2 && error.nextAt < auditEnd) { state.queue.push({ ...task, attempts: (task.attempts || 0) + 1 }); continue; }
-      const reason = error instanceof DeferredRequest ? "Server rate limit persists; retry later" : error instanceof Error && error.name === "AbortError" ? "Request timed out" : error instanceof Error ? error.message : "Request failed";
-      state.visited.push(key); skip(state, task.url, reason);
-      if (task.kind === "robots") state.robots[origin] = { fetched: true, allowed: false, rules: [], delayMs: 0, error: "robots.txt unavailable; crawling paused for this origin" };
-      if (task.kind === "page") {
-        const empty = parseHtml("", task.url), technical = analyzeTechnical({ document: empty, status: 0, finalUrl: task.url });
-        appendFinding(technical, reportFinding("fetch-failed", "Page could not be inspected", reason, "Check availability and crawl permissions, then rescan this page.", "critical"));
-        state.pages.push({ url: task.url, finalUrl: task.url, status: 0, language: task.language || "und", indexable: false, content: { score: null, findings: [] }, technical, responseMs: 0, bytes: 0 });
+      if (error instanceof NeedsRobots) { scheduleRobots(state, error.origin, { ...task, resumeUrl: error.url, redirects: error.redirects }); continue; }
+      const reason = error instanceof Error && error.name === "AbortError" ? "Request timed out" : error instanceof Error ? error.message : "Request failed";
+      diagnostic(state, task, reason, now());
+      // A deadline ends this batch or run; it is not evidence of an SEO defect.
+      if (now() >= auditEnd) { state.queue.unshift(task); break; }
+      if ((error instanceof DeferredRequest || retryable(error)) && (task.attempts || 0) + 1 < MAX_ATTEMPTS) {
+        const nextAt = error instanceof DeferredRequest ? error.nextAt : now() + Math.min(10_000, 1000 * 2 ** (task.attempts || 0));
+        state.hostNextAt[new URL(task.url).host] = Math.max(state.hostNextAt[new URL(task.url).host] || 0, nextAt);
+        state.queue.push({ ...task, attempts: (task.attempts || 0) + 1, ...(error instanceof DeferredRequest ? { lastStatus: error.status } : {}) });
+        continue;
       }
+      state.visited.push(key); skip(state, task.url, reason);
+      if (task.kind === "robots") state.robots[origin] = { fetched: true, allowed: false, rules: [], delayMs: 0, error: `robots.txt unavailable after ${(task.attempts || 0) + 1} attempt(s): ${reason}` };
+      if (task.kind === "page") state.pages.push(uninspected({ ...task, ...(error instanceof DeferredRequest ? { lastStatus: error.status } : {}) }, reason, "failed"));
     }
   }
   state.updatedAt = now();
   if (now() >= auditEnd || state.requests >= MAX_REQUESTS) {
-    for (const task of state.queue) skip(state, task.url, now() >= auditEnd ? "Maximum audit duration reached" : "Maximum request limit reached");
-    state.queue = []; state.status = "incomplete"; state.finishedAt = now();
+    state.stopReason = now() >= auditEnd ? "Maximum audit duration reached; pending tasks were retained." : "Maximum request limit reached; pending tasks were retained.";
+    state.status = "incomplete"; state.finishedAt = now();
   } else if (!state.queue.length) {
-    const limitation = state.skippedUrls.some(item => /limit|timed out|unavailable|Maximum|Response exceeds|Request failed|DNS|private or reserved|Redirect|Sitemap (?:is not|returned)|robots\.txt returned HTTP (?:5\d\d|429)|rate limit/i.test(item.reason));
+    const limitation = state.pages.some(page => page.inspectionStatus === "failed") || state.skippedUrls.some(item => /limit|timed out|unavailable|Maximum|Response exceeds|Request failed|DNS|private or reserved|Redirect|Sitemap (?:is not|returned)|robots\.txt returned HTTP (?:5\d\d|429)|rate limit/i.test(item.reason));
     state.status = limitation ? "incomplete" : "completed"; state.finishedAt = now();
   }
   // Reconcile after each chunk so partial reports improve as link targets are fetched.
   for (const page of state.pages) {
+    if (page.inspectionStatus !== "inspected" && (page.inspectionStatus || !page.status)) continue;
     const links = page.links || [];
     const broken = links.filter(url => (state.linkChecks[url]?.status || 0) >= 400);
     if (broken.length) appendFinding(page.technical, reportFinding("broken-links", "Broken links found", broken.slice(0, 10).map(url => `${url} (HTTP ${state.linkChecks[url].status})`).join("; "), "Update or remove these destinations and rescan the referring page."));
@@ -386,13 +434,13 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
       if (unchecked.length) appendFinding(page.technical, reportFinding("link-coverage", "Some link destinations were not verified", `${links.length - unchecked.length} of ${links.length} extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.`, "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.", "recommendation"));
       if (page.canonical && page.canonical !== page.finalUrl) {
         const target = state.pages.find(item => item.language === page.language && (item.url === page.canonical || item.finalUrl === page.canonical));
-        if (!target) appendFinding(page.technical, reportFinding("canonical-target-unverified", "Canonical destination was not verified", page.canonical, "Verify this URL returns indexable HTML and has a consistent canonical. Add its origin to the trusted configuration if appropriate.", "recommendation"));
+        if (!target || target.inspectionStatus === "failed" || target.inspectionStatus === "skipped" || !target.status) appendFinding(page.technical, reportFinding("canonical-target-unverified", "Canonical destination was not verified", page.canonical, "Verify this URL returns indexable HTML and has a consistent canonical. Add its origin to the trusted configuration if appropriate.", "recommendation"));
         else if (!target.indexable) appendFinding(page.technical, reportFinding("canonical-target-indexing", "Canonical points to a non-indexable destination", `${page.canonical} returned ${target.status} and was not indexable in this scan.`, "Choose an indexable canonical destination or fix its status and indexing restrictions.", "critical"));
       }
       for (const alternate of page.hreflang || []) {
         const url = normalizeCrawlUrl(alternate.href, page.finalUrl); if (!url) continue;
         const target = state.pages.find(item => (item.url === url || item.finalUrl === url) && (alternate.language === "x-default" || item.language.split("-")[0] === alternate.language.split("-")[0]));
-        if (!target) appendFinding(page.technical, reportFinding(`hreflang-unverified-${alternate.language}`, "Language alternate targets were not fully verified", url, "Verify the target is indexable and links back to this page using hreflang.", "recommendation"));
+        if (!target || target.inspectionStatus === "failed" || target.inspectionStatus === "skipped" || !target.status) appendFinding(page.technical, reportFinding(`hreflang-unverified-${alternate.language}`, "Language alternate targets were not fully verified", url, "Verify the target is indexable and links back to this page using hreflang.", "recommendation"));
         else if (!target.indexable || !(target.hreflang || []).some(item => normalizeCrawlUrl(item.href, target.finalUrl) === page.finalUrl)) appendFinding(page.technical, reportFinding(`hreflang-reciprocal-${alternate.language}`, "Language alternate needs review", `${url} is non-indexable or has no return hreflang reference to ${page.finalUrl}.`, "Use reciprocal hreflang links between indexable localized pages."));
       }
     }

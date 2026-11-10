@@ -8,6 +8,7 @@ import { LatticeLoader } from "./react-bits/lattice-loader";
 import { emailLinkIssue, emailTokenLink, passwordLinkEvidence, type PasswordLink, type EmailLinkIssue, type EmailTokenLink } from "@/lib/password-actions";
 import type { Content, Enquiry, ExchangeRate, Language, PriceCurrency } from "@/lib/types";
 import { languageValue, persistLanguage } from "@/lib/language";
+import { localizedPath, localizedRoute } from "@/lib/localized-routes";
 import { CURRENCY_COOKIE, currencyValue, persistCurrency, usableExchangeRate } from "@/lib/currency";
 import { studioText } from "@/lib/studio-i18n";
 import { browserClient, publicBrowserClient } from "@/lib/browser-client";
@@ -25,7 +26,7 @@ import type { StaffRole,StaffProfile } from "@/lib/staff";
 
 type Update<T> = T | ((previous: T) => T);
 type SiteContext = {
-  publicOrigin: string;
+  publicOrigin: string; publicPath?: string;
   content: Content; setContent: (content: Update<Content>) => void;
   language: Language; setLanguage: (l: Language) => void; t: (en: string, vi: string) => string;
   currency: PriceCurrency; setCurrency: (currency: PriceCurrency) => void; exchangeRate: ExchangeRate | null;
@@ -47,7 +48,7 @@ type SiteContext = {
   notice: (message: string) => void;
 };
 const Context = createContext<SiteContext | null>(null);
-export function SiteProvider({ children, initial, initialLanguage = "en", initialCurrency = "USD" }: { children: ReactNode; initialLanguage?: Language; initialCurrency?: PriceCurrency; initial: { content: Content; configured: boolean; error: boolean; exchangeRate?: ExchangeRate | null; publicOrigin?: string } }) {
+export function SiteProvider({ children, initial, initialLanguage = "en", initialCurrency = "USD" }: { children: ReactNode; initialLanguage?: Language; initialCurrency?: PriceCurrency; initial: { content: Content; configured: boolean; error: boolean; exchangeRate?: ExchangeRate | null; publicOrigin?: string; publicPath?: string } }) {
   const router=useRouter(),routerRef=useRef(router);
   useEffect(()=>{routerRef.current=router;},[router]);
   const [passwordLink,setPasswordLink]=useState<PasswordLink|null>(null);
@@ -90,7 +91,9 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   }, [initial.exchangeRate]);
   useLayoutEffect(() => {
     let selected=initialLanguage;
-    try{const stored=localStorage.getItem("gary-language");if(stored==="en"||stored==="vi")selected=stored;}catch{/* Optional storage. */}
+    const explicit=localizedRoute(window.location.pathname)?.language;
+    try{const stored=localStorage.getItem("gary-language");if(!explicit&&(stored==="en"||stored==="vi"))selected=stored;}catch{/* Optional storage. */}
+    if(explicit)selected=explicit;
     // Legacy browser-only preferences must settle before paint during hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     updateLanguage(selected);persistLanguage(selected);
@@ -399,7 +402,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   }, [client, user?.id, sessionPhase]);
 
   useEffect(() => {
-    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") {const selected=languageValue(event.newValue);updateLanguage(selected);persistLanguage(selected);} if(event.key===CURRENCY_COOKIE){const selected=currencyValue(event.newValue);updateCurrency(selected);persistCurrency(selected);} };
+    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") {const selected=localizedRoute(window.location.pathname)?.language||languageValue(event.newValue);updateLanguage(selected);persistLanguage(selected);} if(event.key===CURRENCY_COOKIE){const selected=currencyValue(event.newValue);updateCurrency(selected);persistCurrency(selected);} };
     window.addEventListener("storage", syncLanguage); return () => window.removeEventListener("storage", syncLanguage);
   }, []);
   useLayoutEffect(() => { document.documentElement.lang = language; }, [language]);
@@ -496,7 +499,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
 
   const sessionLoading = sessionPhase === "checking" || sessionPhase === "recovering";
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://garyhome.vn", content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://garyhome.vn", publicPath: initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(localizedRoute(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+window.location.search+window.location.hash,l)); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
     {initial.configured && ["checking", "offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status" aria-busy={sessionLoading}>{sessionLoading ? <LatticeLoader label={studioText(sessionMessage, language)} announce={false}/> : studioText(sessionMessage, language)}{!sessionLoading && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}

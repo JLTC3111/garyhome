@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "./localized-link";
 import { useState } from "react";
 import { PublishedFeedback } from "./published-feedback";
 import { useSite } from "./site-context";

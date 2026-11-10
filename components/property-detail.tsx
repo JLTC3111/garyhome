@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "./localized-link";
 import { ArrowUpRight, Check, Heart, Mail, MapPin, Send, Share2, Phone } from "lucide-react";
 import { useSite } from "./site-context";
 import { usePublishedProperty } from "./use-published-property";

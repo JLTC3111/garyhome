@@ -2,8 +2,10 @@ import { loadContent, staffAdminClient } from "../server";
 import { requireAvailableContent } from "../content-unavailable";
 import { auditEnvironment, auditSeeds } from "./config";
 import { advanceCrawl, createCrawl, isExcludedUrl, normalizeCrawlUrl } from "./crawler";
+import { auditNetworkOptions } from "../seo-audit-runtime";
+import { normalizeAuditState } from "./normalize";
 import { compareAuditMetadata } from "./compare";
-import { claimAudit, createAudit, getAuditSettings, saveAudit } from "./store";
+import { claimAudit, createAudit, getAuditSettings, saveAudit, resumeAuditRecord } from "./store";
 
 export function auditDatabase() {
   const db = staffAdminClient();
@@ -25,29 +27,63 @@ export async function startAudit(trigger: "manual" | "weekly" | "page", actorId?
     seeds = auditSeeds(base, content);
   }
   const scope = targetUrl ? "page" : "site";
-  const state = createCrawl({ ...settings.limits, allowedOrigins, scope, languages: ["en", "vi"] }, seeds);
+  const state = createCrawl({ ...settings.limits, allowedOrigins, scope, languages: ["en", "vi"], languageMode: "url" }, seeds);
   return createAudit(db, state, { trigger, scope, targetUrl, actorId });
+}
+
+export async function resumeAudit(runId:string) {
+  const db=auditDatabase();
+  const loaded=await db.from("seo_audit_runs").select("state,status").eq("id",runId).single();
+  if(loaded.error||!loaded.data)throw new Error("The saved audit could not be loaded.");
+  if(!["failed","incomplete"].includes(loaded.data.status))throw new Error("Only interrupted audits can be resumed.");
+  const state=normalizeAuditState(loaded.data.state);
+  const {allowedOrigins}=auditEnvironment();
+  if(state.config.allowedOrigins.some(origin=>!allowedOrigins.includes(origin)))throw new Error("Audit domains changed. Start a fresh scan with the current configuration.");
+  const legacy=state.analysisVersion!==2;
+  state.originalStartedAt ||= state.startedAt;
+  state.resumeHistory ||= [];
+  state.resumeHistory.push({startedAt:state.startedAt,finishedAt:state.finishedAt,reason:(legacy?"Legacy parser: re-evaluate recorded pages. ":"")+(state.stopReason||state.error||state.status)});
+  // Retry failed public page inspections as part of this explicit execution
+  // segment; successful observations are retained and never silently replayed.
+  for(const page of state.pages.filter(page=>legacy||page.inspectionStatus!=="inspected")) {
+    if(!state.queue.some(task=>task.kind==="page"&&task.url===page.url&&task.language===page.language))state.queue.push({kind:"page",url:page.url,language:page.language,depth:0});
+    state.visited=state.visited.filter(key=>key!==`page:${page.language}:${page.url}`);
+  }
+  state.pages=legacy?[]:state.pages.filter(page=>page.inspectionStatus==="inspected");
+  if(legacy){state.canonicalUrls=[];state.linkChecks={};state.visited=state.visited.filter(key=>!key.startsWith("page:"));}
+  for(const task of state.queue) task.attempts=0;
+  state.robots={};state.visited=state.visited.filter(key=>!key.startsWith("robots:"));
+  state.startedAt=Date.now();state.updatedAt=state.startedAt;delete state.finishedAt;delete state.stopReason;delete state.error;
+  state.status="queued";state.analysisVersion=2;
+  return resumeAuditRecord(db,runId,state);
 }
 
 export async function advanceAudit(runId?: string) {
   const db = auditDatabase(), lease = await claimAudit(db, runId);
   if (!lease) return;
-  const state = lease.run.state;
+  const state = normalizeAuditState(lease.run.state);
+  let next=state;
   try {
-    // Re-check configuration after resuming a persisted job. A removed domain
-    // must not remain authorized by an older crawl state.
     const { allowedOrigins } = auditEnvironment();
-    if (state.config.allowedOrigins.some(origin => !allowedOrigins.includes(origin))) throw new Error("Audit domains changed; start a new scan.");
-    const next = compareAuditMetadata(await advanceCrawl(state, { budgetMs: 12000 }));
-    if (!await saveAudit(db, lease.run.id, lease.leaseToken, next)) throw new Error("Audit progress changed elsewhere. Refresh to load the latest result.");
+    if (state.config.allowedOrigins.some(origin => !allowedOrigins.includes(origin))) {
+      state.status="incomplete";state.stopReason="Configured domains changed. Start a fresh scan.";state.finishedAt=Date.now();
+    } else next=compareAuditMetadata(await advanceCrawl(state,{budgetMs:12000,...auditNetworkOptions()}));
   } catch (error) {
-    // Persist interruption, including the remaining queue, rather than silently
-    // presenting a partial report as a successful scan.
-    state.status = "failed";
-    state.finishedAt = Date.now();
-    state.updatedAt = Date.now();
-    state.skippedUrls.push({ url: lease.run.target_url || state.config.allowedOrigins[0], reason: "Audit interrupted. Start a new scan after checking configuration and connectivity." });
-    await saveAudit(db, lease.run.id, lease.leaseToken, state);
+    const type=error instanceof Error?error.name:"UnknownError";
+    console.warn("[SEO audit] worker interrupted",{runId:lease.run.id,type});
+    state.diagnostics ||= [];
+    state.diagnostics.push({url:state.config.allowedOrigins[0],kind:"worker",reason:`Worker ${type}; queue preserved for resume.`,attempts:1,at:Date.now()});
+    // Unexpected worker errors are operational interruptions, never SEO defects.
+    // Keep the queue and durable observations available for an explicit resume.
+    state.status="incomplete";state.finishedAt=Date.now();state.updatedAt=Date.now();
+    state.stopReason="Worker interrupted before its configured crawl deadline. Resume the saved queue; inspect server logs if this repeats.";
+  }
+  // Do not catch a failed checkpoint and overwrite it with a terminal failure.
+  // A lost response or expired lease may follow a successful database commit.
+  try {
+    if(!await saveAudit(db,lease.run.id,lease.leaseToken,next))throw new Error("Audit checkpoint was not confirmed. Refresh to recover the saved run; an active lease expires after 60 seconds.");
+  } catch(error) {
+    console.warn("[SEO audit] checkpoint unconfirmed",{runId:lease.run.id,type:error instanceof Error?error.name:"UnknownError"});
     throw error;
   }
 }

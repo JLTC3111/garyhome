@@ -1,8 +1,9 @@
 "use client";
 import { ContentImage } from "./content-image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "./localized-link";
 import { usePathname } from "next/navigation";
+import { unlocalizedPath } from "@/lib/localized-routes";
 import { ArrowUpRight, ChevronDown, Menu, X, Phone, MapPin, UserRound, ShieldCheck } from "lucide-react";
 import { useSite } from "./site-context";
 import { CurrencyNotice } from "./currency-switcher";
@@ -18,7 +19,7 @@ function HeaderPortals({mobile=false,onFollow}:{mobile?:boolean;onFollow:()=>voi
  return <><Link className={`customer-login-link ${mobile?"":"desktop-band-control"}`} href="/account" onClick={onFollow} aria-label={t("Customer Login","Đăng nhập khách hàng")}><UserRound size={mobile?18:14}/><span>{t("Customer Login","Đăng nhập khách hàng")}</span></Link><Link className={`staff-login-link ${mobile?"":"desktop-band-control"}`} href="/admin" onClick={onFollow} aria-label={t("Staff Login","Đăng nhập nhân viên")}><ShieldCheck size={mobile?18:14}/><span>{t("Staff Login","Đăng nhập nhân viên")}</span></Link></>;
 }
 export function Header(){
- const {t,content}=useSite(),path=usePathname();
+ const {t,content}=useSite(),path=unlocalizedPath(usePathname());
  const [open,setOpen]=useState(false),[dropdown,setDropdown]=useState<"districts"|"about"|null>(null);
  const header=useRef<HTMLElement>(null),menu=useRef<HTMLButtonElement>(null),districtTrigger=useRef<HTMLButtonElement>(null),aboutTrigger=useRef<HTMLButtonElement>(null),aboutMenu=useRef<HTMLDivElement>(null);
  const close=()=>{setOpen(false);setDropdown(null);};
@@ -51,7 +52,7 @@ function FooterAccordion({title,children}:{title:string;children:ReactNode}){
  return <details className="footer-accordion" name="gary-footer-menus"><summary><h3>{title}</h3><ChevronDown size={18} aria-hidden="true"/></summary><div className="footer-accordion-links">{children}</div></details>;
 }
 export function Footer(){
- const {t,content}=useSite(),path=usePathname();
+ const {t,content}=useSite(),path=unlocalizedPath(usePathname());
  if(path.startsWith("/admin"))return null;
  const s=content.settings;
  const rentals:FooterItem[]=[

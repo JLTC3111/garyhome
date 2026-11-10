@@ -1,0 +1,38 @@
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ dashboard keeps critical technical findings visible on content tab and separates noindex from failed responses (180.511375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a delayed response from a previous staff account cannot reveal its report after an account change (43.186791ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ active audit polling advances the persisted run, then stops after completion (42.538ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ uninspected pages remain neutral and unscored, with distinct failed skipped and pending outcomes (36.581333ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ legacy history scores are withheld until rescanned and print report failures are actionable (31.40725ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ interrupted audits expose explicit resume without discarding the selected run or original start (42.724375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ only safe advance requests retry transient failures with backoff and stop after three retries (63.128667ms)
+✔ authorization failures pause safe advancement without retrying a revoked account (41.133917ms)
+(node:38108) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[SEO audit] checkpoint unconfirmed { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+[SEO audit] checkpoint unconfirmed { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+[SEO audit] worker interrupted { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+✔ a checkpoint response failure at 191 seconds never overwrites the resumable run as failed (56.296125ms)
+✔ an expired lease or unconfirmed compare-and-swap checkpoint does not manufacture a failed run (31.852292ms)
+✔ an unexpected worker interruption preserves observations and pending queue with an actionable incomplete state (9.228792ms)
+✔ changed trusted domains stop advancement without issuing network work or discarding the queue (8.736292ms)
+✔ explicit resume starts a new bounded segment while preserving original time and successful evidence (9.212125ms)
+✔ resume rejects changed domains, active/completed runs and missing records before persisting work (37.081125ms)
+✔ legacy normalization removes fabricated uninspected scores and preserves genuine observed defects (0.462083ms)
+✔ stored summaries weight evaluated checks and omit failed inspections rather than averaging fabricated page scores (11.647542ms)
+✔ resuming legacy parser evidence re-evaluates successful pages before assigning the new score basis (7.609667ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 793.128125

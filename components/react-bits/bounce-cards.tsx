@@ -4,7 +4,7 @@
 // The original spring/picking model is retained in lib/bounce-cards.ts.
 // See THIRD_PARTY_NOTICES.md.
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "../localized-link";
 import { bounceSlots, createBounceAnimator, pickBounceCard } from "@/lib/bounce-cards";
 import { useMotionPreference } from "../use-motion-preference";
 

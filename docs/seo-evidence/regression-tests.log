@@ -1,0 +1,1074 @@
+
+> gary-home@0.1.0 test
+> node --test tests/*.test.mjs
+
+(node:38710) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ all twelve area choices are reachable in groups of four, with real counts and a separate Vinhomes collection (1.08575ms)
+✔ area enquiry context validates CMS areas and translates without accepting arbitrary query text (0.092792ms)
+✔ all new photographs have high-resolution originals, smaller previews and reusable source attribution (86.456542ms)
+✔ area migration can be reapplied and preserves previously edited CMS content (3368.188375ms)
+▶ audited staff and enquiry boundaries hold through direct SQL and RPC calls
+  ✔ unconfirmed existing credentials cannot acquire staff access by direct assignment (13.165375ms)
+  ✔ a manager can revoke stale lower-level email grants without authorizing restoration or protected accounts (34.95675ms)
+  ✔ trusted parent deletions clear references while customer updates remain cancellation-only (22.889375ms)
+  ✔ direct attribution writes enforce active peer/lower choices and retain existing higher credit only (58.7125ms)
+✔ audited staff and enquiry boundaries hold through direct SQL and RPC calls (4073.522166ms)
+✔ Gary Home invitation and recovery messages provide one safe, bilingual password action (8.056292ms)
+(node:38713) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the original fan spacing and picking stay stable while neighbours move (0.93875ms)
+✔ landscape district picking respects photo height and spaced hover never moves neighbouring cards over their labels (3.919417ms)
+✔ hover uses the full push distance, rapid changes settle and no idle frames remain (3.005791ms)
+✔ intro timing is staggered and low-frame-rate recovery cannot leave springs running (1.449625ms)
+✔ hidden tabs, resize and teardown cancel the active animation and late callbacks (0.846084ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the squish language switch changes language immediately, supports arrow keys and preserves an unsaved draft (201.08325ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ district cards render native links without a motion-provider dependency and clean up their observers (414.131625ms)
+✔ Vinhomes keeps the supplied homes and local photos with no invented missing specifications (8.310292ms)
+✔ expanded district gallery pages four cards, preserves its page on translation and clamps after CMS removal (901.140375ms)
+✔ public raster images render real responsive optimizer URLs and retain image semantics (9.974208ms)
+✔ remote CMS URLs, SVGs, GIFs and API paths remain native and never enter the image optimizer (2.598541ms)
+▶ customer portal permissions in real Postgres
+  ✔ the customer migration resolves every diagnostic item (36.128042ms)
+  ✔ customers can edit only their own profile and cannot promote themselves (8.636958ms)
+  ✔ saved homes are isolated across customers and staff (4.945625ms)
+  ✔ authenticated enquiries acquire server-owned identity; matching guest email grants no history (37.02425ms)
+  ✔ legacy and new internal notes remain inaccessible to every customer (24.011042ms)
+  ✔ only staff can confirm an appointment and publish a customer update (45.941916ms)
+  ✔ customers can cancel their own viewing once, without rewriting staff workflow (3.597583ms)
+  ✔ CRM notes, stages and follow-ups are visible and writable only by staff (17.322125ms)
+  ✔ the staff save RPC is atomic and preserves RLS (27.87725ms)
+  ✔ anonymous users cannot read customer data, and new tables all enable RLS (3.159625ms)
+✔ customer portal permissions in real Postgres (3953.218ms)
+(node:38717) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ both submission endpoints strip forged identity and workflow fields (587.784375ms)
+✔ submission validation rejects absent consent, invalid dates, unknown channels and honeypot content (35.207709ms)
+✔ bearer sessions are verified and invalid sessions do not become guest submissions (200.573542ms)
+✔ cross-origin, malformed credentials and oversized submissions are rejected (140.462416ms)
+✔ abuse limits use the platform-owned visitor header independently for each submission type (250.14725ms)
+✔ durable feedback and assistance quota exhaustion returns 429 on a fresh application instance (203.420416ms)
+✔ trusted intake configuration and database failures keep customer submissions unconfirmed (239.003084ms)
+▶ feedback moderation and private assistance attribution enforce consent and assigned roles in Postgres
+  ✔ guests submit without gaining access to private records or choosing workflow fields (26.359833ms)
+  ✔ customers see their own submissions and cannot publish, verify or read internal notes (72.269791ms)
+  ✔ only consented original review fields can be published, with no email or ownership leak (9.991042ms)
+  ✔ owner, admin and manager verify credit; all other identities are denied (61.554708ms)
+  ✔ private property IDs and future assistance dates cannot be submitted (4.100375ms)
+  ✔ withdrawing owned feedback also removes its public copy (39.146084ms)
+✔ feedback moderation and private assistance attribution enforce consent and assigned roles in Postgres (4320.963916ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ back navigation uses browser history and a safe direct-entry fallback with translated labels (754.276875ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ feedback retains its selected rating through language changes and sends an authenticated private submission (1464.452208ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ assistance records the linked property and who, where and when without creating a viewing request (122.680625ms)
+✔ an ambiguous timeout leaves the form available and never automatically replays a submission (88.586375ms)
+▶ CMS schema and row-level permissions in an isolated Postgres engine
+  ✔ anonymous readers see published listings only (5.02425ms)
+  ✔ a signed-in visitor cannot edit listings or self-promote (3.849125ms)
+  ✔ anonymous enquiry submission cannot read the inbox or forge workflow fields (3.192667ms)
+  ✔ ordinary authenticated users cannot see private enquiries (1.560792ms)
+  ✔ team editors can read drafts, publish listings, and manage the inbox (3.202125ms)
+  ✔ storage writes require membership and the correct bucket (5.363709ms)
+  ✔ every application table has RLS enabled (3.050542ms)
+  ✔ the source listings and neighbourhoods can be seeded without overwriting CMS edits (50.096541ms)
+✔ CMS schema and row-level permissions in an isolated Postgres engine (2913.586125ms)
+✔ every locked package has a version, including optional packages for other platforms (1.226375ms)
+✔ locked package dependencies resolve even in platform-specific optional branches (5.046375ms)
+▶ direct staff roles, profile photos and persistent activity obey fresh database permissions
+  ✔ every creator is restricted to lower roles, including when demoting an existing peer (304.063042ms)
+  ✔ managers can add and control staff; directory results include peers and omit higher roles (10.51475ms)
+  ✔ a pending mailbox must be verified before existing credentials can receive staff access (74.854417ms)
+  ✔ new accounts have a password reminder which only they can clear; profile reads cannot select another user (35.364417ms)
+  ✔ photo upload and profile writes are scoped to the authenticated staff owner (26.729584ms)
+  ✔ linked published authors follow photo updates; unlinked private avatars stay out of anonymous reads (26.043416ms)
+  ✔ team activity is durable, permissions hide higher-role activity, and clients cannot forge notifications (13.855625ms)
+  ✔ new enquiries, feedback and assistance create staff notifications without exposing customer messages or email (20.0185ms)
+  ✔ Auth account deletion preserves activity snapshots without blocking the cascade (6.8175ms)
+  ✔ read markers are private and older pages keep stable non-duplicated cursors (9.581167ms)
+  ✔ temporary-password requests enforce lower roles, reactivate the reminder and never accept or log passwords (28.998584ms)
+✔ direct staff roles, profile photos and persistent activity obey fresh database permissions (4093.508917ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ every public, customer and staff route has a title in the selected language (64.644625ms)
+✔ property titles use current CMS translations and never expose unavailable or private listings (6.4815ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ language, navigation and CMS changes update the tab without remounting a customer draft (24.467417ms)
+✔ late framework metadata and restored tabs cannot retain the wrong title or start a mutation loop (8.007167ms)
+✔ rental guide titles use the selected language and unknown articles stay not found (0.144667ms)
+✔ original news titles are bilingual and the retired About page is no longer a content title (0.055667ms)
+✔ live editorial titles translate while draft and withdrawn pages never fall back to seed titles (0.323666ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ listing editor resizes from the left by pointer and keyboard within viewport bounds (337.83125ms)
+✔ full-screen toggle preserves form elements and Escape closes through the guarded callback (83.416417ms)
+▶ editorial upgrade preserves existing articles and enforces draft, publication and deletion permissions
+  ✔ only approved articles are public; guests and customers cannot write (10.781875ms)
+  ✔ staff can create private drafts and publication requires complete bilingual content (5.331833ms)
+  ✔ publishing, changing and unpublishing update public reads immediately; optimistic updates reject stale versions (50.819458ms)
+  ✔ malformed content and unsafe source links are rejected at the database boundary (31.858584ms)
+  ✔ staff and managers cannot delete; revoked staff lose drafts immediately; owner can delete (20.434916ms)
+✔ editorial upgrade preserves existing articles and enforces draft, publication and deletion permissions (3271.945459ms)
+(node:38944) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ guest enquiry input cannot choose identity or internal workflow fields (240.429625ms)
+✔ signed-in enquiries pass verified ownership separately from untrusted contact details (100.966334ms)
+✔ invalid sessions are rejected instead of silently submitting as a guest (19.9685ms)
+✔ malformed authorization and cross-origin requests never reach the database (20.001833ms)
+✔ both guest and authenticated enquiries retain input validation and request limits (17.267625ms)
+✔ Vercel and Cloudflare rate limits isolate visitors using the host-owned IP header (46.689291ms)
+✔ retired batch requests cannot silently create a general enquiry (15.80575ms)
+✔ oversized streamed enquiries never reach Auth or the database (56.829917ms)
+✔ durable enquiry quotas reject a submission even when the current instance has no request history (13.201417ms)
+✔ unavailable trusted configuration and uncertain enquiry writes never report success (259.437375ms)
+(node:38962) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ rates require the correct base, sensible finite values and recent timestamps (4.247666ms)
+✔ the bank feed parses USD selling prices with an explicit Vietnam timezone (0.839ms)
+✔ the server coalesces requests, uses the official bank endpoint and caches validated data (111.713541ms)
+✔ manual redirect rejection works on Cloudflare and fails over only to the fixed backup endpoint (0.892ms)
+✔ a temporary bank failure recovers after five minutes rather than remaining unavailable for an hour (2.61525ms)
+✔ outages retain the last valid rate for at most 72 hours and throttle retries (1.497209ms)
+✔ malformed, oversized, non-JSON and HTTP error responses cannot supply a rate (3004.176666ms)
+✔ a hung response body has a deadline and aborts the upstream request (21.210125ms)
+✔ budget conversions round bounds outward and never reinterpret values without a rate (0.222417ms)
+(node:38977) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ retired guest cart selections merge once into favourites without duplicates (0.968667ms)
+✔ a failed browser migration keeps the original cart for recovery (0.111ms)
+✔ invalid browser favourites do not discard valid retired-cart selections (0.087208ms)
+✔ a pending favourites transfer stays bound to its first account and acknowledgements preserve unrelated guest selections (0.274083ms)
+✔ failed claim persistence prevents an ambiguous cross-account transfer (0.154208ms)
+(node:38978) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ validation explains native constraints with the field name, exact limits and full URL examples in both languages (0.916208ms)
+✔ invalid events show persistent translated field errors, focus the first invalid field, and preserve existing hint IDs (1.149291ms)
+✔ custom URL components keep their own inline errors and native constraints remain untouched (0.138542ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the shared catalogue uses the three confirmed sites and rejects cross-origin overrides (380.127583ms)
+✔ the directory renders useful server HTML with all three sites and local navigation for the current site (129.319209ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ service links separate same-site navigation from new-tab external destinations and translate every card (87.231917ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the apps menu preserves its open state through translation, closes outside and cleans up listeners (41.936792ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the apps disclosure supports keyboard navigation, Escape focus restoration and follow callbacks (22.655667ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ focus stays inside an open apps menu but tabbing away closes the disclosure (52.508667ms)
+✔ touch blur without a focused destination keeps service links available until they are followed (83.971375ms)
+✔ node runtime reads Supabase settings and exposes only public configuration (99.878708ms)
+✔ cloudflare runtime reads Supabase settings and exposes only public configuration (46.735625ms)
+✔ an incomplete Node deployment stays unconfigured without constructing Supabase clients (24.051375ms)
+✔ filename metadata accepts complete basenames and preserves older image updates while rejecting malformed records (3498.194916ms)
+(node:39007) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ original image names preserve special characters, complete names and extension while excluding local paths (1.691833ms)
+✔ existing, external and signed image URLs show their decoded stored basename without query strings (0.201458ms)
+✔ cover changes retain URL-linked names, removal prunes stale metadata, and repeated basenames remain distinct uploads (0.533875ms)
+✔ inline browser previews persist compact filename keys instead of duplicating their image data (12.64275ms)
+✔ filename provenance distinguishes recorded originals, complete stored filenames and unavailable names (0.138667ms)
+✔ upload preparation scopes random paths, enforces limits and never exposes the server credential (388.578542ms)
+✔ finalisation requires actual objects and matching size and MIME, not a forged client manifest (174.447208ms)
+✔ permits reject tampering and expiry; signed-in submissions bind to the verified account (84.099834ms)
+✔ invalid sessions, absent consent, honeypots and cross-origin bodies cannot create introductions (26.097958ms)
+✔ oversized bodies, rate quotas and unavailable storage fail before any lead is saved (33.047125ms)
+▶ private landlord intake, review and conversion enforce fresh database permissions
+  ✔ anonymous and customer clients cannot bypass the server, inspect private records or reserve upload space (12.450625ms)
+  ✔ service quotas are durable and bound both requests and total bytes (6.547959ms)
+  ✔ finalisation is atomic and idempotent, links a customer enquiry and records private file metadata (18.415708ms)
+  ✔ only active staff can read introductions, linked private files and notifications (18.814125ms)
+  ✔ staff may review; only managers can assign or convert; unknown assignees and unreviewed conversions fail (96.632209ms)
+  ✔ conversion creates a single unpublished draft with real facts and no private photos, contacts or messages (52.853958ms)
+  ✔ revoked memberships lose access immediately; deletion is owner/admin only and keeps a listing draft (39.083ms)
+  ✔ cleanup exposes only unlinked old file paths to the service role (11.616125ms)
+✔ private landlord intake, review and conversion enforce fresh database permissions (3508.534792ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ official Lattice orbit is visible in server markup with an accessible loading label and decorative cells (179.211292ms)
+✔ translation updates the same loading indicator and completion/error states release busy status without JS polling (179.498458ms)
+✔ reduced motion provides a static lattice and settled states pause cell animations (22.830125ms)
+(node:39033) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ new listings default to the signed-in linked profile, or automatic own profile, while guests use company contact (0.565292ms)
+✔ explicit company and another author choices never create or replace profiles (0.585792ms)
+✔ a stale draft profile is reused without publishing or overwriting its approved details (0.226375ms)
+✔ first save creates one staff-linked profile without publishing private contact details (3.866375ms)
+✔ concurrent profile creation recovers the already saved linked profile (1.203834ms)
+✔ a profile still loading at first save is fetched before creating the named author (0.291875ms)
+▶ verified staff with an empty display name can save under their own linked placeholder profile
+  ✔ "" (0.357375ms)
+  ✔ "   " (0.107625ms)
+✔ verified staff with an empty display name can save under their own linked placeholder profile (0.722875ms)
+▶ failed or missing staff profile reads still block author creation
+  ✔ RPC error (2.710042ms)
+  ✔ missing profile (0.127541ms)
+  ✔ missing display name (0.062667ms)
+✔ failed or missing staff profile reads still block author creation (3.144792ms)
+▶ dual-currency prices, editable codes and concurrent-edit versions enforce database rules
+  ✔ VND-only, USD-only and dual quotes save independently; invalid VND bounds fail (79.227458ms)
+  ✔ custom IDs normalize, rename existing listings and reserve codes across all statuses (5.607833ms)
+  ✔ automatic assignment skips custom reservations and never truncates seven-digit IDs (27.219584ms)
+  ✔ a stale conditional update cannot overwrite the first editor and the server owns its version (10.792291ms)
+  ✔ new fields and editable IDs retain existing staff-only write permissions (71.625583ms)
+✔ dual-currency prices, editable codes and concurrent-edit versions enforce database rules (3769.060917ms)
+✔ short ID upgrade preserves existing numbers, property links, favourites and enquiry snapshots (3389.96125ms)
+✔ listing uploads use private in-memory resumable sessions, required chunks, original metadata and refreshed credentials (131.044083ms)
+✔ a progressing upload continues for more than 120 seconds without a total deadline (73.597833ms)
+✔ 120 seconds without progress aborts transport, retains its resume URL and allows retry (43.85025ms)
+✔ cancellation aborts transport and ignores late progress and success callbacks (73.626584ms)
+✔ resumable URLs and request credentials cannot cross signed-in accounts (84.295ms)
+✔ only transient network and server errors retry automatically; terminal permissions remain actionable (23.987875ms)
+(node:39041) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ listing IDs normalize short numbers, prefixes and pasted dash variants (0.689042ms)
+✔ browser preview assigns a free code when manual IDs occupy earlier numbers (0.092917ms)
+✔ listing IDs grow past two digits without truncating or adding zeros (0.165708ms)
+(node:39042) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ new and never-published drafts get automatic links while existing public links stay stable (0.541708ms)
+✔ new listing links follow the complete final authored title, including its highlights (0.560459ms)
+✔ one canonical address prefers English and folds Vietnamese when English is not yet entered (0.104166ms)
+✔ existing addresses reserve local uniqueness while the current listing is excluded (0.117667ms)
+✔ long titles and collision suffixes stay within the 180-character address limit (0.280417ms)
+✔ blank titles stay blank while non-Latin and symbol-only titles get stable usable addresses (1.051417ms)
+(node:39065) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ every referenced local media asset and moved destination exists (9.001125ms)
+✔ legacy CMS paths normalize without changing content identity or external uploads (0.56675ms)
+✔ legacy image aliases keep original filename metadata attached after normalization (0.131541ms)
+✔ provided photos and review screenshots remain in separate activity categories (0.234708ms)
+✔ Vietnamese local and international numbers open the same messaging contact (1.061584ms)
+✔ mobile and browser PNG icons have the declared dimensions and PNG signatures (8.874917ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ mobile chat starts collapsed, expands accessible separate links and closes after following a service (375.796791ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Escape, outside taps and viewport changes close the panel and release listeners (78.065708ms)
+✔ language changes preserve the expanded panel and removed channels never leave dead links (39.214833ms)
+(node:39068) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ pagination exhausts results even when the server cap is below the requested page size (1.039833ms)
+✔ a later-page failure rejects the entire read instead of returning a partial catalogue (0.282459ms)
+(node:39070) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ password forms bind to the subject of the matching email link, and malformed links grant no form identity (0.647041ms)
+✔ password setup freezes the intended identity even if the SDK account changes during configuration loading (33.474208ms)
+✔ a mismatched identity never sends any password request (0.4375ms)
+✔ expired email links fail without treating a password update as successful (0.731084ms)
+✔ email callback errors are classified without displaying untrusted descriptions (0.21425ms)
+✔ custom links accept only bounded invite/recovery hashes and reject other purposes (0.34475ms)
+▶ private onboarding guides enforce audience, role and owner-only media management
+  ✔ anonymous visitors cannot read the guide tables (14.123ms)
+  ✔ customers see only published customer/common guides; assigned staff see only their level or lower (79.062875ms)
+  ✔ only the owner creates drafts; the creator is stamped and empty guides cannot be published (62.917542ms)
+  ✔ bucket guards defeat unrelated broad policies without changing access to other buckets (19.878458ms)
+  ✔ owner uploads attach to an existing draft and stay private until publication (34.460167ms)
+  ✔ minimum roles protect both metadata and stored objects, including for admins (4.751458ms)
+  ✔ owner cannot turn a staff guide into a public object through rename/update (89.369ms)
+  ✔ an audience change during upload rejects stale attachment registration (33.732708ms)
+  ✔ removing the last visual file safely unpublishes a guide without written steps (4.372458ms)
+  ✔ file count, types, paths and sizes are enforced by the database (98.776125ms)
+  ✔ deactivated owners immediately lose upload and edit permissions (12.745333ms)
+✔ private onboarding guides enforce audience, role and owner-only media management (3789.467834ms)
+✔ video uploads use 6 MB resumable chunks and fresh account credentials on each request (252.015958ms)
+✔ cancelling an upload aborts transport and ignores late success/progress events (10.446917ms)
+✔ a different signed-in account cannot inherit a pending upload (69.47725ms)
+✔ unsupported files and already-cancelled requests never start transport; endpoints reject unsafe protocols (48.280875ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ manual timing handles unavailable durations and hour-long recordings (313.418666ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ manual playback is user initiated and custom controls reflect the media events (151.424208ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ manual timeline and keyboard seeking clamp to the recording and never hijack form controls (198.728375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ manual volume, playback rate and fullscreen controls update the actual player (134.006875ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ secure link refresh preserves the playhead and settings without autoplay or language resets (62.244792ms)
+✔ a refused playback attempt is acknowledged and can be retried (52.195834ms)
+✔ local preview strips asserted platform identity while preserving application cookies and routing (1.012459ms)
+✔ hosted execution leaves gateway identity handling outside the local preview plugin (0.100792ms)
+✔ verified active administrators and editors can upload listing images while customer, guest and revoked staff cannot (4217.75175ms)
+✔ image bytes determine type when renamed JPEG files have empty, nonstandard or misleading MIME labels (178.213417ms)
+✔ empty, oversized and unsupported image contents are rejected before a storage request (39.1565ms)
+✔ image uploads use resumable transport with random keys, normalized MIME and exact original filenames (69.200292ms)
+✔ missing authentication is explained before uploading (19.686708ms)
+✔ image uploads forward cancellation and progress to the resumable transport (44.741542ms)
+✔ upload errors distinguish permissions, authentication, size, type and connection timeouts (17.058958ms)
+✔ exact map locations are optional public details with normal staff write permissions (4240.503667ms)
+(node:39124) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an author address or coordinates take precedence over the public street and district (0.624542ms)
+✔ missing exact locations fall back to the public street, district and finally Hanoi (0.126334ms)
+✔ special address characters stay inside the map query and cannot replace its host or options (0.125333ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ map embeds load lazily and carry the author precision, destination and translated accessible title (301.353875ms)
+✔ removing an exact location replaces both map destinations and explains the approximate area in either language (19.454292ms)
+▶ published card ordering enforces assigned roles, ownership of staff access and concurrent edits in Postgres
+  ✔ owner, admin and confirmed company managers can save; all other callers are denied (81.135584ms)
+  ✔ scopes are independent and stale editors cannot overwrite a newer saved order (5.057209ms)
+  ✔ RPC and direct writes reject duplicates, unknown IDs and nonpublic properties (6.489417ms)
+  ✔ manager is assignable by an administrator and can administer lower staff only (10.255333ms)
+  ✔ publication time is stamped when a draft goes public and cannot be forged on an edit (23.309916ms)
+✔ published card ordering enforces assigned roles, ownership of staff access and concurrent edits in Postgres (4501.515541ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ card ordering is hidden from customers and ordinary staff (608.661958ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a manager can rearrange with arrows, retain the draft through translation and save the correct scope (230.892208ms)
+✔ a conflicting order leaves the draft visible instead of claiming a save succeeded (86.637709ms)
+(node:39147) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ default catalogue ordering follows publication time rather than featured flags or legacy ranks (1.274625ms)
+✔ manual ordering is stable, ignores unavailable IDs and leaves unarranged posts newest first (0.137375ms)
+✔ only owner, admin and manager assignments allow card ordering (0.122833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ photo captions contain the complete long, special and Unicode filename with its original extension (399.602625ms)
+✔ filenames render as escaped text rather than HTML (97.417125ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ legacy URLs show their full decoded stored filename while unnamed inline images are explicit (47.115459ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ cover and removal controls target the correct image and are disabled during a listing save (22.857459ms)
+✔ existing UUID uploads show the complete stored basename and extension without inventing an original name (96.52075ms)
+(node:39149) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ price formatting preserves fixed, zero, unknown and bilingual range prices (16.102458ms)
+✔ entered USD and VND quotes take precedence over conversion in both directions (0.445292ms)
+✔ missing or expired rates retain the entered currency without comparing unlike currencies (0.15ms)
+✔ each currency validates independently and VND prices use whole đồng (0.965416ms)
+✔ structured prices contain only entered quotes, including VND-only and dual-currency listings (0.593833ms)
+✔ price validation rejects reversed, upper-only, negative and nonfinite amounts (0.128958ms)
+✔ listing videos enforce one stored MP4 below 50 MB with staff-only uploads and normal publication privacy (2735.505792ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ one MP4 uploads with the correct content type and notifies the parent while saving is blocked (719.095375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ multiple and disguised files are explained before any storage write (244.830625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a late upload never attaches to a different listing after the editor changes (86.331042ms)
+✔ video upload cannot start while the listing save is in flight (47.906875ms)
+(node:39174) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ only one uploaded video URL is accepted and ordinary external videos cannot bypass upload limits (0.821666ms)
+✔ video files must be nonempty MP4s strictly below decimal 50 MB (0.153375ms)
+✔ an MP4 filename alone is insufficient; ISO MP4 brands are checked before uploading (2.290042ms)
+(node:39196) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the real SDK loads only published homes and the main public settings (34.576333ms)
+✔ permission errors identify the failed table without embedding server messages in diagnostics (27.891042ms)
+✔ a missing settings row never turns a fallback into a successful live response (45.250667ms)
+✔ empty published results are valid and do not restore reference homes (45.067375ms)
+✔ public recovery cancellation reaches every SDK read (17.889958ms)
+✔ browser public recovery ignores stored staff tokens and login callback URLs (133.844458ms)
+✔ published catalogue exhausts the real SDK ranges and propagates later-page failures (41.664459ms)
+(node:39198) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ trusted intake uses only the service RPC and passes verified identity separately from form fields (152.754167ms)
+✔ trusted visitor keys ignore forged platform headers and isolate different visitor addresses (47.394125ms)
+✔ independent application instances share the durable quota and cannot reset it by signing in (164.152584ms)
+✔ missing service configuration, SQL rejection and transport failure never replay an intake write (20.575208ms)
+✔ public intake requires the trusted boundary and durably enforces quotas and verified ownership (2801.854584ms)
+(node:39225) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a temporary content outage never publishes an incomplete fallback sitemap (318.093166ms)
+✔ app/homes/[slug]/page.tsx distinguishes a temporary backend failure from an absent record (196.767583ms)
+✔ app/homes/[slug]/page.tsx renders a real published record after recovery (7.983625ms)
+✔ app/tips-and-news/[slug]/page.tsx distinguishes a temporary backend failure from an absent record (112.542208ms)
+✔ app/tips-and-news/[slug]/page.tsx renders a real published record after recovery (93.493417ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ complete HTTPS URLs can be typed character by character without expanding partial words (200.445416ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ valid paste preserves typed formatting until blur while a bare word remains visibly invalid (160.819209ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ language changes retain unfinished input and external record changes reset to the stored public URL (46.490459ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+▶ article and neighbourhood records show complete addresses without emitting a change
+  ✔ article (12.905625ms)
+  ✔ neighbourhood (39.215ms)
+✔ article and neighbourhood records show complete addresses without emitting a change (55.998375ms)
+(node:39227) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ full public URLs map to the existing routes and stored keys (1.052667ms)
+✔ URL input rejects unsupported hosts, protocols, routes and address names with specific reasons (0.220083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ published reviews appear on live approval, disappear on withdrawal and never read private submissions (1091.110834ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ feedback recovery pauses while hidden or offline and resumes without an auth lock or repeated writes (1177.442625ms)
+✔ a failed public refresh retains the approved snapshot and allows explicit retry (680.978833ms)
+✔ the fresh-project setup includes every rental schema item and public source seed (2310.465292ms)
+▶ rental catalogue, public authors, media and carts enforce their real Postgres permissions
+  ✔ editors can save ranges, fixed prices and price on request; invalid ranges are rejected (16.338083ms)
+  ✔ IDs are unique, permanent and assigned to future listings; lease lengths remain unconfirmed (4.930125ms)
+  ✔ anonymous visitors see rentals and approved placeholder/media content but cannot write it (4.996667ms)
+  ✔ ordinary customers cannot read unpublished author/media drafts or grant themselves publishing access (3.3655ms)
+  ✔ carts belong only to their customer and cannot contain sale or draft listings (14.798791ms)
+  ✔ a multi-property request is atomic and rejects unavailable inventory (2.80825ms)
+  ✔ an imported conflicting location is retained privately for staff review (63.105792ms)
+  ✔ every new public table has RLS and no privileged public functions were added (3.569542ms)
+  ✔ the single-shortlist migration preserves customer ownership, retires cart access and moves photos to Customers (32.650583ms)
+✔ rental catalogue, public authors, media and carts enforce their real Postgres permissions (1757.782833ms)
+(node:39250) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ gallery survives image shrink/removal, unlocks scrolling and reopens without an undefined photo (391.309916ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ gallery keeps its current image on translation, supports keyboard navigation, traps focus and handles failed photos (63.710708ms)
+✔ legacy language preferences are migrated before paint and valid language writes persist a secure cookie (8.414291ms)
+✔ feedback uses an uncropped portrait gallery and keeps landscape navigation and translated controls (104.605958ms)
+(node:39251) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ JSON request limits count UTF-8 bytes and preserve split Vietnamese characters (59.230125ms)
+✔ oversized chunked requests are cancelled even with a forged Content-Length (14.020875ms)
+✔ declared oversized requests are cancelled before parsing and invalid JSON is rejected (0.656416ms)
+✔ stalled request bodies time out and cancel their stream (21.357958ms)
+✔ an aborted client cancels a pending body without parsing or replay (2.420792ms)
+✔ an already-aborted request cancels its unread stream immediately (0.243917ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ segments render the server selection and support native clicks, keyboard navigation and disabled controls without losing drafts (273.621083ms)
+✔ drag releases commit once, canceled drags preserve selection and live reduced motion cancels pending spring handoffs (265.693791ms)
+(node:39275) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Vietnamese search works with and without diacritics (1.014125ms)
+✔ combined filters apply together and exclude unpriced homes within a budget (0.556792ms)
+✔ draft, archived, rented, and sold listings stay out of search (0.092041ms)
+✔ unknown prices stay last in either price order (0.175625ms)
+✔ monthly budget filters include overlapping price ranges and their endpoints (0.1905ms)
+✔ currency budgets and sorting prefer entered prices and convert only missing quotes (33.851041ms)
+✔ sale searches never include rentals and no-match searches return an empty result (0.120042ms)
+✔ retired duration parameters do not hide rentals in older bookmarks (0.225166ms)
+✔ IDs, bathroom count, monthly price bounds and repeated amenities apply together (0.397125ms)
+✔ rental type groups preserve legacy studios and villas and never expose a published sale (0.263041ms)
+✔ generated titles use recorded facts and confirmed features without inventing area or commercial bedrooms (5.283ms)
+✔ authored listing titles retain street, pets and lake-view details in each language on cards and detail pages (0.124333ms)
+✔ requirements match legacy amenity spellings without inventing facilities or weakening all-selected matching (0.18525ms)
+✔ visible ID search accepts padded, short, unhyphenated and pasted GH codes without partial matches (0.21475ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ property/post ID search is visible without expanding requirements in both rental forms (27.58275ms)
+✔ custom select server rendering exposes the selected label, accessible trigger and form value without a native picker (1.621834ms)
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ controlled selections and translated labels preserve the customer draft and submitted value (24.451333ms)
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ language changes preserve rental search choices without price-period controls (134.714458ms)
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ the requirements disclosure opens from its three-dot trigger, closes with Escape and retains mounted field choices (48.388417ms)
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ homepage search prioritizes bedrooms and bathrooms while retaining one budget range and all submitted values (54.778542ms)
+(node:39277) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ content and technical findings remain strictly separate; advisory keyword and length rules do not affect scores (26.50225ms)
+✔ alt text distinguishes missing attributes, intentional empty text and generic descriptions (1.203292ms)
+✔ language aware counts support Vietnamese, CJK and invalid locale without English reading grade assumptions (1.792375ms)
+✔ server HTML parser handles streamed metadata, quoted delimiters, scripts, entities, JSON-LD and contextual headings (2.690083ms)
+✔ technical restrictions stay critical despite complete content, and omitted checks never pass (0.893833ms)
+✔ technical checks flag duplicate metadata, malformed canonical, invalid JSON, hreflang and observed broken links (0.383458ms)
+✔ heading gaps, repeated paragraphs and unlabelled links produce actionable warnings (0.216667ms)
+✔ canonical target mismatches are reviewable rather than an automatic claim of failure (0.113959ms)
+✔ JSON-LD needs a meaningful typed shape; a malformed graph does not pass as valid schema (0.37175ms)
+✔ bot-scoped X-Robots-Tag restrictions apply to the intended web crawler only (0.237ms)
+✔ same-page anchor links do not count as links to related internal pages (0.141ms)
+✔ hreflang sets need a language-specific self reference only when alternates are declared (0.338166ms)
+✔ actual React streamed Suspense content is analyzed in its main boundary instead of its loading shell (116.10025ms)
+✔ streamed heading recovery requires an observed replacement into main and never promotes unrelated hidden or footer content (0.279875ms)
+✔ all staff audit endpoints authorize before accessing privileged audit services (625.789208ms)
+✔ editors can inspect, start and advance audits through fresh view authorization (98.161458ms)
+✔ individual rescans preserve the authorized actor and selected historical report (27.919625ms)
+✔ weekly settings require current management permission on every PATCH (238.336208ms)
+✔ invalid audit commands and selection IDs fail before service writes (544.835333ms)
+✔ crawl settings reject unsafe limits and malformed JSON without persisting changes (368.812792ms)
+✔ cron rejects absent, wrong, malformed and Unicode-mismatched bearer secrets before any work (17.638542ms)
+✔ authorized cron delegates the weekly due check and advances persisted work (5.787209ms)
+✔ cron failures return a bounded credential-free operational error (2.582333ms)
+✔ resume validates identity and run ID before resuming the selected interrupted audit (363.367375ms)
+(node:39279) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ duplicate metadata comparisons isolate languages, canonical aliases and private indexing intentions (0.945167ms)
+✔ failed or uninspected content never acquires a fabricated pass score (0.090708ms)
+(node:39281) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ resumable sitemap discovery analyzes language variants, retains noindex and bounds external inspection (62.761833ms)
+✔ robots follows specific agent groups, longest match, wildcard anchors and Allow tie precedence (0.322917ms)
+✔ maximum URL, depth, time and serialized continuation limits are explicit (2.132958ms)
+✔ private destinations, unsafe redirects and excluded routes never receive requests (0.887583ms)
+✔ canonical targets are fetched before being marked inspected and nonindexable targets are critical (1.14425ms)
+✔ single-page rescans do not recurse; broken links are reconciled in site scans (1.48825ms)
+✔ rate limits preserve retry-after across chunks and do not create request bursts (16.752333ms)
+✔ resumed batches refresh broken-link evidence instead of retaining the first partial result (10.311209ms)
+✔ default HTTPS transport pins the validated DNS address while retaining the original TLS hostname (2.452458ms)
+✔ DNS and full response-body reads are included in the request timeout (6624.423083ms)
+✔ safe external HTTP links are status-checked with no recursion while audit origins remain HTTPS-only (1.239ms)
+✔ robots-blocked public pages are skipped without pretending unknown content was evaluated (0.208709ms)
+✔ fetch duration excludes intentional host throttling (0.417291ms)
+✔ sitemap membership checks the preferred URL after redirects (0.57575ms)
+✔ soft batch deadlines never shorten the configured request timeout or fabricate terminal failures (0.40075ms)
+✔ transient network and server errors retry safely and resumed serialized tasks keep attempt limits (0.856542ms)
+✔ exhausted retries record an inspection failure with unknown scores instead of SEO defects (0.658ms)
+✔ global duration exhaustion preserves pending work and does not create a false success state (0.153375ms)
+✔ a successful HTTP error inspection scores only the observed HTTP defect, not invented HTML checks (0.362625ms)
+✔ trusted runtime fetch explicitly supports configured origins without unsupported Node lookup or arbitrary external requests (0.542417ms)
+✔ localized URL mode sends one request per language URL and preserves explicit language routing (1.409625ms)
+✔ localized app query variants consolidate to one preferred page without pretending each query was fetched (2.501708ms)
+✔ trusted runtime transport still rejects literal private destinations and private redirect targets (0.452084ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ dashboard keeps critical technical findings visible on content tab and separates noindex from failed responses (394.584417ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a delayed response from a previous staff account cannot reveal its report after an account change (128.869375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ active audit polling advances the persisted run, then stops after completion (114.70425ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ uninspected pages remain neutral and unscored, with distinct failed skipped and pending outcomes (71.657875ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ legacy history scores are withheld until rescanned and print report failures are actionable (49.960041ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ interrupted audits expose explicit resume without discarding the selected run or original start (44.024916ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ only safe advance requests retry transient failures with backoff and stop after three retries (133.56175ms)
+✔ authorization failures pause safe advancement without retrying a revoked account (69.047625ms)
+✔ public localized paths preserve filters and anchors and never prefix private routes or remote links (0.719417ms)
+✔ proxy rewrites explicit language variants with verified upstream language and ignores client header spoofing (84.728667ms)
+✔ retired About redirects before rendering, preserving locale instead of inheriting homepage canonical in a streamed 200 response (30.522458ms)
+✔ server metadata has unique localized canonicals and reciprocal EN/VI alternates with explicit language taking precedence over cookies (126.032708ms)
+✔ sitemap lists actual localized indexable pages with alternates and excludes the retired About alias (52.373375ms)
+✔ browser bootstrap respects explicit language URL over stale browser preference (9.155458ms)
+✔ localized links are real server-rendered anchors and preserve legacy and private navigation (18.978958ms)
+(node:39285) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ printable PDF report computes coverage and scores only from inspected evaluated evidence (1.48825ms)
+✔ uninspected-only report has no fabricated numeric scores or passed checks and escapes audit content (9.704958ms)
+✔ print export handles blocked windows and opens the professional report before invoking native PDF printing (0.456666ms)
+(node:39307) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[SEO audit] checkpoint unconfirmed { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+[SEO audit] checkpoint unconfirmed { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+[SEO audit] worker interrupted { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+✔ a checkpoint response failure at 191 seconds never overwrites the resumable run as failed (154.217292ms)
+✔ an expired lease or unconfirmed compare-and-swap checkpoint does not manufacture a failed run (58.238625ms)
+✔ an unexpected worker interruption preserves observations and pending queue with an actionable incomplete state (34.667292ms)
+✔ changed trusted domains stop advancement without issuing network work or discarding the queue (12.018167ms)
+✔ explicit resume starts a new bounded segment while preserving original time and successful evidence (26.535291ms)
+✔ resume rejects changed domains, active/completed runs and missing records before persisting work (65.719625ms)
+✔ legacy normalization removes fabricated uninspected scores and preserves genuine observed defects (0.539125ms)
+✔ stored summaries weight evaluated checks and omit failed inspections rather than averaging fabricated page scores (37.555875ms)
+✔ resuming legacy parser evidence re-evaluates successful pages before assigning the new score basis (16.467542ms)
+✔ audit storage upgrade preserves legacy evidence and safely resumes interrupted queues (2220.640334ms)
+▶ SEO audit storage enforces staff reads, service writes, leases and twenty-run retention
+  ✔ guests, customers and revoked staff cannot read; staff cannot mutate or run worker RPCs (42.647666ms)
+  ✔ singleton active audit, lease exclusion and stale worker compare-and-swap (74.718541ms)
+  ✔ weekly scans only start when enabled and due (8.723166ms)
+  ✔ expired leases recover and only the newest twenty runs remain (89.999875ms)
+✔ SEO audit storage enforces staff reads, service writes, leases and twenty-run retention (2298.170375ms)
+(node:39334) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ same-user token refresh and tab refocus never remove editor access (6.165834ms)
+✔ auth event callback defers all SDK-dependent work (6.35425ms)
+✔ offline and transient role errors preserve the workspace but fail recovery until verified (0.456792ms)
+✔ expired/revoked session returns to sign-in instead of remaining in recovery (0.202541ms)
+✔ confirmed role revocation removes editor access (0.232625ms)
+✔ late role response cannot restore a signed-out user (1.989042ms)
+✔ late session read cannot undo sign-out or authorize a different account (4.104542ms)
+✔ focus, visibility, and reconnect bursts share one session and membership request (0.714875ms)
+✔ a hung session read times out, releases the recovery slot, and can be retried (6.402625ms)
+✔ a hung membership read times out without losing edits or blocking the next attempt (6.533959ms)
+✔ provider cleanup prevents updates from late requests (1.9115ms)
+✔ a timed-out mutation is aborted and never automatically replayed (8.718167ms)
+✔ response body stalls are bounded, and a subsequent fetch succeeds (14.981709ms)
+✔ the installed Supabase SDK refreshes an expired stored token and restores the editor (5.550417ms)
+✔ wake event wiring coalesces bursts, waits for visibility, queues online recovery, and cleans up (10.463375ms)
+✔ the committed fresh setup is synchronized with every migration and seed (86.646584ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ shiny links preserve native destinations and labels; normal buttons do not accidentally submit a form (331.955208ms)
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ desktop shine waits for mouse hover or keyboard focus, runs once and never creates an idle timer (49.751916ms)
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ touch shine fires once per 60 seconds, preserves its schedule across translation and stops between sweeps (25.203ms)
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+Detected multiple renderers concurrently rendering the same context provider. This is currently unsupported.
+✔ hidden/offscreen touch buttons have no timer, resume with a fresh minute and respect motion, disabled and input changes (118.005292ms)
+(node:39339) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ direct staff creation requires a verified current management role and same-origin bearer request (556.826875ms)
+✔ password and confirmation are validated before any account or membership write (189.857125ms)
+✔ Owner, Admin and Manager can create any lower role and cannot create peers or higher roles (501.853958ms)
+✔ new staff are created with the entered password and confirmed email, with roles assigned through the guarded database (69.57325ms)
+✔ a verified existing login is assigned without any Auth write or password replacement (40.5365ms)
+✔ create and assign modes reject mismatched account state without duplicate accounts (89.42475ms)
+✔ unsupported domains and protected targets are rejected before privileged Auth changes (71.952458ms)
+✔ missing server key and failed Auth creation never grant a staff role (69.926542ms)
+✔ revoking the creator during account creation prevents delayed role assignment and reports the partial outcome (32.482708ms)
+✔ role updates are checked both by hierarchy and protected database targets (29.25475ms)
+✔ directory responses include current photos, paginate and never expose credentials (22.722542ms)
+✔ only owners and admins can delete lower staff assignments; Auth identities are retained (242.501917ms)
+✔ optional password recovery uses the database-approved email and fixed same-origin destination (14.170209ms)
+✔ recovery respects protected roles, failed delivery and sending limits (198.382125ms)
+✔ temporary passwords are explicitly set on the approved existing staff Auth identity without changing roles or sending emails (21.548834ms)
+✔ temporary password writes validate matching passwords and the verified management session first (134.91875ms)
+✔ protected, disabled, unassigned and revoked staff cannot have passwords changed through the management endpoint (92.196666ms)
+✔ Auth failures and identity or confirmation mismatches never report a password success or expose the password (28.337167ms)
+✔ existing-login conflicts provide a recoverable code without creating a duplicate identity (38.075417ms)
+✔ restoring an existing login establishes its temporary password before fresh role assignment (27.181292ms)
+✔ existing-password replacement needs explicit consent and a failed password update never assigns access (76.0105ms)
+✔ the team directory includes peers and lower roles and filters higher roles before sending a response (113.547125ms)
+✔ read-only directory access never permits staff to call any team management or password endpoint (21.331125ms)
+✔ unconfirmed pre-registered logins cannot retain their untrusted password while gaining staff access (14.580625ms)
+✔ an unconfirmed login receives trusted replacement credentials before confirmation and staff assignment (14.995166ms)
+✔ failed or unverified credential results cannot assign staff access to a pending login (119.093916ms)
+✔ revocation after a trusted password replacement prevents assignment and reports the actual partial outcome (11.390833ms)
+✔ a reminder failure reports that trusted credentials and access were saved without claiming a password failure (12.170291ms)
+(node:39340) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the photo endpoint uses the anonymous RLS reader and redirects a published portrait without caching the lookup (131.730916ms)
+✔ unpublished and malformed portrait IDs return 404 and never expose a private profile (4.953583ms)
+▶ company staff accounts enforce assignment, verification, hierarchy and immediate revocation
+  ✔ the existing personal-email owner retains access while legacy personal-email staff lose it (6.657584ms)
+  ✔ personal and unassigned company customers cannot self-promote or read the staff directory (9.485334ms)
+  ✔ metadata and a forged JWT email never override database membership or the verified Auth email (2.109083ms)
+  ✔ owners assign only exact company-domain accounts and can appoint administrators (6.253625ms)
+  ✔ administrators manage staff but cannot appoint admins, edit other admins, or change themselves (17.219166ms)
+  ✔ unconfirmed invitations cannot use Studio until the company mailbox is verified (17.235416ms)
+  ✔ revocation takes effect with the same existing user JWT and preserves customer data (9.798792ms)
+  ✔ changing the Auth email immediately invalidates the old staff assignment (4.011291ms)
+  ✔ anonymous roles cannot execute staff RPCs; public wrappers never bypass RLS (4.998667ms)
+✔ company staff accounts enforce assignment, verification, hierarchy and immediate revocation (2340.855875ms)
+✔ fresh setup and owner bootstrap establish the same company staff security model (981.586167ms)
+▶ assigned Gmail staff, enquiry reads and protected deletion use current database permissions
+  ✔ Gmail needs explicit assignment and verified email; unassigned accounts cannot self-promote (23.179833ms)
+  ✔ reading an enquiry records the first reader without changing status or concurrent staff notes (19.492959ms)
+  ✔ manager, editor, customer and disabled sessions cannot delete listings or enquiries through RPC or direct RLS (12.899792ms)
+  ✔ admin listing deletion preserves enquiry and commission evidence while clearing favourites and manual card order (32.242584ms)
+  ✔ reset targets allow pending setup while preserving current membership and cannot cross protected role boundaries (14.278084ms)
+  ✔ staff deletion removes only membership and protects self, owner and peer administrators (11.734708ms)
+  ✔ owner enquiry deletion also deletes private notes and cannot be replayed by a revoked session (5.823125ms)
+✔ assigned Gmail staff, enquiry reads and protected deletion use current database permissions (2676.740375ms)
+▶ the database enforces peer/lower visibility across accounts, portraits and assignment directories
+  ✔ every role sees peers and lower roles in the raw account RPC, photo RLS and picker RPCs (36.515584ms)
+  ✔ seeing a peer never permits demoting, disabling, deleting access or resetting their password (12.833417ms)
+  ✔ unassigned customers and anonymous visitors cannot read private accounts or portraits (5.480667ms)
+  ✔ existing higher-level commission credit survives a review but cannot be newly assigned (14.377584ms)
+  ✔ pagination filters protected roles in SQL, including after an explicitly supplied higher-role cursor (43.759167ms)
+  ✔ existing sessions immediately follow role demotion and revoked or unconfirmed access (10.972625ms)
+✔ the database enforces peer/lower visibility across accounts, portraits and assignment directories (2526.260083ms)
+(node:39467) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ role visibility is inclusive while management stays strictly below the actor (1.482208ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ portal chooser identifies both destinations without changing authentication (754.671ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ fresh server property props synchronize a persistent layout before rendering or translating (676.596542ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ pending property navigation cannot undo a newer CMS save or unpublish (199.525291ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ stale editorial page props cannot republish an article withdrawn in Studio (172.491917ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ transient page errors offer a bilingual retry without exposing backend details (92.43625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ customer login identifies personal email and links to the separate staff portal in both languages (172.932792ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ staff login explains assigned company or Gmail access, retains owner sign-in and offers no registration (411.781792ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a customer opening staff login receives a customer return link without staff access (351.494083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ public navigation labels both login destinations and keeps one preferences menu outside the mobile navigation (178.166708ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the combined preferences menu changes and persists both choices independently and dismisses accessibly (165.427083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ customer schema errors stay visible until a successful refresh loads real data (194.2255ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ password recovery returns existing staff to Studio (95.116541ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ personal email signup confirms the mailbox without staff access (166.396209ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ personal email password login opens the customer account and never grants staff membership (171.085916ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ customer email recovery keeps the reset destination and releases the translated form (153.800375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ password setup requires the matching email link and rejects an account switch (102.42725ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ opening staff password setup without an invitation cannot change an existing session password (87.9385ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ owner team drafts survive language changes and same-user recovery while temporary passwords clear after sign-out (483.077083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ staff roles can use Studio and a read-only team directory (615.4055ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ unsaved settings survive token refresh, offline/online recovery, and same-user reauthentication (527.439833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a failed server reload automatically recovers public listings and clears the warning for guests (341.550958ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ failed public recovery keeps a translated warning and coalesces retries until live data arrives (347.81525ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an offline reload waits for the online event before recovering public content (387.105ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Studio refresh clears the fallback warning and a late public read cannot replace drafts or unsaved edits (442.103833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ sign-out uses recovered public content instead of restoring the original reference data (150.287167ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ healthy public reloads and session recovery do not make redundant content requests (330.604042ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ public listing recovery does not wait for a stalled login session (154.161792ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ transient permission checks keep forms mounted, while another account cannot inherit a draft (450.10725ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a slow background read cannot overwrite a completed local save (362.464333ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a late private inbox read cannot repopulate the cache after sign-out (368.35525ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a write completing after an account change cannot commit client-side state (371.629833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ edits made while a slow settings save is pending are retained as the next draft (469.832209ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ slow uploads preserve concurrent text edits and cannot attach photos to a different editor (447.841375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ new listing URLs follow the final title, remain stable through translation and save without URL entry (397.895333ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ automatic listing URLs use Vietnamese when English is blank and choose an available suffix (542.170208ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ published listing title edits preserve the existing URL while never-published drafts follow their final title (443.392542ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ automatic listing URL saving avoids a database title collision absent from the local list (475.943166ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a concurrent automatic URL collision retries with a suffix and saves one listing (425.82425ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a new automatic listing URL does not retry a listing ID uniqueness failure (377.356458ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a title edited during first publication keeps its draft and the URL assigned by the completed save (598.258583ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ new listing price ranges survive translation, save both bounds and reopen for editing (471.455125ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the listing editor blocks reversed and upper-only ranges before any database write (546.367541ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ staff can save VND-only or dual quotes and retain both currencies through language changes (431.249584ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ visitor currency choices persist, prefer entered prices and mark converted amounts (149.216542ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an unavailable exchange rate shows the entered currency clearly and keeps the chosen preference (123.720292ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Vinhomes detail prices follow currency choices, retain original quotes and translate without changing amounts (114.850167ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Vinhomes retains its entered VND prices and labels the fallback during an exchange-rate outage (113.964834ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ homepage Vinhomes cards and the budget shortcut follow the saved currency while preserving budget URL units (277.793667ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ currency changes convert budget bounds without changing their meaning or the submitted currency (142.619209ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ editable listing IDs reject local duplicates and preserve drafts after a concurrent database collision (396.556292ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ listing ID availability checks include current database drafts absent from a stale local list (890.703042ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a stale save keeps the draft and refreshes the saved version for reopening (567.985041ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a slow save preserves newer edits while advancing their version for the next save (459.005458ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ customer profile drafts survive idle recovery and language changes without editor access (160.648ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a customer write remains bound to its authenticated identity (146.463666ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ switching accounts during customer session recovery prevents the write from starting (167.250625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ switching accounts during editor recovery also prevents the write from starting (385.803ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ late customer enquiries cannot return after sign-out (157.206958ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ saved-home reads from a previous account cannot overwrite the new account (168.509875ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ customer edits made during a pending save remain as the next draft (172.498125ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ staff can add a customer, keep a follow-up and search the directory (434.91375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a reset form mounted after Supabase clears the hash retains the intended email-link identity (111.460417ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ PASSWORD_RECOVERY navigates a fallback root redirect to the reset form without losing the session (93.76625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ opening an enquiry persists read state and preserves a note edited while the read request is pending (385.933584ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ listing deletion requires explicit confirmation, removes the listing and is unavailable to editors (429.672375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ editors can read enquiries but cannot see destructive listing or enquiry actions (360.330709ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a stale property editor updates its original record and cannot insert a listing removed by another session (402.619958ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Team access routes reset requests separately and confirms membership-only deletion for assigned Gmail staff (396.697125ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the reported expired callback shows a translated recovery form and never permits a password write (98.833542ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ custom invitation links wait for explicit confirmation, scrub the token URL and then show password plus confirmation (102.818417ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ custom token verification errors offer a new link without granting a password form (92.01325ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ switching accounts during custom verification cannot bind setup to the wrong user (91.684708ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a custom staff link landing on the homepage retains verification while routing to setup (81.116ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a connection failure during verification releases the action and permits an explicit retry (98.699958ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ existing staff assignments preserve their login and recovery email remains an explicit separate action (433.158042ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ managers receive Staff-only creation choices and a translated role guide (364.918084ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ staff can change their own password from the sidebar and clear the first-login reminder without email (365.603791ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ profile upload persists a staff-owned path and the sidebar follows the saved photo (402.034791ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ notifications load once per refresh, show persisted activity and keep read state (362.54675ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ existing staff passwords can be replaced explicitly without assigning a role, sending an email or switching the owner session (408.726959ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ temporary-password failures keep the form open and private passwords clear on role change (386.503541ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the staff portal normalizes email, preserves exact password characters and explains existing-account credentials in both languages (328.824209ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Studio branch disclosures preserve the active form draft and translate without remounting it (369.621083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ branch navigation offers a read-only staff directory and hides the email-domain banner in Team access (367.667ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Save changes closes an unchanged profile without changing its password or dismissing the first-login reminder (358.076334ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ profile password mismatches and Auth failures keep the dialog open without claiming a successful save (368.298666ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an unconfirmed photo write cannot be acknowledged by Save changes (352.481375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ duplicate staff conflicts survive a background refresh and offer explicit password replacement when restoring access (408.173542ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ password visibility controls reveal only the primary field and mask it again after clearing (373.333042ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the customer header never borrows a signed-in owner staff photo; About Us excludes agent and testimonial links (134.753167ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the landlord page translates and submits through the private introduction API (121.283625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Tips & News links original sourced articles and undated rental guides in both languages (111.283667ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ landlord uploads keep the draft and completed files across language changes and manual retry (141.08575ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Services uses a cover with different image bytes from the home hero (118.023959ms)
+Base UI: A component is changing the default value state of an uncontrolled Select after being initialized. To suppress this warning opt to use a controlled Select.
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the private property queue preserves a review during translation and only reloads when requested (435.380125ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ admin directory shows peer admins with no management controls and filters out owner accounts (394.198667ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ staff can see a read-only peer directory without creation, access or password controls (372.695791ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ guest favourites automatically merge into the logged-in account without duplicates or replacing existing saves (178.654ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ failed guest-favourite sync retains the cache and supports a manual retry without automatic write loops (187.561375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a pending guest-favourite transfer never crosses into another account (157.642042ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ About Us opens on desktop hover, closes outside its container and stays click-operated on touch (150.9965ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ touch blur keeps About links mounted until the visitor follows a destination (132.13975ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ area links retain their rental context through translation and enquiry submission (123.246833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ restaurant and office consultancy links translate and open the real contact flow (122.492083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ commercial enquiries preserve their draft through translation and send the selected service to the inbox (127.823708ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Vinhomes enquiries carry the exact apartment reference and still require a customer message (128.9375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Studio groups listings and galleries under rentals and separates assistance and editorial work (401.685833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ gallery sections separate feedback screenshots and retain a feedback draft across tabs and translation (414.448834ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ news drafts survive language and session refresh, save privately and clear from public content after sign-out (424.886791ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ rental-tip edits made during a slow save remain a draft with the latest concurrency timestamp (435.330625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ editorial publication errors translate in place and preserve the incomplete draft (399.056083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ fresh editorial page props update a persistent public snapshot without discarding private staff drafts (127.179958ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a notification read started before Mark all read cannot restore stale unread badges (349.850917ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ password visibility can be enabled before typing and resets when an uncontrolled login is cleared (313.033167ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ both signed-in portals expose bilingual help and customers have no upload controls (160.457ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the owner creates, uploads and publishes a guide without losing a bilingual draft (428.9305ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ lower staff roles can read onboarding but never get its manager controls (350.998959ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the help viewer signs private files on demand and clears them on role changes (414.464833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ owner help loads guides once under network latency without cycling session recovery (440.174542ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ customer help loads guides once under network latency without cycling session recovery (250.465375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ customer help features the private manual immediately without restarting session recovery (275.095166ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ staff help features the private manual immediately without restarting session recovery (487.569125ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the featured manual respects publication and audience instead of exposing owner-only drafts (338.74ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a pending manual access response cannot reopen the player after sign-out (148.559959ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Gary apps follow the public-header language without opening authentication (127.534166ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a late guest import keeps a newer favourite removal and reserves only imported additions (181.880083ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ CRM drafts survive same-account reauthentication but clear on explicit sign-out or another account (523.59375ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Customers Refresh loads newly arrived enquiry-only contacts as well as profiles and CRM records (404.147ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Studio and customer directory load past the API row cap without dropping later rows (381.045958ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Customers Refresh updates a selected conversation history without replacing unsaved CRM notes (415.298833ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Lattice Loader marks active session recovery while drafts stay editable, translates, and stops offline or after recovery (429.198167ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ cold configuration loading shows the Lattice banner and Studio gate before a session identity is known (313.979667ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ cold saved-session restoration keeps the Lattice loader visible until the owner workspace is verified (341.754583ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ admin image uploads retain full original names through cover changes, removal, saving and reopening (578.566459ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a timed-out image identifies its full name and can be selected again without losing the draft (351.508041ms)
+✔ closing the listing editor stops the remaining files in an image upload batch (360.455209ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ toast expiry pauses for hover, focus, hidden pages and translation preserves the remaining time (385.456458ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ partial swipe reveals localized dismissal, pauses expiry and keyboard can close or commit it (68.91975ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ full swipe dismisses, while pointer cancellation and vertical scrolling keep the notification (103.594292ms)
+✔ visible close works without swiping and unmount cancels timers and pointer listeners (59.746625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Tech Text keeps actual English, Vietnamese and CMS text readable in a server-rendered H1 (6.226875ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Tech Text pauses offscreen and in a hidden tab, recovers after idle, and releases all work (170.610292ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Tech Text responds to live motion preference changes without hiding the native headline (18.838708ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ Tech Text repaints edited and translated content, preserves combining marks, and falls back for wrapped lines (12.578333ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ missing canvas support preserves native text and starts no animation loop (1.128625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ canvas context loss restores native text until the drawing context recovers (16.982208ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a drawing failure leaves the headline readable and stops further frames (11.867667ms)
+✔ the homepage hover mode sleeps at rest and stops again after the pointer leaves (56.756625ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ SSR uses a stable reduced-motion preference without consulting the browser (4.180334ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ live motion preference changes preserve drafts and release media listeners on unmount (60.352167ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ legacy media-query listeners work and a missing preference API disables motion (5.596833ms)
+ℹ tests 649
+ℹ suites 0
+ℹ pass 649
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 58719.409458

@@ -1,6 +1,6 @@
 "use client";
 import { ServiceAppsSection } from "./service-apps";
-import Link from "next/link";
+import Link from "./localized-link";
 import { ArrowUpRight,Building2,CalendarCheck,ClipboardList,Heart,MapPin,MessageSquare,UtensilsCrossed,BriefcaseBusiness } from "lucide-react";
 import { useSite } from "./site-context";
 import { LandlordForm } from "./landlord-form";

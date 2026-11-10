@@ -1,5 +1,6 @@
 "use client";
-import Link from "next/link";
+import Link from "./localized-link";
+import { localizedPath, localizedRoute } from "@/lib/localized-routes";
 import { useEffect } from "react";
 import { convertBudget, currencyValue } from "@/lib/currency";
 import { formatPriceQuote } from "@/lib/property-pricing";
@@ -15,9 +16,9 @@ import { NumberTicker } from "./magicui/number-ticker";
 import { filterProperties,readFilters } from "@/lib/property-search";
 import { amenityLabel, typeLabel } from "@/lib/rentals";
 export function HomesPage({savedOnly=false}:{savedOnly?:boolean}){
- const {t,language,content,saved,currency,setCurrency,exchangeRate}=useSite(),router=useRouter(),params=useSearchParams();const filters=readFilters(params),matches=filterProperties(content.properties,filters,{currency,exchangeRate}).filter(p=>!savedOnly||saved.includes(p.id)),found=filters.sort||savedOnly?matches:applyPropertyOrder(matches,content.propertyOrders?.listings);
+ const {t,language,publicPath,content,saved,currency,setCurrency,exchangeRate}=useSite(),router=useRouter(),params=useSearchParams();const filters=readFilters(params),matches=filterProperties(content.properties,filters,{currency,exchangeRate}).filter(p=>!savedOnly||saved.includes(p.id)),found=filters.sort||savedOnly?matches:applyPropertyOrder(matches,content.propertyOrders?.listings);
  useEffect(()=>{if(filters.currency==="USD"||filters.currency==="VND")setCurrency(filters.currency);},[filters.currency,setCurrency]);
- const base=savedOnly?"/saved":"/homes";
+ const base=savedOnly?"/saved":publicPath&&localizedRoute(publicPath)?localizedPath("/homes",language):"/homes";
  function change(key:string,value:string){const query=new URLSearchParams(params.toString());query.delete(key);if(value)query.set(key,value);router.replace(`${base}?${query.toString()}`,{scroll:false});}
  function label(key:string,value:string){if(key==="district")return content.neighbourhoods.find(n=>n.slug===value)?.name||value;if(key==="type")return typeLabel(value,language);if(key==="amenity")return value.split(",").map(a=>amenityLabel(a,language)).join(", ");if(key==="min"||key==="max"){const converted=convertBudget(value,currencyValue(filters.currency),currency,exchangeRate,key);return `${key==="min"?"≥":"≤"} ${formatPriceQuote({min:Number(converted??value),max:null,currency:converted===null?currencyValue(filters.currency):currency,approximate:false,fallback:false},language)}`;}if(key==="beds")return `${value}+ ${t("beds","phòng ngủ")}`;if(key==="baths")return `${value}+ ${t("baths","phòng tắm")}`;return value;}
  const active=Object.entries(filters).filter(([key,value])=>value&&!['sort','period','listing','currency'].includes(key));

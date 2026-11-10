@@ -1,0 +1,1607 @@
+{
+  "generatedAt": "2026-11-10T10:13:00.607Z",
+  "started": "2026-11-10T10:12:57.573Z",
+  "origin": "https://www.garyhome.vn",
+  "verification": "HTTP inspection attempt from the task host; no deployment was performed.",
+  "status": "incomplete",
+  "coverage": {
+    "inspected": 0,
+    "passed": 0,
+    "failed": 50,
+    "skipped": 0,
+    "pending": 0,
+    "skippedUrls": 27
+  },
+  "content_score": null,
+  "technical_score": null,
+  "critical_count": 0,
+  "state": {
+    "version": 1,
+    "analysisVersion": 2,
+    "status": "incomplete",
+    "startedAt": 1794305577574,
+    "updatedAt": 1794305580607,
+    "config": {
+      "allowedOrigins": [
+        "https://www.garyhome.vn"
+      ],
+      "maxUrls": 500,
+      "maxDepth": 4,
+      "concurrency": 2,
+      "requestIntervalMs": 1000,
+      "timeoutMs": 10000,
+      "maxDurationMs": 900000,
+      "languageMode": "cookie",
+      "scope": "site",
+      "languages": [
+        "en",
+        "vi"
+      ]
+    },
+    "queue": [],
+    "pages": [
+      {
+        "url": "https://www.garyhome.vn/",
+        "finalUrl": "https://www.garyhome.vn/",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/",
+        "finalUrl": "https://www.garyhome.vn/",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes",
+        "finalUrl": "https://www.garyhome.vn/homes",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes",
+        "finalUrl": "https://www.garyhome.vn/homes",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/neighbourhoods",
+        "finalUrl": "https://www.garyhome.vn/neighbourhoods",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/neighbourhoods",
+        "finalUrl": "https://www.garyhome.vn/neighbourhoods",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/services",
+        "finalUrl": "https://www.garyhome.vn/services",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/services",
+        "finalUrl": "https://www.garyhome.vn/services",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/vinhomes",
+        "finalUrl": "https://www.garyhome.vn/vinhomes",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/vinhomes",
+        "finalUrl": "https://www.garyhome.vn/vinhomes",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/landlords",
+        "finalUrl": "https://www.garyhome.vn/landlords",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/landlords",
+        "finalUrl": "https://www.garyhome.vn/landlords",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/contact",
+        "finalUrl": "https://www.garyhome.vn/contact",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/contact",
+        "finalUrl": "https://www.garyhome.vn/contact",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/activities",
+        "finalUrl": "https://www.garyhome.vn/activities",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/activities",
+        "finalUrl": "https://www.garyhome.vn/activities",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/feedback",
+        "finalUrl": "https://www.garyhome.vn/feedback",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/feedback",
+        "finalUrl": "https://www.garyhome.vn/feedback",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/privacy",
+        "finalUrl": "https://www.garyhome.vn/privacy",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/privacy",
+        "finalUrl": "https://www.garyhome.vn/privacy",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/credits",
+        "finalUrl": "https://www.garyhome.vn/credits",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/credits",
+        "finalUrl": "https://www.garyhome.vn/credits",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+        "finalUrl": "https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+        "finalUrl": "https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "finalUrl": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/viewing-checklist",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/viewing-checklist",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/viewing-checklist",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/viewing-checklist",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+        "status": 0,
+        "language": "en",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+        "finalUrl": "https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+        "status": 0,
+        "language": "vi",
+        "indexable": false,
+        "inspectionStatus": "failed",
+        "crawlError": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 0,
+        "content": {
+          "score": null,
+          "findings": []
+        },
+        "technical": {
+          "score": null,
+          "findings": []
+        },
+        "responseMs": 0,
+        "bytes": 0
+      }
+    ],
+    "skippedUrls": [
+      {
+        "url": "https://www.garyhome.vn/robots.txt",
+        "reason": "getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/sitemap.xml",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/neighbourhoods",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/services",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/vinhomes",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/landlords",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/contact",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/activities",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/feedback",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/privacy",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/credits",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/viewing-checklist",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      }
+    ],
+    "visited": [
+      "robots::https://www.garyhome.vn/robots.txt",
+      "sitemap::https://www.garyhome.vn/sitemap.xml",
+      "page:en:https://www.garyhome.vn/",
+      "page:vi:https://www.garyhome.vn/",
+      "page:en:https://www.garyhome.vn/homes",
+      "page:vi:https://www.garyhome.vn/homes",
+      "page:en:https://www.garyhome.vn/neighbourhoods",
+      "page:vi:https://www.garyhome.vn/neighbourhoods",
+      "page:en:https://www.garyhome.vn/services",
+      "page:vi:https://www.garyhome.vn/services",
+      "page:en:https://www.garyhome.vn/vinhomes",
+      "page:vi:https://www.garyhome.vn/vinhomes",
+      "page:en:https://www.garyhome.vn/tips-and-news",
+      "page:vi:https://www.garyhome.vn/tips-and-news",
+      "page:en:https://www.garyhome.vn/landlords",
+      "page:vi:https://www.garyhome.vn/landlords",
+      "page:en:https://www.garyhome.vn/contact",
+      "page:vi:https://www.garyhome.vn/contact",
+      "page:en:https://www.garyhome.vn/activities",
+      "page:vi:https://www.garyhome.vn/activities",
+      "page:en:https://www.garyhome.vn/feedback",
+      "page:vi:https://www.garyhome.vn/feedback",
+      "page:en:https://www.garyhome.vn/privacy",
+      "page:vi:https://www.garyhome.vn/privacy",
+      "page:en:https://www.garyhome.vn/credits",
+      "page:vi:https://www.garyhome.vn/credits",
+      "page:en:https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "page:vi:https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "page:en:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "page:vi:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "page:en:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "page:vi:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "page:en:https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "page:vi:https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "page:en:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "page:vi:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "page:en:https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "page:vi:https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "page:en:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "page:vi:https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "page:en:https://www.garyhome.vn/tips-and-news/viewing-checklist",
+      "page:vi:https://www.garyhome.vn/tips-and-news/viewing-checklist",
+      "page:en:https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+      "page:vi:https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+      "page:en:https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+      "page:vi:https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+      "page:en:https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "page:vi:https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "page:en:https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "page:vi:https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "page:en:https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+      "page:vi:https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search"
+    ],
+    "canonicalUrls": [],
+    "robots": {
+      "https://www.garyhome.vn": {
+        "fetched": true,
+        "allowed": false,
+        "rules": [],
+        "delayMs": 0,
+        "error": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn"
+      }
+    },
+    "hostNextAt": {
+      "www.garyhome.vn": 1794305580591
+    },
+    "sitemapUrls": [],
+    "linkChecks": {},
+    "requests": 0,
+    "transportMode": "pinned",
+    "diagnostics": [
+      {
+        "url": "https://www.garyhome.vn/robots.txt",
+        "kind": "robots",
+        "reason": "getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305577583
+      },
+      {
+        "url": "https://www.garyhome.vn/robots.txt",
+        "kind": "robots",
+        "reason": "getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 2,
+        "at": 1794305578591
+      },
+      {
+        "url": "https://www.garyhome.vn/robots.txt",
+        "kind": "robots",
+        "reason": "getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 3,
+        "at": 1794305580595
+      },
+      {
+        "url": "https://www.garyhome.vn/sitemap.xml",
+        "kind": "sitemap",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/homes",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/homes",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/neighbourhoods",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/neighbourhoods",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/services",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580596
+      },
+      {
+        "url": "https://www.garyhome.vn/services",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/vinhomes",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/vinhomes",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/landlords",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/landlords",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/contact",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/contact",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/activities",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/activities",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/feedback",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/feedback",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/privacy",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/privacy",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/credits",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/credits",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580597
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580606
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/viewing-checklist",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/viewing-checklist",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/prepare-your-rental-brief",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/organise-your-shortlist",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/hanoi-rental-outlook-q3-2026",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      },
+      {
+        "url": "https://www.garyhome.vn/tips-and-news/metro-and-your-hanoi-rental-search",
+        "kind": "page",
+        "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo ENOTFOUND www.garyhome.vn",
+        "attempts": 1,
+        "at": 1794305580607
+      }
+    ],
+    "finishedAt": 1794305580607
+  }
+}

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readJsonBody, BodyReadError } from "@/lib/request-body";
 import { request as boundedRequest } from "@/lib/requests";
 import { StaffRequestError, staffRequest } from "@/lib/staff-server";
-import { auditDatabase, startAudit, advanceAudit } from "@/lib/seo-audit/service";
+import { auditDatabase, startAudit, advanceAudit, resumeAudit } from "@/lib/seo-audit/service";
 import { auditSnapshot, updateAuditSettings } from "@/lib/seo-audit/store";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ const uuid = z.string().uuid();
 const command = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), url: z.string().trim().min(1).max(2048).optional() }),
   z.object({ action: z.literal("advance"), runId: uuid }),
+  z.object({ action: z.literal("resume"), runId: uuid }),
 ]);
 const settingsInput = z.object({ weeklyEnabled: z.boolean(), limits: z.object({
   maxUrls: z.number().int().min(1).max(500), maxDepth: z.number().int().min(0).max(4),
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     if (input.action === "start") {
       const run = await startAudit(input.url ? "page" : "manual", user.id, input.url);
       runId = run?.id;
-    } else { runId = input.runId; await advanceAudit(runId); }
+    } else { runId = input.runId; if(input.action==="resume")await resumeAudit(runId);else await advanceAudit(runId); }
     return Response.json(await auditSnapshot(auditDatabase(), selectedId || runId), { headers });
   } catch (error) { return failure(error); }
 }

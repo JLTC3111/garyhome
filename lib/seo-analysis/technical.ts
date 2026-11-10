@@ -21,6 +21,8 @@ function typedJsonLdNode(node: unknown, depth = 0): boolean {
   return !!typed || Array.isArray(value["@graph"]) && value["@graph"].some(n => typedJsonLdNode(n, depth + 1));
 }
 export function analyzeTechnical(input: TechnicalInput) {
+  // Status zero is a transport failure, not an inspected HTTP/HTML response.
+  if (input.status <= 0) return { score: null, findings: [] };
   const d = input.document, findings: Finding[] = [];
   const add = (id: string, severity: Finding["severity"], title: string, explanation: string, recommendation: string, evidence?: string) => findings.push({ id, category: "technical", severity, title, explanation, recommendation, ...(evidence ? { evidence } : {}) });
   const ok = input.status >= 200 && input.status < 300;

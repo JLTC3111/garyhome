@@ -1,7 +1,7 @@
 "use client";
 import { ContentImage } from "./content-image";
 import { useState } from "react";
-import Link from "next/link";
+import Link from "./localized-link";
 import { ArrowUpRight, Images, MessageSquare, Users } from "lucide-react";
 import { useSite } from "./site-context";
 import { PublishedFeedback } from "./published-feedback";

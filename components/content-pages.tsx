@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "./localized-link";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, ArrowUpRight, MapPin, Mail, Phone } from "lucide-react";
 import { useSite } from "./site-context";

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect,useRef,useState,type FormEvent } from "react";
-import Link from "next/link";
+import Link from "./localized-link";
 import { createClient } from "@supabase/supabase-js";
 import { ArrowUpRight,Check,FileText,Upload,X } from "lucide-react";
 import { useSite } from "./site-context";

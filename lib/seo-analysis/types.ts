@@ -25,6 +25,7 @@ export type TechnicalInput = {
 // An inspection summary, never a prediction of search rank. Advisory checks do
 // not change the score; unavailable checks must not be reported as passed.
 export function report(findings: Finding[]): AnalysisReport {
-  const scored = findings.filter(f => f.severity !== "recommendation");
-  return { score: scored.length ? Math.round(100 * scored.filter(f => f.severity === "passed").length / scored.length) : null, findings };
+  const unique = findings.filter((finding, index) => findings.findIndex(other => other.id === finding.id) === index);
+  const scored = unique.filter(f => f.severity !== "recommendation");
+  return { score: scored.length ? Math.round(100 * scored.filter(f => f.severity === "passed").length / scored.length) : null, findings: unique };
 }

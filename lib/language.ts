@@ -7,4 +7,4 @@ export function persistLanguage(language:Language) {
 }
 // Runs in the head before the first paint. Existing localStorage preferences are
 // migrated without ever painting the wrong-language page during hydration.
-export const LANGUAGE_BOOTSTRAP=`try{var p=localStorage.getItem('gary-language');if(p==='en'||p==='vi'){if(document.documentElement.lang!==p){document.documentElement.dataset.languagePending='';}document.cookie='gary-language='+p+'; Path=/; Max-Age=31536000; SameSite=Lax'+(window.location?.protocol==='https:'?'; Secure':'');}}catch(e){}`;
+export const LANGUAGE_BOOTSTRAP=`try{var m=(window.location?.pathname||'').match(/^\\/(en|vi)(?:\\/|$)/);var p=m?m[1]:localStorage.getItem('gary-language');if(p==='en'||p==='vi'){if(document.documentElement.lang!==p){document.documentElement.dataset.languagePending='';}document.cookie='gary-language='+p+'; Path=/; Max-Age=31536000; SameSite=Lax'+(window.location?.protocol==='https:'?'; Secure':'');if(m)localStorage.setItem('gary-language',p);}}catch(e){}`;

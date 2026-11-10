@@ -75,3 +75,77 @@ test('active audit polling advances the persisted run, then stops after completi
  assert.equal(pending.length,1);await act(async()=>pending.shift()());
  assert.deepEqual(JSON.parse(calls.at(-1).init.body),{action:'advance',runId:fixture().selectedRun.id});assert.equal(pending.length,0);
 });
+
+test('uninspected pages remain neutral and unscored, with distinct failed skipped and pending outcomes',async t=>{
+ const snapshot=fixture();
+ snapshot.selectedRun.state.pages=[
+  {url:'https://garyhome.vn/timeout',finalUrl:'https://garyhome.vn/timeout',language:'en',indexable:false,status:0,content:{score:100,findings:[{...finding('fabricated-content','passed'),category:'content'}]},technical:{score:0,findings:[finding('fabricated-critical','critical')]},crawlError:'Request timed out'},
+  {url:'https://garyhome.vn/blocked',finalUrl:'https://garyhome.vn/blocked',language:'vi',indexable:false,status:0,inspectionStatus:'skipped',content:{score:null,findings:[]},technical:{score:null,findings:[]},crawlError:'Robots policy excluded inspection'},
+ ];
+ snapshot.selectedRun.state.queue=[{kind:'page',url:'https://garyhome.vn/pending',language:'vi'},{kind:'page',url:'https://garyhome.vn/pending',language:'vi'}];
+ snapshot.selectedRun.content_score=78;snapshot.selectedRun.technical_score=90;
+ const site={current:siteValue()},Component=loader(site,async()=>Response.json(snapshot));
+ let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
+ assert.equal(view.root.findAllByProps({className:'seo-page'}).length,3);
+ assert.equal(view.root.findAllByProps({'aria-label':'Critical technical issues'}).length,0);
+ assert.equal(view.root.findAllByProps({className:'seo-signal seo-passed'}).length,0);
+ assert.equal(view.root.findAllByType('progress').length,0,'unknown scores must not become zero progress bars');
+ assert.doesNotMatch(text(view.toJSON()),/fabricated-critical|fabricated-content|78%|90%/);
+ assert.equal(view.root.findAllByProps({'data-inspection':'pending'}).length,1);
+ const filter=view.root.findAllByType('select').find(select=>select.findAllByType('option').some(option=>option.props.value==='failed'));
+ await act(async()=>filter.props.onChange({target:{value:'failed'}}));
+ assert.equal(view.root.findAllByProps({className:'seo-page'}).length,1);
+ assert.match(text(view.root.findByProps({className:'seo-page'})),/Request timed out/);
+});
+
+test('legacy history scores are withheld until rescanned and print report failures are actionable',async t=>{
+ const site={current:siteValue()},snapshot=fixture(),Component=loader(site,async()=>Response.json(snapshot));
+ const originalWindow=globalThis.window;globalThis.window={open:()=>null};t.after(()=>{globalThis.window=originalWindow;});
+ let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
+ const history=view.root.findByProps({className:'seo-history'});
+ assert.match(text(history),/Legacy \/ needs rescan/);assert.doesNotMatch(text(history),/100%|50%/);
+ const print=view.root.findAllByType('button').find(button=>text(button).includes('Print / Save PDF'));
+ assert.ok(print);await act(async()=>print.props.onClick());
+ assert.match(text(view.root.findByProps({role:'alert'})),/Allow the report window/);
+});
+
+test('interrupted audits expose explicit resume without discarding the selected run or original start',async t=>{
+ const site={current:siteValue()},snapshot=fixture('incomplete'),calls=[];
+ snapshot.selectedRun.state.queue=[{kind:'page',url:'https://garyhome.vn/pending',language:'en'}];
+ const Component=loader(site,async(url,init)=>{calls.push({url,init});return Response.json(snapshot);});
+ let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
+ const resume=view.root.findAllByType('button').find(button=>text(button).includes('Resume interrupted audit'));
+ assert.ok(resume);assert.match(text(view.toJSON()),/new 15-minute execution segment/);
+ await act(async()=>resume.props.onClick());
+ assert.deepEqual(JSON.parse(calls.at(-1).init.body),{action:'resume',runId:snapshot.selectedRun.id});
+ assert.equal(calls.at(-1).url,'/api/admin/seo?runId='+snapshot.selectedRun.id);
+ assert.match(text(view.toJSON()),/10\/11\/2026/);
+});
+
+test('only safe advance requests retry transient failures with backoff and stop after three retries',async t=>{
+ const originalTimer=globalThis.setTimeout,originalClear=globalThis.clearTimeout,pending=[];
+ globalThis.setTimeout=(fn,delay,...args)=>[2500,5000,10000,20000].includes(delay)?(pending.push({fn,delay}),987654):originalTimer(fn,delay,...args);
+ globalThis.clearTimeout=id=>id===987654?undefined:originalClear(id);
+ t.after(()=>{globalThis.setTimeout=originalTimer;globalThis.clearTimeout=originalClear;});
+ const site={current:siteValue()},calls=[];
+ const Component=loader(site,async(url,init)=>{calls.push({url,init});return init.method==='GET'?Response.json(fixture('running')):Response.json({error:'Temporary audit storage interruption'},{status:503});});
+ let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
+ const delays=[];
+ for(let i=0;i<4;i++) {assert.equal(pending.length,1);const job=pending.shift();delays.push(job.delay);await act(async()=>job.fn());}
+ assert.deepEqual(delays,[2500,5000,10000,20000]);assert.equal(pending.length,0);
+ assert.equal(calls.filter(call=>call.init.method==='POST').length,4);
+ assert.ok(calls.filter(call=>call.init.method==='POST').every(call=>JSON.parse(call.init.body).action==='advance'));
+ assert.match(text(view.toJSON()),/Automatic retries stopped after three attempts/);
+ const continueButton=view.root.findAllByType('button').find(button=>text(button).includes('Continue saved scan'));assert.ok(continueButton);
+});
+
+test('authorization failures pause safe advancement without retrying a revoked account',async t=>{
+ const originalTimer=globalThis.setTimeout,originalClear=globalThis.clearTimeout,pending=[];
+ globalThis.setTimeout=(fn,delay,...args)=>delay===2500?(pending.push(fn),987654):originalTimer(fn,delay,...args);
+ globalThis.clearTimeout=id=>id===987654?undefined:originalClear(id);
+ t.after(()=>{globalThis.setTimeout=originalTimer;globalThis.clearTimeout=originalClear;});
+ const site={current:siteValue()};
+ const Component=loader(site,async(url,init)=>init.method==='GET'?Response.json(fixture('running')):Response.json({error:'Staff access required'},{status:403}));
+ let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
+ await act(async()=>pending.shift()());assert.equal(pending.length,0);assert.match(text(view.toJSON()),/Staff access required/);assert.doesNotMatch(text(view.toJSON()),/will retry safely/);
+});

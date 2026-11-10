@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import Link from "next/link";
+import Link from "./localized-link";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { useSite } from "./site-context";
 import { BlurFade } from "./magicui/blur-fade";

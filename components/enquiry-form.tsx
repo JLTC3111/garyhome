@@ -1,6 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
+import Link from "./localized-link";
 import { ArrowUpRight, Check, Mail, Phone } from "lucide-react";
 import { useSite } from "./site-context";
 import { fetchWithDeadline } from "@/lib/requests";

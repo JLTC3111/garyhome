@@ -1,6 +1,6 @@
 "use client";
 import { ContentImage } from "./content-image";
-import Link from "next/link";
+import Link from "./localized-link";
 import { ArrowUpRight, Building2 } from "lucide-react";
 import { useSite } from "./site-context";
 import { PropertyGallery } from "./property-gallery";

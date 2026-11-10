@@ -1,0 +1,3 @@
+(node:9944) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"batch":1,"status":"incomplete","coverage":{"inspected":0,"passed":0,"failed":50,"skipped":0,"pending":0,"skippedUrls":27},"requests":0,"elapsedMs":3035}

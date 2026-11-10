@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "./localized-link";
 import { MessageSquare,RefreshCw,Star } from "lucide-react";
 import { useSite } from "./site-context";
 import { usePublicFeedback } from "./use-public-feedback";

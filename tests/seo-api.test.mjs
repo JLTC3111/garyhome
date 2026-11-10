@@ -20,6 +20,7 @@ function endpoint(options={}) {
     auditDatabase(){state.trace.push({op:'database'});return database;},
     async startAudit(...args){state.trace.push({op:'start',args});if(state.serviceError)throw new Error('fixture failure');return {id:runId};},
     async advanceAudit(...args){state.trace.push({op:'advance',args});if(state.serviceError)throw new Error('fixture failure');},
+    async resumeAudit(...args){state.trace.push({op:'resume',args});if(state.serviceError)throw new Error('fixture failure');return {id:runId};},
   };
   const store={
     async auditSnapshot(db,id){assert.equal(db,database);state.trace.push({op:'snapshot',id});return {runs:[],settings:{weeklyEnabled:false,limits},activeRun:state.activeRun,selectedRun:null};},
@@ -68,7 +69,7 @@ function endpoint(options={}) {
   }
   return {state,send,cron};
 }
-const writes=state=>state.trace.filter(event=>['start','advance','settings'].includes(event.op));
+const writes=state=>state.trace.filter(event=>['start','advance','resume','settings'].includes(event.op));
 
 test('all staff audit endpoints authorize before accessing privileged audit services',async()=>{
   for(const method of ['GET','POST','PATCH'])for(const options of [{valid:false},{role:null}]){
@@ -127,4 +128,14 @@ test('authorized cron delegates the weekly due check and advances persisted work
 });
 test('cron failures return a bounded credential-free operational error',async()=>{
   const h=endpoint({serviceError:true}),response=await h.cron();assert.equal(response.status,503);assert.match((await response.json()).error,/Scheduled SEO audit failed/);assert.equal(h.state.trace.some(e=>e.op==='database'),false);
+});
+
+test('resume validates identity and run ID before resuming the selected interrupted audit',async()=>{
+ const h=endpoint();
+ const response=await h.send('POST',{action:'resume',runId},{query:'?runId='+runId});
+ assert.equal(response.status,200);assert.deepEqual(writes(h.state),[{op:'resume',args:[runId]}]);
+ assert.equal(h.state.trace[0].access,'view');assert.equal(h.state.trace.find(e=>e.op==='snapshot').id,runId);
+ for(const body of [{action:'resume'},{action:'resume',runId:'invalid'}]){const invalid=endpoint();assert.equal((await invalid.send('POST',body)).status,400);assert.deepEqual(writes(invalid.state),[]);}
+ const denied=endpoint({valid:false});assert.equal((await denied.send('POST',{action:'resume',runId})).status,401);assert.deepEqual(writes(denied.state),[]);
+ const invalidSelection=endpoint();assert.equal((await invalidSelection.send('POST',{action:'resume',runId},{query:'?runId=invalid'})).status,400);assert.deepEqual(writes(invalidSelection.state),[]);
 });

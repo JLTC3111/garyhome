@@ -1,8 +1,8 @@
-import { cookies } from "next/headers";
-import { LANGUAGE_BOOTSTRAP, languageValue } from "@/lib/language";
+import { cookies, headers } from "next/headers";
+import { LANGUAGE_BOOTSTRAP } from "@/lib/language";
 import { CURRENCY_COOKIE, currencyValue } from "@/lib/currency";
 import { getExchangeRate } from "@/lib/exchange-rate-server";
-import { loadPageContent, pageMetadata, siteUrl } from "@/lib/seo";
+import { loadPageContent, pageMetadata, siteUrl, requestLanguage } from "@/lib/seo";
 import type { Metadata } from "next";
 import "./globals.css";
 import "./portal.css";
@@ -52,9 +52,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const [content, exchangeRate] = await Promise.all([loadPageContent(), getExchangeRate()]);
-  const initial = { ...content, exchangeRate, publicOrigin: siteUrl() };
+  const initial = { ...content, exchangeRate, publicOrigin: siteUrl(), publicPath: (await headers()).get("x-gary-public-path") || undefined };
   const preferences = await cookies();
-  const initialLanguage=languageValue(preferences.get("gary-language")?.value);
+  const initialLanguage=await requestLanguage();
   const initialCurrency=currencyValue(preferences.get(CURRENCY_COOKIE)?.value);
   return (
     // The head bootstrap can add the temporary language-pending attribute before

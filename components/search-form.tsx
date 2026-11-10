@@ -9,6 +9,7 @@ import { SpotlightCard } from "./react-bits/spotlight-card";
 import { AMENITIES, amenityLabel, canonicalAmenity, RENTAL_TYPES, typeLabel } from "@/lib/rentals";
 import type { Filters } from "@/lib/property-search";
 import { convertBudget, currencyValue } from "@/lib/currency";
+import { localizedPath, localizedRoute } from "@/lib/localized-routes";
 import { CurrencySwitcher } from "./currency-switcher";
 
 function BudgetField({initial,advanced=false}:{initial:Filters;advanced?:boolean}){
@@ -28,12 +29,12 @@ function BathroomField({initial,main=false}:{initial:Filters;main?:boolean}){
 }
 
 export function SearchForm({compact=false,initial={},action="/homes",roomsFirst=false}:{compact?:boolean;initial?:Filters;action?:string;roomsFirst?:boolean}) {
-  const {t,content,language}=useSite();const id=useId(),trigger=useRef<HTMLButtonElement>(null);
+  const {t,content,language,publicPath}=useSite();const id=useId(),trigger=useRef<HTMLButtonElement>(null);
   const [advanced,setAdvanced]=useState(!!(initial.q||initial.amenity||(roomsFirst?(initial.min||initial.max):(initial.beds||initial.baths))));
   const amenities=[...new Set([...Object.keys(AMENITIES),...content.properties.flatMap(p=>p.amenities.map(canonicalAmenity))])];
   const selected=(initial.amenity||"").split(",").map(canonicalAmenity);
   return <SpotlightCard className={`search-box rental-search ${compact?"rental-search-compact":""} ${roomsFirst?"rental-search-rooms-first":""}`}>
-    <form action={action} method="get" aria-labelledby={`${id}-heading`}>
+    <form action={publicPath&&localizedRoute(publicPath)?localizedPath(action,language):action} method="get" aria-labelledby={`${id}-heading`}>
       <div className="rental-search-heading"><h2 id={`${id}-heading`}>{t("Find Your Rental","Tìm nhà cho thuê")}</h2><button ref={trigger} type="button" className={`rental-requirements-trigger ${advanced?"active":""}`} onClick={()=>setAdvanced(!advanced)} id={`${id}-trigger`} aria-controls={`${id}-panel`} aria-expanded={advanced}><span>{t("Custom Requirements","Nhu cầu riêng")}</span><MoreVertical size={21}/></button></div>
       <input type="hidden" name="sort" value={initial.sort||""}/>
       <div className="search-fields">

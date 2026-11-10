@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "./localized-link";
 import { ArrowUpRight, ChevronDown, Heart, Trash2, X } from "lucide-react";
 import { useSite } from "./site-context";
 import { isPublicRental, listingCode, propertyTitle } from "@/lib/rentals";

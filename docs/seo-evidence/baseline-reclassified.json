@@ -1,0 +1,16 @@
+{
+  "label": "Reclassification of the same historical observations, not a fresh production audit",
+  "id": "f62a4c02-8343-4bdd-88e5-023624b37033",
+  "coverage": {
+    "inspected": 59,
+    "passed": 12,
+    "failed": 6,
+    "skipped": 0,
+    "pending": 29,
+    "skippedUrls": 27
+  },
+  "content": 78,
+  "technical": 98,
+  "critical": 0,
+  "pendingTasks": 46
+}

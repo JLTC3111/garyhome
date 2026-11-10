@@ -75,3 +75,22 @@ test('hreflang sets need a language-specific self reference only when alternates
  assert.equal(find(inspect(`<link rel="alternate" hreflang="vi" href="${url}">`),'technical-hreflang-self').severity,'warning');
  assert.equal(find(inspect(`<link rel="alternate" hreflang="en" href="${url}"><link rel="alternate" hreflang="vi" href="https://garyhome.vn/vi/renting">`),'technical-hreflang-self').severity,'passed');
 });
+
+test('actual React streamed Suspense content is analyzed in its main boundary instead of its loading shell',async()=>{
+ const React=await import('react'),{renderToPipeableStream}=await import('react-dom/server'),{PassThrough}=await import('node:stream');
+ let ready=false;const pending=new Promise(resolve=>setTimeout(()=>{ready=true;resolve();},15));
+ function DelayedPage(){if(!ready)throw pending;return React.createElement('section',null,React.createElement('h1',null,'A rental guide for Hanoi'),React.createElement('p',null,'Inspect the lease and confirm the included services before arranging your viewing.'));}
+ const html=await new Promise((resolve,reject)=>{const output=new PassThrough();let text='';output.on('data',chunk=>{text+=chunk;});output.on('end',()=>resolve(text));output.on('error',reject);const stream=renderToPipeableStream(React.createElement('html',null,React.createElement('body',null,React.createElement('main',null,React.createElement(React.Suspense,{fallback:React.createElement('p',null,'Loading content...')},React.createElement(DelayedPage))),React.createElement('footer',null,React.createElement('h2',null,'Footer navigation')))),{onShellReady(){stream.pipe(output);},onError:reject});});
+ assert.match(html,/<template id="B:/);assert.match(html,/\$RC\("B:/);
+ assert.ok(html.indexOf('<h1>')>html.indexOf('</main>'),'fixture must reproduce server streaming page content after the shell');
+ const document=parseHtml(html,url);
+ assert.deepEqual(document.headings,[{level:1,text:'A rental guide for Hanoi'}]);assert.match(document.text,/Inspect the lease/);assert.doesNotMatch(document.text,/Loading content|Footer navigation/);
+ assert.equal(find(analyzeContent(document),'content-heading').severity,'passed');
+});
+
+test('streamed heading recovery requires an observed replacement into main and never promotes unrelated hidden or footer content',()=>{
+ const html='<html><body><main><p>A real page without a main heading.</p></main><footer><!--$?--><template id="B:2"></template><p>Footer fallback</p><!--/$--></footer><div hidden id="S:2"><section><h1>Footer heading</h1></section></div><div hidden id="S:unrelated"><h1>Unused hidden heading</h1></div><script>$RC("B:2","S:2")</script></body></html>';
+ const document=parseHtml(html,url);assert.equal(document.headings.length,0);assert.doesNotMatch(document.text,/Footer|hidden/);assert.equal(find(analyzeContent(document),'content-heading').severity,'warning');
+ const missing='<main><!--$?--><template id="B:0"></template><p>Loading</p><!--/$--></main><script>$RC("B:0","S:0")</script>';
+ assert.equal(find(analyzeContent(parseHtml(missing,url)),'content-heading').severity,'warning','an unfinished stream must not invent a main heading');
+});

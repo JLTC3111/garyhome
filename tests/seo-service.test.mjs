@@ -134,3 +134,60 @@ test('resuming legacy parser evidence re-evaluates successful pages before assig
  assert.deepEqual(saved.canonicalUrls,[]);assert.deepEqual(saved.linkChecks,{});
  assert.match(saved.resumeHistory[0].reason,/Legacy parser/);
 });
+
+
+test('site resume refreshes cached sitemap inventory across deployments and archives previous coverage evidence',async()=>{
+ const state=crawlState();state.status='incomplete';state.finishedAt=192000;
+ const oldUrls=[origin+'/',origin+'/homes'];
+ state.sitemapUrls=[...oldUrls];state.sitemapInspections=[{url:origin+'/sitemap.xml',status:200,valid:true,entries:2,redirects:[origin+'/sitemap-old.xml']}];
+ const oldSitemapFinding={...finding('sitemap-discovery','warning'),evidence:'Old inventory did not include the localized canonical.'};
+ state.pages[0].technical={score:33,findings:[finding('technical-http','passed'),oldSitemapFinding,finding('canonical','warning')]};
+ state.visited=['page:en:'+origin+'/observed','sitemap::'+origin+'/sitemap.xml','sitemap::'+origin+'/old-index.xml','robots::'+origin+'/robots.txt'];
+ state.queue.push({kind:'sitemap',url:origin+'/old-index.xml',depth:1,attempts:2},{kind:'sitemap',url:origin+'/sitemap.xml',depth:0});
+ const h=serviceHarness({state,status:'incomplete'});await h.resumeAudit(runId);
+ const saved=h.calls.resumed[0].state;
+ assert.deepEqual(saved.sitemapUrls,[]);assert.deepEqual(saved.sitemapInspections,[]);
+ assert.deepEqual(saved.queue.filter(task=>task.kind==='sitemap'),[{kind:'sitemap',url:origin+'/sitemap.xml',depth:0,attempts:0}]);
+ assert.equal(saved.queue[0].kind,'sitemap','current inventory is refreshed before pending page work');
+ assert.ok(saved.queue.some(task=>task.kind==='page'&&task.url===origin+'/next'),'pending published page survives the inventory refresh');
+ assert.deepEqual(saved.visited,['page:en:'+origin+'/observed']);
+ assert.deepEqual(saved.pages[0].technical.findings.map(item=>item.id),['technical-http','canonical']);assert.equal(saved.pages[0].technical.score,50);
+ assert.equal(saved.sitemapHistory.length,1);assert.deepEqual(saved.sitemapHistory[0].urls,oldUrls);
+ assert.equal(saved.sitemapHistory[0].segmentStartedAt,1000);assert.equal(saved.sitemapHistory[0].inspections[0].valid,true);
+ assert.deepEqual(saved.sitemapHistory[0].pageFindings[0].findings,[oldSitemapFinding]);
+ assert.deepEqual(state.sitemapUrls,oldUrls,'source segment evidence supplied by the caller is not rewritten');
+});
+
+test('individual-page resume does not enqueue site inventories or expand its inspection scope',async()=>{
+ const state=crawlState();state.status='incomplete';state.config.scope='page';state.queue=[];
+ const failed=page(origin+'/listing','failed');state.pages=[failed];
+ state.sitemapUrls=[origin+'/previous-inventory-evidence'];state.visited=['sitemap::'+origin+'/sitemap.xml'];
+ const h=serviceHarness({state,status:'incomplete'});await h.resumeAudit(runId);
+ const saved=h.calls.resumed[0].state;
+ assert.ok(saved.queue.every(task=>task.kind==='page'));assert.equal(saved.queue.length,1);
+ assert.equal(saved.queue[0].url,failed.url);assert.equal(saved.config.scope,'page');
+ assert.deepEqual(saved.sitemapUrls,state.sitemapUrls);assert.equal(saved.sitemapHistory,undefined);
+});
+
+test('freshly fetched resume inventory replaces old missing-page warnings without hiding genuine omissions',async()=>{
+ const {advanceCrawl}=await import('../lib/seo-audit/crawler.ts');
+ const state=crawlState();state.status='incomplete';state.queue=[];
+ const listed={...page(origin+'/en/homes'),canonical:origin+'/en/homes'},missing={...page(origin+'/en/contact'),canonical:origin+'/en/contact'};
+ for(const row of [listed,missing])row.technical.findings.push(finding('sitemap-discovery','warning'));
+ state.pages=[listed,missing];state.sitemapUrls=[origin+'/homes'];state.sitemapInspections=[{url:origin+'/sitemap.xml',status:200,valid:true,entries:1}];
+ state.visited=state.pages.map(row=>'page:en:'+row.url);state.canonicalUrls=state.pages.map(row=>'en:'+row.url);
+ const h=serviceHarness({state,status:'incomplete'});await h.resumeAudit(runId);
+ const resumed=h.calls.resumed[0].state;let time=resumed.startedAt;const requests=[];
+ await advanceCrawl(resumed,{now:()=>time,sleep:async ms=>{time+=ms;},resolveHost:async()=>['93.184.216.34'],fetch:async url=>{
+  requests.push(url);
+  if(url===origin+'/robots.txt')return new Response('User-agent: *\nAllow: /',{headers:{'content-type':'text/plain'}});
+  if(url===origin+'/sitemap.xml')return new Response('<urlset><url><loc>'+origin+'/en/homes</loc></url></urlset>',{headers:{'content-type':'application/xml'}});
+  throw new Error('Unexpected redundant request: '+url);
+ }});
+ assert.deepEqual(requests,[origin+'/robots.txt',origin+'/sitemap.xml']);
+ assert.equal(resumed.status,'completed');assert.deepEqual(resumed.sitemapUrls,[origin+'/en/homes']);
+ assert.equal(resumed.pages.find(row=>row.url===listed.url).technical.findings.find(item=>item.id==='sitemap-discovery').severity,'passed');
+ assert.equal(resumed.pages.find(row=>row.url===missing.url).technical.findings.find(item=>item.id==='sitemap-discovery').severity,'warning','a genuine fresh-inventory omission is still reported');
+ assert.deepEqual(resumed.sitemapHistory[0].urls,[origin+'/homes']);
+ assert.equal(resumed.sitemapHistory[0].pageFindings.length,2);
+});

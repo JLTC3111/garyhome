@@ -1,7 +1,8 @@
 import { loadContent, staffAdminClient } from "../server";
 import { requireAvailableContent } from "../content-unavailable";
 import { auditEnvironment, auditSeeds } from "./config";
-import { advanceCrawl, createCrawl, isExcludedUrl, normalizeCrawlUrl } from "./crawler";
+import { advanceCrawl, createCrawl, isExcludedUrl, normalizeCrawlUrl, type CrawlState } from "./crawler";
+import { report, type Finding } from "../seo-analysis/types";
 import { auditNetworkOptions } from "../seo-audit-runtime";
 import { normalizeAuditState } from "./normalize";
 import { compareAuditMetadata } from "./compare";
@@ -11,6 +12,37 @@ export function auditDatabase() {
   const db = staffAdminClient();
   if (!db) throw new Error("SEO audits require the server-only Supabase secret key.");
   return db;
+}
+
+type SitemapHistory = {
+  replacedAt: number; segmentStartedAt: number; urls: string[];
+  inspections: NonNullable<CrawlState["sitemapInspections"]>;
+  pageFindings: { url: string; language: string; findings: Finding[] }[];
+};
+function refreshSiteSitemaps(state: CrawlState, resumedAt: number) {
+  if (state.config.scope !== "site") return;
+  const sitemapRules = new Set(["sitemap-discovery", "technical-sitemap", "technical-sitemap-noindex"]);
+  const pageFindings = state.pages.map(page => ({ url: page.url, language: page.language,
+    findings: page.technical.findings.filter(finding => sitemapRules.has(finding.id)).map(finding => ({ ...finding }))
+  })).filter(page => page.findings.length);
+  // A resumed run may cross a deployment. Keep the old inventory and its
+  // findings as historical evidence, but never use them as current coverage.
+  if (state.sitemapUrls.length || state.sitemapInspections?.length || pageFindings.length) {
+    const history = state as CrawlState & { sitemapHistory?: SitemapHistory[] };
+    (history.sitemapHistory ??= []).push({ replacedAt: resumedAt, segmentStartedAt: state.startedAt,
+      urls: [...state.sitemapUrls], inspections: (state.sitemapInspections || []).map(item => ({ ...item,
+        ...(item.redirects ? { redirects: [...item.redirects] } : {}) })), pageFindings });
+  }
+  state.sitemapUrls = [];
+  state.sitemapInspections = [];
+  state.visited = state.visited.filter(key => !key.startsWith("sitemap:"));
+  for (const page of state.pages) page.technical = report(page.technical.findings.filter(finding => !sitemapRules.has(finding.id)));
+  // Discover nested sitemap inventories again from current roots/robots;
+  // reusing old queued indexes could retain destinations removed by a release.
+  const roots: CrawlState["queue"] = [...new Set(state.config.allowedOrigins)].map(origin => ({
+    kind: "sitemap" as const, url: new URL("/sitemap.xml", origin).href, depth: 0
+  }));
+  state.queue = [...roots, ...state.queue.filter(task => task.kind !== "sitemap")];
 }
 
 export async function startAudit(trigger: "manual" | "weekly" | "page", actorId?: string, targetUrl?: string) {
@@ -43,6 +75,7 @@ export async function resumeAudit(runId:string) {
   state.originalStartedAt ||= state.startedAt;
   state.resumeHistory ||= [];
   state.resumeHistory.push({startedAt:state.startedAt,finishedAt:state.finishedAt,reason:(legacy?"Legacy parser: re-evaluate recorded pages. ":"")+(state.stopReason||state.error||state.status)});
+  refreshSiteSitemaps(state, Date.now());
   // Retry failed public page inspections as part of this explicit execution
   // segment; successful observations are retained and never silently replayed.
   for(const page of state.pages.filter(page=>legacy||page.inspectionStatus!=="inspected")) {

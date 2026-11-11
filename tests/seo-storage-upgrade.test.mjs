@@ -5,14 +5,15 @@ import {PGlite} from '@electric-sql/pglite';
 test('audit storage upgrade preserves legacy evidence and safely resumes interrupted queues',async t=>{
  const db=new PGlite();t.after(()=>db.close());
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create schema private;create table auth.users(id uuid primary key);create function private.is_editor()returns boolean language sql stable as $$select false$$;grant usage on schema public,private,auth to anon,authenticated,service_role;`);
- for(const migration of ['20261110090607_seo_audit_system.sql','20261110100526_seo_audit_reliability_and_score_basis.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8'));
+ for(const migration of ['20261110090607_seo_audit_system.sql','20261110100526_seo_audit_reliability_and_score_basis.sql','20261110150224_seo_audit_method_v3.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8'));
  const state={status:'queued',pages:[],queue:[{kind:'page',url:'https://www.garyhome.vn/en',language:'en'}]};
  await db.exec('set role service_role');
  const created=(await db.query("select public.seo_create_audit($1,'manual','site') as run",[state])).rows[0].run;
  assert.equal(created.score_basis,null);
  const lease=(await db.query('select public.seo_claim_audit($1) as run',[created.id])).rows[0].run;
  const interrupted={...state,status:'incomplete',stopReason:'worker interruption'};
- assert.equal((await db.query('select public.seo_save_audit($1,$2,$3,$4) as saved',[created.id,lease.lease_token,interrupted,{content_score:null,technical_score:null,page_count:0,critical_count:0,score_basis:'evaluated-checks-v2',coverage:{inspected:0,failed:0,pending:1}}])).rows[0].saved,true);
+ assert.equal((await db.query('select public.seo_save_audit($1,$2,$3,$4) as saved',[created.id,lease.lease_token,interrupted,{content_score:null,technical_score:null,page_count:0,critical_count:0,score_basis:'evaluated-checks-v3',coverage:{inspected:0,failed:0,pending:1}}])).rows[0].saved,true);
+ assert.equal((await db.query('select score_basis from public.seo_audit_runs where id=$1',[created.id])).rows[0].score_basis,'evaluated-checks-v3');
  await db.exec('reset role; set role authenticated');
  await assert.rejects(db.query('select public.seo_resume_audit($1,$2)',[created.id,state]),e=>e.code==='42501');
  await db.exec('reset role; set role service_role');

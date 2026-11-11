@@ -1,3 +1,4 @@
+import { equivalentSeoUrls } from "./url-identity.ts";
 import { report, type Finding, type TechnicalInput } from "./types.ts";
 // X-Robots-Tag can scope the following comma-separated directives to one bot.
 // Report web-search restrictions, not a restriction intended only for another bot.
@@ -38,7 +39,7 @@ export function analyzeTechnical(input: TechnicalInput) {
   add("technical-canonical", canonicalValid ? "passed" : "warning", canonicalValid ? "Canonical URL is parseable" : "Review canonical declaration", "A canonical identifies the preferred URL; missing, multiple or malformed declarations are ambiguous.", canonicalValid ? "Confirm the destination is the intended public indexable page." : "Emit one absolute canonical URL using the Metadata API.", d.canonical.join("\n") || "No canonical found");
   if (canonicalValid) {
     const target = new URL(input.finalUrl || d.url); target.hash = "";
-    if (canonical!.href !== target.href) add("technical-canonical-target", "warning", "Canonical points to another URL", "This can be intentional for duplicates, but a mistaken target can consolidate the wrong page.", "Check whether this page is a duplicate. If it is unique, point its canonical at the public preferred URL.", `${target.href} → ${canonical!.href}`);
+    if (!equivalentSeoUrls(target.href,canonical!.href,d.htmlLanguage)) add("technical-canonical-target", "warning", "Canonical points to another URL", "This can be intentional for duplicates, but a mistaken target can consolidate the wrong page.", "Check whether this page is a duplicate. If it is unique, point its canonical at the public preferred URL.", `${target.href} → ${canonical!.href}`);
   }
   if (input.redirects?.length) add("technical-redirects", input.redirects.length > 1 ? "warning" : "recommendation", input.redirects.length > 1 ? "Redirect chain detected" : "URL redirects", "Redirect hops add requests and can conceal stale internal links.", "Update internal links and sitemap entries to the final destination; consolidate chains where possible.", input.redirects.join(" → "));
   if (input.sitemapIncluded !== undefined && !noindex) add("technical-sitemap", input.sitemapIncluded ? "passed" : "warning", input.sitemapIncluded ? "Page appears in the sitemap" : "Page is absent from the inspected sitemap", "A sitemap helps discover preferred public URLs; absence alone does not prevent indexing.", input.sitemapIncluded ? "Keep sitemap URLs aligned with preferred public URLs." : "Add the canonical public URL if this page should be indexed.");
@@ -60,7 +61,7 @@ export function analyzeTechnical(input: TechnicalInput) {
     const selfReference = d.hreflang.some(alternate => {
       try {
         const target = new URL(alternate.href); target.hash = "";
-        return target.href === ownUrl.href && alternate.language.toLowerCase() !== "x-default"
+        return equivalentSeoUrls(ownUrl.href,target.href,d.htmlLanguage) && alternate.language.toLowerCase() !== "x-default"
           && (!d.htmlLanguage || alternate.language.split("-")[0].toLowerCase() === d.htmlLanguage.split("-")[0].toLowerCase());
       } catch { return false; }
     });

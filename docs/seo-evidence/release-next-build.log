@@ -1,0 +1,80 @@
+
+> gary-home@0.1.0 prebuild:vercel
+> npm run build:gary-apps
+
+
+> gary-home@0.1.0 build:gary-apps
+> node scripts/build-gary-apps.mjs
+
+Gary Apps v1: 924dd92627c028ed (205 kB JS)
+
+> gary-home@0.1.0 build:vercel
+> next build --webpack
+
+▲ Next.js 16.4.3 (webpack)
+- Environments: .env
+⚠ Warning: Next.js ignored package-lock.json in /Users/skycastle3 because it is outside the current Git repository (/Users/skycastle3/Desktop/gary_group/gary_home_website).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+✓ Running next.config.ts took 506ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 21.0s
+  Running TypeScript ...
+  Finished TypeScript in 7.0s ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/12) ...
+  Generating static pages using 9 workers (3/12) 
+  Generating static pages using 9 workers (6/12) 
+  Generating static pages using 9 workers (9/12) 
+✓ Generating static pages using 9 workers (12/12) in 139ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /about
+├ ƒ /account
+├ ƒ /activities
+├ ƒ /admin
+├ ƒ /api/admin/landlords/cleanup
+├ ƒ /api/admin/seo
+├ ƒ /api/admin/team
+├ ƒ /api/admin/team/reset-password
+├ ƒ /api/admin/team/set-password
+├ ƒ /api/assistance
+├ ƒ /api/config
+├ ƒ /api/cron/seo
+├ ƒ /api/enquiries
+├ ƒ /api/exchange-rate
+├ ƒ /api/feedback
+├ ƒ /api/landlords
+├ ƒ /api/staff-avatar/[userId]
+├ ƒ /auth/callback
+├ ƒ /auth/invite
+├ ƒ /auth/reset
+├ ƒ /cart
+├ ƒ /contact
+├ ƒ /credits
+├ ƒ /feedback
+├ ƒ /homes
+├ ƒ /homes/[slug]
+├ ƒ /landlords
+├ ƒ /login
+├ ƒ /neighbourhoods
+├ ƒ /privacy
+├ ○ /robots.txt
+├ ƒ /saved
+├ ƒ /services
+├ ƒ /sitemap.xml
+├ ƒ /tips-and-news
+├ ƒ /tips-and-news/[slug]
+└ ƒ /vinhomes
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

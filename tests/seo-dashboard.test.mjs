@@ -104,7 +104,7 @@ test('legacy history scores are withheld until rescanned and print report failur
  let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
  const history=view.root.findByProps({className:'seo-history'});
  assert.match(text(history),/Legacy \/ needs rescan/);assert.doesNotMatch(text(history),/100%|50%/);
- const print=view.root.findAllByType('button').find(button=>text(button).includes('Print / Save PDF'));
+ const print=view.root.findAllByType('button').find(button=>text(button).includes('Full report'));
  assert.ok(print);await act(async()=>print.props.onClick());
  assert.match(text(view.root.findByProps({role:'alert'})),/Allow the report window/);
 });
@@ -148,4 +148,17 @@ test('authorization failures pause safe advancement without retrying a revoked a
  const Component=loader(site,async(url,init)=>init.method==='GET'?Response.json(fixture('running')):Response.json({error:'Staff access required'},{status:403}));
  let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
  await act(async()=>pending.shift()());assert.equal(pending.length,0);assert.match(text(view.toJSON()),/Staff access required/);assert.doesNotMatch(text(view.toJSON()),/will retry safely/);
+});
+
+test('dashboard offers executive-only and complete PDF documents through distinct export actions',async t=>{
+ const site={current:siteValue()},snapshot=fixture(),Component=loader(site,async()=>Response.json(snapshot));
+ const originalWindow=globalThis.window,originalTimer=globalThis.setTimeout,written=[];
+ const popup=()=>({closed:false,opener:{},document:{open(){},write(html){written.push(html);},close(){}},focus(){},print(){}});
+ globalThis.window={open:popup};
+ let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{globalThis.window=originalWindow;globalThis.setTimeout=originalTimer;await act(async()=>view.unmount());});
+ const summary=view.root.findAllByType('button').find(button=>text(button).includes('Summary only')),full=view.root.findAllByType('button').find(button=>text(button).includes('Full report'));
+ assert.ok(summary);assert.ok(full);
+ globalThis.setTimeout=(callback,ms)=>ms===150?1:originalTimer(callback,ms);
+ await act(async()=>summary.props.onClick());assert.equal((written[0].match(/data-summary-page=/g)||[]).length,2);assert.doesNotMatch(written[0],/Page-level evidence/);
+ await act(async()=>full.props.onClick());assert.match(written[1],/Page-level evidence/);assert.doesNotMatch(written[1],/data-summary-page=/);
 });

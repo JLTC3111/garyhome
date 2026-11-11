@@ -1,0 +1,190 @@
+{
+  "date": "2026-11-11",
+  "deployment": "dpl_3v4kmnhYfz3X4BPzgM6YCMa1SEJj",
+  "release": "ce39, production www.garyhome.vn alias confirmed READY by deployment controller",
+  "method": "Actual native macOS browser UI through CUA, DevTools open before fresh tab navigation, no temporary title guard or prototype changes",
+  "matrix": [
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Existing normal profile, pre-existing VI locale cookie",
+      "entry": "Direct legacy unprefixed Tứ Liên listing",
+      "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "vi",
+      "canonical": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "guard": false,
+      "result": "Listing and gallery opened/closed. No loading/restoring residue. Console had zero JS errors/warnings. New application chunk 209-99282552e97aa97d.js observed."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Same normal test tab",
+      "entry": "Original diagnostic head-comment mutation",
+      "guard": false,
+      "result": "Subsequent native gallery open/close and synchronous Console metadata evaluation remained responsive. Authored title text retains double space while getter collapses to one, as intended."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Same normal test tab",
+      "entry": "UI switch legacy VI to EN",
+      "url": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "en",
+      "guard": false,
+      "result": "Address gained /en prefix; slug preserved; English H1/body/title rendered."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Same normal test tab",
+      "entry": "Refresh /en listing",
+      "lang": "en",
+      "guard": false,
+      "canonical": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "result": "Console independently reported navigation=reload, correct URL/lang/title/canonical and guard=false; UI responsive."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Same normal test tab",
+      "entry": "UI switch EN to VI, refresh /vi listing, insert diagnostic head comment",
+      "url": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "vi",
+      "guard": false,
+      "canonical": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "result": "Slug preserved; Console independently reported navigation=reload and returned after diagnostic metadata mutation; no observer hang."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Same normal test tab",
+      "entry": "Activate localized related-listing link with native UI click and Enter",
+      "url": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "lang": "vi",
+      "guard": false,
+      "result": "Vietnamese Vũ Miên listing loaded by internal navigation; 10-photo gallery opened and responded."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "New InPrivate window; another QA InPrivate window existed, so not claimed as a pristine profile",
+      "entry": "Direct /en Tứ Liên URL with DevTools before navigation",
+      "url": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "en",
+      "guard": false,
+      "result": "English listing and seven-photo gallery rendered/responded. New layout-5dc1246deaf9c42a.js observed; Network finish 3.99s, DCL 2.92s, load 3.72s. Timing is one observed run, not a performance benchmark."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Same InPrivate test window",
+      "entry": "UI EN-to-VI switch, VI gallery, VI refresh and original head-comment loop trigger",
+      "url": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "vi",
+      "guard": false,
+      "canonical": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "result": "Distinct /vi URL preserved slug; Vietnamese gallery opened; reload Console reported navigation=reload, correct locale/canonical, guard=false; returned after diagnostic head mutation. Console showed no JS errors/warnings."
+    },
+    {
+      "browser": "Microsoft Edge 155",
+      "profile": "Same InPrivate test window, fresh locale state only",
+      "entry": "Removed only gary-language cookie and localStorage key; verified both null; direct legacy listing URL",
+      "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "en",
+      "guard": false,
+      "result": "Default English content loaded; Console then showed lang=en, locale cookie=en, locale storage=en, guard=false. No auth or other storage was read/modified."
+    },
+    {
+      "browser": "Google Chrome 157",
+      "profile": "Fresh tab in QA Guest window, existing VI locale preference",
+      "entry": "Direct /vi Tứ Liên URL with DevTools before navigation; original head-comment loop trigger",
+      "url": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "vi",
+      "guard": false,
+      "canonical": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "result": "Console completed after diagnostic mutation, returning correct locale/canonical and raw double-space title versus normalized getter; seven-photo gallery opened afterward without temporary guard. Console showed zero errors/warnings."
+    },
+    {
+      "browser": "Google Chrome 157",
+      "profile": "Same Guest test tab",
+      "entry": "Refresh /vi listing, then UI switch to English",
+      "url": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "lang": "en",
+      "guard": false,
+      "result": "VI reload Console reported navigation=reload, correct /vi canonical and guard=false. English switch produced /en with identical listing slug and English content."
+    },
+    {
+      "browser": "Google Chrome 157",
+      "profile": "Same Guest test tab",
+      "entry": "Activate localized related-listing link using native click and Enter",
+      "url": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "lang": "en",
+      "guard": false,
+      "result": "Second listing rendered English H1 and facts; eleven-photo gallery opened and responded."
+    }
+  ],
+  "limitations": [
+    "No exhaustive test of browser extensions or every browser build/channel",
+    "New InPrivate window shared the existing QA InPrivate session; locale-only reset was controlled and independently verified, but no pristine-profile claim is made",
+    "A controlled stale-VI-cookie explicit /en navigation was initiated, but its final Console metadata result was not captured before switching to the final audit task",
+    "Browser matrix above exercised first rollout ce39; final beea server worker release retains the same renderer code, as confirmed by release owner. Final audit launch uses refreshed beea admin."
+  ],
+  "performanceNote": "An initial async requestAnimationFrame probe remained shown as Promise pending in the DevTools row; no resolved timing/mutation count was captured. It is not used as timing evidence. Subsequent synchronous Console completion plus native gallery actions are the responsiveness evidence.",
+  "finalAudit": {
+    "id": "78eb112e-86d8-422a-abcf-0c5c15f4996d",
+    "deployment": "dpl_5zoLkLQGcUsStBFeAWTidLzRjgAg",
+    "release": "beea67e63a11b8ef48dfd37f0132c7f23cbe120c",
+    "launchedThrough": "Refreshed authenticated native Edge admin, new Run site audit action",
+    "browserObservedProgress": [
+      {
+        "inspected": 13,
+        "failed": 0,
+        "pending": 37
+      },
+      {
+        "inspected": 31,
+        "failed": 0,
+        "pending": 19
+      },
+      {
+        "inspected": 38,
+        "passed": 30,
+        "issues": 8,
+        "failed": 0,
+        "pending": 12
+      }
+    ],
+    "terminalEvidence": "Release owner independently read completed persisted result; raw evidence docs/seo-evidence/fresh-production-audit.json. Terminal state was not independently observed through CUA after window-handle loss.",
+    "status": "completed",
+    "elapsedSeconds": 183.91,
+    "inspected": 50,
+    "en": 25,
+    "vi": 25,
+    "passed": 42,
+    "contentIssues": 8,
+    "failed": 0,
+    "skippedPages": 0,
+    "pendingPages": 0,
+    "pendingQueue": 0,
+    "duplicateObservations": 0,
+    "criticalSeoFindings": 0,
+    "contentPassedChecks": 350,
+    "contentEvaluatedChecks": 358,
+    "technicalPassedChecks": 576,
+    "technicalEvaluatedChecks": 576,
+    "requests": 86,
+    "excludedUrlRecords": 60
+  },
+  "nativeUiLimit": {
+    "stage": "While final audit was advancing",
+    "error": "Computer Use server error -10005: cgWindowNotFound",
+    "surfaces": [
+      "Microsoft Edge",
+      "Google Chrome"
+    ],
+    "recoveryAttempts": [
+      "Fresh Edge getApp",
+      "Fresh Chrome getApp",
+      "cua.getState refresh: apps running, browser host unavailable",
+      "Chrome getApp by bundle ID",
+      "Native Chrome Cmd+N using existing binding"
+    ],
+    "result": "No accessible native window recovered. No browser process was killed or user tab closed.",
+    "notCompleted": [
+      "Final-release admin listing columns and editor visual language checks",
+      "Native save of fresh completed-audit PDFs, pending handle recovery"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "verifiedAt": "2026-11-11T04:27:29.144Z",
+  "method": "Actual native Microsoft Edge UI and accessibility tree on https://www.garyhome.vn/admin; no content save or publication",
+  "listing": "GH-504",
+  "table": {
+    "englishHeaders": [
+      "Created",
+      "Posted by"
+    ],
+    "vietnameseHeaders": [
+      "Ngày tạo",
+      "Người đăng"
+    ],
+    "exampleCreated": "03/11/2026 08:33 GMT+7",
+    "historicalCreatorEnglish": "Not recorded",
+    "historicalCreatorVietnamese": "Chưa được ghi nhận"
+  },
+  "editor": {
+    "englishLiveTitle": "Live SEO review",
+    "vietnameseLiveTitle": "Kiểm tra SEO trực tiếp",
+    "translatedRuleExamples": [
+      "Đã có tiêu đề",
+      "Kiểm tra phần tiêu đề có thể bị cắt",
+      "Kiểm tra độ rõ ràng và phù hợp"
+    ],
+    "translatedSeverityExamples": [
+      "Đạt",
+      "Đề xuất"
+    ],
+    "expandedTitleExplanation": "Tiêu đề dài có thể bị rút gọn tùy thiết bị và độ rộng ký tự. Không có độ dài cố định để xếp hạng.",
+    "expandedReadabilityExplanation": "Phát hiện 493 đơn vị từ và 29 câu theo ngôn ngữ. Các số đếm này cung cấp ngữ cảnh, không phải điểm chất lượng hay thứ hạng.",
+    "translatedRecommendationLabel": "Gợi ý xử lý",
+    "contentLanguageSelector": "Tiếng Việt",
+    "mobilePreviewSelected": true,
+    "previewUrl": "www.garyhome.vn › vi › homes › 2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+    "authoringFieldsUntouched": true,
+    "closedWithEscape": true
+  },
+  "limitations": [
+    "New-creator provenance was verified by regression/database access checks; no test listing was inserted into production.",
+    "This live screen does not exercise every conditional rule. All sixteen rule translations are covered by regressions."
+  ]
+}

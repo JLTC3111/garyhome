@@ -11,7 +11,7 @@ const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirna
 const origin='https://garyhome.vn',runId='20000000-0000-4000-8000-000000000002';
 const finding=(id,severity,category='technical')=>({id,severity,category,title:id,explanation:'Observed evidence',recommendation:'Review the route.'});
 function page(url,inspectionStatus='inspected') {return {url,finalUrl:url,language:'en',status:inspectionStatus==='inspected'?200:0,indexable:inspectionStatus==='inspected',inspectionStatus,content:{score:100,findings:[finding('content-title','passed','content')]},technical:{score:100,findings:[finding('technical-http','passed')]},responseMs:12,bytes:1024};}
-function crawlState() {return {version:1,analysisVersion:2,status:'running',startedAt:1000,updatedAt:1000,config:{allowedOrigins:[origin],maxUrls:500,maxDepth:4,concurrency:2,requestIntervalMs:1000,timeoutMs:10000,maxDurationMs:900000,scope:'site',languages:['en','vi']},queue:[{kind:'page',url:origin+'/next',language:'vi',depth:0,attempts:2}],pages:[page(origin+'/observed')],skippedUrls:[],visited:[],canonicalUrls:[],robots:{},hostNextAt:{},sitemapUrls:[],linkChecks:{},requests:1};}
+function crawlState() {return {version:1,analysisVersion:3,status:'running',startedAt:1000,updatedAt:1000,config:{allowedOrigins:[origin],maxUrls:500,maxDepth:4,concurrency:2,requestIntervalMs:1000,timeoutMs:10000,maxDurationMs:900000,scope:'site',languages:['en','vi']},queue:[{kind:'page',url:origin+'/next',language:'vi',depth:0,attempts:2}],pages:[page(origin+'/observed')],skippedUrls:[],visited:[],canonicalUrls:[],robots:{},hostNextAt:{},sitemapUrls:[],linkChecks:{},requests:1};}
 function serviceHarness(options={}) {
  const record={id:runId,created_at:'2026-11-10T09:00:00Z',status:options.status||'running',state:structuredClone(options.state||crawlState())};
  const calls={claims:[],saved:[],resumed:[],advanced:[],created:[],compared:0,network:0};
@@ -76,7 +76,7 @@ test('explicit resume starts a new bounded segment while preserving original tim
   const h=serviceHarness({state,status:'incomplete'});const resumed=await h.resumeAudit(runId),saved=h.calls.resumed[0].state;
   assert.equal(h.calls.resumed.length,1);assert.equal(saved.status,'queued');assert.equal(saved.startedAt,500000);assert.equal(saved.originalStartedAt,1000);
   assert.deepEqual(saved.resumeHistory,[{startedAt:1000,finishedAt:192000,reason:'Checkpoint failed'}]);
-  assert.equal(saved.finishedAt,undefined);assert.equal(saved.stopReason,undefined);assert.equal(saved.error,undefined);assert.equal(saved.analysisVersion,2);
+  assert.equal(saved.finishedAt,undefined);assert.equal(saved.stopReason,undefined);assert.equal(saved.error,undefined);assert.equal(saved.analysisVersion,3);
   assert.deepEqual(saved.pages.map(page=>page.url),[origin+'/observed']);assert.equal(saved.pages[0].content.score,100);
   assert.equal(saved.queue.filter(task=>task.url===origin+'/failed').length,1,'failed row is requeued once even if already pending');
   assert.ok(saved.queue.some(task=>task.url===origin+'/blocked'));assert.ok(saved.queue.every(task=>task.attempts===0));
@@ -118,8 +118,8 @@ test('stored summaries weight evaluated checks and omit failed inspections rathe
  const unknown={...page(origin+'/unknown','failed'),content:{score:100,findings:[finding('fabricated','passed','content')]},technical:{score:0,findings:[finding('invented-critical','critical')]}};
  state.pages=[first,second,unknown];
  const summary=auditSummary(state);
- assert.equal(summary.content_score,25);assert.equal(summary.technical_score,20);assert.equal(summary.critical_count,1);assert.equal(summary.score_basis,'evaluated-checks-v2');
- assert.deepEqual(summary.coverage,{inspected:2,passed:1,failed:1,skipped:0,pending:1,skippedUrls:0});
+ assert.equal(summary.content_score,25);assert.equal(summary.technical_score,20);assert.equal(summary.critical_count,1);assert.equal(summary.score_basis,'evaluated-checks-v3');
+ assert.deepEqual(Object.fromEntries(['inspected','passed','failed','skipped','pending','skippedUrls'].map(key=>[key,summary.coverage[key]])),{inspected:2,passed:1,failed:1,skipped:0,pending:1,skippedUrls:0});assert.equal(summary.coverage.issues,1);assert.equal(summary.coverage.duplicateObservations,0);
  state.pages=[unknown];state.queue=[];const empty=auditSummary(state);assert.equal(empty.content_score,null);assert.equal(empty.technical_score,null);assert.equal(empty.critical_count,0);
 });
 
@@ -129,8 +129,65 @@ test('resuming legacy parser evidence re-evaluates successful pages before assig
  state.canonicalUrls=[`en:${origin}/observed`];state.linkChecks={[origin+'/observed']:{status:200}};
  const h=serviceHarness({state,status:'failed'});await h.resumeAudit(runId);
  const saved=h.calls.resumed[0].state;
- assert.equal(saved.analysisVersion,2);assert.deepEqual(saved.pages,[]);
+ assert.equal(saved.analysisVersion,3);assert.deepEqual(saved.pages,[]);
  assert.ok(saved.queue.some(task=>task.url===origin+'/observed'));
  assert.deepEqual(saved.canonicalUrls,[]);assert.deepEqual(saved.linkChecks,{});
  assert.match(saved.resumeHistory[0].reason,/Legacy parser/);
+});
+
+
+test('site resume refreshes cached sitemap inventory across deployments and archives previous coverage evidence',async()=>{
+ const state=crawlState();state.status='incomplete';state.finishedAt=192000;
+ const oldUrls=[origin+'/',origin+'/homes'];
+ state.sitemapUrls=[...oldUrls];state.sitemapInspections=[{url:origin+'/sitemap.xml',status:200,valid:true,entries:2,redirects:[origin+'/sitemap-old.xml']}];
+ const oldSitemapFinding={...finding('sitemap-discovery','warning'),evidence:'Old inventory did not include the localized canonical.'};
+ state.pages[0].technical={score:33,findings:[finding('technical-http','passed'),oldSitemapFinding,finding('canonical','warning')]};
+ state.visited=['page:en:'+origin+'/observed','sitemap::'+origin+'/sitemap.xml','sitemap::'+origin+'/old-index.xml','robots::'+origin+'/robots.txt'];
+ state.queue.push({kind:'sitemap',url:origin+'/old-index.xml',depth:1,attempts:2},{kind:'sitemap',url:origin+'/sitemap.xml',depth:0});
+ const h=serviceHarness({state,status:'incomplete'});await h.resumeAudit(runId);
+ const saved=h.calls.resumed[0].state;
+ assert.deepEqual(saved.sitemapUrls,[]);assert.deepEqual(saved.sitemapInspections,[]);
+ assert.deepEqual(saved.queue.filter(task=>task.kind==='sitemap'),[{kind:'sitemap',url:origin+'/sitemap.xml',depth:0,attempts:0}]);
+ assert.equal(saved.queue[0].kind,'sitemap','current inventory is refreshed before pending page work');
+ assert.ok(saved.queue.some(task=>task.kind==='page'&&task.url===origin+'/next'),'pending published page survives the inventory refresh');
+ assert.deepEqual(saved.visited,['page:en:'+origin+'/observed']);
+ assert.deepEqual(saved.pages[0].technical.findings.map(item=>item.id),['technical-http','canonical']);assert.equal(saved.pages[0].technical.score,50);
+ assert.equal(saved.sitemapHistory.length,1);assert.deepEqual(saved.sitemapHistory[0].urls,oldUrls);
+ assert.equal(saved.sitemapHistory[0].segmentStartedAt,1000);assert.equal(saved.sitemapHistory[0].inspections[0].valid,true);
+ assert.deepEqual(saved.sitemapHistory[0].pageFindings[0].findings,[oldSitemapFinding]);
+ assert.deepEqual(state.sitemapUrls,oldUrls,'source segment evidence supplied by the caller is not rewritten');
+});
+
+test('individual-page resume does not enqueue site inventories or expand its inspection scope',async()=>{
+ const state=crawlState();state.status='incomplete';state.config.scope='page';state.queue=[];
+ const failed=page(origin+'/listing','failed');state.pages=[failed];
+ state.sitemapUrls=[origin+'/previous-inventory-evidence'];state.visited=['sitemap::'+origin+'/sitemap.xml'];
+ const h=serviceHarness({state,status:'incomplete'});await h.resumeAudit(runId);
+ const saved=h.calls.resumed[0].state;
+ assert.ok(saved.queue.every(task=>task.kind==='page'));assert.equal(saved.queue.length,1);
+ assert.equal(saved.queue[0].url,failed.url);assert.equal(saved.config.scope,'page');
+ assert.deepEqual(saved.sitemapUrls,state.sitemapUrls);assert.equal(saved.sitemapHistory,undefined);
+});
+
+test('freshly fetched resume inventory replaces old missing-page warnings without hiding genuine omissions',async()=>{
+ const {advanceCrawl}=await import('../lib/seo-audit/crawler.ts');
+ const state=crawlState();state.status='incomplete';state.queue=[];
+ const listed={...page(origin+'/en/homes'),canonical:origin+'/en/homes'},missing={...page(origin+'/en/contact'),canonical:origin+'/en/contact'};
+ for(const row of [listed,missing])row.technical.findings.push(finding('sitemap-discovery','warning'));
+ state.pages=[listed,missing];state.sitemapUrls=[origin+'/homes'];state.sitemapInspections=[{url:origin+'/sitemap.xml',status:200,valid:true,entries:1}];
+ state.visited=state.pages.map(row=>'page:en:'+row.url);state.canonicalUrls=state.pages.map(row=>'en:'+row.url);
+ const h=serviceHarness({state,status:'incomplete'});await h.resumeAudit(runId);
+ const resumed=h.calls.resumed[0].state;let time=resumed.startedAt;const requests=[];
+ await advanceCrawl(resumed,{now:()=>time,sleep:async ms=>{time+=ms;},resolveHost:async()=>['93.184.216.34'],fetch:async url=>{
+  requests.push(url);
+  if(url===origin+'/robots.txt')return new Response('User-agent: *\nAllow: /',{headers:{'content-type':'text/plain'}});
+  if(url===origin+'/sitemap.xml')return new Response('<urlset><url><loc>'+origin+'/en/homes</loc></url></urlset>',{headers:{'content-type':'application/xml'}});
+  throw new Error('Unexpected redundant request: '+url);
+ }});
+ assert.deepEqual(requests,[origin+'/robots.txt',origin+'/sitemap.xml']);
+ assert.equal(resumed.status,'completed');assert.deepEqual(resumed.sitemapUrls,[origin+'/en/homes']);
+ assert.equal(resumed.pages.find(row=>row.url===listed.url).technical.findings.find(item=>item.id==='sitemap-discovery').severity,'passed');
+ assert.equal(resumed.pages.find(row=>row.url===missing.url).technical.findings.find(item=>item.id==='sitemap-discovery').severity,'warning','a genuine fresh-inventory omission is still reported');
+ assert.deepEqual(resumed.sitemapHistory[0].urls,[origin+'/homes']);
+ assert.equal(resumed.sitemapHistory[0].pageFindings.length,2);
 });

@@ -626,5 +626,10 @@
   "Exit full screen": "Thoát toàn màn hình",
   "Your account does not have permission to upload videos. Ask a team owner to check your staff access.": "Tài khoản của bạn không có quyền tải video lên. Nhờ chủ nhóm kiểm tra quyền nhân viên.",
   "Couldn’t upload the video. Check your connection and retry. Your draft is still open.": "Không thể tải video lên. Kiểm tra kết nối và thử lại. Bản nháp của bạn vẫn đang mở.",
-  "SEO Audit": "Kiểm tra SEO"
+  "SEO Audit": "Kiểm tra SEO",
+  "Created": "Ngày tạo",
+  "Posted by": "Người đăng",
+  "Not recorded": "Chưa được ghi nhận",
+  "Recorded staff member": "Nhân viên được ghi nhận",
+  "Creation times use Hanoi time (GMT+7). Earlier poster identities may not be recorded.": "Thời gian tạo theo giờ Hà Nội (GMT+7). Tin cũ có thể chưa ghi nhận người đăng."
 }

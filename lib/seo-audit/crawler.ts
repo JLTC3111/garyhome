@@ -7,6 +7,8 @@ import { analyzeContent } from "../seo-analysis/content.ts";
 import { analyzeTechnical, hasNoindex } from "../seo-analysis/technical.ts";
 import type { AnalysisReport, Finding } from "../seo-analysis/types.ts";
 import { localizedRoute, localizedPath, isPublicPagePath } from "../localized-routes.ts";
+import { normalizedSeoUrl, preferredUiUrl, equivalentSeoUrls } from "../seo-analysis/url-identity.ts";
+import { declaredPageLanguage } from "./presentation.ts";
 
 export type CrawlConfig = {
   allowedOrigins: string[]; maxUrls?: number; maxDepth?: number; concurrency?: number;
@@ -21,14 +23,17 @@ export type AuditPage = {
   url: string; finalUrl: string; status: number; language: string; indexable: boolean; canonical?: string;
   content: AnalysisReport; technical: AnalysisReport; responseMs: number; bytes: number;
   inspectionStatus?: "inspected" | "failed" | "skipped"; crawlError?: string; attempts?: number;
+  requestedLanguage?: string; declaredLanguage?: string; urlLanguage?: string;
   title?: string; description?: string; hreflang?: { language: string; href: string }[]; links?: string[];
 };
 export type CrawlState = {
-  version: 1; analysisVersion?: 2; originalStartedAt?: number; resumeHistory?: { startedAt: number; finishedAt?: number; reason?: string }[]; status: "queued" | "running" | "completed" | "incomplete" | "failed";
+  version: 1; analysisVersion?: 2 | 3; originalStartedAt?: number; resumeHistory?: { startedAt: number; finishedAt?: number; reason?: string }[]; status: "queued" | "running" | "completed" | "incomplete" | "failed";
   startedAt: number; updatedAt: number; finishedAt?: number; config: Config; queue: CrawlTask[];
   pages: AuditPage[]; skippedUrls: { url: string; reason: string }[]; omittedSkipped?: number;
   visited: string[]; canonicalUrls: string[]; robots: Record<string, RobotsRecord>;
   hostNextAt: Record<string, number>; sitemapUrls: string[]; linkChecks: Record<string, { status: number; finalUrl: string }>;
+  classificationCorrections?: {url:string;findingId:string;reason:string}[];
+  sitemapInspections?: {url:string;status:number;valid:boolean;entries:number;redirects?:string[];reason?:string}[];
   requests: number; error?: string; stopReason?: string; transportMode?: "pinned" | "trusted-fetch";
   diagnostics?: { url: string; kind: CrawlTask["kind"] | "worker"; reason: string; attempts: number; at: number }[];
 };
@@ -71,6 +76,7 @@ export function normalizeCrawlUrl(value: string, base?: string, allowHttp = fals
     const url = new URL(value, base);
     if (!(url.protocol === "https:" || allowHttp && url.protocol === "http:") || url.username || url.password || url.port && url.port !== (url.protocol === "http:" ? "80" : "443") || !safeHostname(url.hostname) || url.href.length > 2048) return null;
     url.hash = "";
+    if(localizedRoute(url.pathname)&&isPublicPagePath(url.pathname))url.pathname=url.pathname.replace(/\/+$/,"")||"/";
     for (const name of [...url.searchParams.keys()]) if (/^(?:utm_|fbclid|gclid)/i.test(name)) url.searchParams.delete(name);
     url.searchParams.sort();
     return url.href;
@@ -116,18 +122,23 @@ function push(state: CrawlState, task: CrawlTask) {
   state.queue.push(task);
 }
 function pushPages(state: CrawlState, url: string, depth: number, source?: string, sourceLanguage?: string) {
+  const target=new URL(url),explicit=localizedRoute(target.pathname),knownPublicPath=isPublicPagePath(target.pathname);
+  // An explicit language URL is one document in ALL modes. Never repeat it
+  // under a conflicting language cookie inherited from a legacy audit.
+  if (state.config.languageMode === "url" && knownPublicPath) {
+    const preferred=preferredUiUrl(target.href);
+    if(preferred.search!==target.search){skip(state,target.href,"UI query variant consolidated to the preferred public page; this query URL was not separately fetched.");target.search=preferred.search;}
+  }
+  if(explicit){push(state,{kind:"page",url:target.href,depth,language:explicit.language,source});return;}
   if (state.config.languageMode === "url") {
-    const target = new URL(url), explicit = localizedRoute(target.pathname);
-    const language = explicit?.language || (sourceLanguage === "vi" ? "vi" : "en"), knownPublicPath = isPublicPagePath(target.pathname);
-    // Existing Metadata API canonicals omit search/filter/contact UI state.
-    // Consolidate only known app pages, never arbitrary query-driven endpoints.
-    if (knownPublicPath && target.search && !isExcludedUrl(target.href)) {
-      skip(state, target.href, "UI query variant consolidated to the preferred public page; this query URL was not separately fetched.");
-      target.search = "";
+    const languages=sourceLanguage?[sourceLanguage]:state.config.languages;
+    if(knownPublicPath)for(const language of languages) {
+      if(language!=="en"&&language!=="vi")continue;
+      const localized=new URL(target.href);localized.pathname=localizedPath(localized.pathname,language);
+      push(state,{kind:"page",url:localized.href,depth,language,source});
     }
-    if (!explicit && knownPublicPath) target.pathname = localizedPath(target.pathname, language);
-    push(state, { kind: "page", url: target.href, depth, language, source });
-  } else for (const language of state.config.languages) push(state, { kind: "page", url, depth, language, source });
+    else push(state,{kind:"page",url:target.href,depth,language:sourceLanguage||"und",source});
+  } else for (const language of state.config.languages) push(state, { kind: "page", url:target.href, depth, language, source });
 }
 export function createCrawl(input: CrawlConfig, seeds: string[], now = Date.now()): CrawlState {
   const allowedOrigins = [...new Set(input.allowedOrigins.map(value => normalizeCrawlUrl(value)).filter((value): value is string => !!value).map(value => new URL(value).origin))];
@@ -140,7 +151,7 @@ export function createCrawl(input: CrawlConfig, seeds: string[], now = Date.now(
     scope: input.scope === "page" ? "page" : "site", languages: [...new Set(input.languages?.filter(language => /^[a-z]{2,3}(?:-[a-zA-Z]{2,8})?$/.test(language)) || ["en"])].slice(0,10),
   };
   if (!config.languages.length) config.languages = ["en"];
-  const state: CrawlState = { version: 1, analysisVersion: 2, status: "queued", startedAt: now, updatedAt: now, config, queue: [], pages: [], skippedUrls: [], visited: [], canonicalUrls: [], robots: {}, hostNextAt: {}, sitemapUrls: [], linkChecks: {}, requests: 0 };
+  const state: CrawlState = { version: 1, analysisVersion: 3, status: "queued", startedAt: now, updatedAt: now, config, queue: [], pages: [], skippedUrls: [], visited: [], canonicalUrls: [], robots: {}, hostNextAt: {}, sitemapUrls: [], linkChecks: {}, requests: 0 };
   for (const origin of allowedOrigins) push(state, { kind: "robots", url: origin + "/robots.txt", depth: 0 });
   if (config.scope === "site") for (const origin of allowedOrigins) push(state, { kind: "sitemap", url: origin + "/sitemap.xml", depth: 0 });
   for (const seed of seeds) pushPages(state, seed, 0);
@@ -196,7 +207,7 @@ class DeferredRequest extends Error {
 }
 function retryable(error: unknown) {
   const value = error as { name?: string; code?: string; message?: string };
-  return value?.name === "AbortError" || /ECONN|EAI_AGAIN|ENOTFOUND|ETIMEDOUT|EPIPE|UND_ERR|network|fetch failed|socket|DNS|premature|connection (?:closed|reset)/i.test(`${value?.code || ""} ${value?.message || ""}`);
+  return value?.name === "AbortError" || /ECONN|EAI_AGAIN|ENOTFOUND|EBUSY|ETIMEDOUT|EPIPE|UND_ERR|network|fetch failed|socket|DNS|premature|connection (?:closed|reset)/i.test(`${value?.code || ""} ${value?.message || ""}`);
 }
 class CrawlLimit extends Error {}
 class NeedsRobots extends Error {
@@ -284,7 +295,7 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
       if (trustedFetch && !allowed(normalized)) throw new Error("External destination not inspected: this runtime has no DNS-pinned external transport.");
       if (EXCLUDED.test(decodeURIComponent(url.pathname))) throw new Error("Request reaches an excluded route");
       if (task.kind !== "link" && task.kind !== "robots" && !allowed(normalized)) throw new Error("Redirect leaves configured domains");
-      if (task.kind === "robots" && url.origin !== new URL(task.url).origin && !(new URL(task.url).protocol === "http:" && url.protocol === "https:" && url.hostname === new URL(task.url).hostname)) throw new Error("robots.txt redirects outside its origin");
+      if (task.kind === "robots" && url.origin !== new URL(task.url).origin && !(new URL(task.url).protocol === "http:" && url.protocol === "https:" && url.hostname === new URL(task.url).hostname) && !allowed(normalized)) throw new Error("robots.txt redirects outside its origin");
       if ((task.kind === "page" || task.kind === "link") && isExcludedUrl(normalized)) throw new Error("Redirect reaches an excluded route or asset");
       if (task.kind !== "robots" && !state.robots[url.origin]) throw new NeedsRobots(url.origin, normalized, redirects);
       if (task.kind !== "robots" && !robotsAllows(state.robots[url.origin], normalized)) throw new Error("Blocked by robots.txt or robots.txt unavailable");
@@ -299,7 +310,7 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
         if (!trustedFetch && (!addresses.length || addresses.some(address => !isPublicAddress(address)))) throw new Error("Target resolves to a private or reserved address");
         state.hostNextAt[url.host] = now() + Math.max(state.config.requestIntervalMs, state.robots[url.origin]?.delayMs || 0);
         state.requests++;
-        const init: RequestInit = { redirect: "manual", cache: "no-store", credentials: "omit", signal: controller.signal, headers: { "User-Agent": USER_AGENT, "Accept-Encoding": "identity", Accept: task.kind === "sitemap" ? "application/xml,text/xml" : "text/html,text/plain;q=0.9,*/*;q=0.1", ...(task.language && state.config.languageMode !== "url" && allowed(normalized) ? { "Accept-Language": task.language, Cookie: "gary-language=" + task.language } : {}) } };
+        const init: RequestInit = { redirect: "manual", cache: "no-store", credentials: "omit", signal: controller.signal, headers: { "User-Agent": USER_AGENT, "Accept-Encoding": "identity", Accept: task.kind === "sitemap" ? "application/xml,text/xml" : "text/html,text/plain;q=0.9,*/*;q=0.1", ...(task.language && !localizedRoute(url.pathname) && state.config.languageMode !== "url" && allowed(normalized) ? { "Accept-Language": task.language, Cookie: "gary-language=" + task.language } : {}) } };
         const response = await abortable(fetcher ? fetcher(normalized, init) : pinnedFetch(normalized, init, addresses), controller.signal);
         if ([408, 425, 429, 500, 502, 503, 504].includes(response.status)) {
           const retry = response.headers.get("retry-after"), seconds = retry && /^\d+$/.test(retry) ? Number(retry) * 1000 : retry ? Date.parse(retry) - now() : Math.min(10_000, 1000 * 2 ** (task.attempts || 0));
@@ -323,7 +334,9 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
     if (state.requests >= MAX_REQUESTS) break;
     const index = state.queue.findIndex(task => (state.hostNextAt[new URL(task.url).host] || 0) < chunkEnd - 100);
     if (index < 0) break;
-    const [task] = state.queue.splice(index, 1), key = keyFor(task), origin = new URL(task.url).origin;
+    const [task] = state.queue.splice(index, 1);
+    if(task.kind==="page") {const explicit=localizedRoute(new URL(task.url).pathname);if(explicit)task.language=explicit.language;}
+    const key = keyFor(task), origin = new URL(task.url).origin;
     if (state.visited.includes(key)) continue;
     if (trustedFetch && !allowed(task.url)) { skip(state, task.url, "External destination not inspected: this runtime has no DNS-pinned external transport."); state.visited.push(key); continue; }
     if (task.kind !== "robots" && !state.robots[origin]) {
@@ -350,8 +363,10 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
           if (allowed(task.url) && state.config.scope === "site") for (const url of parsed.sitemaps) push(state, { kind: "sitemap", url, depth: 0 });
         } else state.robots[origin] = { fetched: true, allowed: result.response.status >= 400 && result.response.status < 500 && ![401,403,429].includes(result.response.status), rules: [], delayMs: 0, ...(result.response.status === 404 ? {} : { error: `robots.txt returned HTTP ${result.response.status}` }) };
       } else if (task.kind === "sitemap") {
-        if (!result.response.ok) { skip(state, task.url, `Sitemap returned HTTP ${result.response.status}`); continue; }
+        if (!result.response.ok) { (state.sitemapInspections??=[]).push({url:task.url,status:result.response.status,valid:false,entries:0,reason:`HTTP ${result.response.status}`});skip(state, task.url, `Sitemap returned HTTP ${result.response.status}`); continue; }
         const index = /<sitemapindex\b/i.test(result.text);
+        state.sitemapInspections ||= [];
+        state.sitemapInspections.push({url:task.url,status:result.response.status,valid:/<(?:sitemapindex|urlset)\b/i.test(result.text),entries:xmlLocations(result.text).length,redirects:result.redirects});
         if (!index && !/<urlset\b/i.test(result.text)) { skip(state, task.url, "Sitemap is not a valid XML sitemap or index"); continue; }
         for (const value of xmlLocations(result.text)) {
           const url = normalizeCrawlUrl(value, task.url); if (!url) { skip(state, value, "Invalid sitemap URL"); continue; }
@@ -373,21 +388,21 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
         const technical: AnalysisReport = isHtml && result.response.ok
           ? analyzeTechnical({ document, status: result.response.status, finalUrl: result.finalUrl, redirects: result.redirects, responseMs: result.responseMs, bytes: result.bytes, xRobotsTag: result.response.headers.get("x-robots-tag") || undefined, robotsAllowed: true })
           : { score: result.response.ok ? null : 0, findings: result.response.ok ? [] : [reportFinding("technical-http", "Published URL returned an HTTP error", `The audit received HTTP ${result.response.status} from ${result.finalUrl}. The error response body is not evaluated as the intended page content.`, "Restore the page or update its published links and sitemap entry.", "critical")] };
-        const page: AuditPage = { inspectionStatus: "inspected", attempts: (task.attempts || 0) + 1, url: task.url, finalUrl: result.finalUrl, status: result.response.status, language: task.language || document.language || document.htmlLanguage || "und", indexable: isHtml && result.response.ok && !hasNoindex(document.robots, result.response.headers.get("x-robots-tag") || undefined), ...(canonical ? { canonical } : {}), title: document.title, description: document.description, hreflang: document.hreflang, content: isHtml && result.response.ok ? analyzeContent(document) : { score: null, findings: [] }, technical, responseMs: result.responseMs, bytes: result.bytes };
+        const page: AuditPage = { inspectionStatus: "inspected", attempts: (task.attempts || 0) + 1, url: task.url, finalUrl: result.finalUrl, status: result.response.status, language: document.htmlLanguage?.split("-")[0].toLowerCase() || task.language || "und", requestedLanguage:task.language, declaredLanguage:document.htmlLanguage||undefined, urlLanguage:localizedRoute(new URL(result.finalUrl).pathname)?.language, indexable: isHtml && result.response.ok && !hasNoindex(document.robots, result.response.headers.get("x-robots-tag") || undefined), ...(canonical ? { canonical } : {}), title: document.title, description: document.description, hreflang: document.hreflang, content: isHtml && result.response.ok ? analyzeContent(document) : { score: null, findings: [] }, technical, responseMs: result.responseMs, bytes: result.bytes };
         if (!isHtml && result.response.ok) appendFinding(technical, reportFinding("response-content-type", "Public page did not return HTML", `HTTP ${result.response.status}; Content-Type: ${type}`, "Check the destination and content negotiation for this published page."));
-        if (result.response.ok && task.language && document.htmlLanguage && document.htmlLanguage.split("-")[0] !== task.language.split("-")[0]) appendFinding(technical, reportFinding("language-response", "Published language differs from the requested variant", `Requested ${task.language}; server-rendered HTML declares ${document.htmlLanguage}.`, "Check the language cookie, localized routing, and server-rendered lang attribute."));
+        if (result.response.ok && (page.urlLanguage||task.language) && document.htmlLanguage && document.htmlLanguage.split("-")[0] !== (page.urlLanguage||task.language)!.split("-")[0]) appendFinding(technical, reportFinding("language-response", "Published language differs from the requested variant", `Expected ${page.urlLanguage||task.language}; server-rendered HTML declares ${document.htmlLanguage}.`, "Check the language cookie, localized routing, and server-rendered lang attribute."));
         state.pages.push(page);
         // A canonical declaration is a hint, not proof that its target was fetched.
         // Mark only the actual response URL inspected, preserving queued canonical-target verification.
         if (allowed(result.finalUrl)) state.canonicalUrls.push(`${task.language}:${result.finalUrl}`);
         state.linkChecks[task.url] = { status: result.response.status, finalUrl: result.finalUrl };
         if (state.config.scope === "site") {
-          if (canonical && allowed(canonical) && canonical !== task.url) pushPages(state, canonical, task.depth + 1, task.url, task.language);
-          for (const alternate of document.hreflang) { const url = normalizeCrawlUrl(alternate.href, result.finalUrl); if (url && allowed(url)) pushPages(state, url, task.depth + 1, task.url, task.language); }
+          if (canonical && allowed(canonical) && canonical !== task.url) pushPages(state, canonical, task.depth + 1, task.url, page.language);
+          for (const alternate of document.hreflang) { const url = normalizeCrawlUrl(alternate.href, result.finalUrl); if (url && allowed(url)) pushPages(state, url, task.depth + 1, task.url, page.language); }
         }
         for (const link of document.links) {
           const url = normalizeCrawlUrl(link.href, result.finalUrl, true); if (!url || url === result.finalUrl) continue;
-          if (allowed(url) && state.config.scope === "site") pushPages(state, url, task.depth + 1, task.url, task.language);
+          if (allowed(url) && state.config.scope === "site") pushPages(state, url, task.depth + 1, task.url, page.language);
           else push(state, { kind: "link", url, depth: 0, source: task.url });
         }
         // Save only relevant link URLs for post-crawl status reconciliation, never full HTML.
@@ -416,7 +431,13 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
     state.stopReason = now() >= auditEnd ? "Maximum audit duration reached; pending tasks were retained." : "Maximum request limit reached; pending tasks were retained.";
     state.status = "incomplete"; state.finishedAt = now();
   } else if (!state.queue.length) {
-    const limitation = state.pages.some(page => page.inspectionStatus === "failed") || state.skippedUrls.some(item => /limit|timed out|unavailable|Maximum|Response exceeds|Request failed|DNS|private or reserved|Redirect|Sitemap (?:is not|returned)|robots\.txt returned HTTP (?:5\d\d|429)|rate limit/i.test(item.reason));
+    const limitation = state.pages.some(page => page.inspectionStatus === "failed") || state.skippedUrls.some(item => {
+      // Earlier failed attempts remain in the evidence log after a successful
+      // resume. They must not keep a fully inspected site permanently incomplete.
+      const resolved=state.pages.some(page=>page.inspectionStatus==="inspected"&&page.url===item.url)||!!state.linkChecks[item.url];
+      let inScope=false;try{inScope=state.config.allowedOrigins.includes(new URL(item.url).origin);}catch{/* Invalid/excluded discovery is not an attempted public page. */}
+      return !resolved&&inScope&&/limit|timed out|unavailable|Maximum|Response exceeds|Request failed|DNS|private or reserved|Redirect|Sitemap (?:is not|returned)|robots\.txt returned HTTP (?:5\d\d|429)|rate limit/i.test(item.reason);
+    });
     state.status = limitation ? "incomplete" : "completed"; state.finishedAt = now();
   }
   // Reconcile after each chunk so partial reports improve as link targets are fetched.
@@ -426,22 +447,25 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
     const broken = links.filter(url => (state.linkChecks[url]?.status || 0) >= 400);
     if (broken.length) appendFinding(page.technical, reportFinding("broken-links", "Broken links found", broken.slice(0, 10).map(url => `${url} (HTTP ${state.linkChecks[url].status})`).join("; "), "Update or remove these destinations and rescan the referring page."));
     if (["completed", "incomplete"].includes(state.status) && page.indexable && state.config.scope === "site") {
-      const preferredUrl = page.canonical || page.finalUrl, included = state.sitemapUrls.includes(preferredUrl);
-      appendFinding(page.technical, reportFinding("sitemap-discovery", included ? "Page appears in a sitemap" : "Page is missing from discovered sitemaps", included ? preferredUrl : `No successfully fetched sitemap listed the preferred indexable URL: ${preferredUrl}`, "Keep canonical, indexable public URLs in the Metadata API sitemap.", included ? "passed" : "warning"));
+      const preferredUrl = page.canonical || page.finalUrl, included = state.sitemapUrls.some(url=>{try{return normalizedSeoUrl(url).href===normalizedSeoUrl(preferredUrl).href;}catch{return false;}});
+      const verified=state.sitemapUrls.length>0||state.sitemapInspections?.some(item=>item.valid);
+      appendFinding(page.technical, reportFinding("sitemap-discovery", included ? "Page appears in a sitemap" : verified?"Page is missing from discovered sitemaps":"Sitemap inclusion could not be verified", included ? preferredUrl : verified?`No successfully fetched sitemap listed the preferred indexable URL: ${preferredUrl}`:"No valid sitemap was successfully inspected; absence from the sitemap cannot be established.", "Keep canonical, indexable public URLs in the Metadata API sitemap.", included ? "passed" : verified?"warning":"recommendation"));
     }
     if (["completed", "incomplete"].includes(state.status)) {
       const unchecked = links.filter(url => !state.linkChecks[url]);
       if (unchecked.length) appendFinding(page.technical, reportFinding("link-coverage", "Some link destinations were not verified", `${links.length - unchecked.length} of ${links.length} extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.`, "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.", "recommendation"));
-      if (page.canonical && page.canonical !== page.finalUrl) {
+      if (page.canonical && !equivalentSeoUrls(page.finalUrl,page.canonical,page.declaredLanguage||page.language)) {
         const target = state.pages.find(item => item.language === page.language && (item.url === page.canonical || item.finalUrl === page.canonical));
         if (!target || target.inspectionStatus === "failed" || target.inspectionStatus === "skipped" || !target.status) appendFinding(page.technical, reportFinding("canonical-target-unverified", "Canonical destination was not verified", page.canonical, "Verify this URL returns indexable HTML and has a consistent canonical. Add its origin to the trusted configuration if appropriate.", "recommendation"));
         else if (!target.indexable) appendFinding(page.technical, reportFinding("canonical-target-indexing", "Canonical points to a non-indexable destination", `${page.canonical} returned ${target.status} and was not indexable in this scan.`, "Choose an indexable canonical destination or fix its status and indexing restrictions.", "critical"));
       }
       for (const alternate of page.hreflang || []) {
         const url = normalizeCrawlUrl(alternate.href, page.finalUrl); if (!url) continue;
-        const target = state.pages.find(item => (item.url === url || item.finalUrl === url) && (alternate.language === "x-default" || item.language.split("-")[0] === alternate.language.split("-")[0]));
-        if (!target || target.inspectionStatus === "failed" || target.inspectionStatus === "skipped" || !target.status) appendFinding(page.technical, reportFinding(`hreflang-unverified-${alternate.language}`, "Language alternate targets were not fully verified", url, "Verify the target is indexable and links back to this page using hreflang.", "recommendation"));
-        else if (!target.indexable || !(target.hreflang || []).some(item => normalizeCrawlUrl(item.href, target.finalUrl) === page.finalUrl)) appendFinding(page.technical, reportFinding(`hreflang-reciprocal-${alternate.language}`, "Language alternate needs review", `${url} is non-indexable or has no return hreflang reference to ${page.finalUrl}.`, "Use reciprocal hreflang links between indexable localized pages."));
+        const target = state.pages.find(item => (item.url === url || item.finalUrl === url) && (alternate.language === "x-default" || (declaredPageLanguage(item)||item.language).split("-")[0] === alternate.language.split("-")[0]));
+        const observedWrongLanguage=alternate.language!=="x-default"?state.pages.find(item=>(item.url===url||item.finalUrl===url)&&item.inspectionStatus==="inspected"&&item.status>0&&(declaredPageLanguage(item)||item.language).split("-")[0]!==alternate.language.split("-")[0]):undefined;
+        if(!target&&observedWrongLanguage)appendFinding(page.technical,reportFinding(`hreflang-target-language-${alternate.language}`,"Language alternate returned the wrong declared language",`${url} declares ${declaredPageLanguage(observedWrongLanguage)||observedWrongLanguage.language}; expected ${alternate.language}.`,"Make the alternate URL serve its declared language independently of cookies, or remove the unsupported alternate."));
+        else if (!target || target.inspectionStatus === "failed" || target.inspectionStatus === "skipped" || !target.status) appendFinding(page.technical, reportFinding(`hreflang-unverified-${alternate.language}`, "Language alternate targets were not fully verified", url, "Verify the target is indexable and links back to this page using hreflang.", "recommendation"));
+        else if (!target.indexable || !(target.hreflang || []).some(item => equivalentSeoUrls(new URL(item.href,target.finalUrl).href,page.canonical||page.finalUrl,page.declaredLanguage||page.language))) appendFinding(page.technical, reportFinding(`hreflang-reciprocal-${alternate.language}`, "Language alternate needs review", `${url} is non-indexable or has no return hreflang reference to ${page.finalUrl}.`, "Use reciprocal hreflang links between indexable localized pages."));
       }
     }
   }

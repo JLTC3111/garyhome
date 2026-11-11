@@ -201,3 +201,41 @@ test('trusted runtime transport still rejects literal private destinations and p
  const state=await finish(createCrawl({allowedOrigins:[origin],scope:'page'},[origin+'/'],h.now()),h);
  assert.equal(state.pages[0].inspectionStatus,'failed');assert.equal(state.pages[0].technical.score,null);assert.deepEqual(state.pages[0].technical.findings,[]);assert.ok(!h.calls.some(c=>c.url.includes('169.254')));
 });
+
+test('explicit locale URLs are requested once in legacy cookie mode and never receive conflicting cookies',async()=>{
+ const h=harness({[origin+'/en']:init=>{assert.equal(new Headers(init.headers).get('cookie'),null);return page('English');},[origin+'/vi']:init=>{assert.equal(new Headers(init.headers).get('cookie'),null);return page('Tiếng Việt').replace('lang="en"','lang="vi"');}});
+ const state=await finish(createCrawl({allowedOrigins:[origin],languages:['en','vi'],scope:'page'},[origin+'/en/',origin+'/vi/'],h.now()),h);
+ assert.equal(state.pages.length,2);assert.equal(h.calls.filter(call=>call.url===origin+'/en').length,1);assert.equal(h.calls.filter(call=>call.url===origin+'/vi').length,1);
+ assert.deepEqual(state.pages.map(page=>[page.requestedLanguage,page.declaredLanguage,page.urlLanguage,page.language]),[['en','en','en','en'],['vi','vi','vi','vi']]);
+ assert.ok(state.pages.every(page=>!page.technical.findings.some(f=>f.id==='language-response')));
+});
+
+test('localized URL mode seeds both genuine language endpoints and records wrong server language independently',async()=>{
+ const h=harness({[origin+'/en/homes']:page('Wrong response').replace('lang="en"','lang="vi"'),[origin+'/vi/homes']:page('Tiếng Việt').replace('lang="en"','lang="vi"')});
+ const state=await finish(createCrawl({allowedOrigins:[origin],languages:['en','vi'],languageMode:'url',scope:'page'},[origin+'/homes'],h.now()),h);
+ assert.equal(state.pages.length,2);const wrong=state.pages.find(page=>page.url.endsWith('/en/homes'));
+ assert.equal(wrong.requestedLanguage,'en');assert.equal(wrong.language,'vi');assert.equal(wrong.declaredLanguage,'vi');assert.equal(wrong.urlLanguage,'en');
+ assert.ok(wrong.technical.findings.some(f=>f.id==='language-response'));
+});
+
+test('unavailable sitemap remains unverified, while a valid legacy sitemap missing localized canonicals is a genuine warning',async()=>{
+ const h=harness({[origin+'/en/homes']:page('Homes','','<link rel="canonical" href="'+origin+'/en/homes">')});
+ const unknown=await finish(createCrawl({allowedOrigins:[origin],languageMode:'url',languages:['en']},[origin+'/en/homes'],h.now()),h);
+ assert.equal(unknown.pages[0].technical.findings.find(f=>f.id==='sitemap-discovery').severity,'recommendation');
+ const valid=harness({[origin+'/sitemap.xml']:'<urlset><url><loc>'+origin+'/homes</loc></url></urlset>',[origin+'/en/homes']:page('Homes','','<link rel="canonical" href="'+origin+'/en/homes">')});
+ const mismatch=await finish(createCrawl({allowedOrigins:[origin],languageMode:'url',languages:['en']},[origin+'/en/homes'],valid.now()),valid);
+ assert.equal(mismatch.pages[0].technical.findings.find(f=>f.id==='sitemap-discovery').severity,'warning');
+});
+
+test('resolved historical timeout logs do not force a fully inspected scan to remain incomplete',async()=>{
+ const h=harness({[origin+'/']:page('Home')});const state=createCrawl({allowedOrigins:[origin],scope:'page'},[origin+'/'],h.now());
+ state.skippedUrls.push({url:origin+'/',reason:'Request timed out'});await finish(state,h);
+ assert.equal(state.status,'completed');assert.ok(state.skippedUrls.some(item=>item.reason==='Request timed out'),'historic evidence is retained');
+});
+
+test('robots redirects may reach a configured public origin and transient resolver EBUSY is retried',async()=>{
+ const other='https://www.gary-public.com';let count=0;
+ const h=harness({[origin+'/robots.txt']:()=>{if(++count===1){const error=new Error('getaddrinfo EBUSY');error.code='EBUSY';throw error;}return new Response('',{status:301,headers:{location:other+'/robots.txt'}});},[other+'/robots.txt']:'User-agent: *\nAllow: /',[origin+'/']:page('Home')});
+ const state=await finish(createCrawl({allowedOrigins:[origin,other],scope:'page'},[origin+'/'],h.now()),h);
+ assert.equal(state.status,'completed');assert.ok(count>=2);assert.equal(state.pages[0].status,200);assert.ok(h.calls.some(call=>call.url===other+'/robots.txt'));
+});

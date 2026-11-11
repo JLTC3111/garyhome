@@ -1,0 +1,102 @@
+
+> gary-home@0.1.0 prebuild
+> npm run build:gary-apps
+
+
+> gary-home@0.1.0 build:gary-apps
+> node scripts/build-gary-apps.mjs
+
+Gary Apps v1: 924dd92627c028ed (205 kB JS)
+
+> gary-home@0.1.0 build
+> node scripts/run-framework.mjs build
+
+
+  vinext build  (Vite 8.1.6)
+
+[1/5] analyze client references...
+[2Ktransforming...✓ 513 modules transformed.
+rendering chunks...
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - rsc:virtual-client-package (19%)
+  - alias (15%)
+  - vinext:middleware-server-only (14%)
+  - vinext:css-data-url (10%)
+  - vinext:og-inline-fetch-assets (7%)
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+✓ built in 4.07s
+[2/5] analyze server references...
+[2Ktransforming...✓ 1185 modules transformed.
+rendering chunks...
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vinext:og-inline-fetch-assets (18%)
+  - vinext:middleware-server-only (17%)
+  - alias (15%)
+  - rsc:virtual-client-package (11%)
+  - vinext:css-data-url (10%)
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+✓ built in 5.57s
+[3/5] build rsc environment...
+[2Ktransforming...✓ 511 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 2.62s
+[4/5] build client environment...
+[2Ktransforming...✓ 2874 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 5.98s
+[5/5] build ssr environment...
+[2Ktransforming...✓ 1220 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 3.85s
+[0m
+  Route (app)
+  ┌ ? /                             
+  ├ ? /about                        
+  ├ ? /account                      
+  ├ ? /activities                   
+  ├ ? /admin                        
+  ├ λ /api/admin/landlords/cleanup  
+  ├ λ /api/admin/seo                
+  ├ λ /api/admin/team               
+  ├ λ /api/admin/team/reset-password
+  ├ λ /api/admin/team/set-password  
+  ├ λ /api/assistance               
+  ├ λ /api/config                   
+  ├ λ /api/cron/seo                 
+  ├ λ /api/enquiries                
+  ├ λ /api/exchange-rate            
+  ├ λ /api/feedback                 
+  ├ λ /api/landlords                
+  ├ λ /api/staff-avatar/:userId     
+  ├ ? /auth/callback                
+  ├ ? /auth/invite                  
+  ├ ? /auth/reset                   
+  ├ ? /cart                         
+  ├ ? /contact                      
+  ├ ? /credits                      
+  ├ ? /feedback                     
+  ├ ? /homes                        
+  ├ ƒ /homes/:slug                  
+  ├ ? /landlords                    
+  ├ ? /login                        
+  ├ ? /neighbourhoods               
+  ├ ? /privacy                      
+  ├ ? /saved                        
+  ├ ? /services                     
+  ├ ? /tips-and-news                
+  ├ ƒ /tips-and-news/:slug          
+  └ ? /vinhomes                     
+
+  λ API  ƒ Dynamic  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+

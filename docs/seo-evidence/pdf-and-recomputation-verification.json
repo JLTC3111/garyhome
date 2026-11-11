@@ -1,0 +1,19 @@
+{
+  "pdfs": {
+    "gary-home-fresh-executive-summary.pdf": {
+      "bytes": 279528,
+      "sha256": "25b465cbcdb499e5b905455b0b63920bb23b3c9746118c53971c3fd9a3e23795"
+    },
+    "gary-home-fresh-full-audit.pdf": {
+      "bytes": 1085294,
+      "sha256": "3544cf2740461b163a1ad59ccc116407e25e49bc8418b108bb1d2c0cea09dcb4"
+    }
+  },
+  "summaryPages": 2,
+  "fullPages": 84,
+  "fullWordsOutsidePage": 0,
+  "fullEmptyPages": 0,
+  "visualReview": "Both executive pages and full-report cover, grouped finding, page-evidence and final exclusion/limitations samples rendered with Poppler and inspected; no clipping seen.",
+  "offlineRecomputationMatchesSavedProduction": true,
+  "sourceAudit": "78eb112e-86d8-422a-abcf-0c5c15f4996d"
+}

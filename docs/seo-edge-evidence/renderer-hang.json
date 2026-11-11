@@ -1,0 +1,205 @@
+{
+  "date": "2026-11-10",
+  "target": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+  "browser": "Microsoft Edge, native macOS application",
+  "browserVersion": "Follow-up UA: Chrome/155.0.0.0 Edg/155.0.0.0; full build/channel not captured",
+  "profile": "Existing normal profile; Vietnamese UI and content observed",
+  "entry": "Direct URL in a new tab, DevTools opened before navigation",
+  "devtools": {
+    "network": "Recording on, cache disabled, no throttling; device emulation switched off before navigation",
+    "networkFinishSeconds": 3.98,
+    "domContentLoadedSeconds": 2.89,
+    "requests": 68,
+    "transferredBytesApprox": 1226236,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "consoleInformationalMessages": [
+      "Images loaded lazily and replaced with placeholders. Load events are deferred.",
+      "Google Maps: Search endpoint requested!"
+    ]
+  },
+  "observedFailure": [
+    "Server-rendered listing text, images, facts and forms appeared.",
+    "The session-restoring message remained present.",
+    "Gallery and mobile-menu controls did not respond to native UI clicks.",
+    "A Console expression 1 + 1 did not return until JavaScript was paused with F8.",
+    "F8 paused the running script in the DocumentTitle MutationObserver callback."
+  ],
+  "pausedStack": {
+    "frame": "e, layout-5eac3e655b6ea61b.js:1",
+    "module": "49927, DocumentTitle",
+    "code": "n && document.title !== r && (document.title = r)",
+    "wanted": "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² ·  Ban công | Gary Home",
+    "actual": "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² · Ban công | Gary Home",
+    "equal": false,
+    "verificationExpression": "JSON.stringify({wanted:r,actual:document.title,equal:r===document.title})"
+  },
+  "rootCause": "The authored Vietnamese title has two ASCII spaces before Ban công. The HTML document.title getter collapses ASCII whitespace to one space. After a later head mutation, the observer compared that normalized getter with the raw title, wrote the raw title again, and generated another head mutation. Its unbounded microtask loop prevented the renderer from servicing input and pending tasks. Edge reproduced naturally; Chrome reproduced after one explicitly injected diagnostic head mutation, proving that the defect is application/content/locale dependent rather than exclusively Edge-specific.",
+  "temporaryTabOnlyPatch": {
+    "attempted": true,
+    "method": "While paused, installed a document.title setter guard that writes only when the native getter differs from the ASCII-whitespace-normalized value, then resumed.",
+    "verifiedRecovery": true,
+    "reason": "Later controlled InPrivate test: clean EN listing gallery responded; setter guard installation returned confirmation in Console; switching the same tab to VI preserved responsiveness and the VI gallery opened. This proves the mechanism in tab memory, not a deployed fix.",
+    "scope": "Test tab memory only; no deployed application or CMS content was edited. Reload restores the original page implementation."
+  },
+  "performanceLimit": "Console reported a 128080ms message-handler violation after resuming, but the duration includes debugger pause time and must not be reported as a CPU benchmark. The debugger stack and the pending Console expression are the direct main-thread-blocking evidence.",
+  "notVerified": [
+    "Deployed fix or release compatibility",
+    "Direct localized UI navigation/refresh matrix",
+    "Other listings in a real browser",
+    "Exact existing-normal-profile cookies/storage/extensions"
+  ],
+  "followUpDate": "2026-11-11",
+  "nativeControlRecovery": "Native Edge control recovered after a later fresh getApp attempt; the earlier cgWindowNotFound gap remains part of the chronology.",
+  "followUpMatrix": [
+    {
+      "browser": "Microsoft Edge",
+      "profile": "Fresh InPrivate",
+      "locale": "en",
+      "entry": "Direct unprefixed listing URL",
+      "guard": false,
+      "result": "Rendered English and property gallery opened/responded"
+    },
+    {
+      "browser": "Microsoft Edge",
+      "profile": "Same InPrivate",
+      "locale": "vi",
+      "entry": "UI language switch from English",
+      "guard": true,
+      "result": "Vietnamese content and title rendered; preferences closed and Vietnamese gallery opened/responded",
+      "urlBehavior": "Legacy address remained unprefixed on the current deployed code"
+    },
+    {
+      "browser": "Google Chrome",
+      "profile": "Fresh Guest",
+      "locale": "en",
+      "entry": "Direct unprefixed listing URL",
+      "guard": false,
+      "result": "Rendered English; gallery opened and closed/responded"
+    },
+    {
+      "browser": "Google Chrome",
+      "profile": "Same Guest",
+      "locale": "vi",
+      "entry": "UI language switch from English",
+      "guard": false,
+      "result": "Initially responsive after VI switch. One diagnostic document.head comment insertion then blocked Console completion and gallery input. F8 caught the same DocumentTitle observer and same raw-versus-normalized title mismatch."
+    },
+    {
+      "browser": "Google Chrome",
+      "profile": "Same Guest",
+      "locale": "vi",
+      "entry": "Resume paused renderer after temporary setter guard",
+      "guard": true,
+      "result": "The pending head-mutation Console statement completed; Vietnamese gallery opened and responded"
+    },
+    {
+      "browser": "Microsoft Edge",
+      "profile": "Same InPrivate, new tab",
+      "locale": "en",
+      "entry": "Direct /en/homes/2-bedroom-apartment-for-rent-in-tay-ho, DevTools before navigation",
+      "guard": false,
+      "result": "Incomplete: English server title/header/footer appeared but Loading remained; document stream, one JS chunk and configuration requests pending; debugger pause disabled. Not attributed to title loop and not a compatibility pass."
+    }
+  ],
+  "independentServerHtml": {
+    "method": "DevTools fetch in Edge InPrivate, credentials omit and cache no-store; response text parsed inertly with DOMParser without executing returned scripts",
+    "responses": [
+      {
+        "locale": "en",
+        "status": 200,
+        "url": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "lang": "en",
+        "title": "2-bedroom apartment for rent in Tu Lien, Tay Ho · 90m² · Balcony | Gary Home",
+        "canonical": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "hreflang": [
+          {
+            "lang": "en",
+            "href": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+          },
+          {
+            "lang": "vi",
+            "href": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+          },
+          {
+            "lang": "x-default",
+            "href": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+          }
+        ],
+        "h1": "2-bedroom apartment for rent in Tu Lien, Tay Ho · 90m² · Balcony"
+      },
+      {
+        "locale": "vi",
+        "status": 200,
+        "url": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "lang": "vi",
+        "title": "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² ·  Ban công | Gary Home",
+        "canonical": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+        "hreflang": [
+          {
+            "lang": "en",
+            "href": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+          },
+          {
+            "lang": "vi",
+            "href": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+          },
+          {
+            "lang": "x-default",
+            "href": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+          }
+        ],
+        "h1": "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² ·  Ban công"
+      }
+    ]
+  },
+  "observedLocaleState": {
+    "method": "Locale-only cookie and localStorage reads in fresh InPrivate Edge before switching",
+    "url": "https://www.garyhome.vn/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+    "htmlLang": "en",
+    "cookie": "en",
+    "localStorage": "en",
+    "canonical": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+  },
+  "chromeDiagnostic": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+    "guardBeforeDiagnostic": false,
+    "lang": "vi",
+    "titleCount": 1,
+    "rawTitle": "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² ·  Ban công | Gary Home",
+    "nativeGetter": "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² · Ban công | Gary Home",
+    "trigger": "document.head.append(document.createComment('Gary Home temporary title observer QA'))",
+    "triggerScope": "Temporary comment in test-tab DOM only; this diagnostic deliberately delivered one head mutation; it was not a natural Chrome direct-navigation failure",
+    "pausedFrame": "e, layout-5eac3e655b6ea61b.js:1 (module 49927, DocumentTitle)",
+    "equal": false,
+    "nativeInertDocumentProbe": {
+      "method": "Observe document.implementation.createHTMLDocument with MutationObserver; set identical raw title then changed raw title, awaiting a microtask for each",
+      "sameTitleMutations": 1,
+      "changedTitleMutations": 1,
+      "getter": "c d",
+      "rawText": "c  d"
+    },
+    "guardRecoveryVerified": true,
+    "environmentalNetworkErrors": "Later ERR_INTERNET_DISCONNECTED / ERR_NETWORK_CHANGED / ERR_NAME_NOT_RESOLVED occurred for realtime websocket, manifest and exchange-rate requests during a network interruption. Original Edge hang had zero console JS errors; these later network errors are recorded separately and are not the established loop cause."
+  },
+  "executiveExportQa": {
+    "date": "2026-11-11",
+    "browser": "Google Chrome Guest",
+    "file": "output/reports/gary-home-latest-executive-summary.html",
+    "method": "Native Cmd+P print preview and visual inspection",
+    "pdfPages": 2,
+    "page1": "Completeness table, scores and evaluated denominators, methodology, 3 actions and footer fit without clipping",
+    "page2": "Visually inspected all 8 grouped causes, wrapped text, limitations and footer; no overlap or clipping",
+    "physicalPrintPerformed": false,
+    "pdfSaved": true,
+    "scope": "Actual English historical-evidence fixture, not all language/report combinations",
+    "pdfPath": "output/pdf/gary-home-latest-executive-summary.pdf",
+    "pdfBytes": 289440,
+    "pdfPageSize": "A4 (594.96 x 841.92 pt)",
+    "browserHeadersFooters": false,
+    "backgroundGraphics": true,
+    "pdfProducer": "Skia/PDF m157",
+    "pdfCreated": "2026-11-11 02:00:57 +07",
+    "saveChronology": "Native Save as PDF destination selected. Browser headers/footers disabled and background graphics enabled. Save panel closed during a native UI-change interruption; the newly created PDF was found in default Downloads and copied to the exact authorized output path. pdfinfo independently verified two pages."
+  }
+}

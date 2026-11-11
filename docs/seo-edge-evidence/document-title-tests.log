@@ -1,0 +1,19 @@
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ every public, customer and staff route has a title in the selected language (9.028125ms)
+✔ property titles use current CMS translations and never expose unavailable or private listings (4.879292ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ language, navigation and CMS changes update the tab without remounting a customer draft (15.28675ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ late framework metadata and restored tabs cannot retain the wrong title or start a mutation loop (2.010917ms)
+✔ authored whitespace cannot create a document-title observer loop after browser title normalization (2.603042ms)
+✔ rental guide titles use the selected language and unknown articles stay not found (0.144459ms)
+✔ original news titles are bilingual and the retired About page is no longer a content title (0.083333ms)
+✔ live editorial titles translate while draft and withdrawn pages never fall back to seed titles (0.366083ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 430.041917

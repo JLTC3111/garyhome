@@ -1,0 +1,112 @@
+{
+  "at": "2026-11-10T19:23:22.299Z",
+  "method": "Vercel authenticated HTTP fetch of live aliases; does not execute JavaScript",
+  "routes": [
+    {
+      "path": "/robots.txt",
+      "status": 200,
+      "language": null,
+      "title": null,
+      "h1": [],
+      "canonical": [],
+      "hreflang": [],
+      "robots": "User-Agent: *\nAllow: /\nDisallow: /account\nDisallow: /admin\nDisallow: /login\nDisallow: /cart\nDisallow: /saved\nDisallow: /auth/\nDisallow: /api/\n\nSitemap: https://www.garyhome.vn/sitemap.xml\n",
+      "location": null
+    },
+    {
+      "path": "/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "status": 200,
+      "language": "en",
+      "title": "2-bedroom apartment for rent in Tu Lien, Tay Ho · 90m² · Balcony | Gary Home",
+      "h1": [
+        "2-bedroom apartment for rent in Tu Lien, Tay Ho · 90m² · Balcony"
+      ],
+      "canonical": [
+        "<link rel=\"canonical\" href=\"https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>"
+      ],
+      "hreflang": [
+        "<link rel=\"alternate\" hrefLang=\"en\" href=\"https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>",
+        "<link rel=\"alternate\" hrefLang=\"vi\" href=\"https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>",
+        "<link rel=\"alternate\" hrefLang=\"x-default\" href=\"https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>"
+      ],
+      "robots": null,
+      "location": null
+    },
+    {
+      "path": "/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "status": 200,
+      "language": "vi",
+      "title": "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² ·  Ban công | Gary Home",
+      "h1": [
+        "Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² ·  Ban công"
+      ],
+      "canonical": [
+        "<link rel=\"canonical\" href=\"https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>"
+      ],
+      "hreflang": [
+        "<link rel=\"alternate\" hrefLang=\"en\" href=\"https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>",
+        "<link rel=\"alternate\" hrefLang=\"vi\" href=\"https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>",
+        "<link rel=\"alternate\" hrefLang=\"x-default\" href=\"https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho\"/>"
+      ],
+      "robots": null,
+      "location": null
+    },
+    {
+      "path": "/en/homes?area=tay-ho",
+      "status": 200,
+      "language": "en",
+      "title": "Hanoi rental properties | Gary Home",
+      "h1": [
+        "Rent a place in Hanoi."
+      ],
+      "canonical": [
+        "<link rel=\"canonical\" href=\"https://www.garyhome.vn/en/homes\"/>"
+      ],
+      "hreflang": [
+        "<link rel=\"alternate\" hrefLang=\"en\" href=\"https://www.garyhome.vn/en/homes\"/>",
+        "<link rel=\"alternate\" hrefLang=\"vi\" href=\"https://www.garyhome.vn/vi/homes\"/>",
+        "<link rel=\"alternate\" hrefLang=\"x-default\" href=\"https://www.garyhome.vn/en/homes\"/>"
+      ],
+      "robots": null,
+      "location": null
+    },
+    {
+      "path": "/vi/homes?area=tay-ho",
+      "status": 200,
+      "language": "vi",
+      "title": "Bất động sản cho thuê Hà Nội | Gary Home",
+      "h1": [
+        "Tìm nhà cho thuê tại Hà Nội."
+      ],
+      "canonical": [
+        "<link rel=\"canonical\" href=\"https://www.garyhome.vn/vi/homes\"/>"
+      ],
+      "hreflang": [
+        "<link rel=\"alternate\" hrefLang=\"en\" href=\"https://www.garyhome.vn/en/homes\"/>",
+        "<link rel=\"alternate\" hrefLang=\"vi\" href=\"https://www.garyhome.vn/vi/homes\"/>",
+        "<link rel=\"alternate\" hrefLang=\"x-default\" href=\"https://www.garyhome.vn/en/homes\"/>"
+      ],
+      "robots": null,
+      "location": null
+    },
+    {
+      "path": "/about",
+      "status": 200,
+      "language": "en",
+      "title": "Other Services | Gary Home",
+      "h1": [
+        "Local support.\nA clearer rental search."
+      ],
+      "canonical": [
+        "<link rel=\"canonical\" href=\"https://www.garyhome.vn/en/services\"/>"
+      ],
+      "hreflang": [
+        "<link rel=\"alternate\" hrefLang=\"en\" href=\"https://www.garyhome.vn/en/services\"/>",
+        "<link rel=\"alternate\" hrefLang=\"vi\" href=\"https://www.garyhome.vn/vi/services\"/>",
+        "<link rel=\"alternate\" hrefLang=\"x-default\" href=\"https://www.garyhome.vn/en/services\"/>"
+      ],
+      "robots": null,
+      "location": null
+    }
+  ]
+}

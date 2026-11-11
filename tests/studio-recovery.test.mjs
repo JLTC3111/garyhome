@@ -152,7 +152,7 @@ async function harness(t, options={}){
   function dependency(id){
    if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
-   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(){},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
+   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
    if(id==='@supabase/supabase-js')return {createClient:(_url,_key,options)=>({storage:{from:bucket=>({upload:async(path,file,uploadOptions)=>{backend.imageUploads??=[];backend.imageUploads.push({bucket,path,file,options:uploadOptions,clientOptions:options});return backend.upload.promise;},getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}}),uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
    if(id==='@/lib/browser-client'||id==='./browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient,browserBackendConfig:()=>({url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'})};
    if(id.startsWith('.')||id.startsWith('@/')){
@@ -1661,4 +1661,29 @@ test('closing the listing editor stops the remaining files in an image upload ba
  await act(async()=>{pending=picker.props.onChange({target:{files:[jpegFile('first.JPG'),jpegFile('second.JPG')],value:'selected'}});await delay(5);});
  assert.equal(h.backend.imageUploads.length,1);await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
  await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});assert.equal(h.backend.imageUploads.length,1);
+});
+
+test('listing management shows localized creation times and verified creator snapshots rather than editable contacts',async t=>{
+ const h=await harness(t,{url:'https://garyhome.vn/admin'}),record=h.site.content.properties[0];
+ h.backend.rows.property_creation_records=[{property_id:record.id,created_at:'2026-11-10T18:04:00Z',actor_name:'Recorded original poster'}];
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ const table=()=>h.renderer.root.findByProps({className:'admin-table admin-table--listings'});
+ const content=node=>typeof node==='string'?node:(node?.children||[]).map(content).join(' ');
+ assert.match(content(table().findByType('thead')),/Created/);assert.match(content(table().findByType('thead')),/Posted by/);
+ assert.match(content(table()),/Recorded original poster/);assert.match(content(table()),/01:04\s+GMT\+7/);assert.match(content(table()),/Not recorded/);
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.match(content(table().findByType('thead')),/Ngày tạo/);assert.match(content(table().findByType('thead')),/Người đăng/);
+ assert.match(content(table()),/Recorded original poster/);assert.match(content(table()),/Chưa được ghi nhận/);
+ assert.ok(table().findAllByType('time').some(node=>node.props.dateTime==='2026-11-10T18:04:00.000Z'));
+});
+
+test('switching language on a legacy listing creates a shareable locale URL and preserves the listing slug',async t=>{
+ const property={...fixture.properties[0],slug:'2-bedroom-apartment-for-rent-tu-lien-tay-ho',updated_at:'2026-11-10T14:00:00Z'};
+ const path='/homes/'+property.slug;
+ const h=await harness(t,{page:'property',path,url:'https://garyhome.vn'+path+'?view=gallery#photos',propertyPage:property});
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(h.backend.navigation.at(-1),'/vi'+path+'?view=gallery#photos');
+ await act(async()=>h.site.setLanguage('en'));
+ assert.equal(h.backend.navigation.at(-1),'/en'+path+'?view=gallery#photos');
+ assert.ok(h.site.content.properties.some(row=>row.slug===property.slug));
 });

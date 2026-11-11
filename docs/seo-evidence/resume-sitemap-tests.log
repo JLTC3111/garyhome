@@ -1,0 +1,25 @@
+(node:31123) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[SEO audit] checkpoint unconfirmed { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+[SEO audit] checkpoint unconfirmed { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+[SEO audit] worker interrupted { runId: '20000000-0000-4000-8000-000000000002', type: 'Error' }
+✔ a checkpoint response failure at 191 seconds never overwrites the resumable run as failed (89.9735ms)
+✔ an expired lease or unconfirmed compare-and-swap checkpoint does not manufacture a failed run (64.940042ms)
+✔ an unexpected worker interruption preserves observations and pending queue with an actionable incomplete state (30.436375ms)
+✔ changed trusted domains stop advancement without issuing network work or discarding the queue (19.441083ms)
+✔ explicit resume starts a new bounded segment while preserving original time and successful evidence (19.828166ms)
+✔ resume rejects changed domains, active/completed runs and missing records before persisting work (89.16025ms)
+✔ legacy normalization removes fabricated uninspected scores and preserves genuine observed defects (1.145459ms)
+✔ stored summaries weight evaluated checks and omit failed inspections rather than averaging fabricated page scores (15.661375ms)
+✔ resuming legacy parser evidence re-evaluates successful pages before assigning the new score basis (15.169584ms)
+✔ site resume refreshes cached sitemap inventory across deployments and archives previous coverage evidence (14.037959ms)
+✔ individual-page resume does not enqueue site inventories or expand its inspection scope (15.245083ms)
+✔ freshly fetched resume inventory replaces old missing-page warnings without hiding genuine omissions (54.287666ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 783.789667

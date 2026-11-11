@@ -12,9 +12,14 @@ export function DocumentTitle() {
 
   useLayoutEffect(() => {
     if (title === null) return;
+    // HTML's document.title getter strips and collapses ASCII whitespace.
+    // Comparing it with the raw authored title can otherwise keep this
+    // observer writing forever (for example "90m² ·  Ban công"). That
+    // microtask loop blocks hydration, input and even the page's console.
+    const browserTitle = title.replace(/[\t\n\f\r ]+/g, " ").replace(/^ | $/g, "");
     let active = true;
     const apply = () => {
-      if (active && document.title !== title) document.title = title;
+      if (active && document.title !== browserTitle) document.title = browserTitle;
     };
     apply();
     // Route metadata can arrive after the page, including from streamed renders.

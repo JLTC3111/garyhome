@@ -77,11 +77,14 @@ test('property titles use current CMS translations and never expose unavailable 
   assert.equal(documentTitle('/homes/%E0%A4%A', 'en', [property]), 'Home not found | Gary Home');
 });
 
-async function harness(t, { strict = false } = {}) {
+async function harness(t, { strict = false, browserWhitespace = false } = {}) {
   const observers = [], listeners = new Set();
   let currentTitle = 'Server title', writes = 0, renderer;
   const page = { head: {} };
-  Object.defineProperty(page, 'title', { get: () => currentTitle, set: value => { currentTitle = value; writes++; } });
+  Object.defineProperty(page, 'title', { get: () => currentTitle, set: value => {
+    currentTitle = browserWhitespace ? value.replace(/[\t\n\f\r ]+/g, ' ').replace(/^ | $/g, '') : value;
+    writes++;
+  } });
   const browser = {
     addEventListener(type, callback) { assert.equal(type, 'pageshow'); listeners.add(callback); },
     removeEventListener(type, callback) { assert.equal(type, 'pageshow'); listeners.delete(callback); },
@@ -160,6 +163,40 @@ test('late framework metadata and restored tabs cannot retain the wrong title or
   await h.unmount();
   h.page.title = 'Another page'; for (const observer of h.observers) observer.callback();
   assert.equal(h.page.title, 'Another page', 'Cleaned-up callbacks cannot change another page');
+});
+
+test('authored whitespace cannot create a document-title observer loop after browser title normalization', async t => {
+  pathname = '/vi/homes/home-by-the-lake';
+  const rawTitle = 'Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² ·  Ban công\n\t';
+  site = { language: 'vi', content: { properties: [{ ...property, title_vi: rawTitle }] } };
+  const h = await harness(t, { strict: true, browserWhitespace: true });
+  assert.equal(h.page.title, 'Cho thuê căn hộ 2 phòng ngủ tại Tứ Liên, Tây Hồ · 90m² · Ban công | Gary Home');
+  const writes = h.writes;
+  const active = h.observers.find(observer => !observer.disconnected);
+  for (let i = 0; i < 100; i++) active.callback();
+  assert.equal(h.writes, writes, 'observer delivery after its own normalized write never schedules another title mutation');
+  assert.equal(site.content.properties[0].title_vi, rawTitle, 'the authored CMS value is not edited');
+  h.page.title = 'Stale streamed title'; active.callback();
+  const recoveredWrites = h.writes;
+  active.callback();
+  assert.equal(h.writes, recoveredWrites, 'late metadata correction also settles');
+  for (const [route, language, slug, authored, expected] of [
+    ['/en/homes/home-by-the-lake', 'en', 'home-by-the-lake', 'Two  bedroom\tapartment\n · Balcony', 'Two bedroom apartment · Balcony'],
+    ['/homes/another-home', 'en', 'another-home', 'A  different home\t', 'A different home'],
+    ['/vi/homes/third-home', 'vi', 'third-home', 'Căn hộ\r\n  khác', 'Căn hộ khác'],
+    ['/en/homes/fourth-home', 'en', 'fourth-home', 'Home\u00a0by the lake', 'Home\u00a0by the lake'],
+  ]) {
+    pathname = route;
+    const record = { ...property, slug, [`title_${language}`]: authored };
+    site = { language, content: { properties: [record] } };
+    await h.redraw();
+    assert.equal(h.page.title, `${expected} | Gary Home`);
+    const settledWrites = h.writes;
+    const observer = h.observers.find(observer => !observer.disconnected);
+    for (let i = 0; i < 100; i++) observer.callback();
+    assert.equal(h.writes, settledWrites, `the title settles for ${route}`);
+    assert.equal(record[`title_${language}`], authored, 'only browser-title presentation is normalized');
+  }
 });
 
 

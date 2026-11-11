@@ -1,0 +1,3719 @@
+{
+  "auditId": "78eb112e-86d8-422a-abcf-0c5c15f4996d",
+  "method": "evaluated-checks-v3",
+  "status": "completed",
+  "elapsedSeconds": 183.91,
+  "coverage": {
+    "inspected": 50,
+    "passed": 42,
+    "issues": 8,
+    "failed": 0,
+    "skipped": 0,
+    "pending": 0,
+    "skippedUrls": 60,
+    "observations": 50,
+    "inspectedObservations": 50,
+    "duplicateObservations": 0,
+    "uniqueUrls": 50,
+    "uniqueResources": 25,
+    "localeVariants": 50,
+    "canonicalVariants": 50,
+    "pageAttempts": 50,
+    "requests": 86,
+    "byLanguage": {
+      "en": {
+        "inspected": 25,
+        "failed": 0,
+        "skipped": 0,
+        "pending": 0
+      },
+      "vi": {
+        "inspected": 25,
+        "failed": 0,
+        "skipped": 0,
+        "pending": 0
+      }
+    }
+  },
+  "scoreDetails": {
+    "content": {
+      "passed": 350,
+      "failed": 8,
+      "evaluated": 358,
+      "recommendations": 84,
+      "score": 98,
+      "formula": "round(100 × passed applicable checks / evaluated applicable checks)",
+      "unit": "One check per normalized requested URL and observed server language; conflicting repeated observations use the worst observed severity."
+    },
+    "technical": {
+      "passed": 576,
+      "failed": 0,
+      "evaluated": 576,
+      "recommendations": 124,
+      "score": 100,
+      "formula": "round(100 × passed applicable checks / evaluated applicable checks)",
+      "unit": "One check per normalized requested URL and observed server language; conflicting repeated observations use the worst observed severity."
+    }
+  },
+  "noindex": [],
+  "sitemaps": [
+    {
+      "url": "https://www.garyhome.vn/sitemap.xml",
+      "valid": true,
+      "status": 200,
+      "entries": 50,
+      "redirects": []
+    }
+  ],
+  "skippedReasons": {
+    "Excluded route or static asset": 14,
+    "UI query variant consolidated to the preferred public page; this query URL was not separately fetched.": 42,
+    "Irrelevant external social, authentication, sharing or tracking destination": 2,
+    "getaddrinfo EBUSY sovhtt.hanoi.gov.vn": 1,
+    "robots.txt unavailable after 3 attempt(s): getaddrinfo EBUSY sovhtt.hanoi.gov.vn": 1
+  },
+  "diagnostics": [
+    {
+      "at": 1794339332888,
+      "url": "https://sovhtt.hanoi.gov.vn/robots.txt",
+      "kind": "robots",
+      "reason": "getaddrinfo EBUSY sovhtt.hanoi.gov.vn",
+      "attempts": 1
+    },
+    {
+      "at": 1794339341301,
+      "url": "https://sovhtt.hanoi.gov.vn/robots.txt",
+      "kind": "robots",
+      "reason": "getaddrinfo EBUSY sovhtt.hanoi.gov.vn",
+      "attempts": 2
+    },
+    {
+      "at": 1794339343303,
+      "url": "https://sovhtt.hanoi.gov.vn/robots.txt",
+      "kind": "robots",
+      "reason": "getaddrinfo EBUSY sovhtt.hanoi.gov.vn",
+      "attempts": 3
+    },
+    {
+      "at": 1794339343303,
+      "url": "https://sovhtt.hanoi.gov.vn/en/introduction/ha-noi-thu-do-viet-nam/",
+      "kind": "link",
+      "reason": "robots.txt unavailable after 3 attempt(s): getaddrinfo EBUSY sovhtt.hanoi.gov.vn",
+      "attempts": 1
+    }
+  ],
+  "groups": [
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:en:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": [
+        "1-bedroom apartment for rent on nguyen cong hoan street, ba dinh – bright and airy, private balcony"
+      ]
+    },
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:en:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": [
+        "2-bedroom apartment for rent on vu mien street, tay ho district · 140m2 · lake view balcony"
+      ]
+    },
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/en/vinhomes:en:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/en/vinhomes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/vinhomes"
+      ],
+      "evidence": [
+        "indicative rent from the supplied notes. confirm availability, included services and current lease terms with the team."
+      ]
+    },
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:vi:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": [
+        "cho thuê căn hộ 1 phòng ngủ tại nguyễn công hoan, ba đình – nhiều ánh sáng tự nhiên, ban công riêng"
+      ]
+    },
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho:vi:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": [
+        "cho thuê căn hộ 2 phòng ngủ tại tây hồ · 100m2 · ban công · cho phép nuôi thú cưng"
+      ]
+    },
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:vi:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": [
+        "cho thuê căn hộ 2 phòng ngủ tại đường vũ miên, tây hồ · 140m2· ban công hướng ra hồ tây"
+      ]
+    },
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:vi:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": [
+        "căn hộ 3 phòng ngủ cho thuê tại tây hồ, hà nội – diện tích 160m2 trên phố quảng khánh"
+      ]
+    },
+    {
+      "key": "content:content-repeated-paragraph:https://www.garyhome.vn/vi/vinhomes:vi:warning",
+      "causeId": "content-repeated-paragraph",
+      "category": "content",
+      "severity": "warning",
+      "title": "Repeated paragraph detected",
+      "explanation": "An identical paragraph appears more than once in the main content.",
+      "recommendation": "Review whether the repeated passage is intentional; consolidate accidental duplication.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/vinhomes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/vinhomes"
+      ],
+      "evidence": [
+        "giá tham khảo theo thông tin được cung cấp. xác nhận tình trạng, dịch vụ bao gồm và điều kiện thuê hiện tại với đội ngũ."
+      ]
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:en:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho:en:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:en:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:en:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:en:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:en:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho:en:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:vi:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho:vi:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:vi:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:vi:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:vi:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:vi:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-description-preview:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho:vi:recommendation",
+      "causeId": "content-description-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review description truncation",
+      "explanation": "Snippet space varies by device and query; this description may be shortened.",
+      "recommendation": "Put essential information first. Do not remove useful detail solely to meet a character target.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-image-alt-quality:https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026:en:recommendation",
+      "causeId": "content-image-alt-quality",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Replace generic image descriptions",
+      "explanation": "Generic words do not convey the information shown in an image.",
+      "recommendation": "Describe what matters in the image without adding unrelated keywords.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": [
+        "Article cover photo"
+      ]
+    },
+    {
+      "key": "content:content-image-alt-quality:https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search:en:recommendation",
+      "causeId": "content-image-alt-quality",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Replace generic image descriptions",
+      "explanation": "Generic words do not convey the information shown in an image.",
+      "recommendation": "Describe what matters in the image without adding unrelated keywords.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": [
+        "Article cover photo"
+      ]
+    },
+    {
+      "key": "content:content-image-alt-quality:https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:en:recommendation",
+      "causeId": "content-image-alt-quality",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Replace generic image descriptions",
+      "explanation": "Generic words do not convey the information shown in an image.",
+      "recommendation": "Describe what matters in the image without adding unrelated keywords.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": [
+        "Article cover photo"
+      ]
+    },
+    {
+      "key": "content:content-image-alt-quality:https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026:vi:recommendation",
+      "causeId": "content-image-alt-quality",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Replace generic image descriptions",
+      "explanation": "Generic words do not convey the information shown in an image.",
+      "recommendation": "Describe what matters in the image without adding unrelated keywords.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": [
+        "Ảnh bìa bài viết"
+      ]
+    },
+    {
+      "key": "content:content-image-alt-quality:https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search:vi:recommendation",
+      "causeId": "content-image-alt-quality",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Replace generic image descriptions",
+      "explanation": "Generic words do not convey the information shown in an image.",
+      "recommendation": "Describe what matters in the image without adding unrelated keywords.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": [
+        "Ảnh bìa bài viết"
+      ]
+    },
+    {
+      "key": "content:content-image-alt-quality:https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:vi:recommendation",
+      "causeId": "content-image-alt-quality",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Replace generic image descriptions",
+      "explanation": "Generic words do not convey the information shown in an image.",
+      "recommendation": "Describe what matters in the image without adding unrelated keywords.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": [
+        "Ảnh bìa bài viết"
+      ]
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 926 language-aware word segments and 338 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/activities:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 63 language-aware word segments and 9 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/activities",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/activities"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/contact:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 211 language-aware word segments and 52 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/contact",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/contact"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/credits:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 320 language-aware word segments and 63 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/credits",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/credits"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/feedback:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 123 language-aware word segments and 33 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/feedback",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/feedback"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 327 language-aware word segments and 145 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 426 language-aware word segments and 123 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 614 language-aware word segments and 180 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 652 language-aware word segments and 187 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 682 language-aware word segments and 188 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 703 language-aware word segments and 183 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 702 language-aware word segments and 189 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 527 language-aware word segments and 178 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/landlords:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 200 language-aware word segments and 46 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/landlords",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/landlords"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/neighbourhoods:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 506 language-aware word segments and 147 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/neighbourhoods",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/neighbourhoods"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/privacy:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 562 language-aware word segments and 64 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/privacy",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/privacy"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/services:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 502 language-aware word segments and 129 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/services",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/services"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/tips-and-news:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 208 language-aware word segments and 61 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 192 language-aware word segments and 37 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 209 language-aware word segments and 40 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 139 language-aware word segments and 29 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 154 language-aware word segments and 29 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 209 language-aware word segments and 39 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/tips-and-news/viewing-checklist:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 136 language-aware word segments and 27 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/viewing-checklist",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/viewing-checklist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/en/vinhomes:en:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 213 language-aware word segments and 105 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/en/vinhomes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/vinhomes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 1224 language-aware word segments and 338 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/activities:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 85 language-aware word segments and 9 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/activities",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/activities"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/contact:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 248 language-aware word segments and 52 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/contact",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/contact"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/credits:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 423 language-aware word segments and 62 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/credits",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/credits"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/feedback:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 161 language-aware word segments and 33 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/feedback",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/feedback"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 442 language-aware word segments and 145 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 570 language-aware word segments and 123 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 791 language-aware word segments and 175 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 875 language-aware word segments and 180 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 943 language-aware word segments and 182 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 956 language-aware word segments and 182 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 932 language-aware word segments and 190 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 703 language-aware word segments and 177 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/landlords:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 278 language-aware word segments and 45 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/landlords",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/landlords"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/neighbourhoods:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 637 language-aware word segments and 146 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/neighbourhoods",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/neighbourhoods"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/privacy:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 707 language-aware word segments and 64 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/privacy",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/privacy"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/services:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 665 language-aware word segments and 129 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/services",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/services"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/tips-and-news:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 273 language-aware word segments and 61 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 251 language-aware word segments and 37 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 254 language-aware word segments and 40 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 174 language-aware word segments and 29 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 195 language-aware word segments and 29 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 251 language-aware word segments and 39 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/tips-and-news/viewing-checklist:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 171 language-aware word segments and 27 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/viewing-checklist",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/viewing-checklist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-readability:https://www.garyhome.vn/vi/vinhomes:vi:recommendation",
+      "causeId": "content-readability",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review clarity and relevance",
+      "explanation": "Detected 285 language-aware word segments and 105 sentences. These counts are context, not quality or ranking scores.",
+      "recommendation": "Read the page in its target language. Explain unfamiliar terms, break up dense passages, verify facts and answer the reader's intent.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/vinhomes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/vinhomes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:en:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": [
+        "111 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho:en:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": [
+        "83 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:en:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": [
+        "103 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:en:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": [
+        "76 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:en:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": [
+        "76 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:en:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": [
+        "87 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho:en:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": [
+        "77 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:vi:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": [
+        "111 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho:vi:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": [
+        "94 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:vi:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": [
+        "99 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:vi:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": [
+        "78 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:vi:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": [
+        "77 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:vi:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": [
+        "97 characters"
+      ]
+    },
+    {
+      "key": "content:content-title-preview:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho:vi:recommendation",
+      "causeId": "content-title-preview",
+      "category": "content",
+      "severity": "recommendation",
+      "title": "Review title truncation",
+      "explanation": "Long titles may be shortened depending on device and character widths. There is no fixed ranking length.",
+      "recommendation": "Use the desktop and mobile previews and put the distinguishing topic near the beginning.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": [
+        "74 characters"
+      ]
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "71 of 106 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/activities:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "32 of 54 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/activities",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/activities"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/contact:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/contact",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/contact"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/credits:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "44 of 77 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/credits",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/credits"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/feedback:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "33 of 56 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/feedback",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/feedback"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "47 of 70 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/landlords:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "34 of 56 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/landlords",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/landlords"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/neighbourhoods:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "34 of 67 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/neighbourhoods",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/neighbourhoods"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/privacy:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "32 of 54 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/privacy",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/privacy"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/services:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "48 of 78 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/services",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/services"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/tips-and-news:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "40 of 62 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "36 of 58 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "37 of 59 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 58 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/tips-and-news/viewing-checklist:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/viewing-checklist",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/viewing-checklist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/en/vinhomes:en:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "36 of 61 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/en/vinhomes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/vinhomes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "71 of 106 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/activities:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "32 of 54 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/activities",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/activities"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/contact:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/contact",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/contact"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/credits:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "44 of 77 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/credits",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/credits"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/feedback:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "33 of 56 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/feedback",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/feedback"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "47 of 70 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "41 of 64 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/landlords:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "34 of 56 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/landlords",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/landlords"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/neighbourhoods:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "34 of 67 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/neighbourhoods",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/neighbourhoods"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/privacy:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "32 of 54 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/privacy",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/privacy"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/services:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "48 of 78 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/services",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/services"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/tips-and-news:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "40 of 62 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "36 of 58 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "37 of 59 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 58 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/tips-and-news/viewing-checklist:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "35 of 57 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/viewing-checklist",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/viewing-checklist"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:link-coverage:https://www.garyhome.vn/vi/vinhomes:vi:recommendation",
+      "causeId": "link-coverage",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Some link destinations were not verified",
+      "explanation": "36 of 61 extracted links have an HTTP result. Remaining links may be excluded, blocked, external, or outside crawl limits.",
+      "recommendation": "Review skipped URLs and rescan relevant destinations. This audit does not certify unchecked links.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/vinhomes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/vinhomes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en"
+      ],
+      "evidence": [
+        "2503 ms; 233149 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/activities:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/activities",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/activities"
+      ],
+      "evidence": [
+        "1436 ms; 167014 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/contact:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/contact",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/contact"
+      ],
+      "evidence": [
+        "1469 ms; 146617 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/credits:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/credits",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/credits"
+      ],
+      "evidence": [
+        "1196 ms; 144595 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/feedback:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/feedback",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/feedback"
+      ],
+      "evidence": [
+        "934 ms; 150437 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes"
+      ],
+      "evidence": [
+        "1844 ms; 187446 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": [
+        "1729 ms; 174976 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": [
+        "1985 ms; 194275 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": [
+        "1924 ms; 194226 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": [
+        "1222 ms; 189900 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": [
+        "1959 ms; 190165 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": [
+        "1757 ms; 195379 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": [
+        "1689 ms; 188923 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/landlords:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/landlords",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/landlords"
+      ],
+      "evidence": [
+        "1151 ms; 147630 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/neighbourhoods:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/neighbourhoods",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/neighbourhoods"
+      ],
+      "evidence": [
+        "2307 ms; 152606 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/privacy:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/privacy",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/privacy"
+      ],
+      "evidence": [
+        "1215 ms; 144411 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/services:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/services",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/services"
+      ],
+      "evidence": [
+        "1280 ms; 161377 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/tips-and-news:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news"
+      ],
+      "evidence": [
+        "1041 ms; 146681 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": [
+        "1165 ms; 145965 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": [
+        "1788 ms; 146468 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/organise-your-shortlist"
+      ],
+      "evidence": [
+        "1254 ms; 143373 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief"
+      ],
+      "evidence": [
+        "1206 ms; 143482 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": [
+        "933 ms; 146339 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/tips-and-news/viewing-checklist:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news/viewing-checklist",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news/viewing-checklist"
+      ],
+      "evidence": [
+        "1740 ms; 143285 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/en/vinhomes:en:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/en/vinhomes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/vinhomes"
+      ],
+      "evidence": [
+        "1228 ms; 172593 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi"
+      ],
+      "evidence": [
+        "2141 ms; 236396 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/activities:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/activities",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/activities"
+      ],
+      "evidence": [
+        "1230 ms; 168482 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/contact:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/contact",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/contact"
+      ],
+      "evidence": [
+        "1252 ms; 147885 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/credits:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/credits",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/credits"
+      ],
+      "evidence": [
+        "1871 ms; 145969 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/feedback:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/feedback",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/feedback"
+      ],
+      "evidence": [
+        "1261 ms; 151748 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes"
+      ],
+      "evidence": [
+        "2421 ms; 189332 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/1-bedroom-apartment-for-rent-on-nguyen-cong-hoan-street-ba-dinh-bright-and-airy-private-balcony"
+      ],
+      "evidence": [
+        "2063 ms; 177357 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-in-tay-ho"
+      ],
+      "evidence": [
+        "1728 ms; 196684 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-on-vu-mien-tay-ho"
+      ],
+      "evidence": [
+        "1714 ms; 197372 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-hoa-tay-ho"
+      ],
+      "evidence": [
+        "1377 ms; 193355 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/2-bedroom-apartment-for-rent-tu-lien-tay-ho"
+      ],
+      "evidence": [
+        "1165 ms; 193221 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-3-phong-ngu-quang-khanh-tay-ho"
+      ],
+      "evidence": [
+        "1247 ms; 198422 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes/cho-thue-can-ho-studio-au-co-tay-ho"
+      ],
+      "evidence": [
+        "1661 ms; 191525 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/landlords:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/landlords",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/landlords"
+      ],
+      "evidence": [
+        "1842 ms; 149041 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/neighbourhoods:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/neighbourhoods",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/neighbourhoods"
+      ],
+      "evidence": [
+        "2029 ms; 154263 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/privacy:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/privacy",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/privacy"
+      ],
+      "evidence": [
+        "915 ms; 146116 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/services:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/services",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/services"
+      ],
+      "evidence": [
+        "1254 ms; 163114 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/tips-and-news:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news"
+      ],
+      "evidence": [
+        "941 ms; 147981 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/hanoi-rental-outlook-q3-2026"
+      ],
+      "evidence": [
+        "887 ms; 147310 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/metro-and-your-hanoi-rental-search"
+      ],
+      "evidence": [
+        "1759 ms; 147664 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/organise-your-shortlist"
+      ],
+      "evidence": [
+        "1146 ms; 144680 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief"
+      ],
+      "evidence": [
+        "1200 ms; 144792 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/tay-ho-ba-dinh-neighbourhood-viewings"
+      ],
+      "evidence": [
+        "1442 ms; 147463 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/tips-and-news/viewing-checklist:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news/viewing-checklist",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news/viewing-checklist"
+      ],
+      "evidence": [
+        "1486 ms; 144338 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-response-time:https://www.garyhome.vn/vi/vinhomes:vi:recommendation",
+      "causeId": "technical-response-time",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "Server response timing recorded",
+      "explanation": "A single server fetch is not a Core Web Vitals or browser performance measurement.",
+      "recommendation": "Compare timings over time. Use browser performance tooling to investigate slow pages.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/vinhomes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/vinhomes"
+      ],
+      "evidence": [
+        "1212 ms; 174119 HTML bytes"
+      ]
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/activities:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/activities",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/activities"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/contact:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/contact",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/contact"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/credits:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/credits",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/credits"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/feedback:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/feedback",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/feedback"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/homes:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/homes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/homes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/landlords:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/landlords",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/landlords"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/neighbourhoods:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/neighbourhoods",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/neighbourhoods"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/privacy:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/privacy",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/privacy"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/services:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/services",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/services"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/tips-and-news:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/tips-and-news",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/tips-and-news"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/en/vinhomes:en:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/en/vinhomes",
+      "language": "en",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/en/vinhomes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/activities:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/activities",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/activities"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/contact:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/contact",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/contact"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/credits:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/credits",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/credits"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/feedback:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/feedback",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/feedback"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/homes:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/homes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/homes"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/landlords:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/landlords",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/landlords"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/neighbourhoods:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/neighbourhoods",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/neighbourhoods"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/privacy:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/privacy",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/privacy"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/services:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/services",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/services"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/tips-and-news:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/tips-and-news",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/tips-and-news"
+      ],
+      "evidence": []
+    },
+    {
+      "key": "technical:technical-structured-data:https://www.garyhome.vn/vi/vinhomes:vi:recommendation",
+      "causeId": "technical-structured-data",
+      "category": "technical",
+      "severity": "recommendation",
+      "title": "No JSON-LD found",
+      "explanation": "Structured data is optional and should describe eligible, visible content accurately.",
+      "recommendation": "Add a relevant schema type only when appropriate. Validate eligibility with Google's Rich Results Test.",
+      "canonicalUrl": "https://www.garyhome.vn/vi/vinhomes",
+      "language": "vi",
+      "occurrences": 1,
+      "urls": [
+        "https://www.garyhome.vn/vi/vinhomes"
+      ],
+      "evidence": []
+    }
+  ]
+}

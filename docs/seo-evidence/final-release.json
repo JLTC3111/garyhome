@@ -1,0 +1,38 @@
+{
+  "verifiedAt": "2026-11-10T19:31:20.909Z",
+  "deployment": {
+    "id": "dpl_5zoLkLQGcUsStBFeAWTidLzRjgAg",
+    "state": "READY",
+    "url": "garyhome-cr781tffh-jltc3111s-projects.vercel.app",
+    "aliases": [
+      "www.garyhome.vn",
+      "garyhome.vercel.app",
+      "garyhome.vn",
+      "garyhome-jltc3111s-projects.vercel.app",
+      "garyhome-git-fix-seo-audit-v3-rendere-658f4b-jltc3111s-projects.vercel.app"
+    ],
+    "commit": "beea67e63a11b8ef48dfd37f0132c7f23cbe120c"
+  },
+  "regressions": {
+    "passed": 674,
+    "failed": 0,
+    "skipped": 0,
+    "log": "release-regression-tests.log"
+  },
+  "database": {
+    "migrations": [
+      "20261110145521_listing_creation_provenance",
+      "20261110150224_seo_audit_method_v3"
+    ],
+    "provenanceRls": true,
+    "anonymousRead": false,
+    "clientInsert": false,
+    "recordedHistoricalCreators": 0
+  },
+  "weeklyAudits": {
+    "enabled": false,
+    "runner": ".github/workflows/seo-audit.yml",
+    "note": "Scheduler support exists; production setting remains disabled. Repository scheduling secrets have not been independently verified."
+  },
+  "mainRefFastForward": true
+}

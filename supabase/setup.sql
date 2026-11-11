@@ -2749,3 +2749,62 @@ revoke all on function public.seo_resume_audit(uuid,jsonb) from public,anon,auth
 grant execute on function public.seo_resume_audit(uuid,jsonb) to service_role;
 notify pgrst,'reload schema';
 commit;
+
+-- Migration: 20261110145521_listing_creation_provenance.sql
+begin;
+-- Creator attribution is private provenance, not the editable public listing
+-- contact. Historical authors are intentionally not inferred or backfilled.
+create table public.property_creation_records (
+ property_id uuid primary key references public.properties(id) on delete cascade,
+ actor_user_id uuid references auth.users(id) on delete set null,
+ actor_name text,
+ created_at timestamptz not null default clock_timestamp()
+);
+alter table public.property_creation_records enable row level security;
+revoke all on public.property_creation_records from public,anon,authenticated;
+grant select on public.property_creation_records to authenticated;
+grant all on public.property_creation_records to service_role;
+create policy property_creation_staff_read on public.property_creation_records for select to authenticated using ((select private.is_editor()));
+create function private.record_property_creation() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare actor uuid:=auth.uid(); name text;
+begin
+ if actor is not null and private.is_editor() then
+  select nullif(btrim(m.display_name),'') into name from public.team_members m where m.user_id=actor;
+  insert into public.property_creation_records(property_id,actor_user_id,actor_name) values(new.id,actor,left(name,120));
+ end if;
+ return new;
+end;
+$$;
+revoke all on function private.record_property_creation() from public,anon,authenticated;
+create trigger properties_record_creation after insert on public.properties for each row execute function private.record_property_creation();
+notify pgrst,'reload schema';
+commit;
+
+-- Migration: 20261110150224_seo_audit_method_v3.sql
+begin;
+-- New summaries distinguish actual response locales and deduplicated evaluated checks.
+-- Existing rows retain their original method version for honest comparisons.
+create or replace function public.seo_save_audit(p_run_id uuid,p_lease_token uuid,p_state jsonb,p_summary jsonb)
+returns boolean language plpgsql security invoker set search_path='' as $$
+declare saved boolean; new_status text:=p_state->>'status';
+begin
+  if new_status not in ('queued','running','completed','incomplete','failed') or new_status is null then raise exception 'Invalid audit status.' using errcode='23514'; end if;
+  update public.seo_audit_runs set state=p_state,status=new_status,
+    finished_at=case when new_status in ('completed','incomplete','failed') then now() else null end,
+    content_score=(p_summary->>'content_score')::integer,technical_score=(p_summary->>'technical_score')::integer,
+    score_basis=case when p_summary->>'score_basis'='evaluated-checks-v3' then 'evaluated-checks-v3' else null end,
+    coverage=p_summary->'coverage',
+    page_count=(p_summary->>'page_count')::integer,critical_count=(p_summary->>'critical_count')::integer,
+    lease_token=null,lease_until=null
+    where id=p_run_id and lease_token=p_lease_token and lease_until>=now() and status in ('queued','running');
+  saved:=found;
+  if saved then
+    delete from public.seo_audit_runs where id in (select id from public.seo_audit_runs order by created_at desc,id desc offset 20) and status not in ('queued','running');
+  end if;
+  return saved;
+end;
+$$;
+
+notify pgrst,'reload schema';
+commit;

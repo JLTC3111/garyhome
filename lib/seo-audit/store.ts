@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CrawlState } from "./crawler";
 import { normalizeAuditState } from "./normalize.ts";
-import { evaluatedScore, evaluatedFindings, reportCoverage } from "./presentation.ts";
+import { evaluatedScore, evaluatedFindings, evaluatedPages, reportCoverage } from "./presentation.ts";
 
 export type CrawlLimits = {
   maxUrls: number; maxDepth: number; concurrency: number; requestIntervalMs: number; timeoutMs: number; maxDurationMs: number;
@@ -26,7 +26,7 @@ function databaseError(error: {code?:string} | null) {
 function publicRun(row: AuditRun): AuditRun {
   const state = normalizeAuditState(row.state);
   return { id:row.id,created_at:row.created_at,finished_at:row.finished_at,status:row.status,scope:row.scope,trigger:row.trigger,target_url:row.target_url,
-    ...auditSummary(state),score_basis:state.analysisVersion===2?"evaluated-checks-v2":"legacy-recomputed",state };
+    ...auditSummary(state),score_basis:state.analysisVersion===3?"evaluated-checks-v3":"legacy-recomputed-v3",state };
 }
 export async function getAuditSettings(db: SupabaseClient): Promise<AuditSettings> {
   const {data,error}=await db.from("seo_audit_settings").select("weekly_enabled,next_run_at,limits").eq("id",true).single();
@@ -40,7 +40,7 @@ export async function auditSnapshot(db: SupabaseClient, runId?: string): Promise
     db.from("seo_audit_runs").select(summaryFields+",state").in("status",["queued","running"]).maybeSingle(),
   ]);
   databaseError(runsResult.error); databaseError(activeResult.error);
-  const runs=((runsResult.data||[]) as unknown as AuditRunSummary[]).map(row=>row.score_basis==="evaluated-checks-v2"?row:{...row,content_score:null,technical_score:null,critical_count:0,score_basis:null});
+  const runs=((runsResult.data||[]) as unknown as AuditRunSummary[]).map(row=>row.score_basis==="evaluated-checks-v3"?row:{...row,content_score:null,technical_score:null,critical_count:0,score_basis:null});
   const activeRun=activeResult.data?publicRun(activeResult.data as unknown as AuditRun):null;
   const selectedId=runId||activeRun?.id||runs[0]?.id;
   let selectedRun=selectedId===activeRun?.id?activeRun:null;
@@ -60,8 +60,8 @@ export async function claimAudit(db:SupabaseClient,runId?:string):Promise<{run:A
 }
 export function auditSummary(state:CrawlState){
   return {content_score:evaluatedScore(state.pages,"content"),technical_score:evaluatedScore(state.pages,"technical"),page_count:state.pages.length,
-    critical_count:state.pages.reduce((count,page)=>count+[...evaluatedFindings(page,"technical"),...evaluatedFindings(page,"content")].filter(f=>f.severity==="critical").length,0),
-    score_basis:state.analysisVersion===2?"evaluated-checks-v2":"legacy-recomputed",coverage:reportCoverage(state)};
+    critical_count:evaluatedPages(state.pages).reduce((count,page)=>count+[...evaluatedFindings(page,"technical"),...evaluatedFindings(page,"content")].filter(f=>f.severity==="critical").length,0),
+    score_basis:state.analysisVersion===3?"evaluated-checks-v3":"legacy-recomputed-v3",coverage:reportCoverage(state)};
 }
 export async function resumeAuditRecord(db:SupabaseClient,runId:string,state:CrawlState):Promise<AuditRun>{
   const {data,error}=await db.rpc("seo_resume_audit",{p_run_id:runId,p_state:state});databaseError(error);

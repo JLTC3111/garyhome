@@ -28,10 +28,11 @@ test('public localized paths preserve filters and anchors and never prefix priva
  assert.equal(routes.localizedPath('/homes?district=tay-ho#results','vi'),'/vi/homes?district=tay-ho#results');
  for(const value of ['/admin','/auth/reset','/api/admin/seo','/account','/saved','https://other.com/homes','//other.com/homes','/images/photo.jpg'])assert.equal(routes.localizedPath(value,'vi'),value);
 });
-test('proxy rewrites explicit language variants with verified upstream language and ignores client header spoofing',()=>{
+test('proxy passes explicit language variants to locale routes with verified upstream language and ignores client header spoofing',()=>{
  const {NextRequest}=require('next/server'),{proxy}=loader()('proxy.ts');
  const response=proxy(new NextRequest('https://www.garyhome.vn/vi/homes?district=tay-ho',{headers:{cookie:'gary-language=en; session=safe','x-gary-language':'en'}}));
- assert.equal(response.headers.get('x-middleware-rewrite'),'https://www.garyhome.vn/homes?district=tay-ho');
+ assert.equal(response.headers.get('x-middleware-rewrite'),null);
+ assert.equal(response.headers.get('x-middleware-request-x-gary-public-path'),'/vi/homes');
  assert.equal(response.headers.get('x-middleware-request-x-gary-language'),'vi');
  assert.equal(response.headers.get('x-middleware-request-cookie'),'session=safe; gary-language=vi');
  const legacy=proxy(new NextRequest('https://www.garyhome.vn/services',{headers:{'x-gary-language':'vi','x-gary-public-path':'/vi/services'}}));
@@ -40,7 +41,7 @@ test('proxy rewrites explicit language variants with verified upstream language 
 });
 test('retired About redirects before rendering, preserving locale instead of inheriting homepage canonical in a streamed 200 response',()=>{
  const {NextRequest}=require('next/server'),{proxy}=loader()('proxy.ts');
- for(const [source,target]of [['/about','/services'],['/en/about','/en/services'],['/vi/about','/vi/services']]){
+ for(const [source,target]of [['/about','/en/services'],['/en/about','/en/services'],['/vi/about','/vi/services']]){
   const response=proxy(new NextRequest('https://www.garyhome.vn'+source));assert.equal(response.status,308);assert.equal(response.headers.get('location'),'https://www.garyhome.vn'+target);
  }
 });
@@ -70,10 +71,10 @@ test('browser bootstrap respects explicit language URL over stale browser prefer
  vm.runInNewContext(LANGUAGE_BOOTSTRAP,{localStorage:{getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)},location:{pathname:'/vi/homes'},document,window:{location:{protocol:'https:',pathname:'/vi/homes'}}});
  assert.equal(values.get('gary-language'),'vi');assert.match(document.cookie,/gary-language=vi/);assert.equal(document.documentElement.dataset.languagePending,undefined);
 });
-test('localized links are real server-rendered anchors and preserve legacy and private navigation',()=>{
+test('localized links are real server-rendered anchors and localize public navigation and preserve private routes',()=>{
  let pathname='/vi/homes';
  const Link=loader({'next/link':{__esModule:true,default:({href,...props})=>React.createElement('a',{href,...props})},'next/navigation':{usePathname:()=>pathname},'./site-context':{useSite:()=>({language:'vi'})}})('components/localized-link.tsx').default;
  assert.match(renderToStaticMarkup(React.createElement(Link,{href:'/contact'},'Contact')),/href="\/vi\/contact"/);
  assert.match(renderToStaticMarkup(React.createElement(Link,{href:'/admin'},'Studio')),/href="\/admin"/);
- pathname='/homes';assert.match(renderToStaticMarkup(React.createElement(Link,{href:'/contact'},'Contact')),/href="\/contact"/);
+ pathname='/homes';assert.match(renderToStaticMarkup(React.createElement(Link,{href:'/contact'},'Contact')),/href="\/vi\/contact"/);
 });

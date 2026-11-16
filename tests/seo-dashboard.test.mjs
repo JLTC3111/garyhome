@@ -162,3 +162,17 @@ test('dashboard offers executive-only and complete PDF documents through distinc
  await act(async()=>summary.props.onClick());assert.equal((written[0].match(/data-summary-page=/g)||[]).length,2);assert.doesNotMatch(written[0],/Page-level evidence/);
  await act(async()=>full.props.onClick());assert.match(written[1],/Page-level evidence/);assert.doesNotMatch(written[1],/data-summary-page=/);
 });
+
+test('Vietnamese audit findings and grouped causes use shared translations inside accessible collapsed sections',async t=>{
+ const snapshot=fixture(),site={current:{...siteValue(),language:'vi'}};
+ snapshot.selectedRun.state.pages[1].technical.findings[0]={...finding('technical-indexability','critical'),title:'Public page has a noindex directive',explanation:'Both HTML robots tags and response headers can prevent indexing.',recommendation:'Confirm this restriction is intended.'};
+ const Component=loader(site,async()=>Response.json(snapshot));let view;
+ await act(async()=>{view=TestRenderer.create(React.createElement(Component));});t.after(async()=>{await act(async()=>view.unmount());});
+ const rendered=text(view.toJSON());assert.match(rendered,/Trang công khai có chỉ thị noindex/);assert.match(rendered,/SEO kỹ thuật/);assert.doesNotMatch(rendered,/Public page has a noindex directive|Both HTML robots|Confirm this restriction is intended/);
+ const collapsed=view.root.findAllByType('details').filter(n=>String(n.props.className||'').includes('seo-section'));
+ assert.ok(collapsed.length>=3,'grouped causes, history and crawl settings are collapsible');
+ assert.ok(collapsed.every(n=>n.props.open!==true),'long supporting sections start collapsed');
+ assert.ok(view.root.findAllByType('details').some(n=>n.props.className==='seo-finding'),'each finding has a keyboard-operable native disclosure');
+ const application=view.root.findByProps({'aria-label':'Ứng dụng'});assert.equal(application.props.value,'home');assert.equal(application.props.disabled,true,'application context cannot grant cross-app access');
+ assert.match(rendered,/Quét lại trang để xác minh thay đổi/);assert.doesNotMatch(rendered,/Mark Resolved/,'a result is not falsely resolved by a local button');
+});

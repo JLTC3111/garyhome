@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import movedAssets from "./data/asset-paths.json";
 
 const nextConfig: NextConfig = {
+  // Return the final localized Metadata API result in the initial HTML head
+  // for browsers and crawlers alike, rather than streaming it after the body.
+  htmlLimitedBots: /.*/,
   async headers() {
     return [{ source: "/shared/gary-apps/v1/:asset*", headers: [
       { key: "Access-Control-Allow-Origin", value: "*" },

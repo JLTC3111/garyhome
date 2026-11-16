@@ -154,7 +154,7 @@ test('site resume refreshes cached sitemap inventory across deployments and arch
  assert.deepEqual(saved.pages[0].technical.findings.map(item=>item.id),['technical-http','canonical']);assert.equal(saved.pages[0].technical.score,50);
  assert.equal(saved.sitemapHistory.length,1);assert.deepEqual(saved.sitemapHistory[0].urls,oldUrls);
  assert.equal(saved.sitemapHistory[0].segmentStartedAt,1000);assert.equal(saved.sitemapHistory[0].inspections[0].valid,true);
- assert.deepEqual(saved.sitemapHistory[0].pageFindings[0].findings,[oldSitemapFinding]);
+ assert.deepEqual(saved.sitemapHistory[0].pageFindings[0].findings,[{...oldSitemapFinding,code:'sitemap-discovery',params:{},schemaVersion:1}]);
  assert.deepEqual(state.sitemapUrls,oldUrls,'source segment evidence supplied by the caller is not rewritten');
 });
 

@@ -6,7 +6,7 @@ import { loadContent } from "./server";
 import { languageValue } from "./language";
 import { documentTitle } from "./document-titles";
 import { isPublicRental, listingCode, propertyTitle } from "./rentals";
-import { runtimeEnv } from "./runtime-env";
+import { CANONICAL_SITE_ORIGIN } from "./site-origin";
 import type { Language, Property } from "./types";
 import { propertyPriceOffers } from "./property-pricing";
 import { localizedAlternates, localizedPath } from "./localized-routes";
@@ -19,10 +19,7 @@ export async function requestLanguage(): Promise<Language> {
   return languageValue(explicit === "en" || explicit === "vi" ? explicit : (await cookies()).get("gary-language")?.value);
 }
 export function siteUrl() {
-  const env = runtimeEnv as Record<string, string | undefined>;
-  const configured = env.SITE_URL || process.env.SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  try { const url = new URL(configured ? (configured.startsWith("https://") ? configured : `https://${configured}`) : "https://gary-home-hanoi.lsd99999999.chatgpt.site"); if (url.protocol !== "https:") throw new Error(); return url.origin; }
-  catch { return "https://gary-home-hanoi.lsd99999999.chatgpt.site"; }
+  return CANONICAL_SITE_ORIGIN;
 }
 export const publicPageDescriptions: Record<string, readonly [string, string]> = {
   "/": [siteDescription("en"), siteDescription("vi")],
@@ -40,11 +37,14 @@ export const publicPageDescriptions: Record<string, readonly [string, string]> =
 };
 export async function pageMetadata(path: string, privatePage = false): Promise<Metadata> {
   const language = await requestLanguage(), origin = siteUrl();
+  const title = documentTitle(path, language, []) || "Gary Home";
+  const description = publicPageDescriptions[path]?.[language === "vi" ? 1 : 0] || siteDescription(language);
   return {
-    title: { absolute: documentTitle(path, language, []) || "Gary Home" },
-    description: publicPageDescriptions[path]?.[language === "vi" ? 1 : 0] || siteDescription(language),
+    title: { absolute: title },
+    description,
     alternates: privatePage ? { canonical: origin + path, languages: {} } : localizedAlternates(path, origin, language),
-    openGraph: { locale: language === "vi" ? "vi_VN" : "en_US", url: origin + (privatePage ? path : localizedPath(path, language)) },
+    openGraph: { title, description, siteName: "Gary Home", type: "website", locale: language === "vi" ? "vi_VN" : "en_US", alternateLocale: language === "vi" ? "en_US" : "vi_VN", url: origin + (privatePage ? path : localizedPath(path, language)) },
+    twitter: { card: "summary", title, description },
     robots: privatePage ? { index: false, follow: false } : undefined,
   };
 }
@@ -65,5 +65,5 @@ export async function guideMetadata(slug: string): Promise<Metadata> {
   const record = publicArticles(content.editorial).find(item => item.slug === slug), language = await requestLanguage();
   if (!record) return { robots: { index: false, follow: false }, alternates: { canonical: null, languages: {} } };
   const guide = editorialView(record), base = await pageMetadata("/tips-and-news/" + slug), index = language === "vi" ? 1 : 0;
-  return { ...base, title: { absolute: guide.title[index] + " | Gary Home" }, description: guide.summary[index], openGraph: { ...base.openGraph, type: "article", title: guide.title[index], description: guide.summary[index], ...(record.published_on ? { publishedTime: record.published_on } : {}), ...(record.image_url ? { images: [{ url: record.image_url }] } : {}) } };
+  return { ...base, title: { absolute: guide.title[index] + " | Gary Home" }, description: guide.summary[index], openGraph: { ...base.openGraph, type: "article", title: guide.title[index], description: guide.summary[index], ...(record.published_on ? { publishedTime: record.published_on } : {}), ...(record.image_url ? { images: [{ url: record.image_url }] } : {}) }, twitter: { card: record.image_url ? "summary_large_image" : "summary", title: guide.title[index] + " | Gary Home", description: guide.summary[index], ...(record.image_url ? { images: [record.image_url] } : {}) } };
 }

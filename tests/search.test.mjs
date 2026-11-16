@@ -71,8 +71,10 @@ test('authored listing titles retain street, pets and lake-view details in each 
   assert.equal(propertyTitle(p,'vi','Tây Hồ',withFeatures),title_vi);
  }
  assert.equal(propertyTitle({...p,title_en:'  '+title_en+'  '},'en','Tây Hồ'),title_en);
- assert.equal(propertyTitle({...p,title_vi:'  '},'vi','Tây Hồ'),title_en);
- assert.equal(propertyTitle({...p,title_en:''},'en','Tây Hồ'),title_vi);
+ assert.equal(propertyTitle({...p,title_vi:'  '},'vi','Tây Hồ'),'Căn hộ 3 phòng ngủ cho thuê tại Tây Hồ · 160 m²');
+ assert.equal(propertyTitle({...p,title_en:''},'en','Tây Hồ'),'3-bedroom apartment for rent in Tây Hồ · 160 m²');
+ assert.doesNotMatch(propertyTitle({...p,title_vi:'  '},'vi','Tây Hồ'),/PETS ALLOWED|LAKE VIEW|Apartment/);
+ assert.doesNotMatch(propertyTitle({...p,title_en:''},'en','Tây Hồ'),/CHO PHÉP|Căn hộ|HƯỚNG HỒ/);
 });
 test('requirements match legacy amenity spellings without inventing facilities or weakening all-selected matching',()=>{
  const homes=[{...home,id:'matching',amenities:['Pet-friendly','Gym','BBQ','Outdoor Shower','Lakeview']},{...home,id:'partial',amenities:['Pet friendly','Gym']}];

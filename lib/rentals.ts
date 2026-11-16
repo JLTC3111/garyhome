@@ -27,8 +27,9 @@ export function rentalTermLabel(term: Property["rental_term"], language: Languag
 }
 export function listingCode(p: Pick<Property,"id"|"listing_code">) { return p.listing_code || p.id; }
 export function propertyTitle(p: Property, language: Language, district?: string, withFeatures = true) {
-  const authored = (language === "vi" ? p.title_vi : p.title_en)?.trim()
-    || (language === "vi" ? p.title_en : p.title_vi)?.trim();
+  // An untranslated title must not turn an explicit locale page into the other
+  // language. Keep authored copy for this locale; otherwise use verified facts.
+  const authored = (language === "vi" ? p.title_vi : p.title_en)?.trim();
   if (authored) return authored;
   const location = district || p.address;
   const type = typeLabel(p.property_type, language);

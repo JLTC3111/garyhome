@@ -16,7 +16,12 @@ function loader(){
   if(modules.has(file))return modules.get(file).exports;
   const loaded={exports:{}};modules.set(file,loaded);
   const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
-  const dep=id=>id.startsWith('.')?load(path.resolve(path.dirname(file),id+'.ts')):require(id);
+  const dep=id=>{
+   if(!id.startsWith('.'))return require(id);
+   const base=path.resolve(path.dirname(file),id);
+   const resolved=[base,base+'.ts',base+'.tsx',base+'.js'].find(candidate=>fs.existsSync(candidate)&&fs.statSync(candidate).isFile());
+   assert.ok(resolved,`Resolve ${id} from ${file}`);return load(resolved);
+  };
   vm.runInThisContext('(function(exports,require,module){'+js+'\n})',{filename:file})(loaded.exports,dep,loaded);
   return loaded.exports;
  }
@@ -53,8 +58,20 @@ test('the directory renders useful server HTML with all three sites and local na
  const {components:{GaryAppsDirectory,GaryAppsMenu}}=loader();
  const html=renderToString(React.createElement(React.Fragment,null,React.createElement(GaryAppsDirectory,{language:'en',currentApp:'home'}),React.createElement(GaryAppsMenu,{language:'en',currentApp:'home'})));
  for(const name of ['Gary Home','Gary Jobs','Gary Visa Service','Find a home','Find a job','Obtain a visa','Explore Vietnam'])assert.ok(html.includes(name),name);
- assert.ok(html.includes('href="/homes"'));assert.ok(html.includes('href="https://jobs.garyhome.vn/#life"'));assert.ok(html.includes('<details'));assert.ok(html.includes('<summary'));assert.ok(!html.includes('opacity:0'));
+ assert.ok(html.includes('href="/en/homes"'));assert.ok(html.includes('href="https://jobs.garyhome.vn/#life"'));assert.ok(html.includes('<details'));assert.ok(html.includes('<summary'));assert.ok(!html.includes('opacity:0'));
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]);assert.equal(new Set(ids).size,ids.length);
+});
+
+test('Home service navigation follows its explicit locale while external Jobs and Agency destinations remain unchanged',()=>{
+ const {components:{GaryAppsDirectory,GaryAppsMenu}}=loader();
+ for(const language of ['en','vi']){
+  const html=renderToString(React.createElement(React.Fragment,null,React.createElement(GaryAppsDirectory,{language,currentApp:'home'}),React.createElement(GaryAppsMenu,{language,currentApp:'home'})));
+  const hrefs=[...html.matchAll(/\bhref="([^"]+)"/g)].map(match=>match[1]);
+  for(const href of hrefs.filter(value=>value.startsWith('/')))assert.ok(href===`/${language}`||href.startsWith(`/${language}/`),href);
+  assert.ok(hrefs.includes(`/${language}/homes`));assert.ok(hrefs.includes(`/${language}/contact`));assert.ok(hrefs.includes(`/${language}/landlords`));
+  assert.ok(hrefs.includes(`/${language}/services#gary-services`),'Keep service-section anchor while switching language');
+  for(const href of ['https://jobs.garyhome.vn/','https://jobs.garyhome.vn/#opportunities','https://jobs.garyhome.vn/#life','https://visa.garyhome.vn/','https://visa.garyhome.vn/#services'])assert.ok(hrefs.includes(href),href);
+ }
 });
 
 test('service links separate same-site navigation from new-tab external destinations and translate every card',async t=>{
@@ -75,8 +92,8 @@ test('the apps menu preserves its open state through translation, closes outside
 });
 
 test('the apps disclosure supports keyboard navigation, Escape focus restoration and follow callbacks',async t=>{
- const h=await harness(t);assert.equal(await h.key('ArrowDown'),true);assert.equal(h.renderer.root.findByType('details').props.open,true);assert.equal(h.focus.at(-1),'/');
- await h.key('ArrowDown',h.links()[0]);assert.equal(h.focus.at(-1),'https://jobs.garyhome.vn/');await h.key('End',h.links()[1]);assert.equal(h.focus.at(-1),'/services#gary-services');
+ const h=await harness(t);assert.equal(await h.key('ArrowDown'),true);assert.equal(h.renderer.root.findByType('details').props.open,true);assert.equal(h.focus.at(-1),'/en');
+ await h.key('ArrowDown',h.links()[0]);assert.equal(h.focus.at(-1),'https://jobs.garyhome.vn/');await h.key('End',h.links()[1]);assert.equal(h.focus.at(-1),'/en/services#gary-services');
  await h.key('Escape',h.links()[1]);assert.equal(h.renderer.root.findByType('details').props.open,false);assert.equal(h.focus.at(-1),'summary');
  await h.toggle();await act(async()=>h.renderer.root.findAllByType('a')[1].props.onClick());assert.equal(h.follows,1);assert.equal(h.renderer.root.findByType('details').props.open,false);
 });
@@ -89,7 +106,7 @@ test('focus stays inside an open apps menu but tabbing away closes the disclosur
 
 test('touch blur without a focused destination keeps service links available until they are followed',async t=>{
  const h=await harness(t);
- for(const href of ['https://jobs.garyhome.vn/','/services#gary-services']){
+ for(const href of ['https://jobs.garyhome.vn/','/en/services#gary-services']){
   await h.toggle();
   await act(async()=>h.renderer.root.findByType('details').props.onBlur({currentTarget:h.details,relatedTarget:null}));
   assert.equal(h.renderer.root.findByType('details').props.open,true,'touch blur must not hide the tapped link before click');

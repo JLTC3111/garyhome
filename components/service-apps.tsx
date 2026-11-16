@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "./localized-link";
 import { useEffect, useRef, useState } from "react";
 import { useSite } from "./site-context";
 import { GaryAppsDirectory, GaryAppsMenu } from "@/shared/gary-apps/gary-apps";

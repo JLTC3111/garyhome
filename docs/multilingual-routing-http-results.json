@@ -1,0 +1,631 @@
+{
+  "verified_date": "2026-11-13",
+  "runtime": "Production Vinext/Cloudflare Workers build served locally by wrangler",
+  "base_url": "http://127.0.0.1:8787",
+  "content": "Bundled bilingual preview/seed data; hosted public CMS checked separately read-only",
+  "checks": "43 HTTP cases; 28 EN/VI landing/detail pages; 2 explicit-locale cookie conflicts; metadata in initial head; self canonicals and reciprocal alternates; public anchors localized",
+  "interactive_browser": "Unavailable: browser access host unavailable; navigation provider behavior covered by five mock-platform tests",
+  "sitemap_entries": 66,
+  "cases": {
+    "about": {
+      "status": 308,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "admin": {
+      "status": 200,
+      "language": "en",
+      "title": "Staff Portal · Gary Home Studio | Gary Home",
+      "description": "Serviced apartments and property rentals in Hanoi. Browse real listings and arrange a viewing with Gary Home.",
+      "heading": "Staff portal.Gary Home Studio.",
+      "canonical": [
+        "https://www.garyhome.vn/admin"
+      ],
+      "headMetadata": true,
+      "alternates": {}
+    },
+    "api": {
+      "status": 200,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "cookie-en": {
+      "status": 200,
+      "language": "en",
+      "title": "Hanoi rental properties | Gary Home",
+      "description": "Browse Gary Home rental listings in Hanoi. Filter apartments, houses and offices by neighbourhood, price and amenities, then request a viewing.",
+      "heading": "Rent a place in Hanoi.",
+      "canonical": [
+        "https://www.garyhome.vn/en/homes"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/homes",
+        "vi": "https://www.garyhome.vn/vi/homes",
+        "x-default": "https://www.garyhome.vn/en/homes"
+      }
+    },
+    "cookie-vi": {
+      "status": 200,
+      "language": "vi",
+      "title": "Bất động sản cho thuê Hà Nội | Gary Home",
+      "description": "Xem tin cho thuê Gary Home tại Hà Nội. Lọc căn hộ, nhà và văn phòng theo khu vực, giá, tiện nghi và gửi yêu cầu xem nhà.",
+      "heading": "Tìm nhà cho thuê tại Hà Nội.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/homes"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/homes",
+        "vi": "https://www.garyhome.vn/vi/homes",
+        "x-default": "https://www.garyhome.vn/en/homes"
+      }
+    },
+    "en-activities": {
+      "status": 200,
+      "language": "en",
+      "title": "Our activities | Gary Home",
+      "description": "See Gary Home team activities and moments with customers from our work finding rental homes in Hanoi.",
+      "heading": "Our activities",
+      "canonical": [
+        "https://www.garyhome.vn/en/activities"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/activities",
+        "vi": "https://www.garyhome.vn/vi/activities",
+        "x-default": "https://www.garyhome.vn/en/activities"
+      }
+    },
+    "en-article": {
+      "status": 200,
+      "language": "en",
+      "title": "A clear brief makes a better shortlist | Gary Home",
+      "description": "The details to share before you start exploring Hanoi rentals.",
+      "heading": "A clear brief makes a better shortlist",
+      "canonical": [
+        "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief",
+        "vi": "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief",
+        "x-default": "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief"
+      }
+    },
+    "en-contact": {
+      "status": 200,
+      "language": "en",
+      "title": "Contact us | Gary Home",
+      "description": "Contact Gary Home about finding a rental in Hanoi, requesting a property viewing or discussing your housing needs with the team.",
+      "heading": "Hello,\nnew beginnings.",
+      "canonical": [
+        "https://www.garyhome.vn/en/contact"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/contact",
+        "vi": "https://www.garyhome.vn/vi/contact",
+        "x-default": "https://www.garyhome.vn/en/contact"
+      }
+    },
+    "en-credits": {
+      "status": 200,
+      "language": "en",
+      "title": "Photo credits | Gary Home",
+      "description": "View photograph and image source credits used on the Gary Home website.",
+      "heading": "The people behind the pictures.",
+      "canonical": [
+        "https://www.garyhome.vn/en/credits"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/credits",
+        "vi": "https://www.garyhome.vn/vi/credits",
+        "x-default": "https://www.garyhome.vn/en/credits"
+      }
+    },
+    "en-feedback": {
+      "status": 200,
+      "language": "en",
+      "title": "Feedback | Gary Home",
+      "description": "Read customer feedback published with permission and Gary Home team replies about rental enquiries and service in Hanoi.",
+      "heading": "A better experience starts with you.",
+      "canonical": [
+        "https://www.garyhome.vn/en/feedback"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/feedback",
+        "vi": "https://www.garyhome.vn/vi/feedback",
+        "x-default": "https://www.garyhome.vn/en/feedback"
+      }
+    },
+    "en-homes": {
+      "status": 200,
+      "language": "en",
+      "title": "Hanoi rental properties | Gary Home",
+      "description": "Browse Gary Home rental listings in Hanoi. Filter apartments, houses and offices by neighbourhood, price and amenities, then request a viewing.",
+      "heading": "Rent a place in Hanoi.",
+      "canonical": [
+        "https://www.garyhome.vn/en/homes"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/homes",
+        "vi": "https://www.garyhome.vn/vi/homes",
+        "x-default": "https://www.garyhome.vn/en/homes"
+      }
+    },
+    "en-landlords": {
+      "status": 200,
+      "language": "en",
+      "title": "For landlords | Gary Home",
+      "description": "Introduce your Hanoi rental property to Gary Home and send a landlord enquiry to discuss listing and viewing arrangements.",
+      "heading": "Your property.\nLet’s discuss its next chapter.",
+      "canonical": [
+        "https://www.garyhome.vn/en/landlords"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/landlords",
+        "vi": "https://www.garyhome.vn/vi/landlords",
+        "x-default": "https://www.garyhome.vn/en/landlords"
+      }
+    },
+    "en-neighbourhoods": {
+      "status": 200,
+      "language": "en",
+      "title": "Find your kind of Hanoi | Gary Home",
+      "description": "Explore Hanoi neighbourhood guides from Gary Home and compare local areas before choosing a rental home.",
+      "heading": "Find your kind of Hanoi.",
+      "canonical": [
+        "https://www.garyhome.vn/en/neighbourhoods"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/neighbourhoods",
+        "vi": "https://www.garyhome.vn/vi/neighbourhoods",
+        "x-default": "https://www.garyhome.vn/en/neighbourhoods"
+      }
+    },
+    "en-news": {
+      "status": 200,
+      "language": "en",
+      "title": "Tips & News | Gary Home",
+      "description": "Hanoi rental news, neighbourhood notes and practical guides from Gary Home.",
+      "heading": "Good questions.\nA better way to find home.",
+      "canonical": [
+        "https://www.garyhome.vn/en/tips-and-news"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/tips-and-news",
+        "vi": "https://www.garyhome.vn/vi/tips-and-news",
+        "x-default": "https://www.garyhome.vn/en/tips-and-news"
+      }
+    },
+    "en-privacy": {
+      "status": 200,
+      "language": "en",
+      "title": "Privacy | Gary Home",
+      "description": "Learn how Gary Home handles enquiries, customer accounts, saved homes and personal information, and how to request correction or deletion.",
+      "heading": "Your details, treated with care.",
+      "canonical": [
+        "https://www.garyhome.vn/en/privacy"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/privacy",
+        "vi": "https://www.garyhome.vn/vi/privacy",
+        "x-default": "https://www.garyhome.vn/en/privacy"
+      }
+    },
+    "en-property": {
+      "status": 200,
+      "language": "en",
+      "title": "A little more room in Tô Ngọc Vân | Gary Home",
+      "description": "Explore this home in Tây Hồ, Hà Nội. Browse the original property photos, save it to your shortlist, and ask our local team about the lease, included services, and current availability. We will help y",
+      "heading": "A little more room in Tô Ngọc Vân",
+      "canonical": [
+        "https://www.garyhome.vn/en/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho",
+        "vi": "https://www.garyhome.vn/vi/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho",
+        "x-default": "https://www.garyhome.vn/en/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho"
+      }
+    },
+    "en-services": {
+      "status": 200,
+      "language": "en",
+      "title": "Other Services | Gary Home",
+      "description": "Explore Gary Home rental services in Hanoi: home search, viewings, landlord enquiries and consultancy for opening restaurants and offices.",
+      "heading": "Local support.\nA clearer rental search.",
+      "canonical": [
+        "https://www.garyhome.vn/en/services"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/services",
+        "vi": "https://www.garyhome.vn/vi/services",
+        "x-default": "https://www.garyhome.vn/en/services"
+      }
+    },
+    "en-vinhomes": {
+      "status": 200,
+      "language": "en",
+      "title": "Vinhomes rental collection in Hanoi | Gary Home",
+      "description": "Explore Gary Home’s Vinhomes Gardenia, Skylake and Smart City rental collection with supplied apartment photos and lease details.",
+      "heading": "Three communities.\nYour next Hanoi home.",
+      "canonical": [
+        "https://www.garyhome.vn/en/vinhomes"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/vinhomes",
+        "vi": "https://www.garyhome.vn/vi/vinhomes",
+        "x-default": "https://www.garyhome.vn/en/vinhomes"
+      }
+    },
+    "en": {
+      "status": 200,
+      "language": "en",
+      "title": "Serviced apartments in Hanoi for rent | Gary Home",
+      "description": "Serviced apartments and property rentals in Hanoi. Browse real listings and arrange a viewing with Gary Home.",
+      "heading": "Find a place.\nFeel at home.",
+      "canonical": [
+        "https://www.garyhome.vn/en"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en",
+        "vi": "https://www.garyhome.vn/vi",
+        "x-default": "https://www.garyhome.vn/en"
+      }
+    },
+    "favicon192": {
+      "status": 200,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "ico": {
+      "status": 200,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "legacy-article": {
+      "status": 308,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "legacy-deep": {
+      "status": 308,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "legacy-home": {
+      "status": 308,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "png": {
+      "status": 200,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "reset": {
+      "status": 200,
+      "language": "en",
+      "title": "Reset your password | Gary Home",
+      "description": "Serviced apartments and property rentals in Hanoi. Browse real listings and arrange a viewing with Gary Home.",
+      "heading": "Checking your email link…",
+      "canonical": [
+        "https://www.garyhome.vn/auth/reset"
+      ],
+      "headMetadata": true,
+      "alternates": {}
+    },
+    "robots": {
+      "status": 200,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "sitemap": {
+      "status": 200,
+      "language": "",
+      "title": "",
+      "description": null,
+      "heading": "",
+      "canonical": [],
+      "headMetadata": false,
+      "alternates": {}
+    },
+    "unknown": {
+      "status": 404,
+      "language": "en",
+      "title": "Serviced apartments in Hanoi for rent | Gary Home",
+      "description": "Serviced apartments and property rentals in Hanoi. Browse real listings and arrange a viewing with Gary Home.",
+      "heading": "This page is unavailable.",
+      "canonical": [
+        "https://www.garyhome.vn/en"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en",
+        "vi": "https://www.garyhome.vn/vi",
+        "x-default": "https://www.garyhome.vn/en"
+      }
+    },
+    "vi-activities": {
+      "status": 200,
+      "language": "vi",
+      "title": "Hoạt động của chúng tôi | Gary Home",
+      "description": "Xem hoạt động của đội ngũ Gary Home và khoảnh khắc cùng khách hàng trong công việc tìm nhà thuê tại Hà Nội.",
+      "heading": "Hoạt động của chúng tôi",
+      "canonical": [
+        "https://www.garyhome.vn/vi/activities"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/activities",
+        "vi": "https://www.garyhome.vn/vi/activities",
+        "x-default": "https://www.garyhome.vn/en/activities"
+      }
+    },
+    "vi-article": {
+      "status": 200,
+      "language": "vi",
+      "title": "Nhu cầu rõ ràng, danh sách nhà phù hợp hơn | Gary Home",
+      "description": "Những thông tin nên chia sẻ trước khi tìm nhà thuê tại Hà Nội.",
+      "heading": "Nhu cầu rõ ràng, danh sách nhà phù hợp hơn",
+      "canonical": [
+        "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief",
+        "vi": "https://www.garyhome.vn/vi/tips-and-news/prepare-your-rental-brief",
+        "x-default": "https://www.garyhome.vn/en/tips-and-news/prepare-your-rental-brief"
+      }
+    },
+    "vi-contact": {
+      "status": 200,
+      "language": "vi",
+      "title": "Liên hệ | Gary Home",
+      "description": "Liên hệ Gary Home để tìm nhà thuê tại Hà Nội, yêu cầu xem bất động sản hoặc trao đổi nhu cầu nhà ở với đội ngũ.",
+      "heading": "Xin chào,\nkhởi đầu mới.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/contact"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/contact",
+        "vi": "https://www.garyhome.vn/vi/contact",
+        "x-default": "https://www.garyhome.vn/en/contact"
+      }
+    },
+    "vi-credits": {
+      "status": 200,
+      "language": "vi",
+      "title": "Nguồn ảnh | Gary Home",
+      "description": "Xem thông tin tác giả và nguồn ảnh được sử dụng trên website Gary Home.",
+      "heading": "Nguồn gốc những hình ảnh trên website.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/credits"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/credits",
+        "vi": "https://www.garyhome.vn/vi/credits",
+        "x-default": "https://www.garyhome.vn/en/credits"
+      }
+    },
+    "vi-feedback": {
+      "status": 200,
+      "language": "vi",
+      "title": "Phản hồi | Gary Home",
+      "description": "Đọc phản hồi khách hàng được cho phép công khai cùng trả lời của Gary Home về yêu cầu thuê nhà và dịch vụ tại Hà Nội.",
+      "heading": "Trải nghiệm tốt hơn bắt đầu từ bạn.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/feedback"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/feedback",
+        "vi": "https://www.garyhome.vn/vi/feedback",
+        "x-default": "https://www.garyhome.vn/en/feedback"
+      }
+    },
+    "vi-homes": {
+      "status": 200,
+      "language": "vi",
+      "title": "Bất động sản cho thuê Hà Nội | Gary Home",
+      "description": "Xem tin cho thuê Gary Home tại Hà Nội. Lọc căn hộ, nhà và văn phòng theo khu vực, giá, tiện nghi và gửi yêu cầu xem nhà.",
+      "heading": "Tìm nhà cho thuê tại Hà Nội.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/homes"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/homes",
+        "vi": "https://www.garyhome.vn/vi/homes",
+        "x-default": "https://www.garyhome.vn/en/homes"
+      }
+    },
+    "vi-landlords": {
+      "status": 200,
+      "language": "vi",
+      "title": "Dành cho chủ nhà | Gary Home",
+      "description": "Giới thiệu bất động sản cho thuê tại Hà Nội với Gary Home và gửi yêu cầu để trao đổi việc đăng tin, xem nhà.",
+      "heading": "Cùng trao đổi bước tiếp theo.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/landlords"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/landlords",
+        "vi": "https://www.garyhome.vn/vi/landlords",
+        "x-default": "https://www.garyhome.vn/en/landlords"
+      }
+    },
+    "vi-neighbourhoods": {
+      "status": 200,
+      "language": "vi",
+      "title": "Tìm khu phố dành cho bạn | Gary Home",
+      "description": "Khám phá cẩm nang khu phố Hà Nội của Gary Home và tìm hiểu từng khu vực trước khi chọn nhà thuê.",
+      "heading": "Tìm một Hà Nội của bạn.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/neighbourhoods"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/neighbourhoods",
+        "vi": "https://www.garyhome.vn/vi/neighbourhoods",
+        "x-default": "https://www.garyhome.vn/en/neighbourhoods"
+      }
+    },
+    "vi-news": {
+      "status": 200,
+      "language": "vi",
+      "title": "Cẩm nang & tin tức | Gary Home",
+      "description": "Tin thuê nhà Hà Nội, ghi chép khu vực và cẩm nang thực tế từ Gary Home.",
+      "heading": "Câu hỏi đúng.\nTìm nhà dễ dàng hơn.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/tips-and-news"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/tips-and-news",
+        "vi": "https://www.garyhome.vn/vi/tips-and-news",
+        "x-default": "https://www.garyhome.vn/en/tips-and-news"
+      }
+    },
+    "vi-privacy": {
+      "status": 200,
+      "language": "vi",
+      "title": "Chính sách bảo mật | Gary Home",
+      "description": "Tìm hiểu cách Gary Home xử lý yêu cầu, tài khoản, nhà yêu thích và thông tin cá nhân; cách yêu cầu chỉnh sửa hoặc xóa dữ liệu.",
+      "heading": "Trân trọng thông tin của bạn.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/privacy"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/privacy",
+        "vi": "https://www.garyhome.vn/vi/privacy",
+        "x-default": "https://www.garyhome.vn/en/privacy"
+      }
+    },
+    "vi-property": {
+      "status": 200,
+      "language": "vi",
+      "title": "Căn hộ dịch vụ 2 phòng ngủ tại Tô Ngọc Vân, Tây Hồ | Gary Home",
+      "description": "Khám phá căn hộ tại Tây Hồ, Hà Nội. Xem ảnh thực tế, lưu vào danh sách yêu thích và liên hệ đội ngũ Gary Home để xác nhận tình trạng, điều kiện thuê và đặt lịch xem nhà.",
+      "heading": "Căn hộ dịch vụ 2 phòng ngủ tại Tô Ngọc Vân, Tây Hồ",
+      "canonical": [
+        "https://www.garyhome.vn/vi/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho",
+        "vi": "https://www.garyhome.vn/vi/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho",
+        "x-default": "https://www.garyhome.vn/en/homes/can-ho-dich-vu-2-phong-ngu-tai-to-ngoc-van-tay-ho"
+      }
+    },
+    "vi-services": {
+      "status": 200,
+      "language": "vi",
+      "title": "Dịch vụ khác | Gary Home",
+      "description": "Tìm hiểu dịch vụ Gary Home tại Hà Nội: tìm nhà, xem nhà, hỗ trợ chủ nhà và tư vấn mở nhà hàng, văn phòng.",
+      "heading": "Đồng hành tại Hà Nội.\nTìm nhà rõ ràng hơn.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/services"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/services",
+        "vi": "https://www.garyhome.vn/vi/services",
+        "x-default": "https://www.garyhome.vn/en/services"
+      }
+    },
+    "vi-vinhomes": {
+      "status": 200,
+      "language": "vi",
+      "title": "Bộ sưu tập căn hộ Vinhomes cho thuê tại Hà Nội | Gary Home",
+      "description": "Khám phá bộ sưu tập căn hộ Vinhomes Gardenia, Skylake và Smart City của Gary Home với ảnh và thông tin thuê được cung cấp.",
+      "heading": "Ba cộng đồng.\nTổ ấm tiếp theo tại Hà Nội.",
+      "canonical": [
+        "https://www.garyhome.vn/vi/vinhomes"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en/vinhomes",
+        "vi": "https://www.garyhome.vn/vi/vinhomes",
+        "x-default": "https://www.garyhome.vn/en/vinhomes"
+      }
+    },
+    "vi": {
+      "status": 200,
+      "language": "vi",
+      "title": "Căn hộ dịch vụ cho thuê tại Hà Nội | Gary Home",
+      "description": "Căn hộ dịch vụ và bất động sản cho thuê tại Hà Nội. Khám phá tin đăng thực tế và đặt lịch xem nhà cùng Gary Home.",
+      "heading": "Tìm một nơi.\nGọi là nhà.",
+      "canonical": [
+        "https://www.garyhome.vn/vi"
+      ],
+      "headMetadata": true,
+      "alternates": {
+        "en": "https://www.garyhome.vn/en",
+        "vi": "https://www.garyhome.vn/vi",
+        "x-default": "https://www.garyhome.vn/en"
+      }
+    }
+  }
+}

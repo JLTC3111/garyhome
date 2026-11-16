@@ -10,20 +10,32 @@ import {renderToString} from 'react-dom/server';
 import {LazyMotion,domAnimation} from 'motion/react';
 import ts from 'typescript';
 const root=path.resolve(import.meta.dirname,'..'),require=createRequire(import.meta.url);
-function loadComponent(){
+function loadComponent({language='en',pathname='/en'}={}){
  const cache=new Map();function load(file){
   if(cache.has(file))return cache.get(file).exports;
   const m={exports:{}};cache.set(file,m);
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   const dependency=id=>{
    if(id==='next/link')return {__esModule:true,default:({children,...props})=>React.createElement('a',props,children)};
-   if(id.startsWith('.'))return load(path.resolve(path.dirname(file),id)+'.ts');
+   if(id==='next/navigation')return {usePathname:()=>pathname};
+   if(id==='./site-context')return {useSite:()=>({language,publicPath:pathname})};
+   if(id.startsWith('.')||id.startsWith('@/')){
+    const target=id.startsWith('@/')?path.join(root,id.slice(2)):path.resolve(path.dirname(file),id);
+    return load([target,target+'.ts',target+'.tsx'].find(value=>fs.existsSync(value)&&fs.statSync(value).isFile()));
+   }
    return require(id);
   };
   vm.runInThisContext('(function(exports,require,module){'+source+'\n})',{filename:file})(m.exports,dependency,m);return m.exports;
  }
  return load(path.join(root,'components/magicui/shiny-button.tsx')).ShinyButton;
 }
+test('shiny public calls to action preserve explicit locale, query and anchor while leaving account and external destinations intact',()=>{
+ const ShinyButton=loadComponent({language:'vi',pathname:'/vi/homes'});
+ const markup=href=>renderToString(React.createElement(LazyMotion,{features:domAnimation,strict:true},React.createElement(ShinyButton,{href},'Liên hệ')));
+ assert.match(markup('/contact?service=office#enquiry'),/href="\/vi\/contact\?service=office#enquiry"/);
+ assert.match(markup('/account'),/href="\/account"/);
+ assert.match(markup('https://visa.garyhome.vn/'),/href="https:\/\/visa.garyhome.vn\/"/);
+});
 test('shiny links preserve native destinations and labels; normal buttons do not accidentally submit a form',async t=>{
  const previous=Object.getOwnPropertyDescriptor(globalThis,'IS_REACT_ACT_ENVIRONMENT');globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  let renderer;t.after(async()=>{if(renderer)await act(async()=>renderer.unmount());if(previous)Object.defineProperty(globalThis,'IS_REACT_ACT_ENVIRONMENT',previous);else delete globalThis.IS_REACT_ACT_ENVIRONMENT;});

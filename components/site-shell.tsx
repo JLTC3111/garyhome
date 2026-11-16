@@ -30,7 +30,7 @@ export function Header(){
   window.addEventListener("keydown",key);document.addEventListener("pointerdown",outside);return()=>{window.removeEventListener("keydown",key);document.removeEventListener("pointerdown",outside);};
  },[open,dropdown]);
  if(path.startsWith("/admin"))return null;
- const aboutLinks=[["/services",t("Other Services","Other Services")],["/vinhomes",t("Vinhomes collection","Bộ sưu tập Vinhomes")],["/tips-and-news",t("Tips & News","Cẩm nang & tin tức")],["/contact",t("Contact","Liên hệ")],["/landlords",t("Landlords","Dành cho chủ nhà")]];
+ const aboutLinks=[["/services",t("Other Services","Dịch vụ khác")],["/vinhomes",t("Vinhomes collection","Bộ sưu tập Vinhomes")],["/tips-and-news",t("Tips & News","Cẩm nang & tin tức")],["/contact",t("Contact","Liên hệ")],["/landlords",t("Landlords","Dành cho chủ nhà")]];
  return <header className="site-header rental-site-header" ref={header}>
   <div className="top-strip"><div className="container rental-header-band"><div className="rental-band-contact"><BackNavigation/><a className="top-strip-phone" href={`tel:${content.settings.contact_phone.replace(/[^+\d]/g,"")}`}><Phone size={16}/><span>{content.settings.contact_phone}</span></a></div><div className="top-strip-actions"><ServiceAppsMenu className="gary-apps-menu--header" onFollow={close} onOpen={()=>setDropdown(null)}/><FavouritesDropdown onOpen={close}/><HeaderPortals onFollow={close}/></div></div></div>
   <div className="header-nav"><div className="container header-inner"><Brand/><nav className={open?"main-nav nav-open":"main-nav"} id="site-navigation" aria-label={t("Main navigation","Điều hướng chính")}>
@@ -64,7 +64,7 @@ export function Footer(){
  const company:FooterItem[]=[
   {href:"/activities?category=team",label:t("Our team","Đội ngũ")},
   {href:"/feedback",label:t("Feedback","Phản hồi")},
-  {href:"/services",label:t("Other Services","Other Services")},
+  {href:"/services",label:t("Other Services","Dịch vụ khác")},
   {href:"/tips-and-news",label:t("Tips & News","Cẩm nang & tin tức")},
   {href:"/landlords",label:t("Landlords","Dành cho chủ nhà")},
  ];

@@ -44,7 +44,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata():Promise<Metadata>{
   const base=await pageMetadata("/");
-  return {...base,metadataBase:new URL(siteUrl()),icons:{icon:[{url:"/favicon.png",type:"image/png",sizes:"32x32"},{url:"/favicon-192.png",type:"image/png",sizes:"192x192"},{url:"/favicon.svg",type:"image/svg+xml",sizes:"any"}],shortcut:"/favicon.png",apple:[{url:"/apple-touch-icon.png",type:"image/png",sizes:"180x180"}]}};
+  return {...base,metadataBase:new URL(siteUrl()),icons:{icon:[{url:"/favicon.png",type:"image/png",sizes:"32x32"},{url:"/favicon-192.png",type:"image/png",sizes:"192x192"},{url:"/favicon.ico",type:"image/x-icon",sizes:"32x32"},{url:"/favicon.svg",type:"image/svg+xml",sizes:"any"}],shortcut:"/favicon.png",apple:[{url:"/apple-touch-icon.png",type:"image/png",sizes:"180x180"}]}};
 }
 
 export default async function RootLayout({

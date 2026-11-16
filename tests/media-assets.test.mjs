@@ -42,3 +42,12 @@ test('mobile and browser PNG icons have the declared dimensions and PNG signatur
   assert.equal(data.readUInt32BE(16),size);assert.equal(data.readUInt32BE(20),size);
  }
 });
+
+test('root ICO compatibility icon preserves the existing branded PNG exactly',()=>{
+ const ico=fs.readFileSync(path.join(root,'public','favicon.ico'));
+ assert.equal(ico.readUInt16LE(0),0);assert.equal(ico.readUInt16LE(2),1);assert.equal(ico.readUInt16LE(4),1);
+ assert.equal(ico[6],32);assert.equal(ico[7],32);assert.equal(ico.readUInt16LE(10),1);assert.equal(ico.readUInt16LE(12),32);
+ const length=ico.readUInt32LE(14),offset=ico.readUInt32LE(18);
+ assert.ok(offset>=22);assert.equal(offset+length,ico.length);
+ assert.deepEqual(ico.subarray(offset,offset+length),fs.readFileSync(path.join(root,'public','favicon.png')));
+});

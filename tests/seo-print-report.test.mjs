@@ -52,7 +52,7 @@ test('executive PDF is two bounded sections with eight prioritized distinct caus
 test('summary localizes controlled copy, preserves evidence values and never fabricates five findings',()=>{
  const run=fixture();run.state.pages[0].technical.findings.push({...finding('canonical','warning'),title:'USER_FINDING_TITLE',recommendation:'USER_ACTION_VALUE'});
  const html=buildAuditPrintHtml(run,'2026-11-10T10:00:00Z',{mode:'summary',language:'vi'});
- assert.match(html,/<html lang="vi">/);assert.match(html,/Tóm tắt điều hành SEO/);assert.match(html,/Mức độ hoàn tất/);assert.match(html,/USER_FINDING_TITLE/);assert.match(html,/USER_ACTION_VALUE/);
+ assert.match(html,/<html lang="vi">/);assert.match(html,/Tóm tắt điều hành SEO/);assert.match(html,/Mức độ hoàn tất/);assert.match(html,/Kiểm tra SEO: canonical/);assert.doesNotMatch(html,/USER_FINDING_TITLE|USER_ACTION_VALUE/,'unknown legacy engine text is not leaked as Vietnamese guidance');
  assert.equal((html.match(/<div class="priority">/g)||[]).length,1);assert.match(html,/Danh sách ít hơn năm/);
  run.state.pages[0].technical.findings[1].title='<script>alert("unsafe")</script>';
  const safe=buildAuditSummaryHtml(run);assert.doesNotMatch(safe,/<script>/);assert.match(safe,/&lt;script&gt;/);

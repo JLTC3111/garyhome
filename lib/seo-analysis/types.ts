@@ -1,7 +1,9 @@
+import { normalizeFinding } from "../../shared/cms-foundation/seo-findings.js";
+
 export type Severity = "critical" | "warning" | "recommendation" | "passed";
 export type Category = "content" | "technical";
 export type Finding = {
-  id: string; category: Category; severity: Severity; title: string;
+  id: string; code?: string; params?: Record<string, string | number | boolean | null | string[]>; schemaVersion?: number; category: Category; severity: Severity; title: string;
   explanation: string; recommendation: string; evidence?: string;
   messageKey?: string; messageValues?: Record<string, string | number | string[]>;
 };
@@ -28,5 +30,5 @@ export type TechnicalInput = {
 export function report(findings: Finding[]): AnalysisReport {
   const unique = findings.filter((finding, index) => findings.findIndex(other => other.id === finding.id) === index);
   const scored = unique.filter(f => f.severity !== "recommendation");
-  return { score: scored.length ? Math.round(100 * scored.filter(f => f.severity === "passed").length / scored.length) : null, findings: unique };
+  return { score: scored.length ? Math.round(100 * scored.filter(f => f.severity === "passed").length / scored.length) : null, findings: unique.map(normalizeFinding) };
 }

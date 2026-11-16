@@ -1,3 +1,4 @@
+import { normalizeFinding } from "../../shared/cms-foundation/seo-findings.js";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { request as httpsRequest } from "node:https";
@@ -191,8 +192,8 @@ export function robotsAllows(record: RobotsRecord | undefined, value: string) {
 function xmlLocations(xml: string) {
   return [...xml.matchAll(/<loc\b[^>]*>([\s\S]*?)<\/loc\s*>/gi)].slice(0, 2000).map(match => match[1].replace(/^\s*<!\[CDATA\[([\s\S]*)\]\]>\s*$/, "$1").trim().replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'"));
 }
-function reportFinding(id: string, title: string, explanation: string, recommendation: string, severity: Finding["severity"] = "warning"): Finding {
-  return { id, category: "technical", severity, title, explanation, recommendation };
+function reportFinding(id: string, title: string, explanation: string, recommendation: string, severity: Finding["severity"] = "warning", params: Finding["params"] = {}): Finding {
+  return normalizeFinding({ id, category: "technical", severity, title, explanation, recommendation, params });
 }
 function appendFinding(report: AnalysisReport, finding: Finding) {
   const index = report.findings.findIndex(item => item.id === finding.id);
@@ -387,7 +388,7 @@ export async function advanceCrawl(state: CrawlState, options: AdvanceOptions = 
         const document = parseHtml(isHtml && result.response.ok ? result.text : "", result.finalUrl), canonical = document.canonical[0] ? normalizeCrawlUrl(document.canonical[0], result.finalUrl) : undefined;
         const technical: AnalysisReport = isHtml && result.response.ok
           ? analyzeTechnical({ document, status: result.response.status, finalUrl: result.finalUrl, redirects: result.redirects, responseMs: result.responseMs, bytes: result.bytes, xRobotsTag: result.response.headers.get("x-robots-tag") || undefined, robotsAllowed: true })
-          : { score: result.response.ok ? null : 0, findings: result.response.ok ? [] : [reportFinding("technical-http", "Published URL returned an HTTP error", `The audit received HTTP ${result.response.status} from ${result.finalUrl}. The error response body is not evaluated as the intended page content.`, "Restore the page or update its published links and sitemap entry.", "critical")] };
+          : { score: result.response.ok ? null : 0, findings: result.response.ok ? [] : [reportFinding("technical-http", "Published URL returned an HTTP error", `The audit received HTTP ${result.response.status} from ${result.finalUrl}. The error response body is not evaluated as the intended page content.`, "Restore the page or update its published links and sitemap entry.", "critical", {status:result.response.status})] };
         const page: AuditPage = { inspectionStatus: "inspected", attempts: (task.attempts || 0) + 1, url: task.url, finalUrl: result.finalUrl, status: result.response.status, language: document.htmlLanguage?.split("-")[0].toLowerCase() || task.language || "und", requestedLanguage:task.language, declaredLanguage:document.htmlLanguage||undefined, urlLanguage:localizedRoute(new URL(result.finalUrl).pathname)?.language, indexable: isHtml && result.response.ok && !hasNoindex(document.robots, result.response.headers.get("x-robots-tag") || undefined), ...(canonical ? { canonical } : {}), title: document.title, description: document.description, hreflang: document.hreflang, content: isHtml && result.response.ok ? analyzeContent(document) : { score: null, findings: [] }, technical, responseMs: result.responseMs, bytes: result.bytes };
         if (!isHtml && result.response.ok) appendFinding(technical, reportFinding("response-content-type", "Public page did not return HTML", `HTTP ${result.response.status}; Content-Type: ${type}`, "Check the destination and content negotiation for this published page."));
         if (result.response.ok && (page.urlLanguage||task.language) && document.htmlLanguage && document.htmlLanguage.split("-")[0] !== (page.urlLanguage||task.language)!.split("-")[0]) appendFinding(technical, reportFinding("language-response", "Published language differs from the requested variant", `Expected ${page.urlLanguage||task.language}; server-rendered HTML declares ${document.htmlLanguage}.`, "Check the language cookie, localized routing, and server-rendered lang attribute."));

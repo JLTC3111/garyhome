@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type AnchorHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowRight, ArrowUpRight, BriefcaseBusiness, ChevronDown, Compass, House, LayoutGrid, PlaneTakeoff } from "lucide-react";
 import { GARY_APPS, GARY_GOALS, garyAppHref, type GaryAppId, type GaryCopy, type GaryLanguage } from "./catalogue";
+import { localizedPath } from "../../lib/localized-routes";
 
 type AnchorProps = AnchorHTMLAttributes<HTMLAnchorElement> & { href: string };
 type SharedProps = { language: GaryLanguage; currentApp?: GaryAppId; className?: string; renderLink?: (props: AnchorProps) => ReactNode };
@@ -13,7 +14,8 @@ const copy = (language: GaryLanguage, en: string, vi: string) => language === "v
 
 function AppLink({ app, path = "/", language, currentApp, renderLink, children, ...props }: SharedProps & AnchorHTMLAttributes<HTMLAnchorElement> & { app: GaryAppId; path?: string }) {
   const external = app !== currentApp;
-  const anchor: AnchorProps = { ...props, href: garyAppHref(app, path, currentApp), target: external ? "_blank" : undefined, rel: external ? "noopener noreferrer" : undefined };
+  const href = app === "home" && currentApp === "home" ? localizedPath(path, language) : garyAppHref(app, path, currentApp);
+  const anchor: AnchorProps = { ...props, href, target: external ? "_blank" : undefined, rel: external ? "noopener noreferrer" : undefined };
   anchor.children = <>{children}{external && <span className="gary-apps-sr">{copy(language, " (opens in a new tab)", " (mở trong thẻ mới)")}</span>}</>;
   return renderLink ? renderLink(anchor) : <a {...anchor}/>;
 }

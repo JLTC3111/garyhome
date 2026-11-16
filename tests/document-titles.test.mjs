@@ -40,7 +40,7 @@ test('every public, customer and staff route has a title in the selected languag
     ['/homes', 'Hanoi rental properties', 'Bất động sản cho thuê Hà Nội'],
     ['/saved', 'Your saved homes', 'Nhà đã lưu'],
     ['/neighbourhoods', 'Find your kind of Hanoi', 'Tìm khu phố dành cho bạn'],
-    ['/services', 'Other Services', 'Other Services'],
+    ['/services', 'Other Services', 'Dịch vụ khác'],
     ['/vinhomes', 'Vinhomes rental collection in Hanoi', 'Bộ sưu tập căn hộ Vinhomes cho thuê tại Hà Nội'],
     ['/tips-and-news', 'Tips & News', 'Cẩm nang & tin tức'],
     ['/landlords', 'For landlords', 'Dành cho chủ nhà'],
@@ -68,7 +68,7 @@ test('property titles use current CMS translations and never expose unavailable 
   const route = '/homes/home-by-the-lake';
   assert.equal(documentTitle(route, 'en', [property]), 'A home by the lake | Gary Home');
   assert.equal(documentTitle(route, 'vi', [property]), 'Tổ ấm bên hồ | Gary Home');
-  assert.equal(documentTitle(route, 'vi', [{ ...property, title_vi: '  ' }]), 'A home by the lake | Gary Home');
+  assert.equal(documentTitle(route, 'vi', [{ ...property, title_vi: '  ' }]), 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
   assert.equal(documentTitle(route, 'vi', [{ ...property, bedrooms: 3 }]), 'Tổ ấm bên hồ | Gary Home');
   assert.equal(documentTitle(route, 'vi', [{ ...property, title_en: '', title_vi: '' }]), 'Căn hộ 2 phòng ngủ cho thuê tại Tây Hồ · 80 m² · Ban công | Gary Home');
   for (const change of [{ status: 'draft' }, { status: 'archived' }, { availability: 'rented' }, { availability: 'sold' }]) {

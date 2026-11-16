@@ -11,6 +11,16 @@ const page=(title,body='',extra='')=>`<!doctype html><html lang="en"><head><titl
 function harness(routes){let time=1000;const calls=[];return {calls,now:()=>time,tick:ms=>{time+=ms;},options:{now:()=>time,sleep:async ms=>{time+=ms;},resolveHost:async()=>['93.184.216.34'],budgetMs:12000,fetch:async(url,init)=>{calls.push({url,at:time,headers:new Headers(init.headers)});const fn=routes[url]??(url.endsWith('/robots.txt')?'User-agent: *\nAllow: /':url.endsWith('/sitemap.xml')?new Response('',{status:404}):new Response('',{status:404}));const value=typeof fn==='function'?await fn(init):fn;return typeof value==='string'?new Response(value,{headers:{'content-type':url.endsWith('.xml')?'application/xml':url.endsWith('.txt')?'text/plain':'text/html'}}):value;}}};}
 async function finish(state,h,max=100){for(let i=0;i<max&&['queued','running'].includes(state.status);i++){await advanceCrawl(state,h.options);h.tick(1000);}assert.ok(!['queued','running'].includes(state.status),'crawl terminated');return state;}
 
+test('HTTP error findings retain structured status parameters even when the response is not HTML',async()=>{
+ const url=origin+'/missing-page';
+ const h=harness({[url]:new Response('Not found',{status:404,headers:{'content-type':'text/plain'}})});
+ const state=await finish(createCrawl({allowedOrigins:[origin],scope:'page',languages:['en']},[url],h.now()),h);
+ assert.equal(state.pages.length,1);assert.equal(state.pages[0].status,404);
+ const finding=state.pages[0].technical.findings.find(f=>f.code==='technical-http');
+ assert.ok(finding);assert.equal(finding.severity,'critical');assert.deepEqual(finding.params,{status:404});assert.equal(finding.schemaVersion,1);
+ assert.deepEqual(state.pages[0].content.findings,[],'An error body is not evaluated as intended page content');
+});
+
 test('resumable sitemap discovery analyzes language variants, retains noindex and bounds external inspection',async()=>{
  const external='https://links.gary-public.com/resource';
  const h=harness({[origin+'/sitemap.xml']:'<urlset><url><loc>'+origin+'/</loc></url><url><loc>'+origin+'/hidden</loc></url></urlset>',[origin+'/']:(init)=>{const vi=new Headers(init.headers).get('cookie')==='gary-language=vi';return page(vi?'Trang chủ':'Home',`<a href="/hidden">Hidden</a><a href="${external}">Reference</a><a href="/admin">Admin</a>`).replace('lang="en"',vi?'lang="vi"':'lang="en"');},[origin+'/hidden']:page('Hidden','','<meta name="robots" content="noindex">'),[external]:page('External','<a href="https://links.gary-public.com/never">Never crawl this</a>')});

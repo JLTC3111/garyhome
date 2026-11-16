@@ -4,7 +4,7 @@
 // Retain the actual moving label mask and border sweep. See THIRD_PARTY_NOTICES.md.
 import { useEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode, type Ref } from "react";
 import { m, type MotionProps } from "motion/react";
-import Link from "next/link";
+import Link from "../localized-link";
 import { useMotionPreference } from "../use-motion-preference";
 
 type ShinyButtonProps = { children: ReactNode; className?: string } & (

@@ -7,6 +7,11 @@ const copy = {
   }
 };
 const additional = {
+  vacancyIntro: ['Create and publish vacancies. Vietnamese translations and summaries are optional.', 'Tạo và đăng tin tuyển dụng. Bản dịch tiếng Việt và tóm tắt không bắt buộc.'],
+  vacancyHint: ['Publish saves and publishes this vacancy. Employer, category and city do not need separate publication. Editing a draft keeps the current public version online.', 'Nút Đăng nội dung sẽ lưu và đăng tin tuyển dụng này. Không cần đăng riêng nhà tuyển dụng, danh mục hoặc tỉnh/thành phố. Chỉnh sửa bản nháp vẫn giữ phiên bản công khai hiện tại.'],
+  optional: ['optional', 'không bắt buộc'],
+  previousValue: ['previous value', 'giá trị trước đây'],
+  vacancyPublished: ['Vacancy published.', 'Đã đăng tin tuyển dụng.'],
   referenceSearch: ['Search options', 'Tìm lựa chọn'],
   referenceChoose: ['Choose a published entry', 'Chọn mục đã đăng'],
   referenceLoading: ['Loading choices…', 'Đang tải lựa chọn…'],

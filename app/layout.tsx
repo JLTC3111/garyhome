@@ -26,6 +26,7 @@ import "./shiny-button.css";
 import "./swipe-row.css";
 import "./lattice-loader.css";
 import "./counter.css";
+import "../shared/editor-workspace/styles.css";
 import "./editor-drawer.css";
 import "./editorial-studio.css";
 import "./seo.css";

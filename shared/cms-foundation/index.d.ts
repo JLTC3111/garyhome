@@ -1,12 +1,13 @@
 export type CmsLanguage = 'en' | 'vi';
 export type CmsStatus = 'draft' | 'review' | 'published' | 'archived';
 export type CmsEntry = { id?: string; kind: string; slug: string; title_en: string; title_vi: string; summary_en: string; summary_vi: string; body_en: string; body_vi: string; status: CmsStatus; version: number; data: Record<string, unknown>; updated_at?: string; [key: string]: unknown };
-export type CmsField = { key: string; label: string | Record<CmsLanguage, string>; type?: 'text' | 'textarea' | 'url' | 'number' | 'date' | 'select' | 'list' | 'reference' | 'email'; bilingual?: boolean; required?: boolean; min?: number; max?: number; minLength?: number; maxLength?: number; minDate?: string; referenceKind?: string; options?: Array<string | {value: string; label: string | Record<CmsLanguage, string>}> };
-export type CmsCollection = { kind: string; label: string | Record<CmsLanguage, string>; fields?: CmsField[]; requireBody?: boolean; automaticSlug?: boolean; publicPath?: string; publishMinimums?: {title?: number; summary?: number; body?: number} };
+export type CmsField = { key: string; label: string | Record<CmsLanguage, string>; type?: 'text' | 'textarea' | 'url' | 'number' | 'date' | 'select' | 'list' | 'reference' | 'email'; allowUnknownDraft?: boolean; preservePublished?: boolean; excludedValues?: string[]; bilingual?: boolean; required?: boolean; min?: number; max?: number; minLength?: number; maxLength?: number; minDate?: string; referenceKind?: string; options?: Array<string | {value: string; label: string | Record<CmsLanguage, string>}> };
+export type CmsCollection = { kind: string; label: string | Record<CmsLanguage, string>; fields?: CmsField[]; publishTextFields?: string[]; directPublish?: boolean; requireBody?: boolean; automaticSlug?: boolean; publicPath?: string; publishMinimums?: {title?: number; summary?: number; body?: number} };
 export type CmsIssue = {code: string; field: string; params?: Record<string, unknown>; severity: string};
 export type CmsReferenceOption = {value: string; label: string | Record<CmsLanguage, string>; published: boolean; status?: CmsStatus; id?: string};
 export type CmsCapabilities = { read: boolean; edit: boolean; publish: boolean; media: boolean; role?: string };
 export type CmsAdapter = {
+  prepare?(record: CmsEntry): Promise<CmsEntry>;
   errorText?(error: unknown, language: CmsLanguage): string | undefined;
   referenceOptions?(kind: string): Promise<CmsReferenceOption[]>;
   createReference?(kind: string, record: {title_en: string;title_vi: string;summary_en: string;summary_vi: string;id?: string;version?: number}): Promise<CmsEntry>;

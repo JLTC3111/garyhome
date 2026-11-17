@@ -1,3 +1,4 @@
+import { attachEditorWorkspace } from '../editor-workspace/index.js';
 import { CMS_VERSION, LOCALES, emptyEntry, titleSlug, fieldsFor, getValue, setValue, safeMediaUrl, validateEntry, contentSeoFindings } from './content.js';
 import { cmsText, validationText } from './copy.js';
 import { localizeFinding } from './seo-findings.js';
@@ -15,8 +16,9 @@ export function mountCms(root, options) {
   let capabilities = { read: false, edit: false, publish: false, media: false };
   let kind = options.collections[0].kind, query = '', status = '', page = 1, total = 0, records = [], media = [], view = 'content';
   let draft = null, baseline = '', revisions = [], notice = '', noticeKind = 'status';
-  let editorIssues = [], editorEpoch = 0;
+  let editorIssues = [], editorEpoch = 0, editorWorkspace = null;
   const references = new Map(), referenceQueries = new Map(), referenceDrafts = new Map(), referenceCreates = new Map();
+  let editorReturnId = null;
   const t = key => cmsText(key, language);
   const label = value => typeof value === 'object' ? value?.[language] || value?.en || '' : value || '';
   const collection = () => options.collections.find(item => item.kind === kind);
@@ -42,9 +44,10 @@ export function mountCms(root, options) {
   }
   function canLeave() { return !dirty() || root.ownerDocument.defaultView.confirm(t('discard')); }
   function shell() {
+    editorWorkspace?.destroy(); editorWorkspace = null;
     root.classList.add('gary-cms'); root.dataset.cmsApp = options.appId || 'content';
     const tabs = options.collections.map(item => button('collection', label(item.label), `data-kind="${escape(item.kind)}" aria-pressed="${item.kind === kind && view === 'content'}"`)).join('');
-    root.innerHTML = `<header class="cms-header"><div><p class="cms-eyebrow">${escape(options.appName || options.appId || 'Gary Group')}</p><h2>${t('cms')}</h2><p>${t('intro')}</p></div><div class="cms-role">${t('role')}: ${escape(capabilities.role ? t(capabilities.role) : t('readOnly'))}</div></header><p class="cms-notice" data-cms-notice role="${noticeKind}" aria-live="polite">${escape(notice)}</p><nav class="cms-collections" aria-label="${t('content')}">${tabs}${button('media', t('media'), `aria-pressed="${view === 'media'}"`)}</nav><div class="cms-workspace" data-cms-workspace></div><dialog class="cms-dialog" id="${id}-editor" aria-labelledby="${id}-editor-heading"></dialog>`;
+    root.innerHTML = `<header class="cms-header"><div><p class="cms-eyebrow">${escape(options.appName || options.appId || 'Gary Group')}</p><h2>${t('cms')}</h2><p>${t(collection().directPublish ? 'vacancyIntro' : 'intro')}</p></div><div class="cms-role">${t('role')}: ${escape(capabilities.role ? t(capabilities.role) : t('readOnly'))}</div></header><p class="cms-notice" data-cms-notice role="${noticeKind}" aria-live="polite">${escape(notice)}</p><nav class="cms-collections" aria-label="${t('content')}">${tabs}${button('media', t('media'), `aria-pressed="${view === 'media'}"`)}</nav><div class="cms-workspace" data-cms-workspace></div><dialog class="cms-dialog" id="${id}-editor" aria-labelledby="${id}-editor-heading"></dialog>`;
     renderWorkspace();
   }
   function renderWorkspace() {
@@ -167,7 +170,7 @@ export function mountCms(root, options) {
     const attributes = `id="${controlId}" name="${escape(key)}" data-field="${escape(key)}" aria-describedby="${controlId}-error"${extra.locale ? ` lang="${extra.locale}"` : ''}${extra.minLength !== undefined ? ` minlength="${Number(extra.minLength)}"` : ''}${disabled(!capabilities.edit || busy)}`;
     let control;
     if (type === 'textarea' || type === 'list') control = `<textarea ${attributes} rows="${type === 'list' ? 4 : key.startsWith('body_') ? 10 : 3}" maxlength="50000"${type === 'list' ? ' data-list="true"' : ''}>${escape(Array.isArray(value) ? value.join('\n') : value)}</textarea>`;
-    else if (type === 'select') control = `<select ${attributes}><option value="">—</option>${(extra.options || []).map(option => { const v = typeof option === 'object' ? option.value : option; return `<option value="${escape(v)}"${String(v) === String(value) ? ' selected' : ''}>${escape(typeof option === 'object' ? label(option.label || option.value) : option)}</option>`; }).join('')}</select>`;
+    else if (type === 'select') control = `<select ${attributes}><option value="">—</option>${value && !(extra.options || []).some(option => String(typeof option === 'object' ? option.value : option) === String(value)) ? `<option value="${escape(value)}" selected${extra.preservePublished && draft.published_at && !extra.excludedValues?.includes(String(value)) ? '' : ' disabled'}>${escape(value)} (${t('previousValue')})</option>` : ''}${(extra.options || []).map(option => { const v = typeof option === 'object' ? option.value : option; return `<option value="${escape(v)}"${String(v) === String(value) ? ' selected' : ''}>${escape(typeof option === 'object' ? label(option.label || option.value) : option)}</option>`; }).join('')}</select>`;
     else control = `<input ${attributes} type="${['number', 'date', 'url', 'email'].includes(type) ? type : 'text'}" value="${escape(value)}"${extra.min !== undefined ? ` min="${Number(extra.min)}"` : ''}${extra.max !== undefined ? ` max="${Number(extra.max)}"` : ''}${type === 'date' && extra.minDate ? ` min="${extra.minDate === 'today' ? new Date().toISOString().slice(0, 10) : escape(extra.minDate)}"` : ''}${type !== 'number' && type !== 'date' ? ` maxlength="${Number(extra.maxLength || 2000)}"` : ''}>`;
     return `<label class="cms-field" for="${controlId}"><span>${escape(text)}${extra.required ? ` <small>(${t('required')})</small>` : ''}</span>${control}<small id="${controlId}-error" class="cms-field-error" data-error-for="${escape(key)}" aria-live="polite"></small></label>`;
   }
@@ -175,7 +178,11 @@ export function mountCms(root, options) {
     const dialog = root.querySelector('.cms-dialog');
     if (!dialog || !draft) return;
     const extraFields = fieldsFor(collection());
-    dialog.innerHTML = `<header><div><p class="cms-eyebrow">${escape(label(collection().label))}</p><h2 id="${id}-editor-heading">${escape(draft.id ? t('edit') : t('add'))}</h2></div>${button('close', t('close'))}</header><form data-cms-editor novalidate><div data-editor-errors></div><div class="cms-editor-meta">${collection().automaticSlug ? '<p class="cms-hint" data-cms-auto-url></p>' : field('slug', t('slug'))}<p><span class="cms-badge cms-badge-${escape(draft.status)}">${t(draft.status)}</span> · <span data-cms-dirty>${t('clean')}</span></p></div><p class="cms-hint">${t('snapshot')}</p><div class="cms-language-columns">${LOCALES.map(locale => `<section lang="${locale}" aria-label="${locale === 'en' ? 'English' : 'Tiếng Việt'}"><h3>${locale === 'en' ? 'English' : 'Tiếng Việt'}</h3>${field(`title_${locale}`, t('title'), 'text', { locale })}${field(`summary_${locale}`, t('summary'), 'textarea', { locale })}${field(`body_${locale}`, t('body'), 'textarea', { locale })}${extraFields.filter(item => item.locale === locale).map(item => field(item.key, label(item.label), item.type, item)).join('')}<details><summary>${t('seo')}</summary>${field(`seo_title_${locale}`, t('seoTitle'), 'text', { locale })}${field(`seo_description_${locale}`, t('seoDescription'), 'textarea', { locale })}</details></section>`).join('')}</div>${extraFields.filter(item => !item.locale).map(item => field(item.key, label(item.label), item.type, item)).join('')}<details class="cms-seo"><summary>${t('seo')}</summary><p class="cms-hint">${t('advisory')}</p><div data-cms-checks></div></details><details class="cms-preview"><summary>${t('preview')}</summary><div class="cms-language-columns" data-cms-preview></div></details><details data-cms-revisions><summary>${t('revision')}</summary><div data-cms-history><p>${t('loadingRevisions')}</p></div></details><p class="cms-dialog-notice" data-editor-notice role="status" aria-live="polite"></p><footer class="cms-editor-actions">${capabilities.edit ? `<button type="submit" class="cms-primary"${disabled(busy)}>${t('save')}</button>${button('review', t('submit'), '', !draft.id)}` : ''}${capabilities.publish ? `${button('publish', t('publish'), '', !draft.id || draft.status !== 'review')}${button('archive', t('archive'), '', !draft.id || draft.status === 'archived')}` : ''}${button('close', t('cancel'))}</footer></form>`;
+    const textRequired = key => collection().publishTextFields?.includes(key);
+    const textLabel = (key, locale) => t(key) + (collection().publishTextFields && !textRequired(`${key}_${locale}`) ? ` (${t('optional')})` : '');
+    dialog.innerHTML = `<header><div><p class="cms-eyebrow">${escape(label(collection().label))}</p><h2 id="${id}-editor-heading">${escape(draft.id ? t('edit') : t('add'))}</h2></div>${button('close', t('close'))}</header><form data-cms-editor novalidate><div class="cms-editor-body gw-editor-body" data-gw-body><div data-editor-errors></div><div class="cms-editor-meta">${collection().automaticSlug ? '<p class="cms-hint" data-cms-auto-url></p>' : field('slug', t('slug'))}<p><span class="cms-badge cms-badge-${escape(draft.status)}">${t(draft.status)}</span> · <span data-cms-dirty>${t('clean')}</span></p></div><p class="cms-hint">${t(collection().directPublish ? 'vacancyHint' : 'snapshot')}</p><div class="cms-language-columns">${LOCALES.map(locale => `<section lang="${locale}" aria-label="${locale === 'en' ? 'English' : 'Tiếng Việt'}"><h3>${locale === 'en' ? 'English' : 'Tiếng Việt'}</h3>${field(`title_${locale}`, textLabel('title', locale), 'text', { locale, required: textRequired(`title_${locale}`) })}${field(`summary_${locale}`, textLabel('summary', locale), 'textarea', { locale, required: textRequired(`summary_${locale}`) })}${field(`body_${locale}`, textLabel('body', locale), 'textarea', { locale, required: textRequired(`body_${locale}`) })}${extraFields.filter(item => item.locale === locale).map(item => field(item.key, label(item.label), item.type, item)).join('')}<details><summary>${t('seo')}</summary>${field(`seo_title_${locale}`, t('seoTitle'), 'text', { locale })}${field(`seo_description_${locale}`, t('seoDescription'), 'textarea', { locale })}</details></section>`).join('')}</div>${extraFields.filter(item => !item.locale).map(item => field(item.key, label(item.label), item.type, item)).join('')}<details class="cms-seo"><summary>${t('seo')}</summary><p class="cms-hint">${t('advisory')}</p><div data-cms-checks></div></details><details class="cms-preview"><summary>${t('preview')}</summary><div class="cms-language-columns" data-cms-preview></div></details><details data-cms-revisions><summary>${t('revision')}</summary><div data-cms-history><p>${t('loadingRevisions')}</p></div></details><p class="cms-dialog-notice" data-editor-notice role="status" aria-live="polite"></p></div><footer class="cms-editor-actions gw-editor-actions" data-gw-actions>${capabilities.edit ? `<button type="submit" class="cms-primary"${disabled(busy)}>${t('save')}</button>${!collection().directPublish || !capabilities.publish ? button('review', t('submit'), '', !draft.id) : ''}` : ''}${capabilities.publish ? `${button('publish', t('publish'), '', !collection().directPublish && (!draft.id || draft.status !== 'review'))}${button('archive', t('archive'), '', !draft.id || draft.status === 'archived')}` : ''}${button('close', t('cancel'))}</footer></form>`;
+    if (!editorWorkspace) editorWorkspace = attachEditorWorkspace(dialog, {key: `${options.appId || 'content'}:cms:${kind}`, language: () => language});
+    editorWorkspace.refresh();
     for (const control of dialog.querySelectorAll('input[data-reference-create-field]')) control.value = referenceDrafts.get(control.dataset.referenceCreateKey)?.[control.dataset.referenceCreateField] || '';
     updateEditorChecks(); renderHistory(); showIssues(editorIssues, {focus: false});
     if (typeof dialog.showModal === 'function') { if (!dialog.open) dialog.showModal(); } else dialog.setAttribute('open', '');
@@ -189,13 +196,24 @@ export function mountCms(root, options) {
     const target = root.querySelector('[data-cms-checks]');
     if (target) target.innerHTML = contentSeoFindings(draft, collection()).map(finding => { const translated = localizeFinding(finding, language); return `<article class="cms-finding cms-${finding.severity}"><strong>${escape(t(finding.severity))}: ${escape(translated.title)}</strong><p>${escape(translated.recommendation || translated.explanation)}</p></article>`; }).join('');
     const preview = root.querySelector('[data-cms-preview]');
-    if (preview) preview.innerHTML = LOCALES.map(locale => `<article lang="${locale}"><h3>${escape(draft[`title_${locale}`] || t('noPreview'))}</h3><p>${escape(draft[`summary_${locale}`])}</p><div class="cms-plain-content">${escape(draft[`body_${locale}`])}</div></article>`).join('');
+    if (preview) preview.innerHTML = LOCALES.map(locale => `<article lang="${locale}"><h3>${escape(draft[`title_${locale}`] || draft.title_en || t('noPreview'))}</h3><p>${escape(draft[`summary_${locale}`] || draft.summary_en || '')}</p><div class="cms-plain-content">${escape(draft[`body_${locale}`] || draft.body_en || '')}</div></article>`).join('');
     const dirtyState = root.querySelector('[data-cms-dirty]'); if (dirtyState) dirtyState.textContent = t(dirty() ? 'changed' : 'clean');
   }
   async function openEditor(record) {
     if (!canLeave()) return;
-    ++editorEpoch; editorIssues = []; referenceQueries.clear(); referenceDrafts.clear(); referenceCreates.clear();
-    draft = structuredClone(record || emptyEntry(kind)); draft.data ||= {}; syncAutomaticSlug();
+    editorReturnId = record?.id || null;
+    const openingEpoch = ++editorEpoch; editorIssues = []; referenceQueries.clear(); referenceDrafts.clear(); referenceCreates.clear();
+    draft = structuredClone(record || emptyEntry(kind)); draft.data ||= {};
+    baseline = JSON.stringify(draft);
+    if (adapter.prepare) {
+      const candidate = draft, preparingState = JSON.stringify(candidate);
+      let prepared;
+      try { prepared = await adapter.prepare(candidate); }
+      catch (error) { if (!disposed && openingEpoch === editorEpoch) announce(errorText(error), true); return; }
+      if (disposed || openingEpoch !== editorEpoch || draft !== candidate || JSON.stringify(draft) !== preparingState) return;
+      draft = prepared;
+    }
+    syncAutomaticSlug();
     baseline = JSON.stringify(draft); revisions = []; editor(); void loadReferences(true);
     if (draft.id && adapter.revisions) {
       const selected = draft.id;
@@ -249,12 +267,17 @@ export function mountCms(root, options) {
       draft = structuredClone(next); draft.data ||= {}; baseline = JSON.stringify(draft); editorIssues = [];
       announce(success); busy = false; editor(); editorNotice(success);
       if (adapter.revisions) { const selected = draft.id; const result = await adapter.revisions(selected); if (draft?.id === selected) { revisions = Array.isArray(result) ? result : result.records || []; renderHistory(); } }
-    } catch (error) { if (!disposed) { failedIssues = Array.isArray(error.issues) ? error.issues : null; editorNotice(errorText(error)); options.onNotice?.(errorText(error)); } }
+    } catch (error) { if (!disposed) { if (error.partialRecord?.id) { draft = structuredClone(error.partialRecord); baseline = JSON.stringify(draft); busy = false; editor(); } failedIssues = Array.isArray(error.issues) ? error.issues : null; editorNotice(errorText(error)); options.onNotice?.(errorText(error)); } }
     finally { if (!disposed) { busy = false; for (const [control, wasDisabled] of controls) if (control.isConnected) control.disabled = wasDisabled; for (const field of referenceFields()) renderReference(field.key); if (failedIssues) showIssues(failedIssues); } }
   }
   function renderMedia(target) {
     const policyText = `${mediaPolicy.mimeTypes.map(type => type.split('/')[1].toUpperCase()).join(', ')} · ${Math.round(mediaPolicy.maxBytes / 1024 / 1024)} MB`;
     target.innerHTML = `<div class="cms-toolbar"><h3>${t('media')}</h3>${button('refresh', t('refresh'))}</div>${capabilities.media && adapter.uploadMedia ? `<form data-cms-upload><p>${escape(policyText)}</p><label class="cms-field"><span>${t('file')}</span><input type="file" name="file" accept="${escape(mediaPolicy.mimeTypes.join(','))}" required></label>${['en', 'vi'].map(locale => `<label class="cms-field"><span>${t(locale === 'en' ? 'altEn' : 'altVi')}</span><input name="alt_${locale}" lang="${locale}" maxlength="500"></label>`).join('')}<p class="cms-hint">${t('altHint')}</p><button type="submit"${disabled(busy)}>${t('upload')}</button></form>` : ''}<div class="cms-media-grid">${media.length ? media.map((item, index) => { const url = safeMediaUrl(item.url || item.public_url || item.signed_url || ''); return `<article>${url && /^image\//.test(item.mime_type || item.type || '') ? `<img src="${escape(url)}" alt="${escape(item[`alt_${language}`] || item.alt || item.filename || item.file_name || '')}" loading="lazy">` : ''}<strong>${escape(item.filename || item.file_name || item.name || item.path || item.object_path || '')}</strong><p>${escape(item[`alt_${language}`] || '')}</p>${url ? `<a href="${escape(url)}" target="_blank" rel="noopener noreferrer">${t('open')}</a>${button('copy-media', t('useMedia'), `data-index="${index}"`)}` : ''}</article>`; }).join('') : `<p>${t('mediaEmpty')}</p>`}</div>`;
+  }
+  function restoreEditorFocus() {
+    const index = records.findIndex(record => record.id === editorReturnId);
+    const target = index >= 0 ? root.querySelector(`[data-action="edit"][data-index="${index}"]`) : root.querySelector('[data-action="new"]');
+    (target || root.querySelector('[data-action="refresh"]'))?.focus();
   }
   async function onClick(event) {
     const target = event.target.closest('[data-action]'); if (!target || !root.contains(target) || target.disabled || busy) return;
@@ -263,17 +286,33 @@ export function mountCms(root, options) {
     if (action === 'focus-issue') { focusField(target.dataset.fieldKey); return; }
     if (action === 'reference-refresh') { const field = referenceFields().find(item => item.key === target.dataset.fieldKey); if (field) await loadReference(field.referenceKind, true); return; }
     if (action === 'reference-create') return createReference(target.dataset.fieldKey);
-    if (action === 'close') { if (!canLeave()) return; draft = null; baseline = ''; root.querySelector('.cms-dialog')?.close?.(); await refresh(); return; }
+    if (action === 'close') { if (!canLeave()) return; ++editorEpoch; draft = null; baseline = ''; root.querySelector('.cms-dialog')?.close?.(); await refresh(); restoreEditorFocus(); return; }
     if (action === 'edit') return openEditor(records[Number(target.dataset.index)]);
     if (action === 'new') { if (capabilities.edit) return openEditor(); return; }
     if (action === 'collection' || action === 'media') {
-      if (!canLeave()) return; draft = null; baseline = ''; query = ''; page = 1;
+      if (!canLeave()) return; ++editorEpoch; draft = null; baseline = ''; query = ''; page = 1;
       if (action === 'collection') { kind = target.dataset.kind; view = 'content'; } else view = 'media';
       shell(); return refresh();
     }
     if (action === 'search') { query = root.querySelector('[data-cms-search]')?.value || ''; page = 1; return refresh(); }
     if (action === 'refresh') return refresh(true);
     if (action === 'previous' || action === 'next') { page += action === 'previous' ? -1 : 1; return refresh(); }
+    if (action === 'publish' && collection().directPublish) {
+      if (!draft || !capabilities.edit || !capabilities.publish) return;
+      syncAutomaticSlug();
+      if (showIssues(validateEntry(draft, collection(), true))) return;
+      const payload = structuredClone(draft), publicationEpoch = editorEpoch, needsSave = dirty() || !draft.id;
+      return mutate(async () => {
+        const issues = adapter.validatePublication ? await adapter.validatePublication(payload) : [];
+        if (issues.length) throw Object.assign(new Error('Publication validation failed'), {issues});
+        if (disposed || publicationEpoch !== editorEpoch) throw new Error('Editor changed before publication');
+        let saved = payload;
+        try {
+          if (needsSave) saved = await adapter.save(payload, {expectedVersion: payload.version});
+          return await adapter.transition(saved.id, 'published', {expectedVersion: saved.version});
+        } catch (error) { if (saved.id && saved !== payload) error.partialRecord = saved; throw error; }
+      }, t('vacancyPublished'));
+    }
     if (['publish', 'archive', 'review'].includes(action)) {
       if (!draft?.id || !(action === 'review' ? capabilities.edit : capabilities.publish)) return;
       if (dirty()) { editorNotice(t('saveFirst')); return; }
@@ -350,10 +389,11 @@ export function mountCms(root, options) {
   const ready = refresh(true);
   return {
     ready, isDirty: dirty, canLeave,
-    async refresh() { if (!canLeave()) return false; draft = null; baseline = ''; await refresh(true); return true; },
+    async refresh() { if (!canLeave()) return false; ++editorEpoch; draft = null; baseline = ''; await refresh(true); return true; },
     setLanguage(value) { language = value === 'vi' ? 'vi' : 'en'; if (draft) { const previous = draft; shell(); draft = previous; editor(); } else shell(); },
     destroy({ force = false } = {}) {
       if (!force && !canLeave()) return false;
+      editorWorkspace?.destroy(); editorWorkspace = null;
       disposed = true; ++epoch; ++editorEpoch; draft = null; records = []; media = []; references.clear(); referenceQueries.clear(); referenceDrafts.clear(); referenceCreates.clear(); editorIssues = [];
       root.removeEventListener('click', onClick); root.removeEventListener('submit', onSubmit); root.removeEventListener('input', onInput); root.removeEventListener('change', onChange); root.removeEventListener('keydown', onKey); root.removeEventListener('cancel', onCancel, true); root.removeEventListener('toggle', onToggle, true); root.ownerDocument.defaultView.removeEventListener('beforeunload', beforeUnload);
       root.replaceChildren(); root.classList.remove('gary-cms'); delete root.dataset.cmsApp; return true;

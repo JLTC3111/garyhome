@@ -1126,10 +1126,10 @@ test('profile upload persists a staff-owned path and the sidebar follows the sav
  const write=h.backend.calls.find(c=>c.table==='staff_profiles');assert.equal(write.payload.user_id,'owner');assert.match(write.payload.avatar_path,/^owner\/[a-f0-9-]+\.png$/);
  assert.equal(h.site.staffProfile.avatar_path,write.payload.avatar_path);
  const button=h.renderer.root.findByProps({'aria-label':'Edit staff profile'});assert.ok(button.findByType('img').props.src.endsWith(write.payload.avatar_path));
- const toast=h.renderer.root.findByType('dialog').findByProps({className:'staff-profile-toast'});assert.equal(toast.props.role,'status');assert.match(JSON.stringify(h.renderer.toJSON()),/Profile photo updated/);
+ const toast=h.renderer.root.findByProps({role:'dialog'}).findByProps({className:'staff-profile-toast'});assert.equal(toast.props.role,'status');assert.match(JSON.stringify(h.renderer.toJSON()),/Profile photo updated/);
  await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Đã cập nhật ảnh hồ sơ/);
  const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.equal(form.findByProps({name:'password'}).props.required,undefined);
- await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Đã lưu thay đổi hồ sơ/);
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Đã lưu thay đổi hồ sơ/);
 });
 test('notifications load once per refresh, show persisted activity and keep read state',async t=>{
  const h=await harness(t);h.backend.notifications=[{id:'notice-one',category:'team',action:'team.role_changed',actor_name:'Owner',actor_user_id:'owner',target_name:'Team colleague',target_user_id:'staff',target_role:'editor',details:{from:'manager',to:'editor'},created_at:'2026-10-25T00:00:00Z',unread:true}];
@@ -1198,15 +1198,15 @@ test('Save changes closes an unchanged profile without changing its password or 
  const h=await harness(t);h.backend.passwordReminder=true;await act(async()=>h.site.refreshStaffProfile());
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
  const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.ok(form.findAllByType('button').some(b=>b.children.includes('Save changes')));
- await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.backend.passwordReminder,true);assert.equal(h.backend.rpcCalls.some(c=>c.name==='acknowledge_staff_password_reminder'),false);assert.match(JSON.stringify(h.renderer.toJSON()),/Your profile is up to date/);
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.backend.passwordReminder,true);assert.equal(h.backend.rpcCalls.some(c=>c.name==='acknowledge_staff_password_reminder'),false);assert.match(JSON.stringify(h.renderer.toJSON()),/Your profile is up to date/);
 });
 test('profile password mismatches and Auth failures keep the dialog open without claiming a successful save',async t=>{
  const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
  const form=()=>h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});
  await act(async()=>{form().findByProps({name:'password'}).props.onChange({target:{value:'A private new staff password'}});form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A mismatching password'}});});
- await act(async()=>{await form().props.onSubmit({preventDefault(){}});});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByType('dialog').length,1);
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,1);
  await act(async()=>{form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A private new staff password'}});});h.backend.passwordError=true;
- await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.renderer.root.findAllByType('dialog').length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the password change/);assert.equal(h.backend.rpcCalls.some(c=>c.name==='acknowledge_staff_password_reminder'),false);
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the password change/);assert.equal(h.backend.rpcCalls.some(c=>c.name==='acknowledge_staff_password_reminder'),false);
 });
 
 
@@ -1217,7 +1217,7 @@ test('an unconfirmed photo write cannot be acknowledged by Save changes',async t
  await act(async()=>{upload.props.onChange({target:{files:[{type:'image/png',size:1024,name:'portrait.png'}],value:'portrait.png'}});await delay(5);});
  await act(async()=>{h.backend.upload.resolve({data:{path:'stored'},error:null});await delay(8);});
  const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.equal(form.findAllByType('button').find(b=>b.children.includes('Save changes')).props.disabled,true);
- await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByType('dialog').length,1);assert.equal(h.renderer.root.findAllByProps({className:'staff-profile-toast'}).length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the photo update/);assert.equal(h.backend.passwordCalls.length,0);
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,1);assert.equal(h.renderer.root.findAllByProps({className:'staff-profile-toast'}).length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the photo update/);assert.equal(h.backend.passwordCalls.length,0);
 });
 
 

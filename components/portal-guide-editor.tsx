@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { Eye, LoaderCircle, Save, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Eye, LoaderCircle, Save, Trash2, Upload } from "lucide-react";
 import { useSite } from "./site-context";
+import { EditorModal } from "./editor-modal";
 import { SelectField } from "./select-field";
 import { DeleteConfirmation } from "./delete-confirmation";
 import { HELP_BUCKET, HELP_FIELDS, HELP_FILE_TYPES, HELP_MAX_FILES, helpFileSize, helpFileType, helpUploadPath, type HelpFile, type HelpGuide } from "@/lib/portal-help";
@@ -15,8 +16,8 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
   const [draft, setDraft] = useState<Draft>(() => draftOf(guide)), [files, setFiles] = useState(guide.files);
   const [busy, setBusy] = useState(""), [error, setError] = useState(""), [conflict, setConflict] = useState(false), [removing, setRemoving] = useState<HelpFile | null>(null);
   const [progress, setProgress] = useState<{ name: string; value: number } | null>(null);
-  const baseline = useRef(guide), active = useRef(true), uploadAbort = useRef<AbortController | null>(null), dialog = useRef<HTMLDialogElement>(null), id = useId();
-  useEffect(() => { active.current = true; const node = dialog.current, previous = document.activeElement instanceof HTMLElement ? document.activeElement : null; node?.showModal(); return () => { active.current = false; uploadAbort.current?.abort(); node?.close(); previous?.focus?.(); }; }, []);
+  const baseline = useRef(guide), active = useRef(true), uploadAbort = useRef<AbortController | null>(null);
+  useEffect(() => { active.current = true; return () => { active.current = false; uploadAbort.current?.abort(); }; }, []);
   function patch<K extends keyof Draft>(key: K, value: Draft[K]) { setDraft(previous => ({ ...previous, [key]: value })); }
   async function refreshAttachments() {
     const { data, error } = await editorTask((db, signal) => db.from("portal_guides").select(HELP_FIELDS).eq("id", guide.id).abortSignal(signal).single());
@@ -88,7 +89,7 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
     finally { if (active.current) setBusy(""); }
   }
   function submit(event: FormEvent) { event.preventDefault(); void save(draft.published); }
-  return <dialog ref={dialog} className="help-editor-dialog" aria-modal="true" aria-labelledby={id} onCancel={event => { event.preventDefault(); if (!busy) close(); }}><header><div><small>{t("OWNER · GUIDE EDITOR", "CHỦ SỞ HỮU · BIÊN TẬP HƯỚNG DẪN")}</small><h2 id={id}>{t("Create a confident first day.", "Tạo một ngày đầu tự tin.")}</h2></div><button autoFocus type="button" className="icon-button" disabled={!!busy} onClick={close} aria-label={t("Close editor", "Đóng trình biên tập")}><X size={20}/></button></header>
+  return <EditorModal workspaceKey="guide" contentClassName="help-editor-workspace" closeDisabled={!!busy} title={t("Create a confident first day.", "Tạo một ngày đầu tự tin.")} subtitle={t("OWNER · GUIDE EDITOR", "CHỦ SỞ HỮU · BIÊN TẬP HƯỚNG DẪN")} close={close}>
     <form className="enquiry-form help-editor-form" onSubmit={submit}>
       <div className="form-row"><label>{t("English title", "Tiêu đề tiếng Anh")}<input name="guide_title_en" maxLength={180} value={draft.title_en} onChange={event => patch("title_en", event.target.value)}/></label><label>{t("Vietnamese title", "Tiêu đề tiếng Việt")}<input name="guide_title_vi" maxLength={180} value={draft.title_vi} onChange={event => patch("title_vi", event.target.value)}/></label></div>
       <div className="form-row"><label>{t("Who can view this?", "Ai được xem?")}<SelectField value={draft.audience} onValueChange={value => setDraft(previous => ({ ...previous, audience: value as Draft["audience"], minimum_role: value === "staff" ? previous.minimum_role : null }))}><option value="customer">{t("Customers", "Khách hàng")}</option><option value="staff">{t("Staff", "Nhân viên")}</option><option value="both">{t("Everyone signed in", "Mọi người đã đăng nhập")}</option></SelectField></label>{draft.audience === "staff" ? <label>{t("Minimum staff role", "Cấp nhân viên tối thiểu")}<SelectField value={draft.minimum_role || "editor"} onValueChange={value => patch("minimum_role", value as Draft["minimum_role"])}><option value="editor">{t("Staff and above", "Nhân viên trở lên")}</option><option value="manager">{t("Manager and above", "Quản lý trở lên")}</option><option value="admin">{t("Administrator and owner", "Quản trị viên và chủ sở hữu")}</option><option value="owner">{t("Owner only", "Chỉ chủ sở hữu")}</option></SelectField></label> : null}</div>
@@ -99,7 +100,7 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
         {files.map(file => <div className="help-file-row" key={file.id}><span><strong>{file.original_name}</strong><small>{helpFileSize(file.size_bytes)}</small></span><button type="button" className="icon-button" disabled={!!busy} onClick={() => { setError(""); setRemoving(file); }} aria-label={t("Remove file", "Gỡ tệp") + ": " + file.original_name}><Trash2 size={16}/></button></div>)}
       </section><label className="help-order-field">{t("Display order (lower first)", "Thứ tự hiển thị (số nhỏ trước)")}<input type="number" min={0} max={9999} step={1} value={draft.sort_order} onChange={event => patch("sort_order", Number(event.target.value))}/></label>
       {conflict && <p className="form-error" role="alert">{t("This guide changed in another tab. Your text is kept here; close and reopen the guide to review the current version before saving.", "Hướng dẫn đã đổi ở tab khác. Nội dung của bạn vẫn ở đây; đóng và mở lại để kiểm tra phiên bản hiện tại trước khi lưu.")}</p>}{error && <p className="form-error" role="alert">{error}</p>}
-      <footer className="help-editor-actions"><button className="button" type="submit" disabled={!!busy || conflict}>{busy === "save" ? <LoaderCircle size={16} className="spin"/> : <Save size={16}/>} {draft.published ? t("Save changes", "Lưu thay đổi") : t("Save draft", "Lưu nháp")}</button><button type="button" className="button button-outline" disabled={!!busy || conflict} onClick={() => void save(!draft.published)}><Eye size={16}/>{draft.published ? t("Unpublish", "Gỡ xuất bản") : t("Publish guide", "Xuất bản hướng dẫn")}</button></footer>
+      <footer className="help-editor-actions gw-editor-actions"><button type="button" className="button button-outline" disabled={!!busy} onClick={close}>{t("Cancel", "Hủy")}</button><button className="button" type="submit" disabled={!!busy || conflict}>{busy === "save" ? <LoaderCircle size={16} className="spin"/> : <Save size={16}/>} {draft.published ? t("Save changes", "Lưu thay đổi") : t("Save draft", "Lưu nháp")}</button><button type="button" className="button button-outline" disabled={!!busy || conflict} onClick={() => void save(!draft.published)}><Eye size={16}/>{draft.published ? t("Unpublish", "Gỡ xuất bản") : t("Publish guide", "Xuất bản hướng dẫn")}</button></footer>
     </form>{removing && <DeleteConfirmation title={t("Remove this file?", "Gỡ tệp này?")} description={t("It will no longer be available from this guide. Removing the last visual file unpublishes a guide with no complete written instructions.", "Tệp sẽ không còn trong hướng dẫn. Gỡ tệp cuối sẽ chuyển hướng dẫn chưa có đủ nội dung chữ về bản nháp.")} target={removing.original_name} busy={!!busy} error={error} onCancel={() => { if (!busy) setRemoving(null); }} onConfirm={() => void removeFile()}/>}
-  </dialog>;
+  </EditorModal>;
 }

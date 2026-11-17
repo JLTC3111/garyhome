@@ -1,8 +1,9 @@
 "use client";
+import { EditorModal } from "./editor-modal";
 import { PasswordInput } from "./password-input";
 import { SwipeToast } from "./swipe-toast";
 import { useEffect,useRef,useState,type FormEvent } from "react";
-import { Camera,CheckCircle2,KeyRound,LoaderCircle,Save,X } from "lucide-react";
+import { Camera,CheckCircle2,KeyRound,LoaderCircle,Save } from "lucide-react";
 import { useSite } from "./site-context";
 import { setAccountPassword } from "@/lib/password-actions";
 
@@ -20,10 +21,10 @@ export function StaffPasswordReminder(){
 }
 function StaffProfileDialog({close}:{close:()=>void}){
  const site=useSite(),{user,client,staffProfile,t,editorTask,accountTask,refreshStaffProfile,notice}=site;
- const dialog=useRef<HTMLDialogElement>(null),active=useRef(true);
+ const active=useRef(true);
  const [busy,setBusy]=useState(""),[error,setError]=useState(""),[photoToast,setPhotoToast]=useState(false);
  const [password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[photoChanged,setPhotoChanged]=useState(false),[photoFailed,setPhotoFailed]=useState(false);
- useEffect(()=>{active.current=true;const node=dialog.current;node?.showModal();return()=>{active.current=false;node?.close();};},[]);
+ useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
  async function upload(file:File){
   if(!user||busy)return;
   if(!["image/jpeg","image/png","image/webp","image/avif"].includes(file.type)||file.size>2097152){setPhotoFailed(true);setError(t("Choose a JPG, PNG, WebP or AVIF image up to 2 MB.","Chọn ảnh JPG, PNG, WebP hoặc AVIF tối đa 2 MB."));return;}
@@ -57,9 +58,9 @@ function StaffProfileDialog({close}:{close:()=>void}){
   finally{if(active.current)setBusy("");}
  }
  const photo=staffProfile?.avatar_path&&client?client.storage.from("staff-avatars").getPublicUrl(staffProfile.avatar_path).data.publicUrl:"";
- return <dialog ref={dialog} className="staff-profile-dialog" aria-modal="true" aria-labelledby="staff-profile-title" onCancel={event=>{event.preventDefault();if(!busy)close();}} onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}><header><div><div className="eyebrow">GARY HOME</div><h2 id="staff-profile-title">{t("Your staff profile","Hồ sơ nhân viên của bạn")}</h2></div><button className="icon-button" type="button" aria-label={t("Close profile","Đóng hồ sơ")} disabled={!!busy} onClick={close}><X/></button></header>
+ return <EditorModal workspaceKey="staff-profile" contentClassName="staff-profile-workspace" closeDisabled={!!busy} title={t("Your staff profile","Hồ sơ nhân viên của bạn")} subtitle="GARY HOME" close={close}>
   <section className="staff-photo-editor"><span className="staff-profile-photo">{photo?<img src={photo} alt=""/>:<Camera size={29}/>}</span><div><strong>{staffProfile?.display_name||user?.email}</strong><p>{t("This photo syncs with your team account and linked listing profiles.","Ảnh này đồng bộ với tài khoản nhân viên và hồ sơ tin đăng được liên kết.")}</p><label className="upload-label">{busy==="photo"?<LoaderCircle className="spin" size={16}/>:<Camera size={16}/>} {t("Change profile photo","Đổi ảnh hồ sơ")}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={!!busy} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file);event.target.value="";}}/></label><small>JPG · PNG · WebP · AVIF · 2 MB</small></div></section>
   {photoToast&&<SwipeToast hostClassName="staff-profile-toast" dismiss={()=>setPhotoToast(false)} dismissLabel={t("Dismiss notification","Đóng thông báo")} actionsLabel={t("Notification actions","Thao tác thông báo")} releaseLabel={t("Release to dismiss","Thả tay để đóng thông báo")}><CheckCircle2 size={18}/><span>{t("Profile photo updated. Linked listing profiles use this photo too.","Đã cập nhật ảnh hồ sơ. Hồ sơ tin đăng được liên kết cũng sử dụng ảnh này.")}</span></SwipeToast>}
-  <form className="enquiry-form staff-password-form" onSubmit={saveChanges}><h3>{t("Change password","Đổi mật khẩu")}</h3><p className="small muted" id="staff-password-help">{t("Leave both fields blank to keep your current password.","Để trống cả hai ô nếu bạn muốn giữ mật khẩu hiện tại.")}</p><label>{t("New password","Mật khẩu mới")}<PasswordInput inputProps={{"name":"password","aria-describedby":"staff-password-help","autoComplete":"new-password","minLength":12,"maxLength":128,"value":password,"disabled":!!busy,"onChange":event=>setPassword(event.target.value)}}/></label><label>{t("Confirm password","Xác nhận mật khẩu")}<input name="confirm_password" type="password" aria-describedby="staff-password-help" autoComplete="new-password" minLength={12} maxLength={128} value={confirm} disabled={!!busy} onChange={event=>setConfirm(event.target.value)}/></label>{error&&<p className="form-error" role="alert">{error}</p>}<button className="button" disabled={!!busy||photoFailed}>{busy==="password"?<LoaderCircle className="spin" size={16}/>:<Save size={16}/>} {t("Save changes","Lưu thay đổi")}</button></form>
- </dialog>;
+  <form className="enquiry-form staff-password-form" onSubmit={saveChanges}><h3>{t("Change password","Đổi mật khẩu")}</h3><p className="small muted" id="staff-password-help">{t("Leave both fields blank to keep your current password.","Để trống cả hai ô nếu bạn muốn giữ mật khẩu hiện tại.")}</p><label>{t("New password","Mật khẩu mới")}<PasswordInput inputProps={{"name":"password","aria-describedby":"staff-password-help","autoComplete":"new-password","minLength":12,"maxLength":128,"value":password,"disabled":!!busy,"onChange":event=>setPassword(event.target.value)}}/></label><label>{t("Confirm password","Xác nhận mật khẩu")}<input name="confirm_password" type="password" aria-describedby="staff-password-help" autoComplete="new-password" minLength={12} maxLength={128} value={confirm} disabled={!!busy} onChange={event=>setConfirm(event.target.value)}/></label>{error&&<p className="form-error" role="alert">{error}</p>}<footer className="gw-editor-actions"><button type="button" className="button button-outline" disabled={!!busy} onClick={close}>{t("Cancel","Hủy")}</button><button className="button" disabled={!!busy||photoFailed}>{busy==="password"?<LoaderCircle className="spin" size={16}/>:<Save size={16}/>} {t("Save changes","Lưu thay đổi")}</button></footer></form>
+ </EditorModal>;
 }

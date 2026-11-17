@@ -37,26 +37,25 @@ export function validateEntry(record, collection, publish = false) {
   // A missing new title is reported on its visible title field, not a hidden URL field.
   if ((!automatic || slug) && (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 180)) issue('cms-slug', 'slug', { slug });
   if (!String(record.title_en || '').trim() && !String(record.title_vi || '').trim()) issue('cms-title-missing', 'title_en', { language: 'en / vi' });
-  for (const locale of LOCALES) {
-    if (publish) {
-      for (const field of ['title', 'summary', ...(collection.requireBody === false ? [] : ['body'])]) {
-        const value = String(record[`${field}_${locale}`] || '').trim(), minimum = collection.publishMinimums?.[field] || 1;
-        if (!value) issue(`cms-${field}-missing`, `${field}_${locale}`, { language: locale });
-        else if ([...value].length < minimum) issue('cms-text-too-short', `${field}_${locale}`, { minimum, count: [...value].length, language: locale });
-      }
+  if (publish) {
+    const requiredText = collection.publishTextFields || LOCALES.flatMap(locale => ['title', 'summary', ...(collection.requireBody === false ? [] : ['body'])].map(field => `${field}_${locale}`));
+    for (const key of requiredText) {
+      const [field, locale] = key.split('_'), value = String(record[key] || '').trim(), minimum = collection.publishMinimums?.[field] || 1;
+      if (!value) { if (!issues.some(item => item.field === key)) issue(`cms-${field}-missing`, key, {language: locale}); }
+      else if ([...value].length < minimum) issue('cms-text-too-short', key, {minimum, count: [...value].length, language: locale});
     }
   }
   for (const field of fieldsFor(collection)) {
     const value = getValue(record, field.key);
-    if (publish && field.required && (value === '' || value === null || value === undefined || Array.isArray(value) && !value.length)) issue('cms-field-required', field.key, { field: field.label?.en || field.key, language: field.locale || '' });
-    if (value !== '' && value !== undefined && value !== null) {
+    if (publish && field.required && (value === null || value === undefined || typeof value === 'string' && !value.trim() || Array.isArray(value) && !value.length)) issue('cms-field-required', field.key, { field: field.label?.en || field.key, language: field.locale || '' });
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
       const text = String(value).trim();
       if (publish && field.minLength !== undefined && [...text].length < field.minLength) issue('cms-text-too-short', field.key, {minimum: field.minLength, count: [...text].length, language: field.locale || ''});
       if (field.maxLength !== undefined && [...text].length > field.maxLength) issue('cms-text-too-long', field.key, {maximum: field.maxLength, count: [...text].length, language: field.locale || ''});
       if (publish && field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) issue('cms-email-invalid', field.key);
       if (field.type === 'url' && !safeMediaUrl(String(value))) issue('cms-url-invalid', field.key);
       if (field.type === 'number' && (!Number.isFinite(Number(value)) || field.min !== undefined && Number(value) < field.min || field.max !== undefined && Number(value) > field.max)) issue('cms-number-invalid', field.key);
-      if (field.type === 'select' && !field.options?.some(option => String(typeof option === 'object' ? option.value : option) === String(value))) issue('cms-option-invalid', field.key);
+      if (field.type === 'select' && (publish || !field.allowUnknownDraft) && !(field.preservePublished && record.published_at && !field.excludedValues?.includes(String(value))) && !field.options?.some(option => String(typeof option === 'object' ? option.value : option) === String(value))) issue('cms-option-invalid', field.key);
       if (field.type === 'date') {
         const parsed = new Date(text + 'T00:00:00Z'), valid = /^\d{4}-\d{2}-\d{2}$/.test(text) && Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === text;
         if (!valid) issue('cms-date-invalid', field.key);
@@ -74,6 +73,6 @@ export function contentSeoFindings(record, collection) {
     if (title && (title.length < 20 || title.length > 65)) issues.push({ id: `cms-title-length:${locale}`, code: 'cms-seo-title-length', params: { language: locale, count: title.length }, severity: 'warning', category: 'content' });
     if (description && (description.length < 70 || description.length > 170)) issues.push({ id: `cms-description-length:${locale}`, code: 'cms-seo-description-length', params: { language: locale, count: description.length }, severity: 'warning', category: 'content' });
   }
-  if (!issues.some(issue => issue.severity === 'critical')) issues.push({ id: 'cms-translation-complete', code: 'cms-translation-complete', params: {}, severity: 'passed', category: 'content' });
+  if (!issues.some(issue => issue.severity === 'critical')) issues.push({ id: 'cms-translation-complete', code: collection.publishTextFields ? 'cms-publication-ready' : 'cms-translation-complete', params: {}, severity: 'passed', category: 'content' });
   return issues;
 }

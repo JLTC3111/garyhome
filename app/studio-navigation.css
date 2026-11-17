@@ -61,6 +61,13 @@
 .admin-sidebar-bottom small{font-size:10px;color:#4f654e}
 .admin-sidebar-bottom .staff-profile-trigger{width:36px;height:36px;min-width:36px;min-height:36px;aspect-ratio:1;flex:0 0 36px;align-self:center;border-radius:50%;padding:0}
 .admin-sidebar-bottom .staff-profile-trigger>img{display:block;width:100%;height:100%;aspect-ratio:1;object-fit:cover;object-position:center;border-radius:50%}
+.admin-sidebar-bottom .admin-sidebar-signout{position:relative;overflow:visible;flex:none;width:32px;height:32px;color:#243c31}
+.admin-sidebar-bottom .admin-sidebar-signout>svg{position:relative;z-index:1}
+.admin-sidebar-bottom .admin-sidebar-signout::before{content:"";position:absolute;inset:0;border:2px solid currentColor;border-radius:inherit;opacity:0;pointer-events:none}
+.admin-sidebar-bottom .admin-sidebar-signout:hover:not(:disabled)::before,.admin-sidebar-bottom .admin-sidebar-signout:focus-visible::before{animation:admin-signout-ping 1s cubic-bezier(0,0,.2,1) infinite}
+.admin-sidebar-bottom .admin-sidebar-signout::after{content:attr(data-tooltip);position:absolute;z-index:2;left:calc(100% + 10px);top:50%;padding:5px 8px;border-radius:6px;background:#243c31;color:#f7f4ea;font:600 11px/1.3 var(--sans);letter-spacing:0;white-space:nowrap;pointer-events:none;opacity:0;visibility:hidden;transform:translateY(-50%)}
+.admin-sidebar-bottom .admin-sidebar-signout:hover:not(:disabled)::after,.admin-sidebar-bottom .admin-sidebar-signout:focus-visible::after{opacity:1;visibility:visible}
+@keyframes admin-signout-ping{0%{transform:scale(1);opacity:.7}75%,100%{transform:scale(1.75);opacity:0}}
 .admin-page-heading h1{font-family:var(--sans);font-size:clamp(28px,2.8vw,40px);font-weight:600;letter-spacing:-.045em;line-height:1.28}
 .admin-page-heading p{font-size:13px;line-height:1.75;color:#50624f}
 .team-directory-tools{display:flex;align-items:center;gap:12px}
@@ -88,4 +95,4 @@
  .branched-menu__lines{display:none}.admin-sidebar-bottom{padding-top:8px}.admin-sidebar-resize,.admin-sidebar-collapse{display:none}.admin-page-heading p{font-size:12px;max-width:none}
  .team-directory-tools .button{font-size:11px;min-height:38px}.team-member>.team-avatar{inline-size:46px;block-size:46px;min-inline-size:46px;max-inline-size:46px;min-block-size:46px;max-block-size:46px;flex-basis:46px}
 }
-@media(prefers-reduced-motion:reduce){.branched-menu__body,.branched-menu__reach,.branched-menu__chevron,.admin-sidebar,.admin-main,.admin-sidebar-resize,.admin-sidebar-collapse{transition:none}}
+@media(prefers-reduced-motion:reduce){.branched-menu__body,.branched-menu__reach,.branched-menu__chevron,.admin-sidebar,.admin-main,.admin-sidebar-resize,.admin-sidebar-collapse,.admin-sidebar-signout::after{transition:none}.admin-sidebar-bottom .admin-sidebar-signout:hover:not(:disabled)::before,.admin-sidebar-bottom .admin-sidebar-signout:focus-visible::before{animation:none;opacity:.85;transform:none}}

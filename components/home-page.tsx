@@ -59,7 +59,8 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
           </div>
         </div>
         <div className="hero-visual">
-          <ContentImage className="hero-photo" src={content.settings.hero_image} alt={t("Light-filled Gary Home apartment with a dining area and leafy views in Tây Hồ", "Căn hộ Gary Home đầy ánh sáng, có bàn ăn và tầm nhìn xanh tại Tây Hồ")} width={900} height={680} sizes="(max-width: 900px) 100vw, 50vw" loading="eager" fetchPriority="high"/>
+          <ContentImage className="hero-photo home-hero-photo-light" src={content.settings.hero_image} alt={t("Light-filled Gary Home apartment with a dining area and leafy views in Tây Hồ", "Căn hộ Gary Home đầy ánh sáng, có bàn ăn và tầm nhìn xanh tại Tây Hồ")} width={900} height={680} sizes="(max-width: 900px) 100vw, 50vw" loading="eager" fetchPriority="high"/>
+          <ContentImage className="hero-photo home-hero-photo-dark" src="/images/apartments/hanoi-after-dark.jpg" alt={t("Apartment living room overlooking the city at dusk", "Phòng khách căn hộ nhìn ra thành phố lúc chạng vạng")} width={1536} height={1024} sizes="(max-width: 900px) 100vw, 50vw" loading="lazy"/>
           <div className="hero-photo-label"><span className="live-dot"/>{t("A LITTLE PIECE OF HANOI", "MỘT GÓC NHỎ HÀ NỘI")}</div>
           <div className="hero-note"><span className="hero-note-icon"><Home size={21}/></span><span>{t("More than an address.", "Hơn một địa chỉ.")}<strong>{t("A place to belong.", "Là nơi thuộc về.")}</strong></span><svg viewBox="0 0 54 44" aria-hidden="true"><path d="M2 39C18 44 40 29 39 12c-1-13-15-14-17-4-3 14 18 22 28 11m-9-2 10 1-2 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg></div>
         </div>

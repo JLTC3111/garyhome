@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "./localized-link";
 import { usePathname } from "next/navigation";
 import { unlocalizedPath } from "@/lib/localized-routes";
+import { STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
 import { ArrowUpRight, ChevronDown, Menu, X, Phone, MapPin, UserRound, ShieldCheck } from "lucide-react";
 import { useSite } from "./site-context";
 import { CurrencyNotice } from "./currency-switcher";
@@ -13,10 +14,10 @@ import { FavouritesDropdown } from "./favourites-dropdown";
 import { FloatingContact } from "./listing-author";
 import { ServiceAppsMenu } from "./service-apps";
 
-export function Brand({light=false}:{light?:boolean}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href="/" aria-label={t("Gary Home homepage","Trang chủ Gary Home")}><ContentImage src="/images/brand/gary-home-logo.png" alt="Gary Home" width={220} height={64} sizes="(max-width: 640px) 193px, 220px" loading="eager"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></Link>;}
+export function Brand({light=false,href="/"}:{light?:boolean;href?:string}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href={href} aria-label={t("Gary Home homepage","Trang chủ Gary Home")}><ContentImage src="/images/brand/gary-home-logo.png" alt="Gary Home" width={220} height={64} sizes="(max-width: 640px) 193px, 220px" loading="eager"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></Link>;}
 function HeaderPortals({mobile=false,onFollow}:{mobile?:boolean;onFollow:()=>void}){
  const {t}=useSite();
- return <><Link className={`customer-login-link ${mobile?"":"desktop-band-control"}`} href="/account" onClick={onFollow} aria-label={t("Customer Login","Đăng nhập khách hàng")}><UserRound size={mobile?18:14}/><span>{t("Customer Login","Đăng nhập khách hàng")}</span></Link><Link className={`staff-login-link ${mobile?"":"desktop-band-control"}`} href="/admin" onClick={onFollow} aria-label={t("Staff Login","Đăng nhập nhân viên")}><ShieldCheck size={mobile?18:14}/><span>{t("Staff Login","Đăng nhập nhân viên")}</span></Link></>;
+ return <><Link className={`customer-login-link ${mobile?"":"desktop-band-control"}`} href="/account" onClick={onFollow} aria-label={t("Customer Login","Đăng nhập khách hàng")}><UserRound size={mobile?18:14}/><span>{t("Customer Login","Đăng nhập khách hàng")}</span></Link><Link className={`staff-login-link ${mobile?"":"desktop-band-control"}`} href={`${STAFF_PORTAL_ORIGIN}/admin`} onClick={onFollow} aria-label={t("Staff Login","Đăng nhập nhân viên")}><ShieldCheck size={mobile?18:14}/><span>{t("Staff Login","Đăng nhập nhân viên")}</span></Link></>;
 }
 export function Header(){
  const {t,content}=useSite(),path=unlocalizedPath(usePathname());
@@ -71,7 +72,7 @@ export function Footer(){
  const account:FooterItem[]=[
   {href:"/saved",label:t("My Favourites","Nhà yêu thích")},
   {href:"/account",label:t("Customer portal","Cổng khách hàng")},
-  {href:"/admin",label:t("Staff portal","Cổng nhân viên")},
+  {href:`${STAFF_PORTAL_ORIGIN}/admin`,label:t("Staff portal","Cổng nhân viên")},
  ];
  const contact:FooterItem[]=[
   {href:`tel:${s.contact_phone.replace(/[^+\d]/g,"")}`,label:s.contact_phone,icon:Phone},

@@ -1122,7 +1122,7 @@ const TechTextContent = ({
     intersectionObserver?.observe(container);
     const themeObserver = typeof MutationObserver === 'function' ? new MutationObserver(wake) : null;
     for (const node of [document.documentElement, document.body]) {
-      if (node) themeObserver?.observe(node, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] });
+      if (node) themeObserver?.observe(node, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-home-theme', 'data-home-public'] });
     }
     const schemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
     schemeQuery?.addEventListener?.('change', wake);

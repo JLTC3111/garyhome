@@ -12,6 +12,13 @@ export function setValue(record, key, value) {
 export function emptyEntry(kind) {
   return { kind, slug: '', title_en: '', title_vi: '', summary_en: '', summary_vi: '', body_en: '', body_vi: '', seo_title_en: '', seo_title_vi: '', seo_description_en: '', seo_description_vi: '', data: {}, status: 'draft', version: 0 };
 }
+/** A title-derived URL name. The application adapter resolves uniqueness on save. */
+export function titleSlug(record) {
+  const titles = [record.title_en, record.title_vi].map(value => String(value || '').trim());
+  if (!titles.some(Boolean)) return '';
+  const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 150).replace(/-$/g, '');
+  return titles.map(normalize).find(Boolean) || normalize(String(record.kind || 'content')) || 'content';
+}
 export function fieldsFor(collection) {
   return (collection.fields || []).flatMap(field => field.bilingual
     ? LOCALES.map(locale => ({ ...field, key: `data.${field.key}_${locale}`, locale, bilingual: false }))
@@ -25,12 +32,17 @@ export function safeMediaUrl(value) {
 export function validateEntry(record, collection, publish = false) {
   const issues = [];
   const issue = (code, field, params = {}) => issues.push({ code, field, params, severity: 'critical' });
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(record.slug || '') || record.slug.length > 180) issue('cms-slug', 'slug', { slug: record.slug || '' });
+  const automatic = collection.automaticSlug && !record.id;
+  const slug = automatic ? titleSlug(record) : record.slug || '';
+  // A missing new title is reported on its visible title field, not a hidden URL field.
+  if ((!automatic || slug) && (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 180)) issue('cms-slug', 'slug', { slug });
   if (!String(record.title_en || '').trim() && !String(record.title_vi || '').trim()) issue('cms-title-missing', 'title_en', { language: 'en / vi' });
   for (const locale of LOCALES) {
     if (publish) {
       for (const field of ['title', 'summary', ...(collection.requireBody === false ? [] : ['body'])]) {
-        if (!String(record[`${field}_${locale}`] || '').trim()) issue(`cms-${field}-missing`, `${field}_${locale}`, { language: locale });
+        const value = String(record[`${field}_${locale}`] || '').trim(), minimum = collection.publishMinimums?.[field] || 1;
+        if (!value) issue(`cms-${field}-missing`, `${field}_${locale}`, { language: locale });
+        else if ([...value].length < minimum) issue('cms-text-too-short', `${field}_${locale}`, { minimum, count: [...value].length, language: locale });
       }
     }
   }
@@ -38,10 +50,18 @@ export function validateEntry(record, collection, publish = false) {
     const value = getValue(record, field.key);
     if (publish && field.required && (value === '' || value === null || value === undefined || Array.isArray(value) && !value.length)) issue('cms-field-required', field.key, { field: field.label?.en || field.key, language: field.locale || '' });
     if (value !== '' && value !== undefined && value !== null) {
+      const text = String(value).trim();
+      if (publish && field.minLength !== undefined && [...text].length < field.minLength) issue('cms-text-too-short', field.key, {minimum: field.minLength, count: [...text].length, language: field.locale || ''});
+      if (field.maxLength !== undefined && [...text].length > field.maxLength) issue('cms-text-too-long', field.key, {maximum: field.maxLength, count: [...text].length, language: field.locale || ''});
+      if (publish && field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) issue('cms-email-invalid', field.key);
       if (field.type === 'url' && !safeMediaUrl(String(value))) issue('cms-url-invalid', field.key);
       if (field.type === 'number' && (!Number.isFinite(Number(value)) || field.min !== undefined && Number(value) < field.min || field.max !== undefined && Number(value) > field.max)) issue('cms-number-invalid', field.key);
       if (field.type === 'select' && !field.options?.some(option => String(typeof option === 'object' ? option.value : option) === String(value))) issue('cms-option-invalid', field.key);
-      if (field.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) issue('cms-date-invalid', field.key);
+      if (field.type === 'date') {
+        const parsed = new Date(text + 'T00:00:00Z'), valid = /^\d{4}-\d{2}-\d{2}$/.test(text) && Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === text;
+        if (!valid) issue('cms-date-invalid', field.key);
+        else if (publish && field.minDate && text < (field.minDate === 'today' ? new Date().toISOString().slice(0, 10) : field.minDate)) issue('cms-date-past', field.key, {minimum: field.minDate});
+      }
     }
   }
   return issues;

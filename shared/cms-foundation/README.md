@@ -43,6 +43,8 @@ An adapter supplies:
 
 Record fields and type declarations are in `index.d.ts`. Custom collection fields support `data.*` paths or bilingual declarations that expand to `data.<key>_en` and `_vi`. `requireBody:false` is available for taxonomy/profile collections. Publication requires complete bilingual content; server-side app validation remains authoritative.
 
+Collections may opt into `automaticSlug:true` and a `publicPath` such as `/jobs/`. This removes the manual Page Address control and derives a new draft's URL name with `titleSlug(record)` from its English title, falling back to Vietnamese. Existing saved URL names remain stable. The application's adapter must resolve duplicate names and return the persisted name; the shared UI does not reserve URLs or override database uniqueness and permissions. Manual-address collections retain their existing behavior. This optional policy is pinned in the Jobs release independently of Agency's existing copy.
+
 Saving never implies publication. Each application maintains a separate public snapshot, so editing or restoring a draft does not remove or alter the live copy. Shared UI handles stale-version errors without discarding the draft. Media policy is app-specific; editorial images must never be mixed with private visa documents or candidate CVs. This release deliberately omits destructive media deletion until usage tracking exists.
 
 ## SEO findings

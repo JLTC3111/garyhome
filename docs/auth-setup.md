@@ -15,7 +15,7 @@ Use project **`duyiihsmaqfgwezmsnjs`**. Confirm the project ID before editing it
 1. Ensure the CMS and customer portal migrations are applied. For an existing project, apply the existing [staff access migration](../supabase/migrations/20261022042327_customer_social_auth_staff_access.sql) after the earlier migrations. Its applied filename is retained; its SQL defines staff domains, membership and role management. After the existing migrations, apply [the Gmail, inbox and deletion migration](../supabase/migrations/20261024173814_staff_gmail_inbox_and_deletion_controls.sql) once to an existing project. Fresh projects can use `supabase/setup.sql`, then `supabase/owner.sql` after creating and confirming the owner user. Do not run the full setup file over an existing database.
 2. In [Authentication → Sign In / Providers](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/providers), enable **Email**, email/password signup and email confirmation. Keep other sign-in methods disabled. Hosted settings are managed in the dashboard; changing the repository's local configuration does not update the hosted project.
 3. Configure production email delivery/SMTP for confirmations, password recovery and staff invitations. Use the prepared Gary Home invitation and recovery templates described below. Other email types can retain their normal Supabase confirmation links.
-4. In [URL Configuration](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration), set **Site URL** to the website origin currently in use. The local preview uses `http://127.0.0.1:3000`; production uses the actual deployed HTTPS origin.
+4. In [URL Configuration](https://supabase.com/dashboard/project/duyiihsmaqfgwezmsnjs/auth/url-configuration), set **Site URL** to `https://www.garyhome.vn`. The local preview uses `http://127.0.0.1:3000`. Customer sign-in and customer password recovery stay on the www origin. Do not change Site URL to the staff host.
 5. Add these exact local **Redirect URLs** for the origins you use:
 
    ```text
@@ -27,7 +27,19 @@ Use project **`duyiihsmaqfgwezmsnjs`**. Confirm the project ID before editing it
    http://localhost:3000/auth/invite
    ```
 
-   At deployment, add the same three paths under the actual production HTTPS origin. The routes handle signup confirmation, password recovery and staff password setup respectively. Remove obsolete application redirect entries from the hosted allow list.
+   At deployment, keep the www account, reset and invite URLs, and add the staff portal recovery URLs. Staff password email uses the staff origin, so Supabase rejects those messages until these exact URLs are allowed:
+
+   ```text
+   https://www.garyhome.vn/account
+   https://www.garyhome.vn/auth/reset
+   https://www.garyhome.vn/auth/invite
+   https://www.garyhome.vn/auth/callback
+   https://staff.garyhome.vn/auth/reset
+   https://staff.garyhome.vn/auth/invite
+   https://staff.garyhome.vn/auth/callback
+   ```
+
+   The routes handle signup confirmation, password recovery and staff password setup respectively. Remove obsolete application redirect entries from the hosted allow list. Customer recovery links stay on www.
 6. Set the app's existing `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the ignored `.env` file and the production runtime. For new staff invitations, also set the server-only `SUPABASE_SECRET_KEY`. The legacy `SUPABASE_SERVICE_ROLE_KEY` is supported as a server-only fallback. Never prefix a secret with `NEXT_PUBLIC_` or `VITE_`, commit it, or share it in chat. Restart the development server after environment changes.
 
 Hosting audience and platform access controls are separate from these application accounts.

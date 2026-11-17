@@ -16,6 +16,7 @@ import { PropertyCard } from "./property-card";
 import { request } from "@/lib/requests";
 import { appointmentLabel, customerError, ENQUIRY_FIELDS, enquiryLabel } from "@/lib/customer-data";
 import type { CustomerEnquiry, CustomerProfile } from "@/lib/types";
+import { STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
 
 type AccountTab = "overview" | "saved" | "enquiries" | "viewings" | "profile" | "submissions" | "help";
 type Draft = { userId: string; value: CustomerProfile } | null;
@@ -100,7 +101,7 @@ function CustomerAuth() {
         </form>}
       <div className="account-help"><ShieldCheck size={16}/><p>{t("Your account is personal. Your details are shared only with the Gary Home team.", "Tài khoản dành riêng cho bạn. Thông tin chỉ được chia sẻ với đội ngũ Gary Home.")}</p></div>
       <a className="text-link" href={`mailto:${content.settings.contact_email}`}>{t("Need a hand? We’re here.", "Cần hỗ trợ? Chúng tôi luôn ở đây.")}<ArrowUpRight size={15}/></a>
-      <Link className="account-team-link portal-other-link" href="/admin"><ShieldCheck size={19}/><span><strong>{t("Are you a staff member?", "Bạn là nhân viên Gary Home?")}</strong><small>{t("Use staff login with your assigned company account", "Đăng nhập nhân viên bằng tài khoản công ty được cấp")}</small></span><ArrowUpRight size={17}/></Link>
+      <Link className="account-team-link portal-other-link" href={`${STAFF_PORTAL_ORIGIN}/admin`}><ShieldCheck size={19}/><span><strong>{t("Are you a staff member?", "Bạn là nhân viên Gary Home?")}</strong><small>{t("Use staff login with your assigned company account", "Đăng nhập nhân viên bằng tài khoản công ty được cấp")}</small></span><ArrowUpRight size={17}/></Link>
     </div>
   </section>;
 }
@@ -213,7 +214,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
     <div className="account-heading"><div><div className="eyebrow">{t("CUSTOMER PORTAL", "CỔNG KHÁCH HÀNG")}</div><h1>{firstName ? t(`Hello, ${firstName}.`, `Xin chào, ${firstName}.`) : t("A little closer to home.", "Gần hơn với tổ ấm.")}</h1><p>{t("Your saved homes, enquiries and viewing plans.", "Nhà đã lưu, yêu cầu và kế hoạch xem nhà của bạn.")}</p></div><Link href="/homes" className="button button-outline">{t("Keep exploring", "Tiếp tục tìm nhà")}<ArrowUpRight size={17}/></Link></div>
     <div className="account-layout"><aside className="account-sidebar"><div className="account-person"><span className="avatar">{(firstName||user.email||"G")[0].toUpperCase()}</span><div><strong>{profile?.full_name || defaultProfile.full_name || t("Your account", "Tài khoản của bạn")}</strong><small>{user.email}</small></div></div>
       <nav aria-label={t("Customer account", "Tài khoản khách hàng")}><AnimatedBackground activeValue={tab}>{tabs.map(([id, label, Icon]) => <button key={id} data-id={id} className={tab === id ? "selected" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}><Icon size={18}/>{label}{id === "saved" && savedReady && <span>{saved.length}</span>}</button>)}</AnimatedBackground></nav>
-      <div className="account-sidebar-bottom">{editor && <Link href="/admin"><ShieldCheck size={16}/>{t("Open staff Studio", "Mở Studio nhân viên")}<ArrowUpRight size={14}/></Link>}<button onClick={() => void signOut()} disabled={!!busy}><LogOut size={16}/>{t("Sign out", "Đăng xuất")}</button></div>
+      <div className="account-sidebar-bottom">{editor && <Link href={`${STAFF_PORTAL_ORIGIN}/admin`}><ShieldCheck size={16}/>{t("Open staff Studio", "Mở Studio nhân viên")}<ArrowUpRight size={14}/></Link>}<button onClick={() => void signOut()} disabled={!!busy}><LogOut size={16}/>{t("Sign out", "Đăng xuất")}</button></div>
     </aside><div className="account-main">
       <div className="account-section-heading"><div><div className="eyebrow">{t("A SPACE OF YOUR OWN", "KHÔNG GIAN RIÊNG CỦA BẠN")}</div><h2>{tabs.find(([id]) => id === tab)?.[1]}</h2></div><button className="text-link" disabled={loading || !!busy} onClick={() => void refreshAccount()}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button></div>
       {error && <div className="form-error" role="alert">{error}</div>}

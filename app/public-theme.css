@@ -1,0 +1,125 @@
+/* Hanoi After Dark. Light styling remains owned by the existing stylesheets.
+   Semantic palette and public-only bridges live here; photographs are never
+   filtered, recolored, or covered by a new theme overlay. */
+.home-hero-photo-dark{display:none}
+.contact-widget-night-art{display:none;position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.home-theme-hint{font-size:10px;line-height:1.7;color:var(--muted);margin-top:10px}
+.site-preferences-panel .home-theme-options{--segment-font:11px;--segment-padding:7px}
+.home-theme-options .rubber-segment__item{gap:5px}
+html[data-home-public="true"][data-home-theme="light"]{color-scheme:light}
+
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"]{
+  color-scheme:dark;
+  --home-background:#121c17;
+  --home-surface:#203027;
+  --home-elevated:#2e4034;
+  --home-text:#f4f0e6;
+  --home-secondary:#b9c7b6;
+  --home-quiet:#a9b8a5;
+  --home-accent:#c7d6b6;
+  --home-copper:#c9a588;
+  --home-border:#53654f;
+  --home-field-border:#7a8e70;
+  --home-action-ink:#16261a;
+  --home-action-hover:#d9e3cb;
+  --home-danger:#f4b9a8;
+  --home-danger-surface:#3a2724;
+  --home-header:#121c17f5;
+  --home-scrim:#08100be6;
+  --home-shadow:0 12px 36px #050b073d;
+  --home-shine-soft:#c7d6b626;
+  --home-shine-peak:#c9a58870;
+  --ink:var(--home-text);
+  --green:var(--home-accent);
+  --olive:var(--home-accent);
+  --orange:var(--home-copper);
+  --paper:var(--home-background);
+  --warm:var(--home-surface);
+  --line:var(--home-border);
+  --muted:var(--home-secondary);
+  --navy:var(--home-text);
+  --navy-deep:var(--home-elevated);
+}
+
+/* The explicit presence + value checks give this public theme bridge a
+   consistent specificity above legacy four-class color rules. All rules share
+   that baseline; component states stay ordered without !important. */
+
+/* Main canvas, editorial hierarchy and navigation. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] body{background:var(--home-background);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(h1,h2,h3,h4,strong,a,button,dd){color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(p,small,dt,figcaption,.muted,.breadcrumbs,.about-breadcrumb,.property-address,.property-specs,.property-kicker,.rental-term-note,.field-help,.field-optional,.form-fineprint,.article-date,.news-meta,.service-number,.guide-card-top,.district-page-status,.rental-requirements-hint,.rental-search-secondary>label,.rental-search .search-field>span,.rental-room-choice>span,.rental-advanced-budget>span,.rental-id>span,.listing-author-person small,.price small){color:var(--home-secondary)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.eyebrow,.text-link,.hero-location,.hero-headline-accent,.rental-search-heading h2,.rental-card-bottom .price strong,.vinhomes-rent,.rental-facilities svg,.service-title>svg,.landlord-steps>section>svg,.commercial-consultancy-grid>article>svg,.home-theme-hint){color:var(--home-accent)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(section,article,aside,fieldset,details,hr,li,table,td,th){border-color:var(--home-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(a,button,summary,input,select,textarea):focus-visible{outline-color:var(--home-accent)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(a:not(.button):hover,.text-link:hover,.rental-site-header .main-nav>a.header-feedback:hover){color:var(--home-copper)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-header,.rental-site-header .top-strip,.rental-site-header .header-nav,.rental-site-header .main-nav){background:var(--home-header);border-color:var(--home-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-site-header .main-nav>a,.district-navigation>button,.about-navigation>button,.rental-band-contact>.top-strip-phone,.favourites-trigger,.rental-brand .brand-tagline,.rental-site-header .top-strip-actions>.staff-login-link,.rental-site-header .top-strip-actions>.customer-login-link){color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-band-contact>.top-strip-phone svg,.hero-location svg,.hero-note>svg,.rental-area-card svg){color:var(--home-copper)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.back-navigation,.rental-requirements-trigger,.favourites-trigger>strong,.site-preferences-trigger){border-color:var(--home-border);background:var(--home-surface);color:var(--home-accent)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-preferences-trigger:hover,.site-preferences-trigger[aria-expanded=true],.back-navigation:hover,.icon-button:hover,.district-dropdown>a:hover,.about-dropdown>a:hover,.about-dropdown>a:focus-visible){background:var(--home-elevated);color:var(--home-text);border-color:var(--home-field-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.district-dropdown,.about-dropdown,.favourites-panel,.site-preferences-panel){background:var(--home-surface);color:var(--home-text);border-color:var(--home-border);box-shadow:var(--home-shadow)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.about-dropdown>a,.favourites-panel li small,.rental-site-header .mobile-nav-portals>.staff-login-link){color:var(--home-secondary)}
+
+/* Existing curved hero, with the supplied natural evening image in dark only. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .restored-hero{background:var(--home-background)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .home-hero-photo-light{display:none}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .home-hero-photo-dark{display:block}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.restored-hero .hero-copy h1,.hero-note strong){color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.hero-copy>p,.restored-hero .hero-collection,.hero-note>span:nth-child(2),.popular-search,.popular-search a){color:var(--home-secondary)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.hero-note,.hero-photo-label){background:var(--home-surface);border-color:var(--home-border);color:var(--home-text);box-shadow:var(--home-shadow)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .restored-hero .hero-note-icon{background:var(--home-elevated);color:var(--home-accent)}
+
+/* Residential surfaces. Existing geometry, spacing and responsive grids stay. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.search-box,.rental-search,.catalogue-filters,.rental-search .search-fields>.search-field,.rental-property-card,.rental-area-card,.rental-info-panel,.listing-author-card,.contact-form-card,.landlord-form-card,.submission-panel,.feedback-review,.homepage-feedback-reviews .feedback-review,.news-card,.vinhomes-card,.vinhomes-project-facts,.commercial-consultancy-grid>article,.property-order-tools,.comparison-panel,.compare-tray,.contact-widget-single,.viewing-card){background:var(--home-surface);border-color:var(--home-border);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.neighbourhood-section,.bounce-district-section,.angled-district-section,.rental-area-section,.rental-home-contact,.contact-cta,.rental-guide-card,.article-sources,.vinhomes-project-enquiry,.commercial-consultancy,.catalogue-note,.rental-catalogue .catalogue-note,.activity-empty,.activity-photo-grid figure,.contact-enquiry-context,.rental-id,.rental-only-label,.form-info,.form-success>span,.feedback-staff-reply,.listing-author-card>h2,.author-portrait-placeholder,.photo-unavailable,.rental-photo-placeholder,.rental-gallery-empty,.empty-state,.contact-methods>a>span,.handwritten){background:var(--home-surface);border-color:var(--home-border);color:var(--home-secondary)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-guide-card:hover,.rental-guide-card:focus-visible,.news-card:hover,.rental-property-card:hover,.rental-area-card:hover){border-color:var(--home-field-border);box-shadow:var(--home-shadow)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-property-card .property-badges>span,.rental-property-card .property-badges>.property-code,.rental-property-card .save-button,.rental-card-photo-nav>button,.rental-gallery-count,.detail-gallery .gallery-all,.save-button,.compare-button,.category-tabs button,.activity-tabs>button,.active-filters button,.rental-catalogue .active-filters button,.district-pagination button){background:var(--home-elevated);border-color:var(--home-field-border);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-property-card .save-button.is-saved,.compare-button.is-compared,.category-tabs button.selected,.activity-tabs>button[aria-pressed=true],.district-pagination button[aria-current=page],.catalogue-filters .filter-toggle.selected){background:var(--home-accent);border-color:var(--home-accent);color:var(--home-action-ink)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.property-hotline-icon,.author-channels>a,.rental-viewing-form,.assistance-report){background:var(--home-elevated);color:var(--home-text);border-color:var(--home-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-viewing-form>p,.rental-viewing-form .field-optional,.rental-viewing-form .form-fineprint,.rental-viewing-form .enquiry-form label,.listing-author-card>p,.author-hotline,.rental-guide-article li,.commercial-consultancy li){color:var(--home-secondary)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-facts,.rental-facts>div,.rental-amenities-filter,.search-tabs,.footer-accordion,.landlord-file-list>li,.rental-inline-thumbs>button,.property-order-editor .icon-button){border-color:var(--home-border)}
+
+/* Fields and top-layer select popups inherit the same semantic palette. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),textarea,select,.site-select-trigger,.site-select-popup,.keyword-field){background:var(--home-surface);color:var(--home-text);border-color:var(--home-field-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(input,textarea)::placeholder{color:var(--home-quiet);opacity:1}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(input[type=checkbox],input[type=radio]){accent-color:var(--home-accent)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-select-trigger:hover,.site-select-option[data-highlighted],.landlord-form .landlord-upload){background:var(--home-elevated);border-color:var(--home-field-border);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-select-option[data-selected],.site-select-indicator,.site-select-chevron,.landlord-form legend){color:var(--home-accent)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .form-error{background:var(--home-danger-surface);color:var(--home-danger);border-color:var(--home-danger)}
+
+/* Primary, quiet and brand-recognizable actions, with AA text contrast. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.button,.rental-viewing-form .button,.assistance-report .customer-submission-form .button,.property-hotline,.rental-detail-actions>.rental-send-us,.mobile-contact-toggle,.skip-link){background:var(--home-accent);border-color:var(--home-accent);color:var(--home-action-ink)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.button:hover,.property-hotline:hover,.rental-detail-actions>.rental-send-us:hover,.mobile-contact-toggle:hover,.rental-viewing-form .button:hover){background:var(--home-action-hover);border-color:var(--home-action-hover);color:var(--home-action-ink)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.button-outline,.button.shiny-button){background:transparent;border-color:var(--home-accent);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.button-outline:hover,.button.shiny-button:hover){background:var(--home-elevated);border-color:var(--home-accent);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .button.shiny-button{--primary:var(--home-accent);--shine-soft:var(--home-shine-soft);--shine-peak:var(--home-shine-peak)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.author-channels>.whatsapp-link,.author-channels>.zalo-link){color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .contact-widget-single>a{color:var(--home-text);border-color:var(--home-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .contact-widget-desktop .contact-widget-art{display:none}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .contact-widget-night-art{display:block}
+
+/* Shared directory remains local styling only: destinations and logos stay. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-apps-directory,.gary-apps-menu){--gary-app-ink:var(--home-text);--gary-app-muted:var(--home-secondary);--gary-app-line:var(--home-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-card,.gary-apps-menu-panel,.gary-apps-menu>summary,.gary-apps-goals>a){background:var(--home-surface);border-color:var(--home-border);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-mark,.gary-app-visit,.gary-app-card[data-current=true] .gary-app-card-top>span:last-child,.gary-app-menu-item strong>small,.gary-apps-menu-panel .gary-apps-menu-all){background:var(--home-elevated);color:var(--home-accent)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-name,.gary-apps-eyebrow,.gary-app-card li>a,.gary-app-menu-host,.gary-apps-menu-travel,.gary-app-menu-item>svg){color:var(--home-secondary)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-apps-menu>summary:hover,.gary-app-menu-item:hover,.gary-apps-goals>a:hover){background:var(--home-elevated);border-color:var(--home-field-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-card ul,.gary-app-card li,.gary-apps-menu-heading,.gary-apps-menu-travel,.mobile-app-services){border-color:var(--home-border)}
+
+/* Footer, comparison and gallery overlays retain their established layouts. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-footer,.rental-footer,.mobile-bottom-nav){background:var(--home-background);border-color:var(--home-border);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-footer .footer-intro>p,.site-footer .footer-location,.site-footer .footer-top>div:not(:first-child)>a,.site-footer .footer-bottom,.site-footer .footer-note,.site-footer .footer-column>a,.site-footer .footer-accordion-links>a,.mobile-bottom-nav>a){color:var(--home-secondary)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-footer .footer-top>div>h3,.site-footer .footer-column>h3,.footer-accordion summary,.mobile-bottom-nav>a.active){color:var(--home-accent)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .comparison-panel{box-shadow:0 0 0 100vmax var(--home-scrim)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-lightbox,.photo-dialog){background:var(--home-background);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-lightbox,.photo-dialog)::backdrop{background:var(--home-scrim)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-preferences-options,.currency-switcher){--segment-track:var(--home-background);--segment-thumb:var(--home-elevated);--segment-text:var(--home-secondary);--segment-active-text:var(--home-text);--segment-border:var(--home-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .toast{background:var(--home-elevated);color:var(--home-text);border:1px solid var(--home-border)}
+
+@media(prefers-reduced-motion:reduce){
+  .home-theme-options .rubber-segment__item{transition:none}
+}
+@media(forced-colors:active){
+  .home-theme-options .rubber-segment__item{forced-color-adjust:auto}
+}

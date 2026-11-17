@@ -203,7 +203,7 @@ async function harness(t, options={}){
 test('portal chooser identifies both destinations without changing authentication',async t=>{
  const h=await harness(t,{guest:true,page:'portals'});
  assert.deepEqual(h.renderer.root.findAllByType('h2').map(node=>node.children.join('')),['Customer portal','Staff portal']);
- assert.deepEqual(h.renderer.root.findAllByType('a').map(node=>node.props.href),['/account','/admin']);
+ assert.deepEqual(h.renderer.root.findAllByType('a').map(node=>node.props.href),['/account','https://staff.garyhome.vn/admin']);
  assert.match(JSON.stringify(h.renderer.toJSON()),/personal email/);
  assert.match(JSON.stringify(h.renderer.toJSON()),/assigned by a higher-level team member/);
  await act(async()=>{h.site.setLanguage('vi');});
@@ -257,8 +257,8 @@ test('customer login identifies personal email and links to the separate staff p
  assert.equal(h.renderer.root.findByType('form').props['aria-label'],'Customer account access');
  assert.match(JSON.stringify(h.renderer.toJSON()),/Personal email address/);
  const selected=()=>h.renderer.root.findByProps({className:'portal-switcher'}).findAllByType('a').filter(node=>node.props['aria-current']==='page');
- assert.equal(selected().length,1);assert.equal(selected()[0].props.href,'/account');
- assert.equal(h.renderer.root.findByProps({className:'account-team-link portal-other-link'}).props.href,'/admin');
+ assert.equal(selected().length,1);assert.equal(selected()[0].props.href,'https://www.garyhome.vn/account');
+ assert.equal(h.renderer.root.findByProps({className:'account-team-link portal-other-link'}).props.href,'https://staff.garyhome.vn/admin');
  await act(async()=>{h.site.setLanguage('vi');});
  assert.equal(h.renderer.root.findByType('form').props['aria-label'],'Truy cập tài khoản khách hàng');
  assert.match(JSON.stringify(h.renderer.toJSON()),/Bạn là nhân viên/);
@@ -269,10 +269,10 @@ test('staff login explains assigned company or Gmail access, retains owner sign-
  assert.equal(h.renderer.root.findByType('form').props['aria-label'],'Staff account access');
  assert.match(JSON.stringify(h.renderer.toJSON()),/Use your assigned company or Gmail address/);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Staff email \/ owner account/);
- assert.equal(h.renderer.root.findByProps({className:'portal-other-link'}).props.href,'/account');
+ assert.equal(h.renderer.root.findByProps({className:'portal-other-link'}).props.href,'https://www.garyhome.vn/account');
  assert.equal(h.renderer.root.findAllByType('input').some(node=>node.props.name==='full_name'),false);
  const selected=h.renderer.root.findByProps({className:'portal-switcher'}).findAllByType('a').filter(node=>node.props['aria-current']==='page');
- assert.equal(selected.length,1);assert.equal(selected[0].props.href,'/admin');
+ assert.equal(selected.length,1);assert.equal(selected[0].props.href,'https://staff.garyhome.vn/admin');
  await act(async()=>{h.site.setLanguage('vi');});
  assert.equal(h.renderer.root.findByType('form').props['aria-label'],'Truy cập tài khoản nhân viên');
  await act(async()=>{await h.renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields:{email:'owner@protonmail.com',password:'Existing owner password'}}});await delay(5);});
@@ -284,7 +284,7 @@ test('a customer opening staff login receives a customer return link without sta
  const h=await harness(t,{customer:true,page:'staff'});
  assert.equal(h.renderer.root.findAllByType('form').length,0);
  assert.equal(h.renderer.root.findAllByProps({'aria-label':'CMS navigation'}).length,0);
- assert.equal(h.renderer.root.findByProps({className:'staff-account-choice'}).findByType('a').props.href,'/account');
+ assert.equal(h.renderer.root.findByProps({className:'staff-account-choice'}).findByType('a').props.href,'https://www.garyhome.vn/account');
  assert.match(JSON.stringify(h.renderer.toJSON()),/Sign out and use a staff account/);
  assert.equal(h.site.editor,false);assert.equal(h.site.staffRole,null);assert.deepEqual(h.backend.calls,[]);
  await act(async()=>{h.site.setLanguage('vi');});
@@ -292,10 +292,10 @@ test('a customer opening staff login receives a customer return link without sta
 });
 
 test('public navigation labels both login destinations and keeps one preferences menu outside the mobile navigation',async t=>{
- const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),logins=band.findAllByType('a').filter(node=>['/account','/admin'].includes(node.props.href));
- assert.deepEqual(logins.map(n=>n.props.href),['/account','/admin']);assert.deepEqual(logins.map(n=>n.props['aria-label']),['Customer Login','Staff Login']);assert.ok(logins.every(n=>n.props.className.includes('desktop-band-control')));
+ const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),logins=band.findAllByType('a').filter(node=>['/account','https://staff.garyhome.vn/admin'].includes(node.props.href));
+ assert.deepEqual(logins.map(n=>n.props.href),['/account','https://staff.garyhome.vn/admin']);assert.deepEqual(logins.map(n=>n.props['aria-label']),['Customer Login','Staff Login']);assert.ok(logins.every(n=>n.props.className.includes('desktop-band-control')));
  assert.deepEqual(logins.map(n=>n.findByType('span').children.join('')),['Customer Login','Staff Login']);
- const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/account','/admin']);assert.equal(mobile.findAllByType('button').length,0);
+ const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/account','https://staff.garyhome.vn/admin']);assert.equal(mobile.findAllByType('button').length,0);
  assert.equal(h.renderer.root.findAllByProps({className:'site-preferences-trigger'}).length,1);assert.equal(h.renderer.root.findByProps({id:'site-navigation'}).findAllByProps({className:'site-preferences'}).length,0);
  const toggle=()=>h.renderer.root.findAllByType('button').find(node=>node.props['aria-controls']==='site-navigation');await act(async()=>toggle().props.onClick());assert.equal(toggle().props['aria-expanded'],true);await act(async()=>mobile.findAllByType('a')[0].props.onClick());assert.equal(toggle().props['aria-expanded'],false);
  assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');await act(async()=>h.site.setLanguage('vi'));assert.equal(logins[0].props['aria-label'],'Đăng nhập khách hàng');assert.equal(logins[1].props['aria-label'],'Đăng nhập nhân viên');assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');await h.emit(authSession('customer'));assert.equal(logins[0].props.href,'/account');assert.equal(logins[0].findAllByType('img').length,0);
@@ -334,7 +334,7 @@ test('password recovery returns existing staff to Studio',async t=>{
  const h=await harness(t,{page:'password',url:'https://gary.example/auth/reset#type=recovery&access_token='+token});
  assert.equal(h.renderer.root.findByType('h1').children.join(''),'Reset staff password.');
  await act(async()=>{await h.renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields:{password:'A replacement owner password',confirm:'A replacement owner password'}}});});
- assert.equal(h.renderer.root.findByProps({className:'button'}).props.href,'/admin');
+ assert.equal(h.renderer.root.findByProps({className:'button'}).props.href,'https://staff.garyhome.vn/admin');
  assert.equal(h.backend.passwordCalls.length,1);
  assert.equal(h.backend.passwordCalls[0].headers.get('authorization'),'Bearer test-token');
 });
@@ -1047,7 +1047,7 @@ test('custom invitation links wait for explicit confirmation, scrub the token UR
  assert.deepEqual(h.site.passwordLink,{type:'invite',userId:'invited-staff'});
  await act(async()=>{await h.renderer.root.findByProps({className:'enquiry-form password-create-form'}).props.onSubmit({preventDefault(){},currentTarget:{fields:{password:'A private staff password',confirm:'A private staff password'}}});});
  assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.backend.passwordCalls[0].headers.get('authorization'),'Bearer test-token');
- assert.equal(h.renderer.root.findByProps({className:'button'}).props.href,'/admin');
+ assert.equal(h.renderer.root.findByProps({className:'button'}).props.href,'https://staff.garyhome.vn/admin');
 });
 test('custom token verification errors offer a new link without granting a password form',async t=>{
  const h=await harness(t,{guest:true,page:'invite',url:'https://gary.example/auth/invite?type=invite&token_hash='+'b'.repeat(64)});h.backend.verifyError={code:'otp_expired'};

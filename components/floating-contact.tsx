@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { useSite } from "./site-context";
 import { channelUrl } from "@/lib/rentals";
+import { ContactWidgetNightArt } from "./contact-widget-night-art";
 
 type ChannelProps={whatsapp:string;zalo:string;whatsappLabel:string;zaloLabel:string;language:"en"|"vi"};
 
@@ -12,6 +13,7 @@ function ChannelLinks({whatsapp,zalo,whatsappLabel,zaloLabel,language,compact=fa
   <picture className="contact-widget-art">
    <img key={compact?"compact":language} src={compact?"/svg/contact-widget-03-transparent.svg":language==="vi"?"/svg/contact-widget-04-chat-with-us-vi.svg":"/svg/contact-widget-04-chat-with-us.svg"} alt="" width={compact?272:586} height={compact?106:115} decoding="async"/>
   </picture>
+  {!compact&&<ContactWidgetNightArt label={language==="vi"?"Nhắn tin:":"Chat with us:"}/>}
   <a className="contact-widget-action contact-widget-whatsapp" href={whatsapp} target="_blank" rel="noreferrer" aria-label={whatsappLabel} title="WhatsApp" onClick={onFollow}><span className="sr-only">WhatsApp</span></a>
   <a className="contact-widget-action contact-widget-zalo" href={zalo} target="_blank" rel="noreferrer" aria-label={zaloLabel} title="Zalo" onClick={onFollow}><span className="sr-only">Zalo</span></a>
  </>;

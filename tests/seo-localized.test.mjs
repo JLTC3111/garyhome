@@ -37,7 +37,7 @@ test('proxy passes explicit language variants to locale routes with verified ups
  assert.equal(response.headers.get('x-middleware-request-cookie'),'session=safe; gary-language=vi');
  const legacy=proxy(new NextRequest('https://www.garyhome.vn/services',{headers:{'x-gary-language':'vi','x-gary-public-path':'/vi/services'}}));
  assert.equal(legacy.headers.get('x-middleware-request-x-gary-language'),null);assert.equal(legacy.headers.get('x-middleware-rewrite'),null);
- const privateRoute=proxy(new NextRequest('https://www.garyhome.vn/vi/admin'));assert.equal(privateRoute.headers.get('x-middleware-rewrite'),null);
+ const privateRoute=proxy(new NextRequest('https://www.garyhome.vn/vi/admin'));assert.equal(privateRoute.headers.get('x-middleware-rewrite'),null);assert.equal(privateRoute.headers.get('location'),'https://staff.garyhome.vn/admin');
 });
 test('retired About redirects before rendering, preserving locale instead of inheriting homepage canonical in a streamed 200 response',()=>{
  const {NextRequest}=require('next/server'),{proxy}=loader()('proxy.ts');
@@ -57,7 +57,7 @@ test('server metadata has unique localized canonicals and reciprocal EN/VI alter
   assert.ok(!seen.has(metadata.description),'each public landing page needs a page-specific description');seen.add(metadata.description);
   assert.equal(metadata.description,publicPageDescriptions[route][1]);
  }
- const privateMetadata=await pageMetadata('/admin',true);assert.equal(privateMetadata.alternates.canonical,'https://www.garyhome.vn/admin');assert.deepEqual(privateMetadata.alternates.languages,{});assert.equal(privateMetadata.robots.index,false);
+ const privateMetadata=await pageMetadata('/admin',true);assert.equal(privateMetadata.alternates.canonical,'https://staff.garyhome.vn/admin');assert.equal(privateMetadata.openGraph.url,'https://staff.garyhome.vn/admin');assert.deepEqual(privateMetadata.alternates.languages,{});assert.equal(privateMetadata.robots.index,false);
  requestHeaders.set('x-gary-language','en');assert.equal((await pageMetadata('/homes')).alternates.canonical,'https://www.garyhome.vn/en/homes');
 });
 test('sitemap lists actual localized indexable pages with alternates and excludes the retired About alias',async()=>{

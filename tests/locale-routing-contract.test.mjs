@@ -89,12 +89,39 @@ test('explicit locale routes use URL language over stale preferences and retain 
 
 test('staff/auth/API/assets do not receive public locale or hostname redirects; preview remains testable',()=>{
  const {proxy}=loader()('proxy.ts');
- for(const pathname of ['/admin','/login','/account','/auth/reset','/api/config','/favicon.ico','/favicon.png','/images/home.jpg']){
+ for(const pathname of ['/login','/account','/auth/reset','/api/config','/favicon.ico','/favicon.png','/images/home.jpg']){
   const response=proxy(new NextRequest('https://www.garyhome.vn'+pathname,{headers:{'x-gary-language':'vi','x-gary-public-path':'/vi/homes'}}));
   assert.equal(response.headers.get('location'),null,pathname);
   assert.equal(response.headers.get('x-middleware-rewrite'),null,pathname);
   assert.equal(response.headers.get('x-middleware-request-x-gary-language'),null,pathname);
  }
+ const staff='https://staff.garyhome.vn/admin';
+ for(const [source,query] of [['https://www.garyhome.vn/admin',''],['https://www.garyhome.vn/admin/','?tab=team'],['https://garyhome.vn/en/admin','?tab=team'],['https://www.garyhome.vn/vi/admin','?section=seo']]){
+  const response=proxy(new NextRequest(source+query));
+  assert.equal(response.status,308,source);
+  assert.equal(response.headers.get('location'),staff+query,source);
+ }
+ for(const source of ['https://staff.garyhome.vn/','https://staff.garyhome.vn/en/admin?tab=team','https://staff.garyhome.vn/admin/']){
+  const response=proxy(new NextRequest(source));
+  assert.equal(response.status,308,source);
+  assert.equal(response.headers.get('location'),source.includes('tab=team')?staff+'?tab=team':staff,source);
+ }
+ const stay=proxy(new NextRequest('https://staff.garyhome.vn/admin?tab=team'));
+ assert.equal(stay.headers.get('location'),null);
+ assert.equal(stay.headers.get('x-middleware-request-x-gary-language'),null);
+ const staffHome=proxy(new NextRequest('https://staff.garyhome.vn/homes?view=map'));
+ assert.equal(staffHome.status,308);assert.equal(staffHome.headers.get('location'),origin+'/en/homes?view=map');
+ const staffAccount=proxy(new NextRequest('https://staff.garyhome.vn/en/account?next=saved'));
+ assert.equal(staffAccount.headers.get('location'),origin+'/account?next=saved');
+ const staffAuth=proxy(new NextRequest('https://staff.garyhome.vn/auth/reset?code=abc'));
+ assert.equal(staffAuth.headers.get('location'),null);
+ for(const [source,target] of [['https://customers.garyhome.vn/','/account'],['https://customers.garyhome.vn/account?ref=email','/account?ref=email'],['https://customers.garyhome.vn/vi/account','/account'],['https://customers.garyhome.vn/auth/reset?code=abc','/auth/reset?code=abc'],['https://customers.garyhome.vn/en/homes?view=map','/en/homes?view=map']]){
+  const response=proxy(new NextRequest(source));
+  assert.equal(response.status,308,source);
+  assert.equal(response.headers.get('location'),origin+target,source);
+ }
+ const previewAdmin=proxy(new NextRequest('http://localhost:3000/admin'));
+ assert.equal(previewAdmin.headers.get('location'),null);
  const preview=proxy(new NextRequest('http://localhost:3000/vi/homes?view=map'));
  assert.equal(preview.headers.get('location'),null);
  assert.equal(preview.headers.get('x-middleware-rewrite'),null);

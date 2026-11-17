@@ -8,6 +8,7 @@ import { useStudioText } from "./use-studio-text";
 import { PortalSwitcher } from "./portal-access";
 import { emailLinkIdentity, setAccountPassword } from "@/lib/password-actions";
 import { request } from "@/lib/requests";
+import { STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
 
 export function PasswordReset({ invitation = false }: { invitation?: boolean }) {
   const {passwordLink,emailVerification}=useSite();
@@ -18,7 +19,7 @@ export function PasswordReset({ invitation = false }: { invitation?: boolean }) 
 }
 function PasswordResetBody({invitation,expectedUser}:{invitation:boolean;expectedUser:string|null}){
   const { client,ready,user,editor,accountTask,t,passwordLinkIssue,emailVerification,verifyEmailLink,reconnect }=useSite(),text=useStudioText();
-  const staffPortal=invitation||editor,portalPath=staffPortal?"/admin":"/account";
+  const staffPortal=invitation||editor,portalPath=staffPortal?`${STAFF_PORTAL_ORIGIN}/admin`:"/account";
   const [busy,setBusy]=useState(false),[error,setError]=useState("");
   const [success,setSuccess]=useState(false),[showPassword,setShowPassword]=useState(false);
   const [resendEmail,setResendEmail]=useState(""),[sent,setSent]=useState(false);

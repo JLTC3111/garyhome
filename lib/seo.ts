@@ -6,7 +6,7 @@ import { loadContent } from "./server";
 import { languageValue } from "./language";
 import { documentTitle } from "./document-titles";
 import { isPublicRental, listingCode, propertyTitle } from "./rentals";
-import { CANONICAL_SITE_ORIGIN } from "./site-origin";
+import { CANONICAL_SITE_ORIGIN, STAFF_PORTAL_ORIGIN } from "./site-origin";
 import type { Language, Property } from "./types";
 import { propertyPriceOffers } from "./property-pricing";
 import { localizedAlternates, localizedPath } from "./localized-routes";
@@ -37,13 +37,14 @@ export const publicPageDescriptions: Record<string, readonly [string, string]> =
 };
 export async function pageMetadata(path: string, privatePage = false): Promise<Metadata> {
   const language = await requestLanguage(), origin = siteUrl();
+  const privateOrigin = path === "/admin" ? STAFF_PORTAL_ORIGIN : origin;
   const title = documentTitle(path, language, []) || "Gary Home";
   const description = publicPageDescriptions[path]?.[language === "vi" ? 1 : 0] || siteDescription(language);
   return {
     title: { absolute: title },
     description,
-    alternates: privatePage ? { canonical: origin + path, languages: {} } : localizedAlternates(path, origin, language),
-    openGraph: { title, description, siteName: "Gary Home", type: "website", locale: language === "vi" ? "vi_VN" : "en_US", alternateLocale: language === "vi" ? "en_US" : "vi_VN", url: origin + (privatePage ? path : localizedPath(path, language)) },
+    alternates: privatePage ? { canonical: privateOrigin + path, languages: {} } : localizedAlternates(path, origin, language),
+    openGraph: { title, description, siteName: "Gary Home", type: "website", locale: language === "vi" ? "vi_VN" : "en_US", alternateLocale: language === "vi" ? "en_US" : "vi_VN", url: (privatePage ? privateOrigin : origin) + (privatePage ? path : localizedPath(path, language)) },
     twitter: { card: "summary", title, description },
     robots: privatePage ? { index: false, follow: false } : undefined,
   };

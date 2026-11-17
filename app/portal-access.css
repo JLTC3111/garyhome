@@ -22,8 +22,11 @@
 .portal-switcher{display:inline-flex;align-items:stretch;gap:5px;padding:5px;border:1px solid #d9dfd2;background:#f2f3ed;border-radius:10px;width:fit-content;max-width:100%}
 .portal-switcher>a{display:flex;align-items:center;justify-content:center;gap:9px;min-height:43px;padding:10px 17px;font-size:12px;border-radius:6px;color:#6b7662;line-height:1.4}
 .portal-switcher>a:hover{background:#e5eadf}
-.portal-switcher>a[href="/account"].active{background:var(--green);color:white}
-.portal-switcher>a[href="/admin"].active{background:#1c3342;color:white}
+.portal-switcher>a.portal-switcher-customer.active{background:var(--green);color:white}
+.portal-switcher>a.portal-switcher-staff.active{background:#1c3342;color:white}
+.admin-auth-header .rental-brand{align-items:center}
+.admin-auth-header .rental-brand .brand-tagline{margin:0;text-align:center;padding-inline-start:.16em}
+.admin-auth-header .rental-brand .brand-tagline[lang="vi"]{padding-inline-start:.07em}
 .account-entry{row-gap:30px;padding-top:40px}
 .account-entry>.portal-switcher{grid-column:1/-1}
 .account-page>.portal-switcher{margin-bottom:30px}

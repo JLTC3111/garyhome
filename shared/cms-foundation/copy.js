@@ -7,11 +7,51 @@ const copy = {
   }
 };
 const additional = {
+  referenceSearch: ['Search options', 'Tìm lựa chọn'],
+  referenceChoose: ['Choose a published entry', 'Chọn mục đã đăng'],
+  referenceLoading: ['Loading choices…', 'Đang tải lựa chọn…'],
+  referenceFailed: ['Choices could not be loaded. Retry without closing your draft.', 'Chưa thể tải lựa chọn. Thử lại mà không cần đóng bản nháp.'],
+  referenceEmpty: ['No published choices yet. Create and publish one below, or ask a publisher to add it.', 'Chưa có lựa chọn đã đăng. Tạo và đăng mục mới bên dưới hoặc nhờ người có quyền xuất bản thêm mục.'],
+  referenceNoMatch: ['No choices match this search.', 'Không có lựa chọn phù hợp với từ khóa.'],
+  referenceExisting: ['Previously entered', 'Giá trị đã nhập trước đây'],
+  referenceUnmatched: ['This entered value is not linked to a published entry. Choose an entry from the list.', 'Giá trị này chưa được liên kết với mục đã đăng. Hãy chọn một mục trong danh sách.'],
+  referenceRefresh: ['Refresh choices', 'Tải lại lựa chọn'],
+  referenceCreate: ['Create and publish a new entry', 'Tạo và đăng mục mới'],
+  referenceCreateIntro: ['This publishes the new profile or taxonomy entry. Your vacancy remains a draft.', 'Thao tác này đăng hồ sơ hoặc danh mục mới. Tin tuyển dụng của bạn vẫn là bản nháp.'],
+  referenceCreateAction: ['Create and publish', 'Tạo và đăng'],
+  referenceCreating: ['Creating and publishing…', 'Đang tạo và đăng…'],
+  referencePartial: ['The new entry was saved, but publication did not finish. Retry to continue with the same entry.', 'Mục mới đã được lưu nhưng chưa đăng xong. Thử lại để tiếp tục với chính mục này.'],
+  referenceCreated: ['Created, published and selected.', 'Đã tạo, đăng và chọn mục mới.'],
+  referenceCreateInvalid: ['Enter titles with at least 3 characters and summaries with at least 10 characters in both languages.', 'Nhập tiêu đề ít nhất 3 ký tự và tóm tắt ít nhất 10 ký tự cho cả hai ngôn ngữ.'],
+  validationSummary: ['Please fix the following before continuing:', 'Vui lòng sửa các mục sau trước khi tiếp tục:'],
+  referenceKindEmployer: ['employer', 'nhà tuyển dụng'],
+  referenceKindCategory: ['job category', 'danh mục việc làm'],
+  referenceKindLocation: ['location', 'địa điểm'],
+  emailInvalid: ['Enter a valid email address.', 'Nhập địa chỉ email hợp lệ.'],
+  datePast: ['Choose today or a later closing date.', 'Chọn hạn tuyển dụng từ hôm nay trở đi.'],
+
+  automaticUrl: ['Generated URL', 'Đường dẫn tự động'],
+  automaticUrlPending: ['The URL is generated automatically from the title.', 'Đường dẫn được tạo tự động từ tiêu đề.'],
   editor: ['Editor', 'Biên tập viên'], publisher: ['Publisher', 'Người duyệt đăng'], admin: ['Administrator', 'Quản trị viên'], recruiter: ['Recruiter', 'Chuyên viên tuyển dụng'],
   reviewFirst: ['Submit this saved draft for review before publishing.', 'Gửi bản nháp đã lưu để duyệt trước khi đăng.'],
 };
 export function cmsText(key, language = 'en') { return copy[language === 'vi' ? 'vi' : 'en'][key] || additional[key]?.[language === 'vi' ? 1 : 0] || key; }
 export function validationText(issue, language) {
   const keys = { 'cms-title-missing': 'titleMissing', 'cms-summary-missing': 'summaryMissing', 'cms-body-missing': 'bodyMissing', 'cms-slug': 'slugInvalid', 'cms-field-required': 'fieldRequired', 'cms-url-invalid': 'invalidUrl', 'cms-number-invalid': 'invalidNumber', 'cms-option-invalid': 'invalidOption', 'cms-date-invalid': 'invalidDate' };
-  return cmsText(keys[issue.code] || 'invalid', language) + (issue.params?.language ? ` (${issue.params.language})` : '');
+  const vi = language === 'vi', params = issue.params || {};
+  if (issue.code === 'cms-text-too-short') return (vi ? `Nhập ít nhất ${params.minimum} ký tự (hiện có ${params.count}).` : `Enter at least ${params.minimum} characters (currently ${params.count}).`) + (params.language ? ` (${params.language})` : '');
+  if (issue.code === 'cms-text-too-long') return vi ? `Nhập tối đa ${params.maximum} ký tự (hiện có ${params.count}).` : `Use at most ${params.maximum} characters (currently ${params.count}).`;
+  if (issue.code === 'cms-email-invalid') return cmsText('emailInvalid', language);
+  if (issue.code === 'cms-date-past') return cmsText('datePast', language);
+  const kindKey = {employer: 'referenceKindEmployer', category: 'referenceKindCategory', location: 'referenceKindLocation'}[params.kind];
+  const kind = kindKey ? cmsText(kindKey, language) : (vi ? 'mục liên quan' : 'related entry');
+  const reference = {
+    'jobs-reference-selection-required': vi ? 'Chọn mục này trong danh sách và lưu bản nháp trước khi đăng.' : 'Choose this item from the list and save the draft before publishing.',
+    'jobs-reference-required': vi ? `Chọn ${kind} đã được đăng.` : `Select a published ${kind}.`,
+    'jobs-reference-unavailable': vi ? `Giá trị này không khớp với ${kind} đã đăng. Hãy chọn từ danh sách.` : `This value does not match a published ${kind}. Choose one from the list.`,
+    'jobs-reference-unpublished': vi ? `Đăng ${kind} đã chọn trước khi đăng tin tuyển dụng.` : `Publish the selected ${kind} before publishing this vacancy.`,
+    'jobs-reference-ambiguous': vi ? `Có nhiều ${kind} trùng tên. Hãy chọn đúng mục từ danh sách.` : `More than one ${kind} has this name. Choose the correct entry from the list.`,
+    'jobs-reference-lookup-failed': vi ? `Chưa thể kiểm tra ${kind}. Tải lại lựa chọn rồi thử lại.` : `The ${kind} could not be checked. Refresh the choices and try again.`,
+  };
+  return reference[issue.code] || cmsText(keys[issue.code] || 'invalid', language) + (params.language ? ` (${params.language})` : '');
 }

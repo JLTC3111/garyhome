@@ -1,7 +1,35 @@
+@property --studio-sidebar-width{syntax:"<length>";inherits:true;initial-value:272px}
 .admin-shell{--studio-sidebar-width:272px}
-.admin-sidebar{width:var(--studio-sidebar-width);padding:25px 16px 18px;background:#edf2e5;border-right-color:#d3ddca;gap:0}
-.admin-main{margin-left:var(--studio-sidebar-width);width:calc(100% - var(--studio-sidebar-width));min-width:0}
-.admin-sidebar>.brand{flex-shrink:0;padding:0 7px}
+.admin-sidebar{width:var(--studio-sidebar-width);padding:25px 16px 18px;background:#edf2e5;border-right-color:#d3ddca;gap:0;overflow:visible;transition:width 180ms ease}
+.admin-main{margin-left:var(--studio-sidebar-width);width:calc(100% - var(--studio-sidebar-width));min-width:0;transition:margin-left 180ms ease,width 180ms ease}
+.admin-shell[data-sidebar-resizing="true"] .admin-sidebar,.admin-shell[data-sidebar-resizing="true"] .admin-main{transition:none}
+.admin-sidebar>.brand{flex-shrink:0;padding:0 7px;min-width:0;max-width:100%}
+.admin-sidebar>.brand img{width:min(193px,100%);height:auto;aspect-ratio:220/64}
+.admin-sidebar>.brand .brand-tagline{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.admin-sidebar-resize,.admin-sidebar-collapse{position:fixed;z-index:46;flex:none;margin:0;padding:0;touch-action:none;transition:left 180ms ease}
+.admin-shell[data-sidebar-resizing="true"] .admin-sidebar-resize,.admin-shell[data-sidebar-resizing="true"] .admin-sidebar-collapse{transition:none}
+.admin-sidebar-resize{top:0;bottom:0;left:calc(var(--studio-sidebar-width) - 5px);width:10px;border:0;background:transparent;cursor:col-resize}
+.admin-sidebar-resize::before{content:"";position:absolute;top:0;bottom:0;left:4px;width:2px;border-radius:2px;background:transparent}
+.admin-sidebar-resize:hover::before,.admin-sidebar-resize:focus-visible::before{background:#516c3b}
+.admin-sidebar-resize:focus-visible{outline:none}
+.admin-sidebar-collapse{top:50%;left:var(--studio-sidebar-width);z-index:47;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #c5d4bc;border-radius:999px;background:#f7faf3;color:#2d4a36;box-shadow:0 1px 4px #233d191f;transform:translate(-50%,-50%);cursor:pointer}
+.admin-sidebar-collapse:hover{background:#e7f0df}
+.admin-sidebar-collapse:focus-visible{outline:2px solid #516c3b;outline-offset:2px}
+.admin-shell[data-sidebar="collapsed"]{--studio-sidebar-width:72px}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar{padding:18px 7px 13px}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar>.brand{align-items:center;padding:0}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar>.brand img{width:52px}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar>.brand .brand-tagline,.admin-shell[data-sidebar="collapsed"] .admin-sidebar>.studio-label,.admin-shell[data-sidebar="collapsed"] .admin-sidebar-identity{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar nav.branched-menu{margin-top:8px;gap:7px;padding-right:0}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu button,.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__tree>.branched-menu__item{justify-content:center;padding:0;gap:0}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu button>span.branched-menu__label,.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu button>span.branched-menu__heading-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__head{background:#e0e8d6;border-radius:8px}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__head>.branched-menu__chevron{position:absolute;right:1px;bottom:3px;width:11px;height:11px}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__icon>svg{width:20px;height:20px}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .studio-menu-count{position:absolute;top:0;right:0;height:16px;min-width:16px;font-size:9px;line-height:16px;padding:0 3px}
+.admin-shell[data-sidebar="collapsed"] .branched-menu__lines{display:none}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar-bottom{padding-top:8px}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar-bottom>div{flex-direction:column;align-items:center;gap:10px}
 .admin-sidebar>.studio-label{color:#4b624d;font-size:10px;font-weight:600;letter-spacing:.15em}
 .admin-sidebar nav.branched-menu{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#afbea5 transparent;display:flex;flex-direction:column;gap:4px;margin-top:14px;padding:0 2px 16px 0}
 .admin-sidebar .branched-menu button{width:100%;border:0;border-radius:9px;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 11px;text-align:left;font-family:var(--sans);font-size:14px;line-height:1.4;color:#344f3d;background:transparent;position:relative;flex-shrink:0}
@@ -57,7 +85,7 @@
  .admin-sidebar .branched-menu .branched-menu__head>.branched-menu__chevron{position:absolute;right:1px;bottom:3px;width:11px;height:11px}
  .admin-sidebar .branched-menu .branched-menu__icon>svg{width:20px;height:20px}
  .admin-sidebar .branched-menu .studio-menu-count{position:absolute;top:0;right:0;height:16px;min-width:16px;font-size:9px;line-height:16px;padding:0 3px}
- .branched-menu__lines{display:none}.admin-sidebar-bottom{padding-top:8px}.admin-sidebar-bottom>a{font-size:0}.admin-page-heading p{font-size:12px;max-width:none}
+ .branched-menu__lines{display:none}.admin-sidebar-bottom{padding-top:8px}.admin-sidebar-resize,.admin-sidebar-collapse{display:none}.admin-page-heading p{font-size:12px;max-width:none}
  .team-directory-tools .button{font-size:11px;min-height:38px}.team-member>.team-avatar{inline-size:46px;block-size:46px;min-inline-size:46px;max-inline-size:46px;min-block-size:46px;max-block-size:46px;flex-basis:46px}
 }
-@media(prefers-reduced-motion:reduce){.branched-menu__body,.branched-menu__reach,.branched-menu__chevron{transition:none}}
+@media(prefers-reduced-motion:reduce){.branched-menu__body,.branched-menu__reach,.branched-menu__chevron,.admin-sidebar,.admin-main,.admin-sidebar-resize,.admin-sidebar-collapse{transition:none}}

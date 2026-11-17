@@ -8,7 +8,7 @@ import { useStudioText } from "./use-studio-text";
 import { attachEditorWorkspace } from "../shared/editor-workspace/index.js";
 
 /** Home keeps its full-height right drawer around the current form content. */
-export function EditorModal({ title, subtitle, close, children, workspaceKey = "content", closeDisabled = false, resizable: _resizable, contentClassName = "" }: {
+export function EditorModal({ title, subtitle, close, children, workspaceKey = "content", closeDisabled = false, resizable = false, contentClassName = "" }: {
   title: string; subtitle: string; close: () => void; children: ReactNode; workspaceKey?: string; closeDisabled?: boolean; resizable?: boolean; contentClassName?: string;
 }) {
   const text = useStudioText(), { language, sessionPhase, reconnect } = useSite();
@@ -36,6 +36,7 @@ export function EditorModal({ title, subtitle, close, children, workspaceKey = "
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }}>
+      {resizable && <div className="editor-flowing-edge" aria-hidden="true"/>}
       <section className={`editor-drawer ${contentClassName}`}><header className="gw-editor-header"><div><div className="eyebrow">{subtitle}</div><h2 id={titleId}>{title}</h2></div>
         <div className="editor-toolbar gw-editor-controls">{["offline", "error"].includes(sessionPhase) && <button type="button" className="icon-button" aria-label={text("Reconnect")} title={text("Reconnect")} onClick={() => void reconnect()}><RefreshCw size={17}/></button>}
           <LanguageSwitcher/><button autoFocus type="button" className="icon-button" disabled={closeDisabled} onClick={requestClose} aria-label={text("Close editor")}><X/></button>

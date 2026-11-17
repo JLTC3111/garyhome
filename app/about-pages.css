@@ -55,8 +55,8 @@
 .team-existing-login-callout>p{font-size:12px;line-height:1.9;color:#3a5636}
 .team-existing-login-callout>div{display:flex;flex-wrap:wrap;gap:12px;margin-top:15px}
 .team-existing-login-callout .button{font-size:11px;min-height:40px;white-space:normal}
-.team-invite-form label.team-password-choice{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.8;color:#405c38}
-.team-invite-form label.team-password-choice>input{width:18px;height:18px;min-height:18px;flex:0 0 18px;margin-top:3px;accent-color:var(--green)}
+.team-invite-form label.team-password-choice{display:flex;flex-direction:row;align-items:center;gap:10px;font-size:12px;line-height:1.8;color:#405c38}
+.team-invite-form label.team-password-choice>input{width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:0;accent-color:var(--green)}
 @keyframes about-drop-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:1000px){.about-section-hero,.landlord-layout{gap:35px}.rental-guide-grid{gap:15px}.rental-guide-card{padding:23px}.rental-guide-card h2{font-size:25px}.landlord-form-card{padding:27px}}
 @media(max-width:760px){.about-section-hero,.landlord-layout{grid-template-columns:1fr;gap:35px}.about-section-hero>img{height:330px}.service-directory{gap:30px;margin-top:50px}.rental-guide-grid{grid-template-columns:1fr}.rental-guide-card h2{font-size:31px}.guide-card-top{margin-bottom:24px}.landlord-form-card{padding:28px 23px}}

@@ -17,16 +17,22 @@
 .staff-profile-workspace .editor-scroll-body{padding:24px 30px 0}
 .staff-profile-workspace .staff-password-form{margin-bottom:0}
 @container editor (max-width:720px){.editor-scroll-body>.editor-form,.editor-scroll-body>.help-editor-form{padding:22px 20px 0}.editor-scroll-body .form-row,.editor-scroll-body .form-row.three{grid-template-columns:1fr}.editor-scroll-body .amenity-options{grid-template-columns:repeat(2,minmax(0,1fr))}.editor-scroll-body .editor-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:720px){.editor-dock>.editor-drawer{border:0;border-radius:0}.editor-drawer>.gw-editor-header{padding:16px;gap:10px;align-items:flex-start;flex-wrap:wrap}.editor-drawer>.gw-editor-header h2{font-size:23px}.editor-drawer .editor-toolbar{gap:5px;margin-left:auto}.editor-scroll-body{scroll-padding-bottom:130px}.editor-scroll-body input,.editor-scroll-body textarea,.editor-scroll-body select{font-size:16px}.editor-scroll-body .gw-editor-actions>.button{flex:1;min-width:120px}.staff-profile-workspace .editor-scroll-body{padding:20px 18px 0}}
+@media(max-width:720px){.editor-flowing-edge{display:none}.editor-dock>.editor-drawer{border:0;border-radius:0}.editor-drawer>.gw-editor-header{padding:16px;gap:10px;align-items:flex-start;flex-wrap:wrap}.editor-drawer>.gw-editor-header h2{font-size:23px}.editor-drawer .editor-toolbar{gap:5px;margin-left:auto}.editor-scroll-body{scroll-padding-bottom:130px}.editor-scroll-body input,.editor-scroll-body textarea,.editor-scroll-body select{font-size:16px}.editor-scroll-body .gw-editor-actions>.button{flex:1;min-width:120px}.staff-profile-workspace .editor-scroll-body{padding:20px 18px 0}}
 
 .editor-dock.gw-drawer .gw-editor-resize[data-gw-edge=w]{left:0;top:0;bottom:0;width:12px;color:var(--olive,#365743);border-radius:0}
 .editor-dock.gw-drawer .gw-editor-resize[data-gw-edge=w]::after{width:4px;height:64px;left:4px;top:calc(50% - 32px);border-radius:8px;box-shadow:0 0 0 1px color-mix(in srgb,var(--paper) 75%,transparent)}
+.editor-dock.gw-editor.gw-drawer:has(>.editor-flowing-edge){overflow:visible}
+.editor-dock:has(>.editor-flowing-edge)>.editor-drawer{border-left:0}
+.editor-flowing-edge{position:absolute;z-index:6;pointer-events:none;left:-9px;top:0;bottom:0;width:12px;background:linear-gradient(180deg,#284d3e,#a6bd9b,#e7d6ab,#557c67,#284d3e);background-size:100% 300%;animation:editor-edge-flow 10s ease-in-out infinite;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='120' viewBox='0 0 12 120'%3E%3Cpath d='M12 0H5C-2 20 12 40 5 60S-2 100 5 120H12Z' fill='black'/%3E%3C/svg%3E") left top/12px 120px repeat-y;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='120' viewBox='0 0 12 120'%3E%3Cpath d='M12 0H5C-2 20 12 40 5 60S-2 100 5 120H12Z' fill='black'/%3E%3C/svg%3E") left top/12px 120px repeat-y}
+.editor-dock.gw-maximized .editor-flowing-edge,.editor-dock.gw-mobile .editor-flowing-edge{display:none}
 .editor-dock.gw-maximized>.editor-drawer{border-left:0;box-shadow:none}
 @keyframes home-editor-slide-in{from{transform:translateX(28px);opacity:.7}to{transform:translateX(0);opacity:1}}
-@media(prefers-reduced-motion:reduce){.editor-dock{animation:none}}
+@keyframes editor-edge-flow{0%,100%{background-position:0 0}50%{background-position:0 100%}}
+@media(prefers-reduced-motion:reduce){.editor-dock{animation:none}.editor-flowing-edge{animation:none}}
 /* Only the editor follows the existing appearance preference; staff navigation
    and the rest of Home's chrome are deliberately unchanged. */
 html[data-home-theme=dark] .editor-dock.gw-drawer{--paper:#17261e;--surface:#1c3025;--border:#3c5143;--ink:#eef3e8;--muted:#bbc8bc;--line:#3c5143;--olive:#b8cba0;--gw-surface:var(--paper);--gw-ink:var(--ink);--gw-line:var(--line);--gw-accent:#bdd1a7}
+html[data-home-theme=dark] .editor-dock .gw-editor-header .icon-button:hover:not(:disabled){background:color-mix(in srgb,var(--gw-accent) 14%,var(--gw-surface));color:var(--gw-ink)}
 html[data-home-theme=dark] .editor-dock .editor-scroll-body :is(input:not([type=checkbox]),textarea,select,.site-select-trigger){background:#1c3025;color:var(--ink);border-color:#57705e}
 html[data-home-theme=dark] .editor-dock .editor-scroll-body :is(.editor-section-title,label,legend,strong,h3){color:var(--ink)}
 html[data-home-theme=dark] .editor-dock .editor-scroll-body :is(.small,.muted,label>small){color:var(--muted)}

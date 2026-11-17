@@ -1,6 +1,6 @@
 # Recruitment section and cross-platform editor workspaces
 
-Implemented locally on 17 November 2026. No website was deployed, and no database, permission, or publishing-service changes were made for this UI task. The earlier vacancy-publication migration remains unapplied.
+Implemented locally on 17 November 2026. No website was deployed, and no database, permission, or publishing-service changes were made for this UI task. The user subsequently confirmed successful application of the earlier vacancy-publication migration. Website deployment remains pending.
 
 ## Recruitment section
 
@@ -79,7 +79,7 @@ Home's broader studio test run had 13 URL/navigation expectation failures; all w
 
 ## Earlier function-only migration clarification
 
-The file is `gary_jobs/gary-teaching-jobs/supabase/migrations/20261117102706_simplify_vacancy_publication.sql`. It belongs to the preceding vacancy-publication fix, not this UI work. It replaces `jobs_private.check_publication` and `jobs_private.transition_content` to remove publication dependencies and return field-specific validation errors. It does not alter tables, records, permissions, or RLS. It has not been applied remotely. No new migration is needed for the recruitment diagram or editor workspace changes.
+The file is `gary_jobs/gary-teaching-jobs/supabase/migrations/20261117102706_simplify_vacancy_publication.sql`. It belongs to the preceding vacancy-publication fix, not this UI work. It replaces `jobs_private.check_publication` and `jobs_private.transition_content` to remove publication dependencies and return field-specific validation errors. It does not alter tables, records, permissions, or RLS. The user has confirmed that it was successfully applied remotely. No new migration is needed for the recruitment diagram or editor workspace changes.
 
 Final checks:
 

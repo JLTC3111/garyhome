@@ -43,12 +43,21 @@ export function mountCms(root, options) {
     options.onNotice?.(text);
   }
   function canLeave() { return !dirty() || root.ownerDocument.defaultView.confirm(t('discard')); }
+  const navigationState = () => ({kind, view, capabilities: {...capabilities}});
+  function announceNavigation() { options.onNavigationChange?.(navigationState()); }
+  async function navigate(destination) {
+    if (disposed || busy || !capabilities.read || destination !== 'media' && !options.collections.some(item => item.kind === destination)) return false;
+    if (!canLeave()) return false;
+    ++editorEpoch; draft = null; baseline = ''; query = ''; page = 1;
+    if (destination === 'media') view = 'media'; else { kind = destination; view = 'content'; }
+    shell(); await refresh(); return true;
+  }
   function shell() {
     editorWorkspace?.destroy(); editorWorkspace = null;
     root.classList.add('gary-cms'); root.dataset.cmsApp = options.appId || 'content';
     const tabs = options.collections.map(item => button('collection', label(item.label), `data-kind="${escape(item.kind)}" aria-pressed="${item.kind === kind && view === 'content'}"`)).join('');
-    root.innerHTML = `<header class="cms-header"><div><p class="cms-eyebrow">${escape(options.appName || options.appId || 'Gary Group')}</p><h2>${t('cms')}</h2><p>${t(collection().directPublish ? 'vacancyIntro' : 'intro')}</p></div><div class="cms-role">${t('role')}: ${escape(capabilities.role ? t(capabilities.role) : t('readOnly'))}</div></header><p class="cms-notice" data-cms-notice role="${noticeKind}" aria-live="polite">${escape(notice)}</p><nav class="cms-collections" aria-label="${t('content')}">${tabs}${button('media', t('media'), `aria-pressed="${view === 'media'}"`)}</nav><div class="cms-workspace" data-cms-workspace></div><dialog class="cms-dialog" id="${id}-editor" aria-labelledby="${id}-editor-heading"></dialog>`;
-    renderWorkspace();
+    root.innerHTML = `<header class="cms-header"><div><p class="cms-eyebrow">${escape(options.appName || options.appId || 'Gary Group')}</p><h2>${t('cms')}</h2><p>${t(collection().directPublish ? 'vacancyIntro' : 'intro')}</p></div><div class="cms-role">${t('role')}: ${escape(capabilities.role ? t(capabilities.role) : t('readOnly'))}</div></header><p class="cms-notice" data-cms-notice role="${noticeKind}" aria-live="polite">${escape(notice)}</p>${options.navigation === false ? '' : `<nav class="cms-collections" aria-label="${t('content')}">${tabs}${button('media', t('media'), `aria-pressed="${view === 'media'}"`)}</nav>`}<div class="cms-workspace" data-cms-workspace></div><dialog class="cms-dialog" id="${id}-editor" aria-labelledby="${id}-editor-heading"></dialog>`;
+    renderWorkspace(); announceNavigation();
   }
   function renderWorkspace() {
     const target = root.querySelector('[data-cms-workspace]');
@@ -289,11 +298,7 @@ export function mountCms(root, options) {
     if (action === 'close') { if (!canLeave()) return; ++editorEpoch; draft = null; baseline = ''; root.querySelector('.cms-dialog')?.close?.(); await refresh(); restoreEditorFocus(); return; }
     if (action === 'edit') return openEditor(records[Number(target.dataset.index)]);
     if (action === 'new') { if (capabilities.edit) return openEditor(); return; }
-    if (action === 'collection' || action === 'media') {
-      if (!canLeave()) return; ++editorEpoch; draft = null; baseline = ''; query = ''; page = 1;
-      if (action === 'collection') { kind = target.dataset.kind; view = 'content'; } else view = 'media';
-      shell(); return refresh();
-    }
+    if (action === 'collection' || action === 'media') return navigate(action === 'media' ? 'media' : target.dataset.kind);
     if (action === 'search') { query = root.querySelector('[data-cms-search]')?.value || ''; page = 1; return refresh(); }
     if (action === 'refresh') return refresh(true);
     if (action === 'previous' || action === 'next') { page += action === 'previous' ? -1 : 1; return refresh(); }
@@ -388,7 +393,7 @@ export function mountCms(root, options) {
   shell();
   const ready = refresh(true);
   return {
-    ready, isDirty: dirty, canLeave,
+    ready, isDirty: dirty, canLeave, navigate, navigationState,
     async refresh() { if (!canLeave()) return false; ++editorEpoch; draft = null; baseline = ''; await refresh(true); return true; },
     setLanguage(value) { language = value === 'vi' ? 'vi' : 'en'; if (draft) { const previous = draft; shell(); draft = previous; editor(); } else shell(); },
     destroy({ force = false } = {}) {

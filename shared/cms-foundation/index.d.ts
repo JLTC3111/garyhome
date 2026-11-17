@@ -23,7 +23,7 @@ export type CmsAdapter = {
   uploadMedia?(file: File, metadata: {alt_en: string; alt_vi: string}): Promise<unknown>;
 };
 export declare const CMS_VERSION: string;
-export declare function mountCms(root: HTMLElement, options: {appId: string; appName?: string; language?: CmsLanguage; collections: CmsCollection[]; adapter: CmsAdapter; mediaPolicy?: {mimeTypes: string[];maxBytes: number}; onNotice?: (message: string) => void}): {ready: Promise<void>; isDirty(): boolean; canLeave(): boolean; refresh(): Promise<boolean>; setLanguage(language: CmsLanguage): void; destroy(options?: {force?: boolean}): boolean};
+export declare function mountCms(root: HTMLElement, options: {appId: string; appName?: string; language?: CmsLanguage; collections: CmsCollection[]; adapter: CmsAdapter; mediaPolicy?: {mimeTypes: string[];maxBytes: number}; onNotice?: (message: string) => void; navigation?: boolean; onNavigationChange?: (state: {kind:string;view:string;capabilities:CmsCapabilities}) => void}): {ready: Promise<void>; isDirty(): boolean; canLeave(): boolean; navigate(destination:string):Promise<boolean>; navigationState():{kind:string;view:string;capabilities:CmsCapabilities}; refresh(): Promise<boolean>; setLanguage(language: CmsLanguage): void; destroy(options?: {force?: boolean}): boolean};
 export declare function validateEntry(record: CmsEntry, collection: CmsCollection, publish?: boolean): Array<{code: string; field: string; params: Record<string, unknown>; severity: string}>;
 export declare function contentSeoFindings(record: CmsEntry, collection: CmsCollection): Array<Record<string, unknown>>;
 export declare function safeMediaUrl(value: string): string;

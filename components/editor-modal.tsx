@@ -7,7 +7,7 @@ import { useSite } from "./site-context";
 import { useStudioText } from "./use-studio-text";
 import { attachEditorWorkspace } from "../shared/editor-workspace/index.js";
 
-/** The same persisted sizing controller is used by the Jobs and Visa editors. */
+/** Home keeps its full-height right drawer around the current form content. */
 export function EditorModal({ title, subtitle, close, children, workspaceKey = "content", closeDisabled = false, resizable: _resizable, contentClassName = "" }: {
   title: string; subtitle: string; close: () => void; children: ReactNode; workspaceKey?: string; closeDisabled?: boolean; resizable?: boolean; contentClassName?: string;
 }) {
@@ -21,7 +21,7 @@ export function EditorModal({ title, subtitle, close, children, workspaceKey = "
     const old = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const element = dock.current;
-    if (element) workspace.current = attachEditorWorkspace(element, {key:`gary-home:${workspaceKey}`,language:()=>languageRef.current,header:element.querySelector<HTMLElement>(".gw-editor-header")!,body:element.querySelector<HTMLElement>(".gw-editor-body")!,anchor:"right"});
+    if (element) workspace.current = attachEditorWorkspace(element, {key:`gary-home:${workspaceKey}`,language:()=>languageRef.current,header:element.querySelector<HTMLElement>(".gw-editor-header")!,body:element.querySelector<HTMLElement>(".gw-editor-body")!,anchor:"right",presentation:"drawer",resizeEdges:["w"],defaultWidth:workspaceKey==="property"?1120:740});
     return () => { workspace.current?.destroy(); workspace.current = null; document.body.style.overflow = old; if (opener.current?.isConnected) opener.current.focus(); };
   }, [workspaceKey]);
   useEffect(() => { workspace.current?.refresh(); }, [language]);

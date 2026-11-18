@@ -199,6 +199,11 @@ html[data-home-theme="dark"]:has(.admin-shell, .admin-loading) {
     &:hover:not(:disabled) { background-color: #ffccbf; border-color: #ffccbf; }
     &:active:not(:disabled) { background-color: #e5aa9d; border-color: #e5aa9d; transform: none; }
   }
+  /* Outline buttons keep a white fill, so the pale dark-theme text color fails contrast. */
+  & .button-outline:where(:not(.button-danger-outline, .manual-video-player .button, .manual-video-placeholder .button)) {
+    color: var(--home-action-ink);
+    &:is(:hover, :active):not(:disabled, [aria-disabled="true"]) { color: var(--home-text); }
+  }
   & :is(.delete-dialog, .staff-profile-dialog, .help-media-dialog) { background-color: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--home-shadow); }
   & :is(.delete-dialog, .staff-profile-dialog, .help-media-dialog)::backdrop { background: var(--home-scrim, #08100be6); }
   & .editor-overlay { background-color: var(--home-scrim); }

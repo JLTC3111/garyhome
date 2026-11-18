@@ -73,6 +73,39 @@ html[data-home-public="true"][data-home-theme="dark"] .gary-apps-directory .gary
   }
 }
 
+/* Keep the service list and explore action on the same left edge as the card copy. */
+.gary-apps-directory .gary-apps-grid > .gary-app-card {
+  text-align: left;
+}
+
+.gary-apps-directory .gary-apps-grid > .gary-app-card ul,
+.gary-apps-directory .gary-apps-grid > .gary-app-card .gary-app-visit {
+  align-self: flex-start;
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: auto;
+  text-align: left;
+}
+
+@media (max-width: 900px) {
+  .gary-apps-directory .gary-apps-grid > .gary-app-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gary-apps-directory .gary-apps-grid > .gary-app-card ul,
+  .gary-apps-directory .gary-apps-grid > .gary-app-card .gary-app-visit {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .gary-apps-directory .gary-apps-grid > .gary-app-card ul {
+    margin-top: 22px;
+  }
+}
+
 @media (max-width: 560px) {
   .gary-apps-directory .gary-apps-grid > .gary-app-card { padding: 18px; }
   .gary-apps-directory .gary-app-card-top { margin-bottom: 14px; }

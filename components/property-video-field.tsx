@@ -24,7 +24,7 @@ function videoUploadError(caught: unknown): string {
 export function PropertyVideoField({ property, onChange, onUploadingChange, disabled = false }: {
   property: Pick<Property, "id" | "video_url">; disabled?: boolean; onChange: (url: string | null) => void; onUploadingChange?: (uploading: boolean) => void;
 }) {
-  const { editorTask, user, demo } = useSite(), text = useStudioText();
+  const { editorTask, user, demo, notice, t } = useSite(), text = useStudioText();
   const [upload, setUpload] = useState<{ id: string; busy: boolean }>({ id: property.id, busy: false });
   const [issue, setIssue] = useState<{ id: string; message: string }>({ id: property.id, message: "" });
   const lifecycle = useRef({ alive: true }), operation = useRef(0), propertyId = useRef(property.id);
@@ -60,7 +60,7 @@ export function PropertyVideoField({ property, onChange, onUploadingChange, disa
       }), null);
       if (propertyVideoUrlError(url)) throw new Error("Couldn’t confirm the uploaded video. Reconnect and try again.");
       paths.current.delete(file);
-      if (current()) onChange(url);
+      if (current()) { notice(t("Video uploaded.", "Đã tải video lên.")); onChange(url); }
     } catch (caught) {
       if (current() && !cancellation.signal.aborted) setIssue({ id, message: videoUploadError(caught) });
     } finally {

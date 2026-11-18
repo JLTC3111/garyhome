@@ -10,7 +10,7 @@ import { PropertyCard } from "./property-card";
 import { HomeFaq } from "./home-faq";
 import { Activities } from "./activities";
 import { BlurFade } from "./magicui/blur-fade";
-import { NumberTicker } from "./magicui/number-ticker";
+import Counter from "./react-bits/counter";
 import { ShinyButton } from "./magicui/shiny-button";
 import TechText from "./react-bits/tech-text";
 import { DistrictGallery } from "./district-gallery";
@@ -55,7 +55,7 @@ export function HomePage({reviews=[],feedbackUnavailable=false}:{reviews?:Public
           <div className="hero-location"><MapPin size={17}/>{t("Rooted in Hanoi. Here for you.", "Am Hiểu Hà Nội. Đồng Hành Cùng Bạn.")}</div>
           <div className="hero-collection">
             <span className="collection-avatars" aria-hidden="true">{published.slice(0, 3).map(p => <ContentImage key={p.id} src={p.images[0] || "/images/apartments/hero.jpg"} alt="" width={36} height={36} sizes="36px" loading="lazy"/>)}</span>
-            <span><strong><NumberTicker value={published.length}/></strong> {t("homes to discover", "căn nhà để khám phá")}<small>{t("Your next chapter, thoughtfully chosen.", "Chọn tổ ấm cho chương mới của bạn.")}</small></span>
+            <span><strong><Counter value={published.length} fontSize="inherit" motionBlur={false} announce/></strong> {t("homes to discover", "căn nhà để khám phá")}<small>{t("Your next chapter, thoughtfully chosen.", "Chọn tổ ấm cho chương mới của bạn.")}</small></span>
           </div>
         </div>
         <div className="hero-visual">

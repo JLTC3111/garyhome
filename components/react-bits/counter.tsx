@@ -27,6 +27,8 @@ export interface CounterProps {
   stagger?: number;
   motionBlur?: boolean;
   intro?: boolean;
+  onFirstAppearance?: () => void;
+  announce?: boolean;
   fade?: number;
   fontSize?: number | string;
   fontWeight?: CSSProperties['fontWeight'];
@@ -213,6 +215,8 @@ function RollingCounter({
   stagger = 0.04,
   motionBlur = true,
   intro = true,
+  onFirstAppearance,
+  announce = false,
   fade = 0.3,
   fontSize = 100,
   fontWeight = 'inherit',
@@ -227,6 +231,9 @@ function RollingCounter({
   const rootRef = useRef<HTMLSpanElement>(null);
   const rowRef = useRef<HTMLSpanElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
+  const appeared = useRef(false);
+  const onAppearance = useRef(onFirstAppearance);
+  useEffect(() => { onAppearance.current = onFirstAppearance; }, [onFirstAppearance]);
   const blurId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const amount = typeof value === 'number' ? (Object.is(value, -0) ? 0 : value) : Number(value);
   const formatKey = JSON.stringify(format ?? {});
@@ -395,9 +402,9 @@ function RollingCounter({
     const trend =
       s.direction !== 'auto'
         ? s.direction
-        : Math.abs(amount) > Math.abs(previous)
+        : amount > previous
           ? 'up'
-          : Math.abs(amount) < Math.abs(previous)
+          : amount < previous
             ? 'down'
             : 'shortest';
     const next = new Set(slots.map(slot => slot.key));
@@ -506,8 +513,11 @@ function RollingCounter({
 
   useEffect(() => {
     const root = rootRef.current;
-    if (!intro || !root || prefersReduced()) return undefined;
+    if (!intro || appeared.current || !root || prefersReduced()) return undefined;
     const spin = () => {
+      if (appeared.current) return;
+      appeared.current = true;
+      onAppearance.current?.();
       const e = engine.current;
       const s = settingsRef.current;
       const turn = s.direction === 'down' ? -10 : 10;
@@ -572,7 +582,7 @@ function RollingCounter({
         } as CSSProperties
       }
     >
-      <span className={SR}>
+      <span className={SR} aria-live={announce ? 'polite' : undefined} aria-atomic={announce || undefined}>
         {prefix}
         {label}
         {suffix}
@@ -632,7 +642,7 @@ function RollingCounter({
 function StaticCounter({
   value = 0, locale = 'en-US', format, decimals, minDigits = 1, prefix, suffix,
   fontSize = 100, fontWeight = 'inherit', textColor = 'inherit', tabular = true,
-  className = '', style
+  className = '', style, announce = false
 }: CounterProps) {
   const options: Intl.NumberFormatOptions = { ...format };
   if (decimals !== undefined) {
@@ -643,6 +653,7 @@ function StaticCounter({
   if (minDigits > 1) options.minimumIntegerDigits = clamp(Math.round(minDigits), 1, 21);
   const amount = Object.is(value, -0) ? 0 : value;
   return <span className={[ROOT, 'rb-counter--static', className].filter(Boolean).join(' ')}
+    aria-live={announce ? 'polite' : undefined} aria-atomic={announce || undefined}
     style={{ fontSize: typeof fontSize === 'number' ? `${fontSize}px` : fontSize, fontWeight,
       color: textColor, fontVariantNumeric: tabular ? 'tabular-nums' : undefined, ...style }}>
     {prefix}{createFormatter(locale, options).format(amount)}{suffix}
@@ -651,6 +662,12 @@ function StaticCounter({
 
 export default function Counter(props: CounterProps) {
   const reducedMotion = useMotionPreference();
-  return reducedMotion ? <StaticCounter {...props}/> : <RollingCounter {...props}/>;
+  const [appeared, setAppeared] = useState(false);
+  return reducedMotion ? <StaticCounter {...props}/> : <RollingCounter {...props}
+    intro={props.intro !== false && !appeared}
+    onFirstAppearance={() => {
+      setAppeared(true);
+      props.onFirstAppearance?.();
+    }}/>;
 }
 

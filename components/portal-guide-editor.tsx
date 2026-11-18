@@ -51,9 +51,9 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
     try { if (selected.length + files.length > HELP_MAX_FILES) throw new Error(); selected.forEach(helpFileType); }
     catch { setError(t("Choose supported files up to 50 MB each, with no more than 12 files per guide.", "Chọn định dạng hỗ trợ, tối đa 50 MB mỗi tệp và 12 tệp cho một hướng dẫn.")); return; }
     const controller = new AbortController(); uploadAbort.current = controller; setBusy("upload");
-    let pendingPath: string | null = null;
+    let pendingPath: string | null = null, complete = false;
     try {
-      for (const file of selected) {
+      for (const [index, file] of selected.entries()) {
         controller.signal.throwIfAborted(); const fileId = crypto.randomUUID();
         const path = helpUploadPath(user.id, guide.id, fileId, file); pendingPath = path;
         setProgress({ name: file.name, value: 0 });
@@ -61,10 +61,17 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
         if (!active.current) return;
         const original_name = Array.from(file.name.replace(/[\x00-\x1f\x7f/\\]/g, "_")).slice(0, 180).join("") || "guide";
         const { error } = await editorTask((db, signal) => db.from("portal_guide_files").insert({ id: fileId, guide_id: guide.id, guide_version: baseline.current.updated_at, storage_path: path, original_name, mime_type: file.type, size_bytes: file.size }).select("id").abortSignal(signal).single());
-        if (error) throw error; pendingPath = null; await refreshAttachments();
+        if (error) throw error;
+        pendingPath = null;
+        complete = index === selected.length - 1;
+        if (complete && active.current) notice(t("Guide files uploaded.", "Đã tải tệp hướng dẫn."));
+        await refreshAttachments();
       }
-      if (active.current) notice(t("Guide files uploaded.", "Đã tải tệp hướng dẫn."));
     } catch (error) {
+      if (complete) {
+        if (active.current) setError(t("The files were saved. Reopen the guide to refresh its attachments.", "Đã lưu tệp. Hãy mở lại hướng dẫn để cập nhật tệp đính kèm."));
+        return;
+      }
       if (pendingPath && active.current) {
         // A timed-out attachment insert may already have committed. Never
         // delete its object unless a fresh read confirms it is still unlinked.
@@ -81,11 +88,11 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
     try {
       const result = await editorTask((db, signal) => db.from("portal_guide_files").delete().eq("id", file.id).select("id").abortSignal(signal).single());
       if (result.error || !result.data) throw result.error;
+      if (active.current) notice(t("Guide file removed.", "Đã gỡ tệp hướng dẫn."));
       let cleanupFailed = false;
       try { const result = await editorTask(db => db.storage.from(HELP_BUCKET).remove([file.storage_path])); cleanupFailed = !!result.error; } catch { cleanupFailed = true; }
       await refreshAttachments(); if (!active.current) return; setRemoving(null);
       if (cleanupFailed) setError(t("The file was removed from this guide. Storage cleanup could not be confirmed.", "Đã gỡ tệp khỏi hướng dẫn. Chưa xác nhận được dọn kho lưu trữ."));
-      else notice(t("Guide file removed.", "Đã gỡ tệp hướng dẫn."));
     } catch { if (active.current) setError(t("Removal could not be confirmed. Refresh before trying again.", "Chưa xác nhận được thao tác gỡ. Làm mới trước khi thử lại.")); }
     finally { if (active.current) setBusy(""); }
   }

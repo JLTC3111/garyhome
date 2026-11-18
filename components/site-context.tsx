@@ -44,7 +44,7 @@ type SiteContext = {
   sessionPhase: SessionPhase; reconnect: () => Promise<void>;
   editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>, timeoutMs?: number | null) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
-  enquiries: Enquiry[]; setEnquiries: (list: Update<Enquiry[]>) => void; refresh: () => Promise<void>;
+  studioDataReady: boolean; enquiries: Enquiry[]; setEnquiries: (list: Update<Enquiry[]>) => void; refresh: () => Promise<void>;
   notice: (message: string, tone?: ToastTone) => void;
 };
 const Context = createContext<SiteContext | null>(null);
@@ -116,10 +116,14 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("checking");
   const [demo, setDemo] = useState(false);
+  const [studioDataReady, setStudioDataReady] = useState(false);
   const [enquiries, updateEnquiries] = useState<Enquiry[]>([]);
-  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; message: string; tone: ToastTone }[]>([]);
+  const toastSerial = useRef(0);
   const notice = useCallback((message: string, tone: ToastTone = "success") => {
-    setToast(current => current?.message === message && current.tone === tone ? current : { message, tone });
+    const id = ++toastSerial.current;
+    setToasts(current => current.some(toast => toast.message === message && toast.tone === tone)
+      ? current : [...current.slice(-2), { id, message, tone }]);
   }, []);
   const clientRef = useRef<SupabaseClient | null>(null);
   const sessionRef = useRef<SessionRecovery | null>(null);
@@ -232,6 +236,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
         const note=Array.isArray(privateNotes)?privateNotes[0]:privateNotes;
         return { ...enquiry, notes:note?.notes??"",read_at:note?.read_at??null,read_by:note?.read_by??null,property_code:note?.property_code||"",property_address:note?.property_address||"" } as Enquiry;
       }));
+      setStudioDataReady(true);
     })();
     refreshFlight.current = { generation, promise };
     try { await promise; } finally { if (refreshFlight.current?.promise === promise) refreshFlight.current = null; }
@@ -349,7 +354,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
               }
               if (next.phase !== "checking" && next.phase !== "recovering") setReady(true);
               if (previous.user && (next.user?.id !== previous.user.id || previous.editor && !next.editor && next.phase === "ready")) {
-                if(!next.editor)setStaffProfile(null);version.current++; updateEnquiries([]); updateContent(initialRef.current);
+                if(!next.editor)setStaffProfile(null);version.current++; setStudioDataReady(false); updateEnquiries([]); updateContent(initialRef.current);
                 if(next.user?.id!==previous.user.id)setPasswordLink(null);
               }
             },
@@ -502,11 +507,17 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
 
   const sessionLoading = sessionPhase === "checking" || sessionPhase === "recovering";
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
     {initial.configured && ["checking", "offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status" aria-busy={sessionLoading}>{sessionLoading ? <LatticeLoader label={studioText(sessionMessage, language)} announce={false}/> : studioText(sessionMessage, language)}{!sessionLoading && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}
-    <FormValidationMessages language={language}/>{children}{toast && <SwipeToast key={toast.tone+toast.message} tone={toast.tone} duration={toast.tone === "error" ? 0 : 4500} dismiss={() => setToast(null)} dismissLabel={studioText("Dismiss notification", language)} actionsLabel={language === "vi" ? "Thao tác thông báo" : "Notification actions"} releaseLabel={language === "vi" ? "Thả tay để đóng thông báo" : "Release to dismiss"}>{studioText(toast.message, language)}</SwipeToast>}
+    <FormValidationMessages language={language}/>{children}
+    <div className="action-toast-host" data-action-toast-host>
+      {toasts.map(toast => <SwipeToast key={toast.id} tone={toast.tone} language={language}
+        dismiss={() => setToasts(current => current.filter(item => item.id !== toast.id))}>
+        {studioText(toast.message, language)}
+      </SwipeToast>)}
+    </div>
   </Context.Provider>;
 }
 export function useSite() { const context = useContext(Context); if (!context) throw new Error("SiteProvider is required"); return context; }

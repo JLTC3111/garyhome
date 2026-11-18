@@ -11,8 +11,11 @@ function subscribe(notify: () => void) {
     media.addEventListener("change", notify);
     return () => media.removeEventListener("change", notify);
   }
-  media.addListener(notify);
-  return () => media.removeListener(notify);
+  if (typeof media.addListener === "function") {
+    media.addListener(notify);
+    return () => media.removeListener(notify);
+  }
+  return () => {};
 }
 
 function snapshot() {

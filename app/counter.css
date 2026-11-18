@@ -72,7 +72,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  will-change: transform;
 }
 
 .rb-counter__symbol {
@@ -108,4 +107,7 @@
 .rb-counter__measure > span {
   display: inline-block;
 }
+
+.admin-stats[hidden],
+.account-stats[hidden] { display: none; }
 

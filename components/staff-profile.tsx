@@ -43,17 +43,20 @@ function StaffProfileDialog({close}:{close:()=>void}){
  }
  async function saveChanges(event:FormEvent<HTMLFormElement>){
   event.preventDefault();if(!user||busy||photoFailed)return;
-  if(!password&&!confirm){notice(t(photoChanged?"Profile changes saved.":"Your profile is up to date.",photoChanged?"Đã lưu thay đổi hồ sơ.":"Hồ sơ của bạn đã được cập nhật."));close();return;}
+  if(!password&&!confirm){if(!photoChanged)notice(t("Your profile is up to date.","Hồ sơ của bạn đã được cập nhật."),"info");close();return;}
   if(password.length<12||password!==confirm){setError(t("Use matching passwords of at least 12 characters.","Nhập mật khẩu trùng khớp, ít nhất 12 ký tự."));return;}
   setBusy("password");setError("");
   try{
    await accountTask((db,signal,id)=>setAccountPassword(db,id,password,signal));
    if(!active.current)return;setPassword("");setConfirm("");
+   notice(t("Your password has been updated.","Đã cập nhật mật khẩu."));
    let acknowledged=false;
    try{const result=await editorTask((db,signal)=>db.rpc("acknowledge_staff_password_reminder").abortSignal(signal));acknowledged=!result.error;}catch{}
-   if(!active.current)return;await refreshStaffProfile().catch(()=>{});if(!active.current)return;
+   if(!active.current)return;
+   if(!acknowledged)notice(t("Refresh to update the password reminder.","Hãy tải lại để cập nhật lời nhắc đổi mật khẩu."),"warning");
+   await refreshStaffProfile().catch(()=>{});if(!active.current)return;
    window.dispatchEvent(new Event("gary-team-access-changed"));
-   notice(acknowledged?t("Profile changes saved. Your password has been updated.","Đã lưu thay đổi hồ sơ và cập nhật mật khẩu."):t("Your password was updated. Refresh to update the reminder.","Đã cập nhật mật khẩu. Hãy tải lại để cập nhật lời nhắc."));close();
+   close();
   }catch{if(active.current)setError(t("Couldn’t confirm the password change. Reconnect and check your account before retrying.","Chưa xác nhận được mật khẩu mới. Hãy kết nối lại và kiểm tra tài khoản trước khi thử lại."));}
   finally{if(active.current)setBusy("");}
  }

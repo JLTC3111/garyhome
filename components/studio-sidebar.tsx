@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 const STORAGE_KEY = "gary-home-studio-sidebar";
 const MIN_WIDTH = 248;
@@ -151,7 +151,7 @@ export function StudioShell({ children, text }: { children: ReactNode; text: Tex
   const controls = <>
     {!collapsed && <button type="button" className="admin-sidebar-resize" role="separator" aria-orientation="vertical" aria-label={text("Resize sidebar")} aria-valuemin={MIN_WIDTH} aria-valuemax={limit} aria-valuenow={shown} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onKeyDown={onResizeKey} onDoubleClick={resetWidth}/>}
     <button type="button" className="admin-sidebar-collapse" aria-controls="staff-sidebar" aria-expanded={!collapsed} onClick={toggle}>
-      {collapsed ? <ChevronRight size={16} aria-hidden="true"/> : <ChevronLeft size={16} aria-hidden="true"/>}
+      <ChevronLeft size={16} aria-hidden="true"/>
       <span className="sr-only">{text(collapsed ? "Expand sidebar" : "Collapse sidebar")}</span>
     </button>
   </>;

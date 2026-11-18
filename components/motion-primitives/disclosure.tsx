@@ -18,6 +18,6 @@ export function Disclosure({ open, id, labelledBy, children, className = "" }: {
     className={`motion-disclosure ${className}`}
     initial={false}
     animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
-    transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+    transition={{ duration: reduceMotion ? 0 : open ? 0.24 : 0.18, ease: open ? [.2, .72, .28, 1] : [.4, 0, .65, 1] }}
   >{children}</m.div>;
 }

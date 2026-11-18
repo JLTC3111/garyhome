@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { SitePreferences } from "./site-preferences";
+import { useOverlayExit } from "./motion-primitives/overlay-exit";
 import { useSite } from "./site-context";
 import { useStudioText } from "./use-studio-text";
 import { attachEditorWorkspace } from "../shared/editor-workspace/index.js";
@@ -12,7 +13,8 @@ export function EditorModal({ title, subtitle, close, children, workspaceKey = "
   title: string; subtitle: string; close: () => void; children: ReactNode; workspaceKey?: string; closeDisabled?: boolean; resizable?: boolean; contentClassName?: string;
 }) {
   const text = useStudioText(), { language, sessionPhase, reconnect } = useSite();
-  const dock = useRef<HTMLDivElement>(null), languageRef = useRef(language), titleId = useId();
+  const dock = useRef<HTMLDivElement>(null), overlay = useRef<HTMLDivElement>(null), languageRef = useRef(language), titleId = useId();
+  const exiting = useOverlayExit(overlay);
   // Capture before the commit-phase Close autofocus moves focus into the editor.
   const opener = useRef<HTMLElement | null>(typeof document !== "undefined" && typeof HTMLElement !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null);
   languageRef.current = language;
@@ -25,9 +27,9 @@ export function EditorModal({ title, subtitle, close, children, workspaceKey = "
     return () => { workspace.current?.destroy(); workspace.current = null; document.body.style.overflow = old; if (opener.current?.isConnected) opener.current.focus(); };
   }, [workspaceKey]);
   useEffect(() => { workspace.current?.refresh(); }, [language]);
-  const requestClose = () => { if (!closeDisabled) close(); };
-  return <div className="editor-overlay" onClick={event => { if (event.currentTarget === event.target) requestClose(); }}>
-    <div ref={dock} className="editor-dock editor-dock--resizable" role="dialog" aria-modal="true" aria-labelledby={titleId}
+  const requestClose = () => { if (!closeDisabled && !exiting) close(); };
+  return <div className="editor-overlay" ref={overlay} data-ui-exiting={exiting || undefined} onClick={event => { if (event.currentTarget === event.target) requestClose(); }}>
+    <div ref={dock} inert={exiting} className="editor-dock editor-dock--resizable" role="dialog" aria-modal="true" aria-labelledby={titleId}
       onKeyDown={event => {
         if (event.key === "Escape") { event.stopPropagation(); requestClose(); }
         if (event.key !== "Tab") return;

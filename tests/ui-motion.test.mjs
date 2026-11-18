@@ -91,3 +91,33 @@ test('legacy media-query listeners work and a missing preference API disables mo
   await act(async () => { renderer = TestRenderer.create(React.createElement(Probe)); });
   assert.equal(renderer.root.findByType('output').children[0], 'true');
 });
+
+test('overlay presence waits for the exit fade and removes immediately when there is no fade', async t => {
+  platform(t, {});
+  let present = true, removed = 0, renderer, finish;
+  const remove = () => { removed++; };
+  const fade = new Promise(resolve => { finish = resolve; });
+  const ref = { current: { getAnimations: () => [{ transitionProperty: 'opacity', finished: fade }] } };
+  const source = ts.transpileModule(fs.readFileSync(new URL('../components/motion-primitives/overlay-exit.ts', import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const module = { exports: {} };
+  vm.runInThisContext('(function(exports,require,module){' + source + '\n})')(
+    module.exports, id => id === 'react' ? React : { usePresence: () => [present, remove] }, module,
+  );
+  function Probe() { return React.createElement('div', { 'data-exiting': module.exports.useOverlayExit(ref) }); }
+  t.after(async () => { if (renderer) await act(async () => renderer.unmount()); });
+  await act(async () => { renderer = TestRenderer.create(React.createElement(Probe)); });
+  present = false;
+  await act(async () => renderer.update(React.createElement(Probe)));
+  assert.equal(renderer.root.findByType('div').props['data-exiting'], true);
+  assert.equal(removed, 0);
+  await act(async () => finish());
+  assert.equal(removed, 1);
+  present = true;
+  await act(async () => renderer.update(React.createElement(Probe)));
+  present = false;
+  ref.current.getAnimations = () => [];
+  await act(async () => renderer.update(React.createElement(Probe)));
+  assert.equal(removed, 2);
+});

@@ -292,7 +292,7 @@ test('a customer opening staff login receives a customer return link without sta
 });
 
 test('public navigation labels both login destinations and keeps one preferences menu outside the mobile navigation',async t=>{
- const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),logins=band.findAllByType('a').filter(node=>['/account','https://staff.garyhome.vn/admin'].includes(node.props.href));
+ const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),logins=band.findAllByType('a').filter(node=>node.props.className?.includes('desktop-band-control')&&['/account','https://staff.garyhome.vn/admin'].includes(node.props.href));
  assert.deepEqual(logins.map(n=>n.props.href),['/account','https://staff.garyhome.vn/admin']);assert.deepEqual(logins.map(n=>n.props['aria-label']),['Customer Login','Staff Login']);assert.ok(logins.every(n=>n.props.className.includes('desktop-band-control')));
  assert.deepEqual(logins.map(n=>n.findByType('span').children.join('')),['Customer Login','Staff Login']);
  const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/account','https://staff.garyhome.vn/admin']);assert.equal(mobile.findAllByType('button').length,0);
@@ -1156,7 +1156,7 @@ test('notifications load once per refresh, show persisted activity and keep read
  const mark=h.renderer.root.findAllByType('button').find(n=>n.children.includes('Mark all read'));
  await act(async()=>{await mark.props.onClick();await delay(5);});assert.equal(h.renderer.root.findAllByProps({className:'notification-count'}).length,0);
  await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Hoạt động & thông báo/);
- const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({className:'studio-notification-panel'}).length,0);
+ const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findByProps({className:'studio-notification-panel'}).props.inert,true);
 });
 
 
@@ -1259,9 +1259,9 @@ test('the customer header never borrows a signed-in owner staff photo; About Us 
  const h=await harness(t,{page:'header',path:'/'});h.backend.profilePaths=new Map([['owner','owner/private-staff-avatar.png']]);await act(async()=>h.site.refreshStaffProfile());
  for(const link of h.renderer.root.findAllByType('a').filter(n=>n.props.className?.includes('customer-login-link')))assert.equal(link.findAllByType('img').length,0);
  const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
- const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/services','/vinhomes','/tips-and-news','/contact','/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
- await act(async()=>h.site.setLanguage('vi'));assert.ok(h.renderer.root.findByProps({id:'about-navigation-links'}).findAllByType('a').some(link=>link.props.href==='/services'&&link.children.includes('Other Services')));
- const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findAllByProps({id:'about-navigation-links'}).length,0);
+ const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/en/services','/en/vinhomes','/en/tips-and-news','/en/contact','/en/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
+ await act(async()=>h.site.setLanguage('vi'));assert.ok(h.renderer.root.findByProps({id:'about-navigation-links'}).findAllByType('a').some(link=>link.props.href==='/vi/services'&&link.children.includes('Dịch vụ khác')));
+ const event=new Event('keydown');Object.defineProperty(event,'key',{value:'Escape'});await act(async()=>h.browser.dispatchEvent(event));assert.equal(h.renderer.root.findByProps({id:'about-navigation-links'}).props.inert,true);
 });
 test('the landlord page translates and submits through the private introduction API',async t=>{
  const h=await harness(t,{page:'landlords'});const form=h.renderer.root.findByType('form');assert.ok(h.renderer.root.findAllByType('input').some(n=>n.props.name==='owner_name'));
@@ -1338,7 +1338,7 @@ test('touch blur keeps About links mounted until the visitor follows a destinati
  await act(async()=>about().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:null}));
  assert.equal(trigger().props['aria-expanded'],true,'touch blur must not remove the tapped destination before click');
  const links=about().findAllByType('a');assert.ok(links.length>0);
- const destination=links.find(link=>link.props.href==='/contact');assert.ok(destination);
+ const destination=links.find(link=>link.props.href==='/en/contact');assert.ok(destination);
  await act(async()=>destination.props.onClick());assert.equal(trigger().props['aria-expanded'],false);
 });
 

@@ -1,4 +1,5 @@
 "use client";
+import { AnimatePresence } from "motion/react";
 import { EditorModal } from "./editor-modal";
 import { PasswordInput } from "./password-input";
 import { SwipeToast } from "./swipe-toast";
@@ -12,7 +13,7 @@ export function StaffProfileButton(){
  const button=useRef<HTMLButtonElement>(null);
  useEffect(()=>{const show=()=>setOpen(true);window.addEventListener("gary-open-staff-profile",show);return()=>window.removeEventListener("gary-open-staff-profile",show);},[]);
  const photo=staffProfile?.avatar_path&&client?client.storage.from("staff-avatars").getPublicUrl(staffProfile.avatar_path).data.publicUrl:"";
- return <><button ref={button} className="avatar staff-profile-trigger" type="button" aria-label={t("Edit staff profile","Chỉnh sửa hồ sơ nhân viên")} title={t("Change profile photo or password","Đổi ảnh hồ sơ hoặc mật khẩu")} onClick={()=>setOpen(true)}>{photo?<img src={photo} alt=""/>:user?.email?.[0]?.toUpperCase()}<Camera size={11}/></button>{open&&<StaffProfileDialog close={()=>{setOpen(false);button.current?.focus();}}/>}</>;
+ return <><button ref={button} className="avatar staff-profile-trigger" type="button" aria-label={t("Edit staff profile","Chỉnh sửa hồ sơ nhân viên")} title={t("Change profile photo or password","Đổi ảnh hồ sơ hoặc mật khẩu")} onClick={()=>setOpen(true)}>{photo?<img src={photo} alt=""/>:user?.email?.[0]?.toUpperCase()}<Camera size={11}/></button><AnimatePresence initial={false} onExitComplete={()=>button.current?.focus()}>{open&&<StaffProfileDialog close={()=>setOpen(false)}/>}</AnimatePresence></>;
 }
 export function StaffPasswordReminder(){
  const {staffProfile,t}=useSite();

@@ -1,4 +1,5 @@
 "use client";
+import { AnimatePresence } from "motion/react";
 import { useEffect,useRef,useState,type FormEvent } from "react";
 import { ArrowUpRight,Download,FileText,Plus,RefreshCw,Trash2 } from "lucide-react";
 import { useSite } from "./site-context";
@@ -66,6 +67,6 @@ function Manager({openListing}:{openListing:(property:Property)=>void}){
    {canDelete&&<button type="button" className="text-link text-danger" disabled={busy} onClick={()=>{setError("");setDeleting(true);}}><Trash2 size={15}/>{t("Delete introduction","Xóa thông tin giới thiệu")}</button>}
   </form>}</div>
   {canDelete&&<div className="landlord-maintenance"><button type="button" className="text-link" onClick={cleanup} disabled={busy}>{t("Clean unused uploads","Dọn tệp tải lên không sử dụng")}</button><small>{t("Removes only unlinked files older than 24 hours. Active introductions and listing photos are kept.","Chỉ xóa tệp chưa liên kết đã hơn 24 giờ. Giữ tệp của thông tin giới thiệu và ảnh tin đăng.")}</small></div>}
-  {deleting&&row&&<DeleteConfirmation title={t("Delete this introduction?","Xóa thông tin giới thiệu này?")} target={row.address} description={t("The private record, attachment links and linked enquiry will be deleted. An existing listing draft is kept. Unlinked uploads can be cleaned after 24 hours.","Thông tin riêng tư, liên kết tệp và yêu cầu liên hệ tương ứng sẽ bị xóa. Tin đăng đã tạo được giữ lại. Tệp không còn liên kết có thể dọn sau 24 giờ.")} busy={busy} error={error?errorText:""} onCancel={()=>{setDeleting(false);setError("");}} onConfirm={remove}/>}
+  <AnimatePresence initial={false}>{deleting&&row&&<DeleteConfirmation title={t("Delete this introduction?","Xóa thông tin giới thiệu này?")} target={row.address} description={t("The private record, attachment links and linked enquiry will be deleted. An existing listing draft is kept. Unlinked uploads can be cleaned after 24 hours.","Thông tin riêng tư, liên kết tệp và yêu cầu liên hệ tương ứng sẽ bị xóa. Tin đăng đã tạo được giữ lại. Tệp không còn liên kết có thể dọn sau 24 giờ.")} busy={busy} error={error?errorText:""} onCancel={()=>{setDeleting(false);setError("");}} onConfirm={remove}/>}</AnimatePresence>
  </section>;
 }

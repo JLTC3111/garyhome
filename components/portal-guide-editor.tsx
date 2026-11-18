@@ -1,4 +1,5 @@
 "use client";
+import { AnimatePresence } from "motion/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Eye, LoaderCircle, Save, Trash2, Upload } from "lucide-react";
 import { useSite } from "./site-context";
@@ -101,6 +102,6 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
       </section><label className="help-order-field">{t("Display order (lower first)", "Thứ tự hiển thị (số nhỏ trước)")}<input type="number" min={0} max={9999} step={1} value={draft.sort_order} onChange={event => patch("sort_order", Number(event.target.value))}/></label>
       {conflict && <p className="form-error" role="alert">{t("This guide changed in another tab. Your text is kept here; close and reopen the guide to review the current version before saving.", "Hướng dẫn đã đổi ở tab khác. Nội dung của bạn vẫn ở đây; đóng và mở lại để kiểm tra phiên bản hiện tại trước khi lưu.")}</p>}{error && <p className="form-error" role="alert">{error}</p>}
       <footer className="help-editor-actions gw-editor-actions"><button type="button" className="button button-outline" disabled={!!busy} onClick={close}>{t("Cancel", "Hủy")}</button><button className="button" type="submit" disabled={!!busy || conflict}>{busy === "save" ? <LoaderCircle size={16} className="spin"/> : <Save size={16}/>} {draft.published ? t("Save changes", "Lưu thay đổi") : t("Save draft", "Lưu nháp")}</button><button type="button" className="button button-outline" disabled={!!busy || conflict} onClick={() => void save(!draft.published)}><Eye size={16}/>{draft.published ? t("Unpublish", "Gỡ xuất bản") : t("Publish guide", "Xuất bản hướng dẫn")}</button></footer>
-    </form>{removing && <DeleteConfirmation title={t("Remove this file?", "Gỡ tệp này?")} description={t("It will no longer be available from this guide. Removing the last visual file unpublishes a guide with no complete written instructions.", "Tệp sẽ không còn trong hướng dẫn. Gỡ tệp cuối sẽ chuyển hướng dẫn chưa có đủ nội dung chữ về bản nháp.")} target={removing.original_name} busy={!!busy} error={error} onCancel={() => { if (!busy) setRemoving(null); }} onConfirm={() => void removeFile()}/>}
+    </form><AnimatePresence initial={false}>{removing && <DeleteConfirmation title={t("Remove this file?", "Gỡ tệp này?")} description={t("It will no longer be available from this guide. Removing the last visual file unpublishes a guide with no complete written instructions.", "Tệp sẽ không còn trong hướng dẫn. Gỡ tệp cuối sẽ chuyển hướng dẫn chưa có đủ nội dung chữ về bản nháp.")} target={removing.original_name} busy={!!busy} error={error} onCancel={() => { if (!busy) setRemoving(null); }} onConfirm={() => void removeFile()}/>}</AnimatePresence>
   </EditorModal>;
 }

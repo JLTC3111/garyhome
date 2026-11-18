@@ -1,4 +1,5 @@
 "use client";
+import { AnimatePresence } from "motion/react";
 import { useState } from "react";
 import { SeoEditorPanel } from "./seo-editor-panel";
 import { PublicUrlField } from "./public-url-field";
@@ -110,6 +111,6 @@ export function EditorialManager({ kind, upload }: { kind: EditorialKind; upload
       {issue && <div className="form-error" role="alert">{issue}</div>}
       <div className="editorial-save-actions"><button type="submit" className="button" disabled={busy || uploading}><Save size={16}/>{busy ? t("Saving…", "Đang lưu…") : t("Save article", "Lưu bài viết")}</button>{rows.some(row => row.id === article.id) && canDeleteContent(staffRole) && <button type="button" className="button button-outline button-danger-outline" disabled={busy} onClick={() => { setError(null); setDeleting(article); }}><Trash2 size={16}/>{t("Delete article", "Xóa bài viết")}</button>}</div>
     </form> : <p>{t("Choose an article to edit or create a new draft.", "Chọn bài viết để chỉnh sửa hoặc tạo bản nháp mới.")}</p>}</div></div>
-    {deleting && <DeleteConfirmation title={t("Delete article?", "Xóa bài viết?")} target={articleText(deleting, "title", language) || deleting.slug} description={t("This permanently removes the article and its public page.", "Thao tác này xóa vĩnh viễn bài viết và trang công khai.")} busy={busy} error={error?.id === deleting.id ? issueText(error.code) : ""} onCancel={() => { setDeleting(null); setError(null); }} onConfirm={() => void remove()}/>}
+    <AnimatePresence initial={false}>{deleting && <DeleteConfirmation title={t("Delete article?", "Xóa bài viết?")} target={articleText(deleting, "title", language) || deleting.slug} description={t("This permanently removes the article and its public page.", "Thao tác này xóa vĩnh viễn bài viết và trang công khai.")} busy={busy} error={error?.id === deleting.id ? issueText(error.code) : ""} onCancel={() => { setDeleting(null); setError(null); }} onConfirm={() => void remove()}/>}</AnimatePresence>
   </section>;
 }

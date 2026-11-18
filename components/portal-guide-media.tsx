@@ -1,4 +1,5 @@
 "use client";
+import { useOverlayExit } from "./motion-primitives/overlay-exit";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Download, ExternalLink, LoaderCircle, RefreshCw, X } from "lucide-react";
 import { useSite } from "./site-context";
@@ -6,6 +7,7 @@ import { HELP_BUCKET, HELP_FILE_TYPES, helpFileSize, type HelpFile } from "@/lib
 
 export function PortalGuideMedia({ file, close }: { file: HelpFile; close: () => void }) {
   const { accountTask, t } = useSite(), dialog = useRef<HTMLDialogElement>(null), active = useRef(true), id = useId();
+ const exiting = useOverlayExit(dialog);
   const [links, setLinks] = useState<{ view: string; download: string } | null>(null), [failed, setFailed] = useState(false), [loading, setLoading] = useState(true);
   const [animation, setAnimation] = useState(false);
   const generation = useRef(0), kind = HELP_FILE_TYPES[file.mime_type]?.kind;
@@ -30,7 +32,7 @@ export function PortalGuideMedia({ file, close }: { file: HelpFile; close: () =>
     return () => { active.current = false; node?.close(); document.body.style.overflow = overflow; previous?.focus?.(); };
   }, []);
   useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled) void read(); }); return () => { cancelled = true; }; }, [read]);
-  return <dialog className="help-media-dialog" ref={dialog} aria-modal="true" aria-labelledby={id} onCancel={event => { event.preventDefault(); close(); }} onKeyDown={event => {
+  return <dialog className="help-media-dialog" data-ui-exiting={exiting || undefined} inert={exiting} ref={dialog} aria-modal="true" aria-labelledby={id} onCancel={event => { event.preventDefault(); close(); }} onKeyDown={event => {
     if (event.key === "Escape") event.stopPropagation();
     if (event.key === "Tab") { const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],video,iframe')); const first = buttons[0], last = buttons[buttons.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }
   }}>

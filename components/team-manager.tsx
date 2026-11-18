@@ -1,4 +1,5 @@
 "use client";
+import { AnimatePresence } from "motion/react";
 import { useCallback,useEffect,useRef,useState,type FormEvent } from "react";
 import { Check,KeyRound,LoaderCircle,RefreshCw,ShieldCheck,Trash2,UserPlus,UserRound } from "lucide-react";
 import { SelectField } from "./select-field";
@@ -110,7 +111,7 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
    })}
    {!members.length&&!loading&&<p>{text("No team members loaded. Refresh the directory to try again.")}</p>}{next&&<button type="button" className="button button-outline" disabled={loading||!!busy} onClick={()=>void load(next)}>{text("Load more")}</button>}
   </section>
-  {passwordTarget&&<StaffTemporaryPassword key={passwordTarget.user_id} member={passwordTarget} busy={!!busy} error={error} close={()=>{if(!busy){setPasswordTarget(null);setError("");}}} save={setTemporaryPassword}/>}
-  {removing&&<DeleteConfirmation title={text("Delete staff access?")} target={removing.display_name+" · "+removing.email} description={text("This removes the staff assignment. The person’s customer account and customer history are preserved.")} busy={!!busy} error={error?text(error):""} onCancel={()=>{setRemoving(null);setError("");}} onConfirm={()=>void remove()} confirmLabel={text("Delete access")}/>}
+  <AnimatePresence initial={false}>{passwordTarget&&<StaffTemporaryPassword key={passwordTarget.user_id} member={passwordTarget} busy={!!busy} error={error} close={()=>{if(!busy){setPasswordTarget(null);setError("");}}} save={setTemporaryPassword}/>}</AnimatePresence>
+  <AnimatePresence initial={false}>{removing&&<DeleteConfirmation title={text("Delete staff access?")} target={removing.display_name+" · "+removing.email} description={text("This removes the staff assignment. The person’s customer account and customer history are preserved.")} busy={!!busy} error={error?text(error):""} onCancel={()=>{setRemoving(null);setError("");}} onConfirm={()=>void remove()} confirmLabel={text("Delete access")}/>}</AnimatePresence>
  </div>;
 }

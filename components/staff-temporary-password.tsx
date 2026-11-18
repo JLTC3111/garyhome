@@ -1,4 +1,5 @@
 "use client";
+import { useOverlayExit } from "./motion-primitives/overlay-exit";
 import { PasswordInput } from "./password-input";
 import { useEffect,useId,useRef,useState,type FormEvent } from "react";
 import { KeyRound,LoaderCircle,X } from "lucide-react";
@@ -7,6 +8,7 @@ import { useStudioText } from "./use-studio-text";
 
 export function StaffTemporaryPassword({member,busy,error,close,save}:{member:StaffAccount;busy:boolean;error:string;close:()=>void;save:(password:string,confirmation:string)=>Promise<void>}){
  const text=useStudioText(),dialog=useRef<HTMLDialogElement>(null),id=useId();
+ const exiting = useOverlayExit(dialog);
  const [password,setPassword]=useState(""),[confirmation,setConfirmation]=useState(""),[validation,setValidation]=useState("");
  useEffect(()=>{const previous=document.activeElement as HTMLElement|null,node=dialog.current;node?.showModal();return()=>{node?.close();previous?.focus?.();};},[]);
  async function submit(event:FormEvent<HTMLFormElement>){
@@ -14,7 +16,7 @@ export function StaffTemporaryPassword({member,busy,error,close,save}:{member:St
   if(password.length<12||password!==confirmation){setValidation("Use matching passwords of at least 12 characters.");return;}
   setValidation("");await save(password,confirmation);
  }
- return <dialog ref={dialog} className="staff-profile-dialog staff-temporary-password-dialog" aria-labelledby={id} aria-modal="true" onCancel={event=>{event.preventDefault();if(!busy)close();}} onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}>
+ return <dialog ref={dialog} data-ui-exiting={exiting || undefined} inert={exiting} className="staff-profile-dialog staff-temporary-password-dialog" aria-labelledby={id} aria-modal="true" onCancel={event=>{event.preventDefault();if(!busy)close();}} onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}>
   <header><div><div className="eyebrow">{text("EXISTING STAFF ACCOUNT")}</div><h2 id={id}>{text("Set temporary password")}</h2></div><button type="button" className="icon-button" aria-label={text("Close")} disabled={busy} onClick={close}><X size={20}/></button></header>
   <div className="temporary-password-target"><strong>{member.display_name||member.email}</strong><span>{member.email}</span></div>
   <p className="form-info">{text("This replaces this staff account’s current password. Its role and customer history stay unchanged. No email link is required.")}</p>

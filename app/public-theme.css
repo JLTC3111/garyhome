@@ -1,6 +1,4 @@
-/* Hanoi After Dark. Light styling remains owned by the existing stylesheets.
-   Semantic palette and public-only bridges live here; photographs are never
-   filtered, recolored, or covered by a new theme overlay. */
+/* Hanoi After Dark. Studio shares the palette tokens with the public site. */
 .home-hero-photo-dark{display:none}
 .contact-widget-night-art{display:none;position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .home-theme-hint{font-size:10px;line-height:1.7;color:var(--muted);margin-top:10px}
@@ -8,8 +6,7 @@
 .home-theme-options .rubber-segment__item{gap:5px}
 html[data-home-public="true"][data-home-theme="light"]{color-scheme:light}
 
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"]{
-  color-scheme:dark;
+:root{
   --home-background:#121c17;
   --home-surface:#203027;
   --home-elevated:#2e4034;
@@ -29,6 +26,10 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
   --home-shadow:0 12px 36px #050b073d;
   --home-shine-soft:#c7d6b626;
   --home-shine-peak:#c9a58870;
+}
+
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"]{
+  color-scheme:dark;
   --ink:var(--home-text);
   --green:var(--home-accent);
   --olive:var(--home-accent);

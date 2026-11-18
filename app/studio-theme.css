@@ -1,0 +1,254 @@
+.studio-appearance {
+  align-self: flex-start;
+  margin-inline: 7px;
+}
+
+.studio-appearance .site-preferences-panel {
+  inset: auto auto 0 calc(100% + 10px);
+  width: min(300px, calc(100vw - 84px));
+  max-height: calc(100dvh - 160px);
+}
+
+.admin-shell[data-sidebar="collapsed"] .studio-appearance { align-self: center; margin-inline: 0; }
+
+@media (max-width: 680px) {
+  .admin-sidebar > .studio-appearance { align-self: center; margin-inline: 0; }
+  .studio-appearance .home-theme-options .rubber-segment__item { flex-direction: column; }
+}
+
+/* Root scope supplies tokens to portaled controls and themes the viewport scrollbar. */
+html:has(.admin-shell) {
+  color-scheme: light;
+  --muted: #5c685c;
+  --studio-action: #4c6553;
+  --studio-action-hover: #415946;
+  --studio-action-active: #354c3d;
+  --studio-on-action: #fff;
+  --studio-focus: #506b56;
+  --studio-control-border: #758975;
+  --studio-quiet-hover: #e5ecdf;
+  --studio-quiet-active: #d5e1d1;
+  --studio-warning: #74572d;
+
+  & :is(
+    .button:not(:where(.button-outline, .button-danger, .button-danger-outline, .shiny-button, .manual-video-player .button, .manual-video-placeholder .button)),
+    .team-account-modes > button[aria-pressed="true"],
+    .admin-shell .activity-tabs > button[aria-pressed="true"],
+    .seo-category-tabs > button[aria-selected="true"],
+    .studio-menu-count, .skip-link
+  ) {
+    background-color: var(--studio-action);
+    border-color: var(--studio-action);
+    color: var(--studio-on-action);
+
+    &:where(.button, button):not(:disabled, [aria-disabled="true"]) {
+      &:hover { background-color: var(--studio-action-hover); border-color: var(--studio-action-hover); }
+      &:active { background-color: var(--studio-action-active); border-color: var(--studio-action-active); transform: none; }
+    }
+  }
+
+  & .button:disabled { transform: none; }
+  & .button-outline:where(:not(.button-danger-outline, .manual-video-player .button, .manual-video-placeholder .button)) { border-color: var(--studio-control-border); }
+  & :is(
+    .button-outline:where(:not(.button-danger-outline, .manual-video-player .button, .manual-video-placeholder .button)),
+    .team-account-modes > button:not([aria-pressed="true"]),
+    .admin-shell .activity-tabs > button:not([aria-pressed="true"]),
+    .seo-category-tabs > button:not([aria-selected="true"])
+  ):not(:disabled) {
+    &:hover { background-color: var(--studio-quiet-hover); }
+    &:active { background-color: var(--studio-quiet-active); transform: none; }
+  }
+
+  & .admin-shell :is(a, button, input, textarea, select, summary):focus-visible:where(:not(.manual-video-player *)),
+  & :is(.upload-label, .help-upload-label):focus-within {
+    outline-color: var(--studio-focus);
+  }
+  & .upload-label:focus-within { outline: 2px solid var(--studio-focus); outline-offset: 3px; }
+  & :is(.admin-topbar > .admin-breadcrumb, .admin-connection:not(.demo), .admin-stats p, .admin-empty p,
+    .admin-table :is(th, td, td > small), .admin-property-cell small, .table-footer, .status-badge) { color: var(--muted); }
+  & .admin-connection.demo { color: var(--studio-warning); }
+}
+
+html[data-home-theme="dark"]:has(.admin-shell, .admin-loading) {
+  color-scheme: dark;
+  background: var(--home-background);
+  color: var(--home-text);
+  --paper: var(--home-background);
+  --warm: var(--home-elevated);
+  --surface: var(--home-surface);
+  --ink: var(--home-text);
+  --muted: var(--home-secondary);
+  --green: var(--home-accent);
+  --olive: var(--home-accent);
+  --orange: var(--home-copper);
+  --line: var(--home-border);
+  --border: var(--line);
+  --navy: var(--ink);
+  --studio-heading: var(--home-accent);
+  --studio-action: var(--home-quiet);
+  --studio-action-hover: var(--home-accent);
+  --studio-action-active: #98ad93;
+  --studio-on-action: var(--home-action-ink);
+  --studio-focus: var(--home-accent);
+  --studio-control-border: var(--home-field-border);
+  --studio-quiet-hover: var(--home-elevated);
+  --studio-quiet-active: var(--home-background);
+  --studio-warning: #e9c796;
+  --studio-warning-surface: #3e3226;
+
+  /* Navigation and menus */
+  & .admin-shell { background-color: var(--home-background); }
+  & :is(.admin-topbar, .admin-sidebar, .admin-sidebar-bottom > div) { border-color: var(--line); }
+  & :is(.admin-topbar, .admin-sidebar) { background-color: var(--surface); }
+  & :is(.admin-page-heading p, .admin-sidebar .brand-tagline, .admin-sidebar-bottom :is(a, small)) { color: var(--muted); }
+  & .admin-shell .eyebrow { color: var(--olive); }
+  & :is(.admin-sidebar > .studio-label, .staff-profile-trigger > svg) {
+    color: var(--green); background-color: var(--warm); border-color: var(--line);
+  }
+  & .admin-sidebar nav.branched-menu { scrollbar-color: var(--studio-control-border) transparent; }
+  & .admin-sidebar .branched-menu button { color: var(--ink); }
+  & .admin-sidebar .branched-menu .branched-menu__head { color: var(--muted); background-color: var(--paper); }
+  & .admin-sidebar .branched-menu button:is(:hover, :focus-visible, .selected) { color: var(--ink); background-color: var(--warm); }
+  & .admin-sidebar .branched-menu button.selected { box-shadow: inset 0 0 0 1px var(--studio-control-border); }
+  & .admin-sidebar .branched-menu button:active { background-color: var(--paper); }
+  & .branched-menu__base { stroke: var(--studio-control-border); }
+  & .branched-menu__reach { stroke: var(--green); }
+  & .admin-sidebar-resize:is(:hover, :focus-visible)::before { background-color: var(--studio-focus); }
+  & :is(.admin-sidebar-collapse, .admin-topbar .back-navigation, .studio-appearance .site-preferences-trigger) {
+    color: var(--ink); background-color: var(--surface); border-color: var(--studio-control-border);
+  }
+  & :is(.admin-sidebar-collapse:hover, .admin-topbar .back-navigation:hover, .studio-appearance .site-preferences-trigger:is(:hover, [aria-expanded="true"]),
+    .icon-button:hover, .notification-toolbar button:hover) { background-color: var(--warm); }
+  & :is(.admin-sidebar-bottom strong, .admin-sidebar-bottom .admin-sidebar-signout) { color: var(--ink); }
+  & .admin-sidebar-bottom .admin-sidebar-signout::after { background-color: var(--warm); color: var(--ink); }
+  & [data-squish-switch] .squish-switch-track { background-color: var(--paper); box-shadow: inset 0 0 0 1px var(--studio-control-border); }
+  & [data-squish-switch][aria-checked="true"] .squish-switch-track { background-color: var(--warm); }
+  & [data-squish-switch]:focus-visible { outline-color: var(--studio-focus); }
+  & .squish-switch-options { color: var(--muted); }
+  & .squish-switch-blob { background-color: var(--studio-action); }
+  & .squish-switch-current { color: var(--studio-on-action); }
+  & .studio-appearance .home-theme-options {
+    --segment-track: var(--paper);
+    --segment-thumb: var(--warm);
+    --segment-text: var(--muted);
+    --segment-active-text: var(--ink);
+    --segment-border: var(--studio-control-border);
+  }
+  & .gary-apps-menu {
+    --gary-app-ink: var(--ink);
+    --gary-app-muted: var(--muted);
+    --gary-app-line: var(--line);
+  }
+  & :is(.gary-apps-menu > summary, .gary-apps-menu-panel, .studio-appearance .site-preferences-panel) {
+    background-color: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--home-shadow);
+  }
+  & :is(.gary-apps-menu > summary:is(:hover, :focus-visible), .gary-apps-menu[open] > summary, .gary-app-menu-item:hover,
+    .gary-app-mark, .gary-app-menu-item strong > small, .gary-apps-menu-panel .gary-apps-menu-all) {
+    background-color: var(--warm); color: var(--green); border-color: var(--line);
+  }
+  & :is(.gary-app-menu-host, .gary-apps-menu-travel, .gary-app-menu-item > svg) { color: var(--muted); }
+
+  /* Dashboard, directories, tables and notifications */
+  & :is(.admin-panel, .admin-stats > div, .admin-media-grid > button, .customer-metrics > button,
+    .studio-notification-panel, .studio-notification-panel li > button) { background-color: var(--surface); color: var(--ink); }
+  & :is(.admin-table th, .seo-history th, .team-permissions-guide, .team-access-summary, .team-existing-login-callout,
+    .customer-preferences, .customer-metrics > button.selected, .lead-message, .getting-started, .submitted-copy,
+    .landlord-create-draft) { background-color: var(--warm); border-color: var(--line); }
+  & :is(.admin-stats > div:hover, .customer-metrics > button:is(.selected, :hover)) { border-color: var(--studio-control-border); }
+  & :is(.team-permissions-guide th, .team-permissions-guide td, .getting-started > button, .landlord-review,
+    .landlord-attachments li, .landlord-maintenance) { border-color: var(--line); }
+  & :is(.enquiry-row:hover, .customer-row:is(.selected, :hover), .customer-history > button:hover,
+    .studio-notification-panel li > button:is([data-unread="true"], :hover),
+    .landlord-records button:is([aria-pressed="true"], :hover)) { background-color: var(--warm); }
+  & .landlord-records button { color: var(--ink); }
+  & .landlord-records button[aria-pressed="true"] { border-color: var(--studio-control-border); }
+  & .studio-notification-panel { box-shadow: var(--home-shadow); }
+  & :is(.admin-stats > div > span, .team-existing-login-callout > p, .admin-empty) { color: var(--green); }
+  & :is(.avatar, .team-avatar, .staff-profile-photo, .notification-avatar, .form-success > span, .team-state.active) { background-color: var(--warm); color: var(--green); }
+  & .getting-started > button > span { background-color: var(--paper); color: var(--green); }
+  & :is(.studio-notification-panel li button > span > span, .listing-upload-metrics > div > span:first-child,
+    .landlord-queue-help, .landlord-facts dt, .landlord-records small, .landlord-review-header small,
+    .landlord-attachments small, .landlord-maintenance small, .rental-cms-row small) { color: var(--muted); }
+  & :is(.status-badge, .empty-state) { background-color: var(--warm); border-color: var(--line); }
+  & :is(.staff-password-reminder, .customer-filter-note, .help-owner-note, .team-state:not(.active)) {
+    color: var(--studio-warning); background-color: var(--studio-warning-surface); border-color: var(--studio-warning);
+  }
+  & :is(.enquiry-row[data-unread="true"] .enquiry-read-state, .upload-idle-note, .customer-row-meta .followup-due) { color: var(--studio-warning); }
+  & .admin-connection.demo .live-dot { background-color: var(--studio-warning); }
+  & .notification-count { background-color: var(--home-copper); color: var(--studio-on-action); }
+
+  /* Forms, status feedback and dialog controls */
+  & :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"])), textarea, select, .site-select-trigger) {
+    color: var(--ink); background-color: var(--paper); border-color: var(--studio-control-border);
+  }
+  & :is(input, textarea)::placeholder { color: var(--home-quiet); opacity: 1; }
+  & :is(input[type="checkbox"], input[type="radio"], progress) { accent-color: var(--green); }
+  & :is(input, textarea, select, .site-select-trigger)[aria-invalid="true"] { border-color: var(--home-danger); }
+  & :is(.listing-id-conflict, .slug-field-error) { color: var(--home-danger); }
+  & :is(.site-select-trigger:hover, .site-select-option[data-highlighted]) { background-color: var(--warm); color: var(--ink); border-color: var(--studio-control-border); }
+  & .site-select-trigger:is(:focus-visible, [data-popup-open]) { outline-color: var(--studio-focus); }
+  & :is(.site-select-chevron, .site-select-indicator, .site-select-option[data-selected]) { color: var(--green); }
+  & .site-select-popup { background-color: var(--surface); color: var(--ink); border-color: var(--studio-control-border); box-shadow: var(--home-shadow); }
+  & .site-select-list { scrollbar-color: var(--studio-control-border) transparent; }
+  & :is(.team-account-modes, .upload-label, .listing-upload-status, .editor-photo-grid > div > span,
+    .editor-photo-grid button, .editor-photo-order, .editor-photo-card, .staff-photo-editor) { background-color: var(--warm); border-color: var(--line); }
+  & :is(.property-video, .rental-cms-row) { border-color: var(--line); }
+  & .upload-label { border-color: var(--studio-control-border); }
+  & :is(.upload-label:hover, .editor-photo-grid button:hover) { background-color: var(--paper); }
+  & .team-invite-form label.team-password-choice { color: var(--ink); }
+  & .admin-shell .activity-tabs > button:not([aria-pressed="true"]) {
+    background-color: var(--surface); border-color: var(--studio-control-border); color: var(--ink);
+    &:hover { background-color: var(--studio-quiet-hover); }
+    &:active { background-color: var(--studio-quiet-active); }
+  }
+  & :is(.form-info, .staff-profile-toast) { background-color: var(--warm); color: var(--ink); border-color: var(--line); }
+  & :is(.form-error, .seo-critical-banner, .button.button-danger-outline:hover) { background-color: var(--home-danger-surface); color: var(--home-danger); border-color: var(--home-danger); }
+  & :is(.button.button-danger-outline, .row-actions > .text-danger, .team-member-actions > .text-danger) { color: var(--home-danger); border-color: var(--home-danger); }
+  & .button.button-danger {
+    color: var(--studio-on-action); background-color: var(--home-danger); border-color: var(--home-danger);
+    &:hover:not(:disabled) { background-color: #ffccbf; border-color: #ffccbf; }
+    &:active:not(:disabled) { background-color: #e5aa9d; border-color: #e5aa9d; transform: none; }
+  }
+  & :is(.delete-dialog, .staff-profile-dialog, .help-media-dialog) { background-color: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--home-shadow); }
+  & :is(.delete-dialog, .staff-profile-dialog, .help-media-dialog)::backdrop { background: var(--home-scrim, #08100be6); }
+  & .editor-overlay { background-color: var(--home-scrim); }
+  & :is(.toast, .staff-profile-toast:has(> .swipe-row)) { --toast-background: var(--warm); --toast-color: var(--ink); }
+
+  /* Content editors, SEO and the staff guide library */
+  & :is(.editorial-list > button:hover, .editorial-cover-preview, .seo-category-tabs, .seo-progress,
+    .seo-severity, .seo-skipped, .seo-trend, .seo-coverage > div, .seo-inspection-error, .seo-diagnostics, .seo-methodology,
+    .seo-page:is([data-inspection="failed"], [data-inspection="skipped"], [data-inspection="pending"]) summary,
+    .seo-editor-finding pre, .help-intro, .help-quick-start, .help-empty, .help-upload-section, .help-media-dialog > header) {
+    background-color: var(--warm); border-color: var(--line);
+  }
+  & :is(.editorial-list > button[aria-pressed="true"], .seo-editor-preview-header button[aria-pressed="true"]) { background-color: var(--warm); color: var(--ink); }
+  & .editorial-list > button[aria-pressed="true"] { box-shadow: inset 3px 0 var(--green); }
+  & :is(.editorial-list span, .editorial-editor fieldset, .editorial-section-fields > div + div, .editorial-source, .seo-finding,
+    .seo-editor-preview-header button, .seo-editor-statistics span, .seo-editor-findings, .seo-editor-finding,
+    .help-media-dialog > :is(header, footer), .help-editor-actions, .help-media-stage iframe) { border-color: var(--line); }
+  & :is(.editorial-list span, .editorial-editor legend, .seo-coverage strong, .seo-inspection-error strong,
+    .seo-passed, .portal-manual-eyebrow, .help-card-top, .help-library-heading > svg) { color: var(--green); }
+  & .seo-fix { color: var(--green) !important; }
+  & :is(.editorial-toolbar > p, .editorial-list small, .editorial-list > p, .editorial-editor > p, .seo-filters label, .seo-progress small,
+    .seo-coverage span, .seo-history-legacy, .seo-not-evaluated, .seo-unknown, .seo-pending,
+    .seo-page:is([data-inspection="failed"], [data-inspection="skipped"], [data-inspection="pending"]) summary > span,
+    .seo-editor-score small, .seo-editor-statistics, .seo-editor-muted, .seo-editor-finding > div, .seo-search-url, .seo-search-preview p,
+    .help-intro p, .help-quick-start small, .help-guide-card > p, .help-card-bottom, .help-summary, .help-attachments > p,
+    .help-file small, .help-file-row small, .help-media-note, .help-media-dialog header small, .help-upload-section > p,
+    .portal-manual-heading p, .portal-manual-caption, .portal-manual-caption small, .help-library-heading p) { color: var(--muted); }
+  & :is(.seo-warning, .seo-recommendation) { color: var(--studio-warning); }
+  & :is(.seo-critical, .seo-critical-banner h3, .seo-critical-banner > p) { color: var(--home-danger); }
+  & .seo-critical-banner > div { border-color: var(--home-danger); }
+  & .seo-score progress::-webkit-progress-bar { background-color: var(--warm); }
+  & .seo-score progress::-webkit-progress-value { background-color: var(--green); }
+  & .seo-trend-content { stroke: var(--green); }
+  & .seo-trend-technical { stroke: var(--studio-warning); }
+  & :is(.seo-search-preview, .help-search, .help-guide-card, .help-article, .help-file, .help-file-row, .portal-manual,
+    .help-media-stage iframe) { background-color: var(--surface); color: var(--ink); border-color: var(--line); }
+  & .help-search, & .help-upload-section { border-color: var(--studio-control-border); }
+  & .help-search, & .help-search input { background-color: var(--paper); }
+  & :is(.seo-search-brand, .help-empty, .help-quick-start, .portal-manual-heading h2) { color: var(--ink); }
+  & .seo-search-title { color: #adc7f1; }
+  & :is(.help-intro-icon, .portal-manual-badge) { background-color: var(--paper); color: var(--green); border-color: var(--line); }
+  & :is(.help-quick-start:hover, .help-file:hover) { background-color: var(--paper); }
+}

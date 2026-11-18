@@ -12,7 +12,7 @@ const source = ts.transpileModule(fs.readFileSync(new URL('../components/site-pr
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }
 }).outputText;
 
-async function controls(t, { language = 'en', pathname = '/en' } = {}) {
+async function controls(t, { language = 'en', pathname = '/en', appearanceOnly = false } = {}) {
   const previous = new Map();
   for (const [name, value] of Object.entries({
     IS_REACT_ACT_ENVIRONMENT: true,
@@ -22,7 +22,7 @@ async function controls(t, { language = 'en', pathname = '/en' } = {}) {
     previous.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
     Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
   }
-  const selections = [], localeChanges = [];
+  const selections = [], saved = [], localeChanges = [];
   const module = { exports: {} };
   const Segment = props => React.createElement('div', { 'data-choice-group': props['aria-label'] },
     props.items.map(item => React.createElement('button', { key: item.value, 'data-value': item.value,
@@ -33,12 +33,13 @@ async function controls(t, { language = 'en', pathname = '/en' } = {}) {
     if (id === 'next-themes') return { useTheme: () => ({ theme: 'dark', setTheme: value => selections.push(value) }) };
     if (id === 'next/navigation') return { usePathname: () => pathname };
     if (id === '@/lib/localized-routes') return { isPublicPagePath: value => !['/account', '/auth/reset', '/admin'].includes(value) };
+    if (id === '@/lib/public-theme') return { isHomeTheme: value => ['light', 'dark', 'system'].includes(value), persistHomeTheme: value => saved.push(value) };
     if (id === './currency-switcher') return { CurrencySwitcher: () => React.createElement('span', null, 'USD / VND') };
     if (id === './react-bits/rubber-segment') return { __esModule: true, default: Segment };
     return require(id);
   }, module);
   let renderer;
-  await act(async () => { renderer = TestRenderer.create(React.createElement(module.exports.SitePreferences), {
+  await act(async () => { renderer = TestRenderer.create(React.createElement(module.exports.SitePreferences, { appearanceOnly }), {
     createNodeMock: () => ({ contains: () => false, querySelector: () => null, focus() {} })
   }); });
   await act(async () => renderer.root.findByProps({ 'aria-haspopup': 'dialog' }).props.onClick());
@@ -49,7 +50,7 @@ async function controls(t, { language = 'en', pathname = '/en' } = {}) {
       else delete globalThis[name];
     }
   });
-  return { renderer, selections, localeChanges };
+  return { renderer, selections, saved, localeChanges };
 }
 
 for (const language of ['en', 'vi']) test(`header preference choices dispatch Light/Dark/System without changing ${language} language or currency`, async t => {
@@ -59,8 +60,21 @@ for (const language of ['en', 'vi']) test(`header preference choices dispatch Li
   assert.equal(group.findByProps({ 'data-value': 'dark' }).props['aria-checked'], true);
   for (const value of ['light', 'dark', 'system']) await act(async () => group.findByProps({ 'data-value': value }).props.onClick());
   assert.deepEqual(ui.selections, ['light', 'dark', 'system']);
+  assert.deepEqual(ui.saved, ui.selections);
   assert.deepEqual(ui.localeChanges, []);
   assert.ok(ui.renderer.root.findAllByType('span').some(span => span.children.includes('USD / VND')));
+});
+
+test('staff appearance uses the same three choices in the workspace sidebar', async t => {
+  const ui = await controls(t, { language: 'vi', pathname: '/admin', appearanceOnly: true });
+  const dialog = ui.renderer.root.findByProps({ role: 'dialog' });
+  assert.equal(dialog.props['aria-label'], 'Giao diện');
+  const group = dialog.findByProps({ 'data-choice-group': 'Chế độ giao diện' });
+  assert.deepEqual(group.findAllByType('button').map(button => button.children.join('')), ['Sáng', 'Tối', 'Hệ thống']);
+  assert.equal(dialog.findAll(node => node.props['data-choice-group']).length, 1);
+  await act(async () => group.findByProps({ 'data-value': 'system' }).props.onClick());
+  assert.deepEqual(ui.selections, ['system']);
+  assert.deepEqual(ui.saved, ui.selections);
 });
 
 test('customer portal header retains language/currency preferences without advertising an inactive public theme control', async t => {

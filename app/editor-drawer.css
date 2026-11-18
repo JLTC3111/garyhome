@@ -29,19 +29,9 @@
 @keyframes home-editor-slide-in{from{transform:translateX(28px);opacity:.7}to{transform:translateX(0);opacity:1}}
 @keyframes editor-edge-flow{0%,100%{background-position:0 0}50%{background-position:0 100%}}
 @media(prefers-reduced-motion:reduce){.editor-dock{animation:none}.editor-flowing-edge{animation:none}}
-/* Only the editor follows the existing appearance preference; staff navigation
-   and the rest of Home's chrome are deliberately unchanged. */
-html[data-home-theme=dark] .editor-dock.gw-drawer{--paper:#17261e;--surface:#1c3025;--border:#3c5143;--ink:#eef3e8;--muted:#bbc8bc;--line:#3c5143;--olive:#b8cba0;--gw-surface:var(--paper);--gw-ink:var(--ink);--gw-line:var(--line);--gw-accent:#bdd1a7}
+/* Use the Studio palette for the shared editor workspace controls. */
+html[data-home-theme=dark] .editor-dock.gw-drawer{--paper:var(--home-surface);--gw-accent:var(--home-accent)}
 html[data-home-theme=dark] .editor-dock .gw-editor-header .icon-button:hover:not(:disabled){background:color-mix(in srgb,var(--gw-accent) 14%,var(--gw-surface));color:var(--gw-ink)}
-html[data-home-theme=dark] .editor-dock .editor-scroll-body :is(input:not([type=checkbox]),textarea,select,.site-select-trigger){background:#1c3025;color:var(--ink);border-color:#57705e}
-html[data-home-theme=dark] .editor-dock .editor-scroll-body :is(.editor-section-title,label,legend,strong,h3){color:var(--ink)}
-html[data-home-theme=dark] .editor-dock .editor-scroll-body :is(.small,.muted,label>small){color:var(--muted)}
-html[data-home-theme=dark] .editor-dock :is(.form-info,.listing-upload-status){background:#20362a;border-color:#405844;color:#d4e0cf}
-html[data-home-theme=dark] .editor-dock :is(.seo-editor-muted,.seo-editor-statistics,.seo-editor-finding>div,.seo-editor-score small){color:var(--muted)}
-html[data-home-theme=dark] .editor-dock :is(.seo-editor-statistics span,.seo-editor-findings,.seo-editor-finding){border-color:var(--line)}
-html[data-home-theme=dark] .editor-dock .seo-editor-finding pre{background:#20362a;color:var(--muted)}
-html[data-home-theme=dark] .editor-dock .seo-editor-preview-header button[aria-pressed=true]{background:#b8cba0;color:#17261e}
-html[data-home-theme=dark] .editor-dock .form-error{background:#432b24;color:#ffe1d3;border-color:#8a5a46}
 
 .listing-upload-status{padding:16px;border:1px solid #d7dfd1;border-radius:12px;background:#f5f7ef;display:grid;gap:10px}
 .listing-upload-metrics{display:flex;align-items:center;gap:28px;flex-wrap:wrap}.listing-upload-metrics>div{display:grid;gap:5px}.listing-upload-metrics>div>span:first-child{font-size:12px;color:#687660}.listing-upload-metrics>button{margin-left:auto}.listing-upload-status progress{width:100%;height:8px;accent-color:#365743}.listing-upload-status p{margin:0}.upload-idle-note{display:flex;align-items:baseline;gap:5px;flex-wrap:wrap;font-size:13px;color:#6b591f}

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import postcss from 'postcss';
 import ts from 'typescript';
 
 const root = new URL('../', import.meta.url);
@@ -43,6 +44,7 @@ test('the public palette does not opt staff, auth, customer portals, API or unkn
 const css = fs.readFileSync(new URL('app/public-theme.css', root), 'utf8');
 const tokens = Object.fromEntries([...css.matchAll(/--(home-[\w-]+):\s*(#[\da-f]{6})(?:;|\s)/gi)].map(([, name, value]) => [name, value]));
 function luminance(hex) {
+  if (hex.length === 4) hex = '#' + [...hex.slice(1)].map(digit => digit.repeat(2)).join('');
   const components = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
   return components.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
     .reduce((total, value, index) => total + value * [.2126, .7152, .0722][index], 0);
@@ -61,6 +63,33 @@ test('forest surfaces, secondary copy, sage actions and input outlines meet AA c
   assert.ok(contrast(tokens['home-action-ink'], tokens['home-accent']) >= 4.5);
   assert.ok(contrast(tokens['home-field-border'], tokens['home-surface']) >= 3);
   assert.ok(contrast(tokens['home-accent'], tokens['home-elevated']) >= 3, 'visible focus outline');
+});
+
+test('Studio action, focus and field colors meet contrast targets in both themes', () => {
+  const studio = postcss.parse(fs.readFileSync(new URL('app/studio-theme.css', root), 'utf8'));
+  const declarations = (selector, scheme) => {
+    const rule = studio.nodes.find(node => node.selector === selector);
+    assert.ok(rule, `expected Studio-scoped ${scheme} styles`);
+    assert.ok(rule.nodes.some(node => node.prop === 'color-scheme' && node.value === scheme));
+    return Object.fromEntries(rule.nodes.filter(node => node.type === 'decl' && node.prop.startsWith('--')).map(node => [node.prop.slice(2), node.value]));
+  };
+  const light = declarations('html:has(.admin-shell)', 'light');
+  const dark = { ...tokens, ...light, ...declarations('html[data-home-theme="dark"]:has(.admin-shell, .admin-loading)', 'dark') };
+  for (const [palette, surfaces] of [[light, ['#fff', '#f5f6f0', '#edf2e5']], [dark, ['home-background', 'home-surface', 'home-elevated'].map(name => tokens[name])]]) {
+    const color = name => {
+      const value = palette[name];
+      const reference = /^var\(--([\w-]+)\)$/.exec(value);
+      return reference ? color(reference[1]) : value;
+    };
+    for (const state of ['studio-action', 'studio-action-hover', 'studio-action-active']) {
+      assert.ok(contrast(color('studio-on-action'), color(state)) >= 4.5, state);
+      for (const surface of surfaces) assert.ok(contrast(color(state), surface) >= 3, `${state} on ${surface}`);
+    }
+    for (const surface of surfaces) {
+      assert.ok(contrast(color('studio-focus'), surface) >= 3, `focus on ${surface}`);
+      assert.ok(contrast(color('studio-control-border'), surface) >= 3, `control border on ${surface}`);
+    }
+  }
 });
 
 test('dark styles preserve image color and the supplied evening asset is an unmodified copy', () => {

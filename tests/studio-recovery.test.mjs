@@ -1703,3 +1703,29 @@ test('switching language on a legacy listing creates a shareable locale URL and 
  assert.equal(h.backend.navigation.at(-1),'/en'+path+'?view=gallery#photos');
  assert.ok(h.site.content.properties.some(row=>row.slug===property.slug));
 });
+
+test('staff Contact link opens the localized public page as a normal document',async t=>{
+ const h=await harness(t,{page:'staff',path:'/admin',url:'https://staff.garyhome.vn/admin'});
+ const contact=()=>h.renderer.root.findAllByType('a').find(node=>node.parent.props.className==='admin-empty');
+ assert.equal(contact()?.props.href,'https://www.garyhome.vn/en/contact');
+ assert.equal(contact().props.target,'_blank');
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(contact()?.props.href,'https://www.garyhome.vn/vi/contact');
+ await act(async()=>h.site.enterDemo());
+ assert.equal(contact()?.props.href,'/vi/contact');
+});
+
+test('staff notifications catch up when the browser restores the page from its history cache',async t=>{
+ const h=await harness(t,{page:'staff',path:'/admin',url:'https://staff.garyhome.vn/admin'});
+ const reads=()=>h.backend.rpcCalls.filter(call=>call.name==='get_studio_notifications').length;
+ const badge=()=>h.renderer.root.findAllByProps({className:'notification-count'})[0];
+ const initialReads=reads();
+ h.backend.notifications=[{id:'cached-activity',created_at:'2026-11-18T09:00:00Z',action:'enquiry_created',category:'enquiries',details:{},unread:true}];
+ await act(async()=>{h.browser.dispatchEvent(new Event('pageshow'));await delay(5);});
+ assert.equal(reads(),initialReads);
+ assert.equal(badge(),undefined);
+ const restore=Object.defineProperty(new Event('pageshow'),'persisted',{value:true});
+ await act(async()=>{h.browser.dispatchEvent(restore);await delay(5);});
+ assert.equal(reads(),initialReads+1);
+ assert.equal(badge()?.children.join(''),'1');
+});

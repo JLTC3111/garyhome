@@ -20,9 +20,20 @@ export function StudioNotifications({navigate}:{navigate:(category:StudioCategor
   }).catch(()=>{if(active.current&&generation===sequence.current)setFailed(true);}).finally(()=>{if(active.current&&generation===sequence.current)setLoading(false);});
  },[client]);
  const load=useCallback((older?:StudioNotification)=>{setLoading(true);return read(older);},[read]);
- useEffect(()=>{if(!client||!userId)return;void read();const refresh=()=>void load();window.addEventListener("gary-team-access-changed",refresh);
+ useEffect(()=>{
+  if(!client||!userId)return;
+  void read();
+  const refresh=()=>void load();
+  const restore=(event:PageTransitionEvent)=>{if(event.persisted)refresh();};
+  // The Realtime transport reconnects on restore. Read activity missed while cached.
+  window.addEventListener("pageshow",restore);
+  window.addEventListener("gary-team-access-changed",refresh);
   const channel=typeof client.channel==="function"?client.channel("gary-studio-notifications-"+userId).on("postgres_changes",{event:"INSERT",schema:"public",table:"studio_notifications"},refresh).subscribe():null;
-  return()=>{window.removeEventListener("gary-team-access-changed",refresh);if(channel)void client.removeChannel(channel);};
+  return()=>{
+   window.removeEventListener("pageshow",restore);
+   window.removeEventListener("gary-team-access-changed",refresh);
+   if(channel)void client.removeChannel(channel);
+  };
  },[client,userId,read,load]);
  useEffect(()=>{if(!open)return;panel.current?.querySelector<HTMLElement>('button')?.focus();
   const key=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.stopPropagation();setOpen(false);trigger.current?.focus();}};

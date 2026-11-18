@@ -1,0 +1,74 @@
+@property --gary-network-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0turn;
+}
+
+.gary-apps-directory .gary-apps-grid > .gary-app-card {
+  --gary-network-accent: var(--gary-app-accent);
+  --gary-network-glow:
+    0 8px 24px color-mix(in srgb, var(--gary-network-accent) 13%, transparent),
+    0 0 12px color-mix(in srgb, var(--gary-network-accent) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--gary-network-accent) 26%, transparent);
+  position: relative;
+  border-top-width: 1px;
+  border-color: var(--gary-app-line);
+  transform: var(--gary-network-lift, none);
+  box-shadow: var(--gary-network-shadow, 0 8px 25px #20392504);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+html[data-home-public="true"][data-home-theme="dark"] .gary-apps-directory .gary-apps-grid > .gary-app-card {
+  --gary-network-accent: color-mix(in srgb, var(--gary-app-accent) 62%, var(--home-text));
+}
+
+@supports (mask-composite: exclude) {
+  .gary-apps-directory .gary-apps-grid > .gary-app-card::after {
+    --gary-network-angle: var(--gary-network-sweep, 0turn);
+    content: "";
+    position: absolute;
+    inset: -1px;
+    padding: 1px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--gary-network-angle), transparent 245deg,
+      color-mix(in srgb, var(--gary-network-accent) 30%, transparent) 304deg,
+      var(--gary-network-accent) 349deg, transparent 1turn);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: var(--gary-network-opacity, 0);
+    transition: opacity 220ms ease, --gary-network-angle 920ms ease-out;
+  }
+}
+
+.gary-apps-directory .gary-apps-grid > .gary-app-card:has(a:active) {
+  --gary-network-opacity: 1;
+  --gary-network-shadow: var(--gary-network-glow);
+}
+
+.gary-apps-directory .gary-apps-grid > .gary-app-card:has(a:focus-visible) {
+  --gary-network-opacity: 1;
+  --gary-network-sweep: 1turn;
+  --gary-network-shadow: var(--gary-network-glow);
+  --gary-network-lift: translateY(-2px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gary-apps-directory .gary-apps-grid > .gary-app-card:hover {
+    --gary-network-opacity: 1;
+    --gary-network-sweep: 1turn;
+    --gary-network-shadow: var(--gary-network-glow);
+    --gary-network-lift: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gary-apps-directory .gary-apps-grid > .gary-app-card {
+    transform: none;
+    transition: none;
+  }
+  .gary-apps-directory .gary-apps-grid > .gary-app-card::after {
+    background: color-mix(in srgb, var(--gary-network-accent) 55%, transparent);
+    transition: none;
+  }
+}

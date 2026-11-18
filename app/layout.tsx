@@ -42,6 +42,7 @@ import { DocumentTitle } from "@/components/document-title";
 import { PublicThemeProvider } from "@/components/public-theme-provider";
 import { PUBLIC_THEME_SCOPE_BOOTSTRAP } from "@/lib/public-theme";
 import "./public-theme.css";
+import "./gary-network-cards.css";
 import "./studio-theme.css";
 
 // Read CMS content at request time so publishing edits does not need a rebuild.

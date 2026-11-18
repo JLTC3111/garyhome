@@ -12,17 +12,16 @@ const source = ts.transpileModule(fs.readFileSync(new URL('../components/site-pr
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }
 }).outputText;
 
-async function controls(t, { language = 'en', pathname = '/en', appearanceOnly = false } = {}) {
+async function controls(t, { language = 'en', pathname = '/en', studio = false } = {}) {
   const previous = new Map();
   for (const [name, value] of Object.entries({
     IS_REACT_ACT_ENVIRONMENT: true,
-    document: { addEventListener() {}, removeEventListener() {} },
-    window: { addEventListener() {}, removeEventListener() {} }
+    document: { addEventListener() {}, removeEventListener() {} }
   })) {
     previous.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
     Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
   }
-  const selections = [], saved = [], localeChanges = [];
+  const selections = [], saved = [], localeChanges = [], focus = [];
   const module = { exports: {} };
   const Segment = props => React.createElement('div', { 'data-choice-group': props['aria-label'] },
     props.items.map(item => React.createElement('button', { key: item.value, 'data-value': item.value,
@@ -39,8 +38,8 @@ async function controls(t, { language = 'en', pathname = '/en', appearanceOnly =
     return require(id);
   }, module);
   let renderer;
-  await act(async () => { renderer = TestRenderer.create(React.createElement(module.exports.SitePreferences, { appearanceOnly }), {
-    createNodeMock: () => ({ contains: () => false, querySelector: () => null, focus() {} })
+  await act(async () => { renderer = TestRenderer.create(React.createElement(module.exports.SitePreferences, { studio }), {
+    createNodeMock: node => ({ contains: () => false, querySelector: () => null, focus() { focus.push(node.props.className); } })
   }); });
   await act(async () => renderer.root.findByProps({ 'aria-haspopup': 'dialog' }).props.onClick());
   t.after(async () => {
@@ -50,7 +49,7 @@ async function controls(t, { language = 'en', pathname = '/en', appearanceOnly =
       else delete globalThis[name];
     }
   });
-  return { renderer, selections, saved, localeChanges };
+  return { renderer, selections, saved, localeChanges, focus };
 }
 
 for (const language of ['en', 'vi']) test(`header preference choices dispatch Light/Dark/System without changing ${language} language or currency`, async t => {
@@ -65,16 +64,26 @@ for (const language of ['en', 'vi']) test(`header preference choices dispatch Li
   assert.ok(ui.renderer.root.findAllByType('span').some(span => span.children.includes('USD / VND')));
 });
 
-test('staff appearance uses the same three choices in the workspace sidebar', async t => {
-  const ui = await controls(t, { language: 'vi', pathname: '/admin', appearanceOnly: true });
+test('staff preferences group language and appearance and return focus on Escape', async t => {
+  const ui = await controls(t, { language: 'vi', pathname: '/admin', studio: true });
   const dialog = ui.renderer.root.findByProps({ role: 'dialog' });
-  assert.equal(dialog.props['aria-label'], 'Giao diện');
+  assert.equal(dialog.props['aria-label'], 'Ngôn ngữ và giao diện');
+  const language = dialog.findByProps({ 'data-choice-group': 'Ngôn ngữ' });
+  assert.equal(language.findByProps({ 'data-value': 'vi' }).props['aria-checked'], true);
   const group = dialog.findByProps({ 'data-choice-group': 'Chế độ giao diện' });
   assert.deepEqual(group.findAllByType('button').map(button => button.children.join('')), ['Sáng', 'Tối', 'Hệ thống']);
-  assert.equal(dialog.findAll(node => node.props['data-choice-group']).length, 1);
+  assert.deepEqual(dialog.findAllByType('legend').map(legend => legend.children.join('')), ['Ngôn ngữ', 'Giao diện']);
+  await act(async () => language.findByProps({ 'data-value': 'en' }).props.onClick());
   await act(async () => group.findByProps({ 'data-value': 'system' }).props.onClick());
+  assert.deepEqual(ui.localeChanges, ['en']);
   assert.deepEqual(ui.selections, ['system']);
   assert.deepEqual(ui.saved, ui.selections);
+  const wrapper = ui.renderer.root.findByProps({ className: 'site-preferences studio-preferences' });
+  let stopped = false;
+  await act(async () => wrapper.props.onKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() { stopped = true; } }));
+  assert.equal(stopped, true, 'an outer editor cannot receive Escape from an open preferences panel');
+  assert.equal(wrapper.findAllByProps({ role: 'dialog' }).length, 0);
+  assert.deepEqual(ui.focus, ['site-preferences-trigger']);
 });
 
 test('customer portal header retains language/currency preferences without advertising an inactive public theme control', async t => {

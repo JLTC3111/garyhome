@@ -29,7 +29,7 @@ async function harness(t, options={}){
  browser.history={state:null,replaceState(_state,_title,url){browser.location=new URL(url,browser.location);}};
  // Headless controls inspect DOM constructors even when test-renderer refs are null.
  class TestElement {} class TestHTMLElement extends TestElement {}
- Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement});
+ Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement,innerWidth:1440,matchMedia:media=>Object.assign(new EventTarget(),{media,matches:false})});
  setGlobal('Element',TestElement);setGlobal('HTMLElement',TestHTMLElement);
  setGlobal('IS_REACT_ACT_ENVIRONMENT',true);setGlobal('window',browser);setGlobal('document',page);setGlobal('navigator',network);
  setGlobal('localStorage',{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)});
@@ -312,10 +312,26 @@ test('the combined preferences menu changes and persists both choices independen
  assert.equal(h.site.language,'vi');assert.equal(h.site.currency,'USD');assert.equal(h.stored.get('gary-language'),'vi');assert.match(preferences().props['aria-label'],/Tiếng Việt, USD/);
  await act(async()=>panel().findAllByType('button').find(node=>node.children.includes('VND')).props.onClick());
  assert.equal(h.site.currency,'VND');assert.equal(h.stored.get('gary-currency'),'VND');assert.match(h.page.cookie,/gary-currency=VND/);assert.match(preferences().props['aria-label'],/Tiếng Việt, VND/);
- await act(async()=>h.browser.dispatchEvent(Object.assign(new Event('keydown',{cancelable:true}),{key:'Escape'})));
+ await act(async()=>h.renderer.root.findByProps({className:'site-preferences'}).props.onKeyDown({key:'Escape',preventDefault(){},stopPropagation(){}}));
  assert.equal(preferences().props['aria-expanded'],false);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);
  await act(async()=>preferences().props.onClick());await act(async()=>h.page.dispatchEvent(new Event('pointerdown')));assert.equal(preferences().props['aria-expanded'],false);
  await act(async()=>preferences().props.onClick());await act(async()=>panel().findAllByType('button').find(node=>node.props['aria-label']==='Đóng tùy chọn').props.onClick());assert.equal(preferences().props['aria-expanded'],false);
+});
+
+test('the staff topbar groups language and appearance under one preference trigger', async t=>{
+ const h=await harness(t,{page:'staff',path:'/admin',url:'https://staff.garyhome.vn/admin'});
+ const topbar=h.renderer.root.findByProps({className:'admin-topbar-actions'});
+ const triggers=h.renderer.root.findAllByProps({className:'site-preferences-trigger'});
+ assert.equal(triggers.length,1);
+ assert.equal(topbar.findByProps({className:'site-preferences-trigger'}),triggers[0]);
+ await act(async()=>triggers[0].props.onClick());
+ const panel=topbar.findByProps({role:'dialog'});
+ assert.deepEqual(panel.findAllByType('legend').map(node=>node.children.join('')),['Language','Appearance']);
+ await act(async()=>panel.findAllByType('button').find(node=>node.props.lang==='vi').props.onClick());
+ assert.equal(h.site.language,'vi');
+ assert.equal(h.stored.get('gary-language'),'vi');
+ await act(async()=>panel.findAllByType('button').find(node=>node.children.includes('Tối')).props.onClick());
+ assert.match(h.page.cookie,/gary-home-theme=dark/);
 });
 
 test('customer schema errors stay visible until a successful refresh loads real data',async t=>{

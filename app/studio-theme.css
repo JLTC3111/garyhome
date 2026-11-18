@@ -1,19 +1,9 @@
-.studio-appearance {
-  align-self: flex-start;
-  margin-inline: 7px;
-}
+.studio-preferences .site-preferences-panel { right: 0; }
+.editor-drawer .editor-toolbar { position: relative; }
+.editor-toolbar .studio-preferences { position: static; }
 
-.studio-appearance .site-preferences-panel {
-  inset: auto auto 0 calc(100% + 10px);
-  width: min(300px, calc(100vw - 84px));
-  max-height: calc(100dvh - 160px);
-}
-
-.admin-shell[data-sidebar="collapsed"] .studio-appearance { align-self: center; margin-inline: 0; }
-
-@media (max-width: 680px) {
-  .admin-sidebar > .studio-appearance { align-self: center; margin-inline: 0; }
-  .studio-appearance .home-theme-options .rubber-segment__item { flex-direction: column; }
+@media (max-width: 400px) {
+  .studio-preferences .home-theme-options .rubber-segment__item { flex-direction: column; }
 }
 
 /* Root scope supplies tokens to portaled controls and themes the viewport scrollbar. */
@@ -114,10 +104,10 @@ html[data-home-theme="dark"]:has(.admin-shell, .admin-loading) {
   & .branched-menu__base { stroke: var(--studio-control-border); }
   & .branched-menu__reach { stroke: var(--green); }
   & .admin-sidebar-resize:is(:hover, :focus-visible)::before { background-color: var(--studio-focus); }
-  & :is(.admin-sidebar-collapse, .admin-topbar .back-navigation, .studio-appearance .site-preferences-trigger) {
+  & :is(.admin-sidebar-collapse, .admin-topbar .back-navigation, .studio-preferences .site-preferences-trigger) {
     color: var(--ink); background-color: var(--surface); border-color: var(--studio-control-border);
   }
-  & :is(.admin-sidebar-collapse:hover, .admin-topbar .back-navigation:hover, .studio-appearance .site-preferences-trigger:is(:hover, [aria-expanded="true"]),
+  & :is(.admin-sidebar-collapse:hover, .admin-topbar .back-navigation:hover, .studio-preferences .site-preferences-trigger:is(:hover, [aria-expanded="true"]),
     .icon-button:hover, .notification-toolbar button:hover) { background-color: var(--warm); }
   & :is(.admin-sidebar-bottom strong, .admin-sidebar-bottom .admin-sidebar-signout) { color: var(--ink); }
   & .admin-sidebar-bottom .admin-sidebar-signout::after { background-color: var(--warm); color: var(--ink); }
@@ -127,7 +117,7 @@ html[data-home-theme="dark"]:has(.admin-shell, .admin-loading) {
   & .squish-switch-options { color: var(--muted); }
   & .squish-switch-blob { background-color: var(--studio-action); }
   & .squish-switch-current { color: var(--studio-on-action); }
-  & .studio-appearance .home-theme-options {
+  & .studio-preferences .site-preferences-options {
     --segment-track: var(--paper);
     --segment-thumb: var(--warm);
     --segment-text: var(--muted);
@@ -139,7 +129,7 @@ html[data-home-theme="dark"]:has(.admin-shell, .admin-loading) {
     --gary-app-muted: var(--muted);
     --gary-app-line: var(--line);
   }
-  & :is(.gary-apps-menu > summary, .gary-apps-menu-panel, .studio-appearance .site-preferences-panel) {
+  & :is(.gary-apps-menu > summary, .gary-apps-menu-panel, .studio-preferences .site-preferences-panel) {
     background-color: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--home-shadow);
   }
   & :is(.gary-apps-menu > summary:is(:hover, :focus-visible), .gary-apps-menu[open] > summary, .gary-app-menu-item:hover,

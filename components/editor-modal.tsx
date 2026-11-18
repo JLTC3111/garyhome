@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { RefreshCw, X } from "lucide-react";
-import { LanguageSwitcher } from "./language-switcher";
+import { SitePreferences } from "./site-preferences";
 import { useSite } from "./site-context";
 import { useStudioText } from "./use-studio-text";
 import { attachEditorWorkspace } from "../shared/editor-workspace/index.js";
@@ -39,7 +39,7 @@ export function EditorModal({ title, subtitle, close, children, workspaceKey = "
       {resizable && <div className="editor-flowing-edge" aria-hidden="true"/>}
       <section className={`editor-drawer ${contentClassName}`}><header className="gw-editor-header"><div><div className="eyebrow">{subtitle}</div><h2 id={titleId}>{title}</h2></div>
         <div className="editor-toolbar gw-editor-controls">{["offline", "error"].includes(sessionPhase) && <button type="button" className="icon-button" aria-label={text("Reconnect")} title={text("Reconnect")} onClick={() => void reconnect()}><RefreshCw size={17}/></button>}
-          <LanguageSwitcher/><button autoFocus type="button" className="icon-button" disabled={closeDisabled} onClick={requestClose} aria-label={text("Close editor")}><X/></button>
+          <SitePreferences studio/><button autoFocus type="button" className="icon-button" disabled={closeDisabled} onClick={requestClose} aria-label={text("Close editor")}><X/></button>
         </div></header><div className="gw-editor-body editor-scroll-body">{children}</div></section>
     </div>
   </div>;

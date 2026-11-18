@@ -18,7 +18,7 @@ type Directory={members:StaffAccount[];next:string|null;domains:string[];directC
 export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:TeamDraft)=>void}){
  const {client,user,staffRole,sessionPhase,editorTask,notice}=useSite(),text=useStudioText();
  const [members,setMembers]=useState<StaffAccount[]>([]),[next,setNext]=useState<string|null>(null),[domains,setDomains]=useState<string[]>([]),[enabled,setEnabled]=useState(false);
- const [loading,setLoading]=useState(false),[busy,setBusy]=useState(""),[error,setError]=useState(""),[result,setResult]=useState("");
+ const [loading,setLoading]=useState(false),[busy,setBusy]=useState(""),[error,setError]=useState("");
  const [password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[replacePassword,setReplacePassword]=useState(false);
  const [loadError,setLoadError]=useState(""),[errorCode,setErrorCode]=useState("");
  const [removing,setRemoving]=useState<StaffAccount|null>(null),[passwordTarget,setPasswordTarget]=useState<StaffAccount|null>(null);
@@ -51,11 +51,11 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
   event.preventDefault();if(busy)return;setErrorCode("");
   if(!domains.includes(draft.email.trim().toLowerCase().split("@")[1])){setError("Use an allowed company or Gmail address.");return;}
   if((mode==="create"||replacePassword)&&(password.length<12||password!==confirm)){setError("Use matching passwords of at least 12 characters.");return;}
-  setBusy("create");setError("");setResult("");version.current++;
+  setBusy("create");setError("");version.current++;
   try{const data=await editorTask((_db,signal)=>call("POST",signal,{...draft,mode,replace_password:mode==="assign"&&replacePassword,...(mode==="create"||replacePassword?{password,confirm_password:confirm}:{})})) as {created:boolean;password_set?:boolean};
    if(!active.current)return;setDraft(emptyTeamDraft());setPassword("");setConfirm("");setReplacePassword(false);
    const message=data.created?"Staff account created and confirmed. Share the temporary password securely; a change-password reminder appears after login.":data.password_set?"Staff access assigned and temporary password saved. Use the regular Staff portal to sign in.":"Staff access assigned. The verified login password is unchanged.";
-   setResult(message);notice(text(message));changed();await load();
+   notice(text(message));changed();await load();
   }catch(error){if(active.current){setError(error instanceof Error?error.message:"Couldn’t create the staff account. Refresh before trying again.");setErrorCode(error instanceof TeamActionError?error.code:"");if(error instanceof TeamActionError&&["staff_access_assigned_reminder_unconfirmed","staff_password_saved_access_unconfirmed"].includes(error.code))await load();}}
   finally{if(active.current)setBusy("");}
  }
@@ -91,7 +91,7 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
   {error&&<div className={errorCode==="existing_login"?"form-info":"form-error"} role="alert">{text(error)}</div>}
   {errorCode==="existing_login"&&<div className="team-existing-login-callout"><p>{text("Removing staff access keeps the login account and customer history. Choose how to reuse this email.")}</p><div><button type="button" className="button button-outline button-small" disabled={!!busy} onClick={()=>reuseExisting(false)}>{text("Assign and keep existing password")}</button><button type="button" className="button button-small" disabled={!!busy} onClick={()=>reuseExisting(true)}>{text("Assign and set temporary password")}</button></div></div>}
   {errorCode==="unverified_login"&&<div className="team-existing-login-callout"><button type="button" className="button button-small" disabled={!!busy} onClick={()=>reuseExisting(true)}>{text("Assign and set temporary password")}</button></div>}
-  {loadError&&<div className="form-error" role="alert">{text(loadError)}</div>}{result&&<div className="form-info" role="status">{text(result)}</div>}
+  {loadError&&<div className="form-error" role="alert">{text(loadError)}</div>}
   {managing&&<div className="team-creation-grid"><form className="admin-panel enquiry-form team-invite-form" onSubmit={create}>
    <div className="eyebrow">{text("DIRECT ACCOUNT SETUP")}</div><h2>{text("Add a team member")}</h2>
    <div className="team-account-modes" role="group" aria-label={text("Account setup mode")}><button type="button" aria-pressed={mode==="create"} disabled={!!busy} onClick={()=>{setDraft({...draft,mode:"create"});setReplacePassword(false);setErrorCode("");setError("");setPassword("");setConfirm("");}}>{text("Create new account")}</button><button type="button" aria-pressed={mode==="assign"} disabled={!!busy} onClick={()=>reuseExisting(false)}>{text("Assign existing login")}</button></div>

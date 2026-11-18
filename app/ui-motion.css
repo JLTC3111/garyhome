@@ -154,6 +154,48 @@
   .editor-overlay > .editor-dock { translate: 14px 0; }
 }
 
+html:root .editor-overlay[data-listing-drawer] {
+  contain: paint;
+  background-color: transparent;
+  backdrop-filter: none;
+  opacity: 1;
+  transition: none;
+}
+html[data-home-theme="dark"] .editor-overlay[data-listing-drawer] { --listing-backdrop: var(--home-scrim); }
+.editor-overlay[data-listing-drawer]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--listing-backdrop, #10281f77);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 180ms var(--gary-motion-in);
+}
+.editor-overlay[data-listing-entered]:not([data-ui-exiting])::before {
+  opacity: 1;
+  transition: opacity 250ms var(--gary-motion-out);
+}
+.editor-overlay[data-listing-drawer] > .editor-dock {
+  translate: none;
+  transform: translateX(0);
+  transition: transform 250ms var(--gary-motion-out),
+    left var(--gary-layout-time, 0ms) var(--gary-motion-out), width var(--gary-layout-time, 0ms) var(--gary-motion-out);
+}
+.editor-overlay[data-listing-drawer]:is(:not([data-listing-entered]), [data-ui-exiting]) > .editor-dock {
+  transform: translateX(100%);
+}
+.editor-overlay[data-listing-drawer]:not([data-listing-entered]) > .editor-dock { transition: none; }
+.editor-overlay[data-listing-drawer][data-ui-exiting] > .editor-dock { transition: transform 180ms var(--gary-motion-in); }
+.editor-overlay[data-listing-drawer] > .editor-dock.gw-resizing { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.editor-overlay[data-listing-drawer], .editor-overlay[data-listing-entered]:not([data-ui-exiting]))::before { transition: none; }
+  .editor-overlay[data-listing-drawer]:not([data-ui-exiting])::before { opacity: 1; }
+  .editor-overlay[data-listing-drawer]:is(:not([data-listing-entered]), [data-ui-exiting]) > .editor-dock,
+  .editor-overlay[data-listing-drawer] > .editor-dock { transform: none; transition: none; }
+}
+
 @media (max-width: 1200px) {
   .rental-site-header .main-nav {
     opacity: 0;

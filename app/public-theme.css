@@ -61,6 +61,12 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-preferences-trigger:hover,.site-preferences-trigger[aria-expanded=true],.back-navigation:hover,.icon-button:hover,.district-dropdown>a:hover,.about-dropdown>a:hover,.about-dropdown>a:focus-visible){background:var(--home-elevated);color:var(--home-text);border-color:var(--home-field-border)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.district-dropdown,.about-dropdown,.favourites-panel,.site-preferences-panel){background:var(--home-surface);color:var(--home-text);border-color:var(--home-border);box-shadow:var(--home-shadow)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.about-dropdown>a,.favourites-panel li small,.rental-site-header .mobile-nav-portals>.staff-login-link){color:var(--home-secondary)}
+@media (max-width: 1200px) {
+  html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .rental-site-header .main-nav.nav-open{background:var(--home-background)}
+}
+@media (max-width: 680px) {
+  html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .rental-site-header .mobile-nav-portals>a{background:var(--home-surface);color:var(--home-text);border-color:var(--home-field-border)}
+}
 
 /* Existing curved hero, with the supplied natural evening image in dark only. */
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .restored-hero{background:var(--home-background)}

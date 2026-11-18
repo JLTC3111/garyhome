@@ -16,7 +16,7 @@ export function SubmissionManager({kind}:{kind:"feedback"|"assistance"}){
  return <Manager key={user.id+kind} kind={kind}/>;
 }
 function Manager({kind}:{kind:"feedback"|"assistance"}){
- const {t,editorTask,language,content}=useSite();
+ const {t,editorTask,language,content,notice}=useSite();
  const [feedback,setFeedback]=useState<FeedbackSubmission[]>([]),[reports,setReports]=useState<AssistanceReport[]>([]),[reviews,setReviews]=useState<AssistanceReview[]>([]),[published,setPublished]=useState<PublicFeedback[]>([]),[staff,setStaff]=useState<StaffChoice[]>([]);
  const [version,setVersion]=useState(0),[loading,setLoading]=useState(true),[error,setError]=useState(false),[busy,setBusy]=useState(false),[selected,setSelected]=useState<string|null>(null),[status,setStatus]=useState("");
  useEffect(()=>{let current=true;
@@ -35,7 +35,7 @@ function Manager({kind}:{kind:"feedback"|"assistance"}){
   event.preventDefault();if(busy||!selected)return;const data=new FormData(event.currentTarget);setBusy(true);setError(false);
   try{
    const result=await editorTask((db,signal)=>kind==="feedback"?db.rpc("moderate_feedback",{submission_id:selected,decision:String(data.get("decision")),reply:String(data.get("reply")||"")}).abortSignal(signal):db.rpc("review_property_assistance",{report:selected,decision:String(data.get("decision")),credited_staff:String(data.get("credited_staff")||"")||null,helper:String(data.get("helper")||""),review_notes:String(data.get("review_notes")||"")}).abortSignal(signal));
-   if(result.error)throw result.error;if(kind==="feedback")notifyPublicFeedbackChanged();setSelected(null);setLoading(true);setVersion(v=>v+1);
+   if(result.error)throw result.error;if(kind==="feedback")notifyPublicFeedbackChanged();notice(kind==="feedback"?"Feedback review saved.":"Assistance review saved.");setSelected(null);setLoading(true);setVersion(v=>v+1);
   }catch{setError(true);}finally{setBusy(false);}
  }
  const propertyCode=(id:string|null,snapshot="")=>{const p=content.properties.find(p=>p.id===id);return p?listingCode(p):snapshot||id||t("General experience","Trải nghiệm chung");};

@@ -191,7 +191,7 @@ html[data-home-theme="dark"]:has(.admin-shell, .admin-loading) {
     &:hover { background-color: var(--studio-quiet-hover); }
     &:active { background-color: var(--studio-quiet-active); }
   }
-  & :is(.form-info, .staff-profile-toast) { background-color: var(--warm); color: var(--ink); border-color: var(--line); }
+  & .form-info { background-color: var(--warm); color: var(--ink); border-color: var(--line); }
   & :is(.form-error, .seo-critical-banner, .button.button-danger-outline:hover) { background-color: var(--home-danger-surface); color: var(--home-danger); border-color: var(--home-danger); }
   & :is(.button.button-danger-outline, .row-actions > .text-danger, .team-member-actions > .text-danger) { color: var(--home-danger); border-color: var(--home-danger); }
   & .button.button-danger {
@@ -202,7 +202,6 @@ html[data-home-theme="dark"]:has(.admin-shell, .admin-loading) {
   & :is(.delete-dialog, .staff-profile-dialog, .help-media-dialog) { background-color: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--home-shadow); }
   & :is(.delete-dialog, .staff-profile-dialog, .help-media-dialog)::backdrop { background: var(--home-scrim, #08100be6); }
   & .editor-overlay { background-color: var(--home-scrim); }
-  & :is(.toast, .staff-profile-toast:has(> .swipe-row)) { --toast-background: var(--warm); --toast-color: var(--ink); }
 
   /* Content editors, SEO and the staff guide library */
   & :is(.editorial-list > button:hover, .editorial-cover-preview, .seo-category-tabs, .seo-progress,

@@ -72,3 +72,12 @@ html[data-home-public="true"][data-home-theme="dark"] .gary-apps-directory .gary
     transition: none;
   }
 }
+
+@media (max-width: 560px) {
+  .gary-apps-directory .gary-apps-grid > .gary-app-card { padding: 18px; }
+  .gary-apps-directory .gary-app-card-top { margin-bottom: 14px; }
+  .gary-apps-directory .gary-app-card h3 { margin-bottom: 9px; }
+  .gary-apps-directory .gary-app-card ul { margin-block: 14px 12px; }
+  .gary-apps-directory .gary-app-card li > a { min-height: 44px; padding-block: 7px; }
+  .gary-apps-directory .gary-app-visit { min-height: 44px; padding-block: 10px; }
+}

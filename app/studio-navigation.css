@@ -1,6 +1,6 @@
 @property --studio-sidebar-width{syntax:"<length>";inherits:true;initial-value:272px}
 .admin-shell{--studio-sidebar-width:272px}
-.admin-sidebar{width:var(--studio-sidebar-width);padding:25px 16px 18px;background:#edf2e5;border-right-color:#d3ddca;gap:0;overflow:visible;transition:width 180ms ease}
+.admin-sidebar{width:var(--studio-sidebar-width);max-height:100dvh;min-height:0;padding:25px 16px 18px;background:#edf2e5;border-right-color:#d3ddca;gap:0;overflow:visible;transition:width 180ms ease}
 .admin-main{margin-left:var(--studio-sidebar-width);width:calc(100% - var(--studio-sidebar-width));min-width:0;transition:margin-left 180ms ease,width 180ms ease}
 .admin-shell[data-sidebar-resizing="true"] .admin-sidebar,.admin-shell[data-sidebar-resizing="true"] .admin-main{transition:none}
 .admin-sidebar>.brand{flex-shrink:0;padding:0 7px;min-width:0;max-width:100%}
@@ -32,6 +32,8 @@
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar-bottom>div{flex-direction:column;align-items:center;gap:10px}
 .admin-sidebar>.studio-label{color:#4b624d;font-size:10px;font-weight:600;letter-spacing:.15em}
 .admin-sidebar nav.branched-menu{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#afbea5 transparent;display:flex;flex-direction:column;gap:4px;margin-top:14px;padding:0 2px 16px 0}
+.admin-sidebar nav.branched-menu > *{flex-shrink:0}
+.admin-sidebar nav.branched-menu:focus-visible{outline:2px solid var(--studio-focus,var(--orange));outline-offset:-2px}
 .admin-sidebar .branched-menu button{width:100%;border:0;border-radius:9px;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 11px;text-align:left;font-family:var(--sans);font-size:14px;line-height:1.4;color:#344f3d;background:transparent;position:relative;flex-shrink:0}
 .admin-sidebar .branched-menu button>span:not(.studio-menu-count){position:static;margin:0;padding:0;min-width:0;background:transparent;color:inherit;border:0;border-radius:0;font:inherit;text-align:left;line-height:inherit}
 .admin-sidebar .branched-menu .branched-menu__icon{display:inline-flex;flex:none}
@@ -73,11 +75,6 @@
 .team-directory-tools{display:flex;align-items:center;gap:12px}
 .team-member>.team-avatar{inline-size:52px;block-size:52px;min-inline-size:52px;max-inline-size:52px;min-block-size:52px;max-block-size:52px;aspect-ratio:1;flex:0 0 52px;align-self:flex-start;overflow:hidden;border-radius:50%}
 .team-member>.team-avatar>img{display:block;inline-size:100%;block-size:100%;aspect-ratio:1;object-fit:cover;object-position:center;border-radius:50%}
-.staff-profile-toast{display:flex;align-items:flex-start;gap:10px;background:#e6efdd;border:1px solid #bdd1aa;border-radius:10px;padding:13px 15px;margin-top:18px;color:#2b4e2f;font-size:12px;line-height:1.75;box-shadow:0 5px 16px #233d1910}
-.staff-profile-toast>svg{flex:none;margin-top:2px}
-.staff-profile-toast>span{flex:1}
-.staff-profile-toast>button{flex:none;padding:3px;border-radius:4px;display:inline-flex;align-self:flex-start}
-.staff-profile-toast>button:focus-visible{outline:2px solid #4a6837;outline-offset:2px}
 .staff-photo-editor small{line-height:1.8}
 .staff-password-form>.small{font-size:12px;line-height:1.8}
 .footer-intro>p:first-child{margin-top:0}

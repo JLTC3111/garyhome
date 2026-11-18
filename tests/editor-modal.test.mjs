@@ -17,10 +17,14 @@ async function harness(t,{busy=false,workspaceKey='property',resizable=false}={}
  vm.runInThisContext('(function(exports,require,module){'+source+'\n})')(loaded.exports,dependency,loaded);
  let renderer,closes=0,submissions=0;const form=React.createElement('form',{onSubmit:event=>{event.preventDefault();submissions++;}},React.createElement('input',{defaultValue:'Unsaved draft'}),React.createElement('input',{type:'file'}),React.createElement('p',{role:'alert'},'Exact field error'),React.createElement('footer',{className:'gw-editor-actions'},React.createElement('button',{type:'submit'},'Save')));
  const render=()=>React.createElement(loaded.exports.EditorModal,{title:'Listing',subtitle:'PROPERTY EDITOR',workspaceKey,resizable,closeDisabled:busy,close:()=>closes++},form);
- const element={querySelector:selector=>({selector})};
- await act(async()=>{renderer=TestRenderer.create(render(),{createNodeMock:node=>{if(node.props.className?.startsWith('editor-dock')){document.activeElement=autofocusedClose;return element;}return null;}});});
- t.after(async()=>{await act(async()=>renderer.unmount());assert.ok(calls.every(call=>call.destroyed));assert.equal(body.style.overflow,'auto');assert.equal(opener.focuses,1,'Closing restores the original opener captured before commit autofocus');assert.equal(autofocusedClose.focuses,0,'Cleanup never restores focus to its own Close control');for(const [key,prior] of descriptors){if(prior)Object.defineProperty(globalThis,key,prior);else delete globalThis[key];}});
- return {renderer,body,calls,language,opener,autofocusedClose,render:async()=>act(async()=>renderer.update(render())),get closes(){return closes;},get submissions(){return submissions;},dock:()=>renderer.root.findByProps({role:'dialog'})};
+ const frames=new Map();let nextFrame=0,layouts=0;
+ const element={querySelector:selector=>({selector}),getBoundingClientRect(){layouts++;},ownerDocument:{defaultView:{
+  requestAnimationFrame(callback){const id=++nextFrame;frames.set(id,callback);return id;},
+  cancelAnimationFrame(id){frames.delete(id);}
+ }}};
+ await act(async()=>{renderer=TestRenderer.create(render(),{createNodeMock:node=>{if(node.props.className?.startsWith('editor-dock')){if(workspaceKey!=='property')document.activeElement=autofocusedClose;return element;}if(node.props['aria-label']==='Close editor')return autofocusedClose;return null;}});});
+ t.after(async()=>{await act(async()=>renderer.unmount());assert.ok(calls.every(call=>call.destroyed));assert.equal(body.style.overflow,'auto');assert.equal(opener.focuses,1,'Closing restores the original opener captured before commit autofocus');assert.equal(autofocusedClose.focuses,Number(workspaceKey==='property'),'Cleanup never restores focus to its own Close control');for(const [key,prior] of descriptors){if(prior)Object.defineProperty(globalThis,key,prior);else delete globalThis[key];}});
+ return {renderer,body,calls,language,opener,autofocusedClose,frames,get layouts(){return layouts;},render:async()=>act(async()=>renderer.update(render())),get closes(){return closes;},get submissions(){return submissions;},dock:()=>renderer.root.findByProps({role:'dialog'})};
 }
 test('all Home editor shells reuse one controller and keep the same form, upload and errors across locale/layout refreshes',async t=>{
  const h=await harness(t,{resizable:true});assert.equal(h.body.style.overflow,'hidden');assert.equal(document.activeElement,h.autofocusedClose,'The commit moved focus inside the editor before passive effects');assert.equal(h.calls.length,1);assert.equal(h.calls[0].options.key,'gary-home:property');assert.equal(h.calls[0].options.anchor,'right');assert.equal(h.calls[0].options.presentation,'drawer');assert.deepEqual(h.calls[0].options.resizeEdges,['w']);assert.equal(h.calls[0].options.defaultWidth,1120);assert.ok(h.calls[0].options.header);assert.ok(h.calls[0].options.body);
@@ -31,6 +35,23 @@ test('all Home editor shells reuse one controller and keep the same form, upload
  await act(async()=>form.props.onSubmit({preventDefault(){}}));assert.equal(h.submissions,1);
  let stopped=false;await act(async()=>h.dock().props.onKeyDown({key:'Escape',stopPropagation(){stopped=true;}}));assert.equal(h.closes,1);assert.equal(stopped,true);
  const css=fs.readFileSync(root+'/app/editor-drawer.css','utf8');assert.match(css,/\.editor-scroll-body\{[^}]*overflow:auto/);assert.match(css,/\.gw-editor-actions\{[^}]*position:sticky/);assert.match(css,/@container editor \(max-width:720px\)/);assert.match(css,/@media\(max-width:720px\)/);
+});
+test('listing drawer commits its offscreen state and enters on the next frame without remounting the form',async t=>{
+ const h=await harness(t),overlay=()=>h.renderer.root.findByProps({className:'editor-overlay'});
+ const form=h.renderer.root.findByType('form');
+ assert.equal(overlay().props['data-listing-drawer'],true);
+ assert.equal(overlay().props['data-listing-entered'],undefined);
+ assert.equal(h.layouts,1);
+ assert.equal(h.frames.size,1);
+ const frame=[...h.frames.values()][0];
+ await act(async()=>frame());
+ assert.equal(overlay().props['data-listing-entered'],true);
+ assert.equal(h.renderer.root.findByType('form'),form);
+ const css=fs.readFileSync(root+'/app/ui-motion.css','utf8');
+ assert.match(css,/\[data-listing-drawer\][^{}]*> \.editor-dock \{\s*transform: translateX\(100%\)/);
+ assert.match(css,/transition: transform 250ms/);
+ assert.match(css,/\[data-listing-drawer\]\[data-ui-exiting\] > \.editor-dock \{ transition: transform 180ms/);
+ assert.match(css,/\[data-listing-drawer\] > \.editor-dock\.gw-resizing \{ transition: none/);
 });
 test('other Home content retains the original narrower drawer with its own preference key',async t=>{
  const h=await harness(t,{workspaceKey:'guide'});assert.equal(h.calls[0].options.presentation,'drawer');assert.equal(h.calls[0].options.defaultWidth,740);assert.equal(h.calls[0].options.key,'gary-home:guide');assert.deepEqual(h.calls[0].options.resizeEdges,['w']);assert.equal(h.renderer.root.findAllByProps({className:'editor-flowing-edge'}).length,0);

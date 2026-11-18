@@ -227,12 +227,19 @@
 
 /* Toast hosts retain their existing placement; the Swipe Row owns the surface. */
 .toast:has(>.swipe-row){display:block;padding:0;background:none;overflow:hidden;width:min(520px,calc(100% - 32px));max-width:calc(100% - 32px)}
-.staff-profile-toast:has(>.swipe-row){--toast-background:#e6efdd;--toast-color:#2b4e2f;display:block;padding:0;overflow:hidden}
-.toast>.swipe-row,.staff-profile-toast>.swipe-row{width:100%}
-.toast .swipe-row__surface,.staff-profile-toast .swipe-row__surface{min-height:64px;height:auto;padding:15px 16px;gap:16px}
+.toast>.swipe-row{width:100%}
+.toast .swipe-row__surface{min-height:64px;height:auto;padding:15px 16px;gap:16px}
 .swipe-toast-message{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1;line-height:1.75;overflow-wrap:anywhere}
 .swipe-toast-message>svg{flex:none;margin-top:3px}
 .swipe-toast-close{display:inline-flex;align-items:center;justify-content:center;flex:none;align-self:center;width:36px;height:36px;padding:7px;border-radius:6px;color:inherit!important}
 .swipe-toast-close:focus-visible,.swipe-row__action:focus-visible{outline:2px solid currentColor;outline-offset:-4px}
-.toast .swipe-row__glyph,.staff-profile-toast .swipe-row__glyph{font-size:10px;line-height:1.4;max-width:74px;text-align:center}
+.toast .swipe-row__glyph{font-size:10px;line-height:1.4;max-width:74px;text-align:center}
+
+.toast[data-tone]{bottom:calc(85px + env(safe-area-inset-bottom))}
+.toast[data-tone="success"] > .swipe-row{--toast-background:#e6efdd;--toast-color:#2b4e2f}
+.toast[data-tone="warning"] > .swipe-row{--toast-background:#fff5e3;--toast-color:#705123}
+.toast[data-tone="error"] > .swipe-row{--toast-background:#fbebe5;--toast-color:#843b2e}
+html[data-home-theme="dark"] .toast[data-tone="success"] > .swipe-row{--toast-background:var(--home-elevated);--toast-color:var(--home-accent)}
+html[data-home-theme="dark"] .toast[data-tone="warning"] > .swipe-row{--toast-background:var(--studio-warning-surface,#3e3226);--toast-color:var(--studio-warning,#e9c796)}
+html[data-home-theme="dark"] .toast[data-tone="error"] > .swipe-row{--toast-background:var(--home-danger-surface);--toast-color:var(--home-danger)}
 @media(prefers-reduced-motion:reduce){.swipe-row,.swipe-row__glyph{transition:none}}

@@ -27,7 +27,7 @@ export function BranchedMenu({items,active,onSelect,label}:Props){
   buttons[event.key==="Home"?0:event.key==="End"?buttons.length-1:(current+(event.key==="ArrowDown"?1:-1)+buttons.length)%buttons.length]?.focus();
  }
  function content(item:BranchedMenuChild){return <>{item.icon&&<span className="branched-menu__icon" aria-hidden="true">{item.icon}</span>}<span className="branched-menu__label admin-nav-label">{item.label}</span>{!!item.badge&&<span className="studio-menu-count">{item.badge}</span>}</>;}
- return <nav ref={nav} className="branched-menu studio-branched-menu" aria-label={label} onKeyDown={keyboard}>
+ return <nav ref={nav} className="branched-menu studio-branched-menu" aria-label={label} tabIndex={0} onKeyDown={keyboard}>
   {items.map(item=>{
    if(!item.children)return <button key={item.value} className={`branched-menu__item branched-menu__root ${active===item.value?"selected":""}`} type="button" data-id={item.value} aria-current={active===item.value?"page":undefined} aria-label={item.label} title={item.label} onClick={()=>onSelect(item.value)}>{content(item)}</button>;
    const expanded=open.has(item.value),children=item.children,height=PAD*2+children.length*ROW;

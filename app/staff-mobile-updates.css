@@ -33,9 +33,9 @@
  .rental-site-header .favourites-trigger{gap:4px;min-height:34px}
  .rental-site-header .favourites-panel{top:44px;left:12px;right:12px}
  .rental-site-header .main-nav{max-height:calc(100dvh - 125px)}
- .mobile-nav-tools{display:flex;flex-direction:column;border-top:1px solid var(--line);margin-top:13px;padding-top:14px;gap:12px}
- .mobile-nav-portals{display:grid;gap:7px}
- .rental-site-header .mobile-nav-portals>a{display:flex;align-items:center;gap:10px;padding:11px 12px;min-height:46px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:500;color:var(--ink);background:#fff}
+ .mobile-nav-tools{display:flex;flex-direction:column;border-top:1px solid var(--line);margin-top:11px;padding-top:12px;gap:10px}
+ .mobile-nav-portals{display:grid;gap:8px}
+ .rental-site-header .mobile-nav-portals>a{display:flex;align-items:center;gap:10px;padding:11px 12px;min-height:46px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:600;color:var(--ink);background:var(--paper)}
  .mobile-nav-tools .portal-full-label{display:inline}
  .mobile-nav-tools .portal-short-label{display:none}
  .mobile-nav-language{display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:13px;min-height:44px;padding:0 5px}

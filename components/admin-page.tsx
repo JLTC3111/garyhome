@@ -174,7 +174,7 @@ export function AdminPage() {
       setEnquiries(rows=>rows.map(row=>row.id===enquiry.id?{...row,...state}:row));
       setLead(current=>current?.id===enquiry.id?{...current,...state}:current);
     };
-    void mark().catch(()=>{if(demo||currentAccount.current===actor)notice(text("Couldn’t mark this enquiry as read. Reopen it to try again."));}).finally(()=>reading.current.delete(enquiry.id));
+    void mark().catch(()=>{if(demo||currentAccount.current===actor)notice(text("Couldn’t mark this enquiry as read. Reopen it to try again."), "error");}).finally(()=>reading.current.delete(enquiry.id));
   }
   async function removeRecord(){
     if(!pendingDelete||busy||!canDeleteContent(site.staffRole))return;

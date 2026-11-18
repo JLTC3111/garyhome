@@ -3,7 +3,7 @@ import { FormValidationMessages } from "./form-validation";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { usePathname, useRouter } from "next/navigation";
-import { SwipeToast } from "./swipe-toast";
+import { SwipeToast, type ToastTone } from "./swipe-toast";
 import { LatticeLoader } from "./react-bits/lattice-loader";
 import { emailLinkIssue, emailTokenLink, passwordLinkEvidence, type PasswordLink, type EmailLinkIssue, type EmailTokenLink } from "@/lib/password-actions";
 import type { Content, Enquiry, ExchangeRate, Language, PriceCurrency } from "@/lib/types";
@@ -45,7 +45,7 @@ type SiteContext = {
   editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>, timeoutMs?: number | null) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
   enquiries: Enquiry[]; setEnquiries: (list: Update<Enquiry[]>) => void; refresh: () => Promise<void>;
-  notice: (message: string) => void;
+  notice: (message: string, tone?: ToastTone) => void;
 };
 const Context = createContext<SiteContext | null>(null);
 export function SiteProvider({ children, initial, initialLanguage = "en", initialCurrency = "USD" }: { children: ReactNode; initialLanguage?: Language; initialCurrency?: PriceCurrency; initial: { content: Content; configured: boolean; error: boolean; exchangeRate?: ExchangeRate | null; publicOrigin?: string; publicPath?: string } }) {
@@ -117,7 +117,10 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("checking");
   const [demo, setDemo] = useState(false);
   const [enquiries, updateEnquiries] = useState<Enquiry[]>([]);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
+  const notice = useCallback((message: string, tone: ToastTone = "success") => {
+    setToast(current => current?.message === message && current.tone === tone ? current : { message, tone });
+  }, []);
   const clientRef = useRef<SupabaseClient | null>(null);
   const sessionRef = useRef<SessionRecovery | null>(null);
   const snapshotRef = useRef<SessionState>({ user: null, editor: false, role: null, phase: "checking", generation: 0 });
@@ -238,7 +241,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     if (!sessionRef.current) { await connectRef.current(); await recoverPublicContent(); return; }
     const publicRecovery = recoverPublicContent();
     if (await sessionRef.current.recover()) {
-      try { await refresh(); } catch (error) { setToast(error instanceof Error ? error.message : "Couldn’t load CMS data. Check your connection and editor permissions."); }
+      try { await refresh(); } catch (error) { notice(error instanceof Error ? error.message : "Couldn’t load CMS data. Check your connection and editor permissions.", "error"); }
     }
     await publicRecovery;
   }, [refresh, recoverPublicContent]);
@@ -410,7 +413,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     version.current++;
     updateContent(previous => {
       const value = typeof next === "function" ? next(previous) : next;
-      if (demo) { try { localStorage.setItem("gary-preview-content", JSON.stringify(value)); } catch { setToast("Browser storage is full. Changes are only kept for this session."); } }
+      if (demo) { try { localStorage.setItem("gary-preview-content", JSON.stringify(value)); } catch { notice("Browser storage is full. Changes are only kept for this session.", "warning"); } }
       else initialRef.current={...value,editorial:(value.editorial||[]).filter(row=>row.status==="published"),properties:value.properties.filter(isPublicRental),authors:(value.authors||[]).filter(row=>row.published),activities:(value.activities||[]).filter(row=>row.published)};
       return value;
     });
@@ -419,15 +422,15 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     version.current++;
     updateEnquiries(previous => {
       const value = typeof next === "function" ? next(previous) : next;
-      if (!initial.configured) { try { localStorage.setItem("gary-preview-enquiries", JSON.stringify(value)); } catch { setToast("Browser storage is unavailable."); } }
+      if (!initial.configured) { try { localStorage.setItem("gary-preview-enquiries", JSON.stringify(value)); } catch { notice("Browser storage is unavailable.", "warning"); } }
       return value;
     });
   }
   function toggleSaved(id: string) {
-    if (!user) { setSaved(previous => { const next = previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id]; try { localStorage.setItem("gary-saved", JSON.stringify(next));if(!next.includes(id))releaseBrowserFavouriteClaim(localStorage,id); } catch { setToast("Saved for this visit. Browser storage is unavailable."); } return next; }); return; }
+    if (!user) { setSaved(previous => { const next = previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id]; try { localStorage.setItem("gary-saved", JSON.stringify(next));if(!next.includes(id))releaseBrowserFavouriteClaim(localStorage,id); } catch { notice("Saved for this visit. Browser storage is unavailable.", "warning"); } return next; }); return; }
     const identity = user.id, key = identity + ":" + id, remove = saved.includes(id);
     if (savedFlight.current.has(key)) return;
-    if (savedAccount !== identity) { setToast(language === "vi" ? "Đang kết nối danh sách nhà đã lưu. Hãy kết nối lại và thử lại." : "Your saved homes are still connecting. Reconnect and try again."); return; }
+    if (savedAccount !== identity) { notice(language === "vi" ? "Đang kết nối danh sách nhà đã lưu. Hãy kết nối lại và thử lại." : "Your saved homes are still connecting. Reconnect and try again.", "warning"); return; }
     savedFlight.current.add(key); savedVersion.current++; setPendingSaved(previous => [...previous, id]);
     void accountTask((db, signal, userId) => remove
       ? db.from("saved_homes").delete().eq("user_id", userId).eq("property_id", id).select("property_id").abortSignal(signal)
@@ -435,7 +438,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
       .then(({ error }) => {
         if (error) throw error;
         if (snapshotRef.current.user?.id === identity) { savedVersion.current++; setSaved(previous => remove ? previous.filter(value => value !== id) : previous.includes(id) ? previous : [...previous, id]); }
-      }).catch(error => { if (snapshotRef.current.user?.id === identity) setToast(customerError(error, language)); })
+      }).catch(error => { if (snapshotRef.current.user?.id === identity) notice(customerError(error, language), "error"); })
       .finally(() => { savedFlight.current.delete(key); if (snapshotRef.current.user?.id === identity) setPendingSaved(previous => previous.filter(value => value !== id)); });
   }
   async function importSaved():Promise<number> {
@@ -473,7 +476,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     // failure; language changes and auth recovery never replay a pending write.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.id,savedAccount,sessionPhase]);
-  function toggleCompare(id: string) { setCompare(previous => previous.includes(id) ? previous.filter(x => x !== id) : previous.length < 3 ? [...previous, id] : (setToast(language === "en" ? "Compare up to 3 homes at a time." : "So sánh tối đa 3 căn hộ."), previous)); }
+  function toggleCompare(id: string) { setCompare(previous => previous.includes(id) ? previous.filter(x => x !== id) : previous.length < 3 ? [...previous, id] : (notice(language === "en" ? "Compare up to 3 homes at a time." : "So sánh tối đa 3 căn hộ.", "warning"), previous)); }
   function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   useEffect(()=>{
@@ -499,11 +502,11 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
 
   const sessionLoading = sessionPhase === "checking" || sessionPhase === "recovering";
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice: setToast }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, enquiries, setEnquiries, refresh, notice }}>
     {initial.configured && ["checking", "offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status" aria-busy={sessionLoading}>{sessionLoading ? <LatticeLoader label={studioText(sessionMessage, language)} announce={false}/> : studioText(sessionMessage, language)}{!sessionLoading && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}
-    <FormValidationMessages language={language}/>{children}{toast && <SwipeToast key={toast} duration={4500} dismiss={() => setToast("")} dismissLabel={studioText("Dismiss notification", language)} actionsLabel={language === "vi" ? "Thao tác thông báo" : "Notification actions"} releaseLabel={language === "vi" ? "Thả tay để đóng thông báo" : "Release to dismiss"}>{studioText(toast, language)}</SwipeToast>}
+    <FormValidationMessages language={language}/>{children}{toast && <SwipeToast key={toast.tone+toast.message} tone={toast.tone} duration={toast.tone === "error" ? 0 : 4500} dismiss={() => setToast(null)} dismissLabel={studioText("Dismiss notification", language)} actionsLabel={language === "vi" ? "Thao tác thông báo" : "Notification actions"} releaseLabel={language === "vi" ? "Thả tay để đóng thông báo" : "Release to dismiss"}>{studioText(toast.message, language)}</SwipeToast>}
   </Context.Provider>;
 }
 export function useSite() { const context = useContext(Context); if (!context) throw new Error("SiteProvider is required"); return context; }

@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import SwipeRow from "./react-bits/swipe-row";
 
-export function SwipeToast({ children, dismiss, dismissLabel, actionsLabel, releaseLabel, hostClassName = "toast", duration = 0 }: {
+export type ToastTone = "success" | "warning" | "error";
+
+export function SwipeToast({ children, dismiss, dismissLabel, actionsLabel, releaseLabel, hostClassName = "toast", duration = 0, tone }: {
   children: ReactNode; dismiss: () => void; dismissLabel: string; actionsLabel: string; releaseLabel: string;
-  hostClassName?: string; duration?: number;
+  hostClassName?: string; duration?: number; tone?: ToastTone;
 }) {
   const latestDismiss = useRef(dismiss);
   useEffect(() => { latestDismiss.current = dismiss; }, [dismiss]);
@@ -25,7 +27,7 @@ export function SwipeToast({ children, dismiss, dismissLabel, actionsLabel, rele
     return () => { clearTimeout(timer); remaining.current = Math.max(0, remaining.current - (Date.now() - started)); };
   }, [duration, paused]);
 
-  return <div className={hostClassName} role="status" aria-live="polite" aria-atomic="true"
+  return <div className={hostClassName} data-tone={tone} role={tone === "error" ? "alert" : "status"} aria-live={tone === "error" ? "assertive" : "polite"} aria-atomic="true"
     onPointerEnter={event => { if (event.pointerType !== "touch") setHovered(true); }} onPointerLeave={() => setHovered(false)}
     onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
     <SwipeRow label={actionsLabel} actionsLabel={actionsLabel} releaseLabel={releaseLabel}

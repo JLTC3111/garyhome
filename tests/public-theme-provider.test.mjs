@@ -7,6 +7,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import TestRenderer, { act } from 'react-test-renderer';
 import ts from 'typescript';
+import * as localizedRoutes from '../lib/localized-routes.ts';
 
 const require = createRequire(import.meta.url);
 function loadSource(path, imports, globals) {
@@ -20,12 +21,12 @@ function loadSource(path, imports, globals) {
   return module.exports;
 }
 
-const preferences = loadSource('../lib/public-theme.ts', { './public-routes': { PUBLIC_LANDING_PATHS: ['/'] } });
+const themeImports = { './public-routes': { PUBLIC_LANDING_PATHS: ['/'] }, './localized-routes': localizedRoutes };
+const preferences = loadSource('../lib/public-theme.ts', themeImports);
 const key = preferences.HOME_THEME_STORAGE_KEY;
 function loadProvider(imports = {}) {
   return loadSource('../components/public-theme-provider.tsx', {
     'next/navigation': { usePathname: () => '/en' },
-    '@/lib/localized-routes': { isPublicPagePath: () => true },
     '@/lib/public-theme': preferences,
     ...imports
   }).PublicThemeProvider;
@@ -73,7 +74,7 @@ test('the preference cookie shares only the production Gary Home domain', () => 
   const cookieWrites = [];
   const document = { set cookie(value) { cookieWrites.push(value); } };
   const window = { location: {} };
-  const { persistHomeTheme } = loadSource('../lib/public-theme.ts', { './public-routes': { PUBLIC_LANDING_PATHS: [] } }, { document, window });
+  const { persistHomeTheme } = loadSource('../lib/public-theme.ts', themeImports, { document, window });
   for (const hostname of ['www.garyhome.vn', 'staff.garyhome.vn', 'preview.example.org', 'localhost']) {
     window.location = { hostname, protocol: hostname === 'localhost' ? 'http:' : 'https:' };
     persistHomeTheme('system');
@@ -93,7 +94,8 @@ test('the provider migrates a stored choice and adopts shared updates on cookie 
 
   const changes = [];
   const context = React.createContext();
-  const Provider = loadProvider({ 'next-themes': {
+  let pathname = '/en';
+  const Provider = loadProvider({ 'next/navigation': { usePathname: () => pathname }, 'next-themes': {
     ThemeProvider: ({ children }) => {
       const [theme, setTheme] = React.useState('dark');
       return React.createElement(context.Provider, { value: { theme, setTheme: value => { changes.push(value); setTheme(value); } } }, children);
@@ -109,6 +111,11 @@ test('the provider migrates a stored choice and adopts shared updates on cookie 
     }
   });
   await act(async () => { renderer = TestRenderer.create(React.createElement(Provider)); });
+  for (const [route, scope] of [['/account', 'true'], ['/saved', 'true'], ['/admin', 'false']]) {
+    pathname = route;
+    await act(async () => renderer.update(React.createElement(Provider)));
+    assert.equal(cookieDocument.documentElement.dataset.homePublic, scope, route);
+  }
   assert.match(cookieDocument.cookie, new RegExp(`^${key}=dark;`));
   assert.deepEqual(changes, []);
 

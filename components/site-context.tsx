@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { SwipeToast, type ToastTone } from "./swipe-toast";
 import { emailLinkIssue, emailTokenLink, passwordLinkEvidence, type PasswordLink, type EmailLinkIssue, type EmailTokenLink } from "@/lib/password-actions";
 import type { Content, Enquiry, ExchangeRate, Language, PriceCurrency } from "@/lib/types";
-import { languageValue, persistLanguage } from "@/lib/language";
+import { LANGUAGE_COOKIE, languageValue, persistLanguage, readLanguagePreference } from "@/lib/language";
 import { localizedPath, localizedRoute, isPublicPagePath } from "@/lib/localized-routes";
 import { CURRENCY_COOKIE, currencyValue, persistCurrency, usableExchangeRate } from "@/lib/currency";
 import { studioText } from "@/lib/studio-i18n";
@@ -92,13 +92,11 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     return () => { active = false; controller.abort(); clearInterval(timer); window.removeEventListener("online", refreshRate); };
   }, [initial.exchangeRate]);
   useLayoutEffect(() => {
-    let selected=initialLanguage;
-    const explicit=localizedRoute(window.location.pathname)?.language;
-    try{const stored=localStorage.getItem("gary-language");if(!explicit&&(stored==="en"||stored==="vi"))selected=stored;}catch{/* Optional storage. */}
-    if(explicit)selected=explicit;
+    const selected = localizedRoute(window.location.pathname)?.language ?? readLanguagePreference() ?? initialLanguage;
     // Legacy browser-only preferences must settle before paint during hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    updateLanguage(selected);persistLanguage(selected);
+    updateLanguage(selected);
+    document.documentElement.lang = selected;
     if(document.documentElement?.dataset)delete document.documentElement.dataset.languagePending;
   }, [initialLanguage, pathname]);
   const [saved, setSaved] = useState<string[]>([]);
@@ -435,8 +433,26 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   }, [client, user?.id, sessionPhase]);
 
   useEffect(() => {
-    const syncLanguage = (event: StorageEvent) => { if (event.key === "gary-language") {const selected=localizedRoute(window.location.pathname)?.language||languageValue(event.newValue);updateLanguage(selected);persistLanguage(selected);} if(event.key===CURRENCY_COOKIE){const selected=currencyValue(event.newValue);updateCurrency(selected);persistCurrency(selected);} };
-    window.addEventListener("storage", syncLanguage); return () => window.removeEventListener("storage", syncLanguage);
+    const syncLanguage = () => {
+      const selected = localizedRoute(window.location.pathname)?.language ?? readLanguagePreference();
+      if (selected) updateLanguage(selected);
+    };
+    const syncStorage = (event: StorageEvent) => {
+      if (event.key === LANGUAGE_COOKIE) updateLanguage(localizedRoute(window.location.pathname)?.language ?? readLanguagePreference() ?? languageValue(event.newValue));
+      if (event.key === CURRENCY_COOKIE) {
+        const selected = currencyValue(event.newValue);
+        updateCurrency(selected);
+        persistCurrency(selected);
+      }
+    };
+    window.addEventListener("storage", syncStorage);
+    window.addEventListener("focus", syncLanguage);
+    window.addEventListener("pageshow", syncLanguage);
+    return () => {
+      window.removeEventListener("storage", syncStorage);
+      window.removeEventListener("focus", syncLanguage);
+      window.removeEventListener("pageshow", syncLanguage);
+    };
   }, []);
   useLayoutEffect(() => { document.documentElement.lang = language; }, [language]);
   const setContent = useCallback((next: Update<Content>) => {

@@ -4,8 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Globe2, X, Sun, Moon, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
-import { isPublicPagePath } from "@/lib/localized-routes";
-import { isHomeTheme, persistHomeTheme } from "@/lib/public-theme";
+import { isHomeTheme, isHomeThemePath, persistHomeTheme } from "@/lib/public-theme";
 import { useSite } from "./site-context";
 import { CurrencySwitcher } from "./currency-switcher";
 import RubberSegment from "./react-bits/rubber-segment";
@@ -14,7 +13,7 @@ export function SitePreferences({ onOpen, studio = false }: { onOpen?: () => voi
   const { language, setLanguage, currency, t } = useSite();
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
-  const showTheme = studio || isPublicPagePath(pathname);
+  const showTheme = studio || isHomeThemePath(pathname);
   const [open, setOpen] = useState(false);
   const id = useId();
   const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null);

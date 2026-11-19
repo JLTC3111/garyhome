@@ -3,13 +3,12 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
-import { isPublicPagePath } from '@/lib/localized-routes';
-import { HOME_THEME_PREFERENCE_BOOTSTRAP, HOME_THEME_STORAGE_KEY, isHomeTheme, persistHomeTheme, readHomeThemeCookie } from '@/lib/public-theme';
+import { HOME_THEME_PREFERENCE_BOOTSTRAP, HOME_THEME_STORAGE_KEY, isHomeTheme, isHomeThemePath, persistHomeTheme, readHomeThemeCookie } from '@/lib/public-theme';
 
 function PublicThemeScope() {
   const pathname = usePathname();
   useLayoutEffect(() => {
-    document.documentElement.dataset.homePublic = String(isPublicPagePath(pathname));
+    document.documentElement.dataset.homePublic = String(isHomeThemePath(pathname));
   }, [pathname]);
   return null;
 }

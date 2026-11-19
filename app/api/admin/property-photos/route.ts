@@ -1,4 +1,4 @@
-import { canDeleteContent } from "@/lib/staff";
+import { canRenamePropertyPhotos } from "@/lib/staff";
 import { staffRequest, StaffRequestError } from "@/lib/staff-server";
 import { backendConfig, staffAdminClient } from "@/lib/server";
 import { request } from "@/lib/requests";
@@ -11,7 +11,7 @@ export async function POST(req:Request) {
   try {
     return await request(async signal=>{
       const {db,role} = await staffRequest(req,signal);
-      if (!canDeleteContent(role)) return json({error:"forbidden"},403);
+      if (!canRenamePropertyPhotos(role)) return json({error:"forbidden"},403);
       const raw:unknown = await req.json().catch(()=>null);
       if (!raw || typeof raw!=="object" || Array.isArray(raw)) return json({error:"invalid_request"},400);
       const input = raw as Record<string,unknown>;

@@ -125,6 +125,50 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-preferences-options,.currency-switcher){--segment-track:var(--home-background);--segment-thumb:var(--home-elevated);--segment-text:var(--home-secondary);--segment-active-text:var(--home-text);--segment-border:var(--home-border)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .toast{background:var(--home-elevated);color:var(--home-text);border:1px solid var(--home-border)}
 
+/* The customer workspace uses the same surfaces and controls as the website. */
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.account-entry, .account-page) {
+  & :where(.account-auth-card, .account-sidebar, .account-details-form, .account-enquiry, .account-stats > button,
+    .portal-switcher, .help-search, .help-guide-card, .help-article, .help-file-row, .help-file) {
+    background-color: var(--home-surface);
+    border-color: var(--home-border);
+    color: var(--home-text);
+  }
+  & :where(.account-plan-card, .account-import, .account-empty, .account-appointment, .account-team-update,
+    .help-intro, .help-empty, .help-quick-start, .account-sidebar .selection-background,
+    .account-sidebar nav > button:hover, .account-stats > button:hover, .portal-switcher > a:hover,
+    .help-guide-card:hover, .help-file:hover, .help-quick-start:hover, .account-enquiry .status-badge) {
+    background-color: var(--home-elevated);
+    border-color: var(--home-border);
+  }
+  & :where(.account-stats > button:hover, .help-guide-card:hover, .help-file:hover, .help-quick-start:hover) {
+    border-color: var(--home-field-border);
+  }
+  & :where(.account-person .avatar, .account-auth-icon, .account-empty > span, .help-intro-icon) {
+    background-color: var(--home-elevated);
+    color: var(--home-accent);
+  }
+  & :where(.account-benefits, .account-enquiry-message, .account-team-link, .account-sidebar nav > button,
+    .account-sidebar-bottom > a, .account-sidebar-bottom > button, .portal-switcher > a,
+    .help-card-bottom, .help-file small, .help-file-row small, .help-intro p, .help-guide-card > p,
+    .help-quick-start small, .help-empty, .help-attachments > p, .help-library-heading p, .account-enquiry .status-badge) {
+    color: var(--home-secondary);
+  }
+  & :where(.account-plan-card > svg, .account-stats > button > svg, .account-sidebar nav > button.selected,
+    .help-card-top, .help-library-heading > svg, .account-enquiry .status-scheduled) {
+    color: var(--home-accent);
+  }
+  & :where(.account-enquiry .status-new, .portal-switcher > a:hover) { color: var(--home-copper); }
+  & .portal-switcher > a.portal-switcher-customer.active {
+    background-color: var(--home-accent);
+    color: var(--home-action-ink);
+  }
+  & .account-details-form input[readonly] {
+    background-color: var(--home-elevated);
+    color: var(--home-secondary);
+  }
+  & :where(.help-attachments, .help-card-bottom) { border-color: var(--home-border); }
+}
+
 @media(prefers-reduced-motion:reduce){
   .home-theme-options .rubber-segment__item{transition:none}
 }

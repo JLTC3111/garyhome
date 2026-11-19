@@ -91,6 +91,7 @@ async function setup(t) {
  await pg.exec(baseline.match(/create function private\.preserve_deleted_property\(\)[\s\S]*?create trigger preserve_deleted_property[\s\S]*?;/)[0]);
  await pg.exec(baseline.match(/create function public\.delete_property\(target_property uuid\)[\s\S]*?end; \$\$;/)[0]);
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119095000_property_deletion_media_cleanup.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../supabase/migrations/20261119183631_property_photo_rename_owner_only.sql',import.meta.url),'utf8'));
  const files=new Map([[oldKey,{mime:'image/jpeg',bytes:jpeg}]]), calls=[];
  let onCopy=()=>{}, onRemove=()=>{};
  const original=globalThis.fetch;
@@ -139,16 +140,16 @@ async function setup(t) {
   onCopy:callback=>{onCopy=callback;},onRemove:callback=>{onRemove=callback;}};
 }
 
-test('guarded copy, stale edit retry, atomic references, retained originals and explicit removal',async t=>{
- const h=await setup(t), write=h.client('authenticated',admin), system=h.client('service_role');
+test('Owner-only copy, stale edit retry, atomic references, retained originals and explicit removal',async t=>{
+ const h=await setup(t), write=h.client('authenticated',owner), system=h.client('service_role');
  const input={propertyId:first,source:oldUrl,filename:'room.jpg (3).jpg',version};
  const rename=(db=write,extra={})=>renamePropertyPhoto(db,system,origin,{...input,...extra},signal());
  const photos=h.listing;
- for(const actor of [editor,manager])await assert.rejects(rename(h.client('authenticated',actor)),/forbidden/);
+ for(const actor of [admin,manager,editor])await assert.rejects(rename(h.client('authenticated',actor)),/forbidden/);
  assert.equal(h.calls.length,0);
- const active=h.client('authenticated',owner);
  await h.pg.query('update auth.users set banned_until=now()+interval \'1 day\' where id=$1',[owner]);
- await assert.rejects(rename(active),/forbidden/);
+ await assert.rejects(rename(),/forbidden/);
+ await h.pg.query('update auth.users set banned_until=null where id=$1',[owner]);
  await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('insert into storage.objects values($1,$2)',[bucket,newKey])),/policy/);
  assert.equal((await h.role('authenticated',editor,()=>h.pg.query('delete from storage.objects where name=$1',[oldKey]))).affectedRows,0);
  await h.pg.query('insert into storage.objects values($1,$2)',[bucket,newKey]);
@@ -186,7 +187,17 @@ test('guarded copy, stale edit retry, atomic references, retained originals and 
  assert.deepEqual((await rename(write,{cleanupConfirmed:true})).cleanup,{status:'pending',reason:'review_required'},
   'retrying an older operation cannot upgrade it to automatic removal');
  assert.equal(h.calls.filter(call=>call[0]==='remove').length,0);
- await assert.rejects(h.role('authenticated',admin,()=>h.pg.query('select public.home_photo_rename_request_removal($1,false)',[result.id])),/confirm_required/);
+ const renameRpcs=[
+  ['lookup',[first,origin,oldKey,'room-03.jpg']],['reserve',[first,origin,oldKey,'room-03.jpg',version]],
+  ['resume',[first,origin,oldKey]],['reserve_v2',[first,origin,oldKey,'room-03.jpg',version,true]],
+  ['apply',[result.id,version]],['history',[first]],['request_removal',[result.id,true]],
+ ];
+ for(const [action,args] of renameRpcs){
+  const params=args.map((_,i)=>'$'+(i+1)).join(',');
+  await assert.rejects(h.role('authenticated',admin,()=>h.pg.query(`select public.home_photo_rename_${action}(${params})`,args)),/forbidden/,action);
+ }
+ await assert.rejects(h.role('authenticated',admin,()=>h.pg.query('select private.home_photo_rename_history($1)',[first])),/permission denied/);
+ await assert.rejects(h.role('authenticated',owner,()=>h.pg.query('select public.home_photo_rename_request_removal($1,false)',[result.id])),/confirm_required/);
  h.files.set(newKey,{mime:'image/jpeg',bytes:new Uint8Array([255,216,255,224,0,0,0,2])});
  await assert.rejects(retirePropertyPhoto(write,system,origin,result.id,signal()),/integrity_failed/);
  assert.equal(h.files.has(oldKey),true);
@@ -305,7 +316,7 @@ test('an in-flight rename blocks deletion and historical recovery checks the rev
 });
 
 test('confirmed cleanup is recoverable after a stale update, failed removal, and lost response',async t=>{
- const h=await setup(t), db=h.client('authenticated',admin), system=h.client('service_role');
+ const h=await setup(t), db=h.client('authenticated',owner), system=h.client('service_role');
  const input={propertyId:first,source:oldUrl,filename:'room-03',version,cleanupConfirmed:true};
  const rename=extra=>renamePropertyPhoto(db,system,origin,{...input,...extra},signal());
  const read=()=>h.listing(first);

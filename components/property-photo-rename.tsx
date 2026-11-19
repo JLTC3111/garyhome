@@ -22,7 +22,7 @@ const messages:Record<string,[string,string]> = {
   stale_listing:["The listing changed. Reopen the saved listing before retrying. Your edits are still open.", "Tin đăng đã thay đổi. Mở lại bản đã lưu trước khi thử lại. Các chỉnh sửa vẫn đang mở."],
   photo_not_saved:["Save this photo to the listing before renaming it.", "Lưu ảnh vào tin đăng trước khi đổi tên."],
   migration_required:["Apply the Home photo rename migration before using this tool.", "Áp dụng bản cập nhật đổi tên ảnh Gary Home trước khi sử dụng."],
-  forbidden:["Current Home Admin or Owner access is required.", "Cần quyền Quản trị viên hoặc Chủ sở hữu Gary Home đang hoạt động."],
+  forbidden:["Active Gary Home Owner access is required.", "Cần quyền Chủ sở hữu Gary Home đang hoạt động."],
   integrity_failed:["The copy could not be verified. The existing photo is retained.", "Không thể xác minh bản sao. Ảnh hiện tại vẫn được giữ."],
   unsupported_source:["This photo is outside the configured Home Storage bucket.", "Ảnh không nằm trong kho lưu trữ đã cấu hình của Gary Home."],
   object_unavailable:["The photo could not be loaded from Storage.", "Không thể tải ảnh từ kho lưu trữ."],

@@ -193,6 +193,33 @@ test('legacy language preferences are migrated before paint and valid language w
  vm.runInThisContext(LANGUAGE_BOOTSTRAP);assert.equal(p.page.documentElement.dataset.languagePending,undefined);
 });
 
+test('the shared language beats stale host preferences on direct portal visits and keeps explicit public URLs readable',()=>{
+ const shared={language:'vi'},localCookies={'staff.garyhome.vn':'en','www.garyhome.vn':'en'};
+ function visit(hostname,pathname,serverLanguage) {
+  const documentElement={lang:serverLanguage,dataset:{}};
+  const values=new Map([['gary-language','en']]);
+  const document={documentElement,get cookie(){
+   return [localCookies[hostname],shared.language].filter(Boolean).map(value=>'gary-language='+value).join('; ');
+  },set cookie(line){
+   const value=line.split(';')[0].split('=')[1];
+   if(line.includes('Max-Age=0')) delete localCookies[hostname];
+   else if(line.includes('Domain=garyhome.vn')) shared.language=value;
+   else localCookies[hostname]=value;
+  }};
+  vm.runInNewContext(LANGUAGE_BOOTSTRAP,{document,window:{location:{hostname,pathname,protocol:'https:'}},
+   localStorage:{getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)}});
+  return {documentElement,stored:values.get('gary-language')};
+ }
+ for(const [host,path] of [['staff.garyhome.vn','/admin'],['www.garyhome.vn','/account']]){
+  const visited=visit(host,path,'en');
+  assert.equal(visited.documentElement.dataset.languagePending,'');
+  assert.equal(visited.stored,'vi');
+  assert.equal(localCookies[host],undefined);
+ }
+ assert.equal(visit('www.garyhome.vn','/en','en').documentElement.dataset.languagePending,undefined);
+ assert.equal(shared.language,'vi');
+});
+
 test('feedback uses an uncropped portrait gallery and keeps landscape navigation and translated controls',async t=>{
  const p=await platform(t),site={current:{t:en=>en}}, {gallery:{PropertyGallery}}=loadComponents(site);const view=()=>React.createElement(PropertyGallery,{images:['portrait-9-16.jpg','landscape.jpg'],title:'Customer feedback',variant:'feedback'}),renderer=await p.mount(view());assert.ok(renderer.root.findByProps({className:'rental-gallery rental-gallery-feedback'}));const cover=renderer.root.findByProps({className:'rental-gallery-cover'}).findByType('img');assert.equal(cover.props.width,900);assert.equal(cover.props.height,1600);
  await act(async()=>renderer.root.findAllByType('button').find(button=>button.props['aria-label']==='Open feedback photos').props.onClick());assert.equal(renderer.root.findByType('dialog').props['aria-label'],'Feedback photo gallery');await act(async()=>renderer.root.findByType('dialog').props.onKeyDown({key:'ArrowRight',preventDefault(){}}));assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,'landscape.jpg');site.current.t=(_en,vi)=>vi;await act(async()=>renderer.update(view()));assert.equal(renderer.root.findByType('dialog').props['aria-label'],'Thư viện ảnh phản hồi');assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,'landscape.jpg');

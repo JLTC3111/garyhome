@@ -1,18 +1,26 @@
 "use client";
 import { AnimatePresence } from "motion/react";
 import { EditorModal } from "./editor-modal";
+import { HeaderAccountMenu } from "./header-account-menu";
 import { PasswordInput } from "./password-input";
 import { useEffect,useRef,useState,type FormEvent } from "react";
 import { Camera,KeyRound,LoaderCircle,Save } from "lucide-react";
 import { useSite } from "./site-context";
 import { setAccountPassword } from "@/lib/password-actions";
 
-export function StaffProfileButton(){
- const {user,client,staffProfile,t}=useSite(),[open,setOpen]=useState(false);
+export function StaffAccountMenu({ onDashboard, onSignedOut }: { onDashboard: () => void; onSignedOut: () => void }){
+ const {editor,sessionResolved,sessionPhase}=useSite(),[open,setOpen]=useState(false);
  const button=useRef<HTMLButtonElement>(null);
- useEffect(()=>{const show=()=>setOpen(true);window.addEventListener("gary-open-staff-profile",show);return()=>window.removeEventListener("gary-open-staff-profile",show);},[]);
- const photo=staffProfile?.avatar_path&&client?client.storage.from("staff-avatars").getPublicUrl(staffProfile.avatar_path).data.publicUrl:"";
- return <><button ref={button} className="avatar staff-profile-trigger" type="button" aria-label={t("Edit staff profile","Chỉnh sửa hồ sơ nhân viên")} title={t("Change profile photo or password","Đổi ảnh hồ sơ hoặc mật khẩu")} onClick={()=>setOpen(true)}>{photo?<img src={photo} alt=""/>:user?.email?.[0]?.toUpperCase()}<Camera size={11}/></button><AnimatePresence initial={false} onExitComplete={()=>button.current?.focus()}>{open&&<StaffProfileDialog close={()=>setOpen(false)}/>}</AnimatePresence></>;
+ const canOpenProfile = editor && sessionResolved && sessionPhase === "ready";
+ useEffect(()=>{
+  const show=()=>{if(canOpenProfile)setOpen(true);};
+  window.addEventListener("gary-open-staff-profile",show);
+  return()=>window.removeEventListener("gary-open-staff-profile",show);
+ },[canOpenProfile]);
+ return <>
+  <HeaderAccountMenu staffActions={{ dashboard: onDashboard, profile: () => { if(canOpenProfile)setOpen(true); }, signedOut: onSignedOut, trigger: button }}/>
+  <AnimatePresence initial={false} onExitComplete={()=>button.current?.focus({preventScroll:true})}>{open&&editor&&<StaffProfileDialog close={()=>setOpen(false)}/>}</AnimatePresence>
+ </>;
 }
 export function StaffPasswordReminder(){
  const {staffProfile,t}=useSite();

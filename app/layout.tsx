@@ -71,7 +71,7 @@ export default async function RootLayout({
     // The head bootstrap can add the temporary language-pending attribute before
     // hydration. Limit this escape hatch to the intentional root attributes.
     <html lang={initialLanguage} data-home-public={initial.publicPath ? "true" : "false"} suppressHydrationWarning>
-      <head><link rel="preload" href="/fonts/be-vietnam-pro-regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><script id="gary-language-bootstrap" dangerouslySetInnerHTML={{__html:LANGUAGE_BOOTSTRAP}}/><script id="gary-home-theme-scope" dangerouslySetInnerHTML={{__html:PUBLIC_THEME_SCOPE_BOOTSTRAP}}/><style>{`html[data-language-pending] body{visibility:hidden}`}</style></head>
+      <head><link rel="preload" href="/fonts/be-vietnam-pro-regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><link rel="preload" href="/fonts/be-vietnam-pro-medium.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/><link rel="stylesheet" href="/fonts/fonts.css"/><script id="gary-language-bootstrap" dangerouslySetInnerHTML={{__html:LANGUAGE_BOOTSTRAP}}/><script id="gary-home-theme-scope" dangerouslySetInnerHTML={{__html:PUBLIC_THEME_SCOPE_BOOTSTRAP}}/><style>{`html[data-language-pending] body{visibility:hidden}`}</style></head>
       <body><PublicThemeProvider><InteractionProvider><SiteProvider initial={initial} initialLanguage={initialLanguage} initialCurrency={initialCurrency}><DocumentTitle/><a className="skip-link" href="#main-content">{initialLanguage==="vi"?"Đến nội dung chính":"Skip to content"}</a><Header /><main id="main-content">{children}</main><Footer /></SiteProvider></InteractionProvider></PublicThemeProvider></body>
     </html>
   );

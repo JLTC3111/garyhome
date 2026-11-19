@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { ChevronDown, Heart, House, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { request } from "@/lib/requests";
-import { STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
+import { CUSTOMER_ACCOUNT_URL, STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
 import type { StaffRole } from "@/lib/staff";
 import Link from "./localized-link";
 import { useSite } from "./site-context";
@@ -17,16 +17,23 @@ const roleNames: Record<StaffRole, [string, string]> = {
 };
 
 type CustomerAccess = { profile: boolean; saved: boolean; name: string; unavailable: boolean };
+type StaffMenuActions = {
+  dashboard: () => void; profile: () => void; signedOut: () => void; trigger: RefObject<HTMLButtonElement | null>;
+};
 
 function AccountAvatar({ photo, name = "" }: { photo?: string; name?: string }) {
   const [failedPhoto, setFailedPhoto] = useState("");
+  const words = name.trim().split(/\s+/);
+  const initials = (words[0]?.[0] ?? "") + (words.length > 1 ? words[words.length - 1][0] : "");
   return <span className="header-account-avatar" aria-hidden="true">
     {photo && failedPhoto !== photo ? <img src={photo} alt="" onError={() => setFailedPhoto(photo)}/>
-      : name ? Array.from(name)[0].toLocaleUpperCase() : <UserRound size={18}/>}
+      : initials ? initials.toLocaleUpperCase() : <UserRound size={18}/>}
   </span>;
 }
 
-export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
+export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions }: {
+  onOpen?: () => void; customerAvatar?: boolean; staffActions?: StaffMenuActions;
+}) {
   const { t, user, client, editor, staffRole, staffProfile, sessionResolved, sessionExpired,
     staffAccessRevoked, sessionPhase, revalidateSession, signOutSession } = useSite();
   const identity = sessionResolved ? user?.id ?? "guest" : "restoring";
@@ -35,7 +42,8 @@ export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
   const [checking, setChecking] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutFailed, setSignOutFailed] = useState(false);
-  const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
+  const root = useRef<HTMLDivElement>(null), defaultTrigger = useRef<HTMLButtonElement>(null);
+  const trigger = staffActions?.trigger ?? defaultTrigger;
   const verification = useRef<AbortController | null>(null);
   const id = useId();
 
@@ -72,14 +80,15 @@ export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
       const [, [profile, saved]] = await Promise.all([revalidateSession(), request(signal => {
         const abort = AbortSignal.any([signal, check.signal]);
         return Promise.all([
-          client.from("customer_profiles").select("full_name").eq("user_id", user.id).abortSignal(abort).maybeSingle(),
-          client.from("saved_homes").select("property_id", { head: true }).eq("user_id", user.id).limit(1).abortSignal(abort),
+          client.from("customer_profiles").select(staffActions ? "user_id" : "full_name").eq("user_id", user.id).abortSignal(abort).maybeSingle(),
+          staffActions ? null : client.from("saved_homes").select("property_id", { head: true }).eq("user_id", user.id).limit(1).abortSignal(abort),
         ]);
       })]);
       if (check.signal.aborted) return;
+      const profileName = profile.data && "full_name" in profile.data ? profile.data.full_name : undefined;
       setCustomer({
-        profile: !profile.error, saved: !saved.error, name: profile.data?.full_name?.trim() ?? "",
-        unavailable: [profile, saved].some(result => result.error && result.error.code !== "42501" && result.status !== 403),
+        profile: !profile.error, saved: !!saved && !saved.error, name: typeof profileName === "string" ? profileName.trim() : "",
+        unavailable: [profile, saved].some(result => result?.error && result.error.code !== "42501" && result.status !== 403),
       });
     } catch {
       if (!check.signal.aborted) setCustomer({ profile: false, saved: false, name: "", unavailable: true });
@@ -97,6 +106,7 @@ export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
     setSignOutFailed(false);
     try {
       await signOutSession();
+      staffActions?.signedOut();
       setDisclosure(previous => ({ ...previous, open: false }));
       trigger.current?.focus({ preventScroll: true });
     } catch { setSignOutFailed(true); }
@@ -114,18 +124,18 @@ export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
   }
 
   const role = sessionPhase === "ready" && editor ? staffRole : null;
-  const staff = role && staffProfile?.user_id === user?.id ? staffProfile : null;
+  const staff = !customerAvatar && role && staffProfile?.user_id === user?.id ? staffProfile : null;
   const photo = staff?.avatar_path && client ? client.storage.from("staff-avatars").getPublicUrl(staff.avatar_path).data.publicUrl : "";
   const email = user?.email ?? "";
   const signupName = user?.user_metadata?.full_name;
-  const name = staff?.display_name?.trim() || customer?.name || (typeof signupName === "string" ? signupName.trim() : "") || email;
+  const name = staff?.display_name?.trim() || (!staffActions && customer?.name) || (typeof signupName === "string" ? signupName.trim() : "") || email;
   const verified = sessionPhase === "ready" && !checking && customer !== null;
   const showStaff = verified && !!role;
   const showProfile = verified && customer.profile;
   const showSaved = verified && customer.saved;
   const canRetry = sessionPhase !== "ready" || customer?.unavailable;
-  const label = user ? t("My account", "Tài khoản của tôi") : t("Sign in", "Đăng nhập");
-  return <div className="header-account-menu" ref={root} onBlur={event => {
+  const label = staffActions ? t("Staff account", "Tài khoản nhân viên") : user ? t("My account", "Tài khoản của tôi") : t("Sign in", "Đăng nhập");
+  return <div className={staffActions ? "header-account-menu staff-account-menu" : "header-account-menu"} ref={root} onBlur={event => {
     if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) close();
   }} onKeyDown={event => {
     if (!open || event.key !== "Escape") return;
@@ -137,11 +147,11 @@ export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
     <button type="button" className="header-account-trigger" ref={trigger} aria-label={label} aria-controls={id} aria-expanded={open}
       onClick={() => {
         if (open) { close(); return; }
-        onOpen();
+        onOpen?.();
         setDisclosure({ identity, open: true });
         if (user) void checkAccess();
       }}>
-      <AccountAvatar photo={photo} name={name}/><span className="header-account-trigger-label">{label}</span><ChevronDown size={14} aria-hidden="true"/>
+      <AccountAvatar photo={photo} name={name}/><span className="header-account-trigger-label">{staffActions && name ? name : label}</span><ChevronDown size={14} aria-hidden="true"/>
     </button>
     <div className="header-account-panel" id={id} hidden={!open} inert={!open}>
       {open && (user ? <>
@@ -155,11 +165,12 @@ export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
           </div>
         </div>
         <nav className="header-account-links" aria-label={t("Account destinations", "Điều hướng tài khoản")}>
-          {showStaff && <a href={staffDashboard} onClick={close}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</a>}
-          {showProfile && <>
-            <Link href="/account" onClick={close}><House size={19} aria-hidden="true"/>{t("Customer Dashboard", "Bảng điều khiển khách hàng")}</Link>
-            <Link href="/account?tab=profile" onClick={close}><UserRound size={19} aria-hidden="true"/>{t("My Profile", "Hồ sơ của tôi")}</Link>
-          </>}
+          {showStaff && (staffActions
+            ? <button type="button" onClick={() => { close(); staffActions.dashboard(); trigger.current?.focus({preventScroll:true}); }}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</button>
+            : <a href={staffDashboard} onClick={close}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</a>)}
+          {showProfile && <Link href={staffActions ? CUSTOMER_ACCOUNT_URL : "/account"} onClick={close}><House size={19} aria-hidden="true"/>{t("Customer Dashboard", "Bảng điều khiển khách hàng")}</Link>}
+          {staffActions ? showStaff && <button type="button" onClick={() => { close(); staffActions.profile(); }}><UserRound size={19} aria-hidden="true"/>{t("My Staff Profile", "Hồ sơ nhân viên của tôi")}</button>
+            : showProfile && <Link href="/account?tab=profile" onClick={close}><UserRound size={19} aria-hidden="true"/>{t("My Profile", "Hồ sơ của tôi")}</Link>}
           {showSaved && <Link href="/saved" onClick={close}><Heart size={19} aria-hidden="true"/>{t("Saved Homes", "Nhà đã lưu")}</Link>}
         </nav>
         {staffAccessRevoked && <p className="header-account-message" role="status">{t("Your staff access was removed.", "Quyền truy cập nhân viên của bạn đã bị thu hồi.")}</p>}

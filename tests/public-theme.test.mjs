@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import postcss from 'postcss';
 import ts from 'typescript';
+import * as localizedRoutes from '../lib/localized-routes.ts';
 
 const root = new URL('../', import.meta.url);
 const routes = fs.readFileSync(new URL('lib/public-routes.ts', root), 'utf8');
@@ -13,13 +14,14 @@ const code = ts.transpileModule(fs.readFileSync(new URL('lib/public-theme.ts', r
 }).outputText;
 const loaded = { exports: {} };
 vm.runInThisContext('(function(exports,require,module){' + code + '\n})')(
-  loaded.exports, () => ({ PUBLIC_LANDING_PATHS: publicPaths }), loaded
+  loaded.exports, id => id === './localized-routes' ? localizedRoutes : { PUBLIC_LANDING_PATHS: publicPaths }, loaded
 );
-const { PUBLIC_THEME_SCOPE_BOOTSTRAP, HOME_THEME_STORAGE_KEY, HOME_THEME_VALUES } = loaded.exports;
+const { PUBLIC_THEME_SCOPE_BOOTSTRAP, HOME_THEME_STORAGE_KEY, HOME_THEME_VALUES, isHomeThemePath } = loaded.exports;
 
 function publicScope(pathname) {
   const html = { dataset: {} };
   vm.runInNewContext(PUBLIC_THEME_SCOPE_BOOTSTRAP, { location: { pathname }, document: { documentElement: html } });
+  assert.equal(html.dataset.homePublic, String(isHomeThemePath(pathname)), 'hydration and first paint agree');
   return html.dataset.homePublic;
 }
 
@@ -33,8 +35,12 @@ test('theme scope runs before hydration on every public page type in both langua
   }
 });
 
-test('the public palette does not opt staff, auth, customer portals, API or unknown routes into dark mode', () => {
-  for (const pathname of ['/admin', '/en/admin', '/vi/admin', '/auth/reset', '/auth/invite', '/account', '/login', '/saved', '/cart', '/api/config', '/homes/invalid_slug', '/unknown']) {
+test('customer routes share the home palette while staff, auth and API routes keep their own scope', () => {
+  for (const pathname of ['/account', '/account/', '/saved', '/saved/']) {
+    assert.equal(publicScope(pathname), 'true', pathname);
+    assert.equal(localizedRoutes.isPublicPagePath(pathname), false, 'the palette is independent of public routing');
+  }
+  for (const pathname of ['/admin', '/en/admin', '/vi/admin', '/auth/reset', '/auth/invite', '/login', '/cart', '/api/config', '/homes/invalid_slug', '/unknown']) {
     assert.equal(publicScope(pathname), 'false', pathname);
   }
   assert.deepEqual(HOME_THEME_VALUES, ['light', 'dark', 'system']);
@@ -65,6 +71,23 @@ test('forest surfaces, secondary copy, sage actions and input outlines meet AA c
   assert.ok(contrast(tokens['home-accent'], tokens['home-elevated']) >= 3, 'visible focus outline');
 });
 
+test('customer dark surfaces and controls use the shared palette tokens', () => {
+  const theme = postcss.parse(css);
+  const customer = theme.nodes.find(rule => rule.selector?.endsWith(':where(.account-entry, .account-page)'));
+  assert.match(customer?.selector, /data-home-public="true".*data-home-theme="dark"/);
+  function assertToken(selector, property, token) {
+    assert.ok(customer.nodes.some(rule => rule.selector?.includes(selector)
+      && rule.nodes.some(node => node.prop === property && node.value === `var(--${token})`)), selector);
+  }
+  for (const selector of ['.account-auth-card', '.account-sidebar', '.account-details-form', '.account-enquiry', '.help-guide-card']) {
+    assertToken(selector, 'background-color', 'home-surface');
+    assertToken(selector, 'color', 'home-text');
+  }
+  assertToken('.account-details-form input[readonly]', 'background-color', 'home-elevated');
+  assertToken('.portal-switcher-customer.active', 'color', 'home-action-ink');
+  assertToken('.selection-background', 'background-color', 'home-elevated');
+});
+
 test('Studio action, focus and field colors meet contrast targets in both themes', () => {
   const studio = postcss.parse(fs.readFileSync(new URL('app/studio-theme.css', root), 'utf8'));
   const declarations = (selector, scheme) => {
@@ -74,7 +97,7 @@ test('Studio action, focus and field colors meet contrast targets in both themes
     return Object.fromEntries(rule.nodes.filter(node => node.type === 'decl' && node.prop.startsWith('--')).map(node => [node.prop.slice(2), node.value]));
   };
   const light = declarations('html:has(.admin-shell)', 'light');
-  const dark = { ...tokens, ...light, ...declarations('html[data-home-theme="dark"]:has(.admin-shell, .admin-loading)', 'dark') };
+  const dark = { ...tokens, ...light, ...declarations('html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .session-gate)', 'dark') };
   for (const [palette, surfaces] of [[light, ['#fff', '#f5f6f0', '#edf2e5']], [dark, ['home-background', 'home-surface', 'home-elevated'].map(name => tokens[name])]]) {
     const color = name => {
       const value = palette[name];
@@ -96,7 +119,7 @@ test('dark styles preserve image color and the supplied evening asset is an unmo
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
   for (const [, selector, body] of rules) {
     if (selector.includes('home-theme="dark"')) {
-      assert.ok(selector.includes('data-home-public="true"'), 'every dark rule is public-only');
+      assert.ok(selector.includes('data-home-public="true"'), 'dark rules use the home palette scope');
       assert.doesNotMatch(body, /(?:filter\s*:|mix-blend-mode\s*:)/i, selector);
     }
   }

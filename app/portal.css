@@ -1,3 +1,4 @@
+:where(.admin-shell,.admin-auth,.account-entry,.account-page){font-family:var(--sans);font-synthesis-weight:none}
 .account-entry{display:grid;grid-template-columns:1.08fr .92fr;gap:100px;align-items:start;padding-block:68px 90px}
 .account-welcome h1{font-size:57px;line-height:1.08;margin-top:19px;max-width:580px}
 .account-welcome h1 em{font-weight:400;color:var(--olive)}

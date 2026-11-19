@@ -14,6 +14,7 @@ export function assignableRoles(role:unknown):Exclude<StaffRole,"owner">[]{retur
 export function canManageStaff(role: unknown) { return staffRank(role)>=2; }
 export function canManageRole(actor:unknown,target:unknown){return staffRank(target)>0&&staffRank(target)<staffRank(actor);}
 export function canDeleteContent(role: unknown) { return role === "owner" || role === "admin"; }
+export function canRenamePropertyPhotos(role: unknown) { return role === "owner"; }
 
 export function canReorderProperties(role:unknown){return role==="owner"||role==="admin"||role==="manager";}
 

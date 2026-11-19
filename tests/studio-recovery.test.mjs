@@ -313,14 +313,23 @@ test('a customer opening staff login receives a customer return link without sta
  assert.match(JSON.stringify(h.renderer.toJSON()),/Mở cổng khách hàng/);
 });
 
-function headerAccount(h) {
- const root=()=>h.renderer.root.findByProps({className:'header-account-menu'});
+function headerAccount(h, className='header-account-menu') {
+ const root=()=>h.renderer.root.findByProps({className});
  const trigger=()=>root().findByProps({className:'header-account-trigger'});
  const panel=()=>root().findByProps({className:'header-account-panel'});
  const menuText=()=>JSON.stringify(h.renderer.toJSON());
  const links=()=>panel().findAllByType('a').map(a=>a.props.href);
  const toggle=async()=>{await act(async()=>{trigger().props.onClick();await delay(5);});};
  return {root,trigger,panel,menuText,links,toggle};
+}
+
+const staffAccount = h => headerAccount(h, 'header-account-menu staff-account-menu');
+async function openStaffProfile(h) {
+ const account=staffAccount(h);
+ await account.toggle();
+ const profile=account.panel().findAllByType('button').find(button=>button.children.includes('My Staff Profile'));
+ assert.ok(profile);
+ await act(async()=>profile.props.onClick());
 }
 
 test('header account shares one guest disclosure on desktop and mobile and closes on Escape',async t=>{
@@ -377,6 +386,60 @@ test('header account shows dual access and removes the staff badge, portrait and
  assert.deepEqual(account.links(),['/account','/account?tab=profile','/saved']);
  assert.deepEqual(badges(),['Customer']);assert.equal(account.root().findAllByType('img').length,0);
  assert.match(account.menuText(),/Your staff access was removed/);
+});
+
+test('staff account dropdown shows verified portrait, dashboard and profile actions, with conditional customer access',async t=>{
+ const h=await harness(t,{page:'staff',role:'admin',path:'/admin',url:'https://staff.garyhome.vn/admin'});
+ const account=staffAccount(h);
+ h.backend.profilePaths=new Map([['owner','owner/staff-portrait.png']]);
+ await act(async()=>h.site.refreshStaffProfile());
+ assert.equal(account.trigger().props['aria-label'],'Staff account');
+ assert.ok(account.trigger().findByType('img').props.src.endsWith('/staff-portrait.png'));
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Site settings'}).props.onClick());
+ await account.toggle();
+ assert.match(account.menuText(),/Staff.*Admin/);
+ assert.deepEqual(account.links(),['https://www.garyhome.vn/account']);
+ const action=label=>account.panel().findAllByType('button').find(button=>button.children.includes(label));
+ assert.ok(action('My Staff Profile'));assert.ok(action('Sign Out'));
+ await act(async()=>action('Staff Dashboard').props.onClick());
+ assert.equal(account.panel().props.hidden,true);
+ assert.match(h.renderer.root.findByProps({className:'admin-breadcrumb'}).findByType('strong').children.join(''),/Overview/);
+ h.backend.readErrors.set('customer_profiles',{code:'42501'});
+ await account.toggle();assert.deepEqual(account.links(),[]);assert.ok(action('My Staff Profile'));
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(account.trigger().props['aria-label'],'Tài khoản nhân viên');
+ assert.ok(action('Hồ sơ nhân viên của tôi'));
+ h.backend.role=null;
+ await act(async()=>h.site.revalidateSession());
+ assert.equal(h.renderer.root.findAllByProps({className:'header-account-menu staff-account-menu'}).length,0);
+ assert.equal(h.site.editor,false);
+});
+
+test('customer portal header keeps a staff portrait out of the customer identity',async t=>{
+ const h=await harness(t,{page:'header',path:'/account',url:'https://www.garyhome.vn/account'});
+ const account=headerAccount(h);
+ h.backend.profilePaths=new Map([['owner','owner/staff-portrait.png']]);
+ h.backend.rows.customer_profiles=[{user_id:'owner',full_name:'Customer Profile'}];
+ await act(async()=>h.site.refreshStaffProfile());
+ await account.toggle();
+ assert.equal(account.root().findAllByType('img').length,0);
+ assert.equal(account.root().findByType('strong').children.join(''),'Customer Profile');
+ assert.equal(account.root().findAllByProps({className:'header-account-avatar'})[0].children.join(''),'CP');
+ assert.ok(account.links().includes('https://staff.garyhome.vn/admin'));
+});
+
+test('staff pages link back to the chosen public locale and honor shared language on page return',async t=>{
+ const h=await harness(t,{page:'staff',path:'/admin',url:'https://staff.garyhome.vn/admin'});
+ const homeLink=()=>h.renderer.root.findAllByType('a').find(link=>link.props.className?.includes('rental-brand'));
+ assert.equal(homeLink().props.href,'https://www.garyhome.vn/en');
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.match(h.page.cookie,/gary-language=vi;.*Domain=garyhome.vn; Secure/);
+ assert.equal(homeLink().props.href,'https://www.garyhome.vn/vi');
+ h.stored.set('gary-language','vi');
+ h.page.cookie='gary-language=en';
+ await act(async()=>h.browser.dispatchEvent(new Event('pageshow')));
+ assert.equal(h.site.language,'en');
+ assert.equal(homeLink().props.href,'https://www.garyhome.vn/en');
 });
 
 test('header account updates after a staff-host sign-in and sign-out in the shared store',async t=>{
@@ -474,6 +537,21 @@ test('the combined preferences menu changes and persists both choices independen
  assert.equal(preferences().props['aria-expanded'],false);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);
  await act(async()=>preferences().props.onClick());await act(async()=>h.page.dispatchEvent(new Event('pointerdown')));assert.equal(preferences().props['aria-expanded'],false);
  await act(async()=>preferences().props.onClick());await act(async()=>panel().findAllByType('button').find(node=>node.props['aria-label']==='Đóng tùy chọn').props.onClick());assert.equal(preferences().props['aria-expanded'],false);
+});
+
+test('customer portal preferences expose Light, Dark and System in both languages',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/account',url:'https://www.garyhome.vn/account'});
+ const trigger=h.renderer.root.findByProps({className:'site-preferences-trigger'});
+ await act(async()=>trigger.props.onClick());
+ const panel=h.renderer.root.findByProps({className:'site-preferences-panel'});
+ const choice=label=>panel.findAllByType('button').find(button=>button.children.includes(label));
+ for(const label of ['Light','Dark','System'])assert.ok(choice(label));
+ await act(async()=>choice('Dark').props.onClick());
+ assert.match(h.page.cookie,/gary-home-theme=dark/);
+ await act(async()=>h.site.setLanguage('vi'));
+ for(const label of ['Sáng','Tối','Hệ thống'])assert.ok(choice(label));
+ await act(async()=>choice('Sáng').props.onClick());
+ assert.match(h.page.cookie,/gary-home-theme=light/);
 });
 
 test('the staff topbar groups language and appearance under one preference trigger', async t=>{
@@ -1175,6 +1253,18 @@ test('editors can read enquiries but cannot see destructive listing or enquiry a
  assert.equal(h.renderer.root.findAllByType('button').some(n=>n.props.className==='text-danger'),false);
 });
 
+test('only the Owner sees listing photo rename and history controls',async t=>{
+ for(const role of ['owner','admin','manager','editor'])await t.test(role,async sub=>{
+  const h=await harness(sub,{role});
+  const src='https://duyiihsmaqfgwezmsnjs.supabase.co/storage/v1/object/public/property-media/properties/room.jpg';
+  await act(async()=>h.site.setContent(c=>({...c,properties:[{...c.properties[0],images:[src]},...c.properties.slice(1)]})));
+  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+  await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+  assert.equal(h.renderer.root.findAllByProps({'aria-label':'Rename photo 1'}).length,role==='owner'?1:0);
+  assert.equal(h.renderer.root.findAllByType('summary').some(node=>node.children.includes('Rename history and old copies')),role==='owner');
+ });
+});
+
 
 test('a stale property editor updates its original record and cannot insert a listing removed by another session',async t=>{
  const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
@@ -1289,26 +1379,30 @@ test('staff can change their own password from the sidebar and clear the first-l
  const h=await harness(t);h.backend.passwordReminder=true;
  await act(async()=>{await h.site.refreshStaffProfile();});
  assert.equal(h.renderer.root.findAllByProps({className:'staff-password-reminder'}).length,1);
- await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ await openStaffProfile(h);
  const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});
  await act(async()=>{form.findByProps({name:'password'}).props.onChange({target:{value:'A new personal staff password'}});form.findByProps({name:'confirm_password'}).props.onChange({target:{value:'A new personal staff password'}});});
  await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});
  assert.equal(h.backend.passwordCalls.length,1);assert.equal(h.renderer.root.findAllByProps({className:'staff-password-reminder'}).length,0);assert.deepEqual(h.backend.authCalls,[]);
- assert.match(JSON.stringify(h.renderer.toJSON()),/Profile changes saved. Your password has been updated/);assert.equal(h.renderer.root.findAllByType('dialog').length,0);
+ const toast=h.renderer.root.findByProps({className:'action-toast','data-tone':'success'});
+ assert.equal(toast.findByProps({className:'action-toast-content'}).children.join(''),'Your password has been updated.');
+ assert.equal(h.renderer.root.findAllByType('dialog').length,0);
 });
 test('profile upload persists a staff-owned path and the sidebar follows the saved photo',async t=>{
  const h=await harness(t);h.backend.upload=deferred();
- await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ await openStaffProfile(h);
  const upload=h.renderer.root.findAllByType('input').find(n=>n.props.type==='file');
  await act(async()=>{upload.props.onChange({target:{files:[{type:'image/png',size:1024,name:'portrait.png'}],value:'portrait.png'}});await delay(5);});
  await act(async()=>{h.backend.upload.resolve({data:{path:'stored'},error:null});await delay(8);});
  const write=h.backend.calls.find(c=>c.table==='staff_profiles');assert.equal(write.payload.user_id,'owner');assert.match(write.payload.avatar_path,/^owner\/[a-f0-9-]+\.png$/);
  assert.equal(h.site.staffProfile.avatar_path,write.payload.avatar_path);
- const button=h.renderer.root.findByProps({'aria-label':'Edit staff profile'});assert.ok(button.findByType('img').props.src.endsWith(write.payload.avatar_path));
- const toast=h.renderer.root.findByProps({className:'toast','data-tone':'success'});assert.equal(toast.props.role,'status');assert.match(JSON.stringify(h.renderer.toJSON()),/Profile photo updated/);
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Đã cập nhật ảnh hồ sơ/);
+ assert.ok(staffAccount(h).trigger().findByType('img').props.src.endsWith(write.payload.avatar_path));
+ const toast=()=>h.renderer.root.findByProps({className:'action-toast','data-tone':'success'}).findByProps({className:'action-toast-content'});
+ assert.equal(toast().props.role,'status');assert.match(toast().children.join(''),/Profile photo updated/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(toast().children.join(''),/Đã cập nhật ảnh hồ sơ/);
  const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.equal(form.findByProps({name:'password'}).props.required,undefined);
- await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);assert.match(JSON.stringify(h.renderer.toJSON()),/Đã lưu thay đổi hồ sơ/);
+ await act(async()=>{await form.props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);
+ assert.match(toast().children.join(''),/Đã cập nhật ảnh hồ sơ/);
 });
 test('notifications load once per refresh, show persisted activity and keep read state',async t=>{
  const h=await harness(t);h.backend.notifications=[{id:'notice-one',category:'team',action:'team.role_changed',actor_name:'Owner',actor_user_id:'owner',target_name:'Team colleague',target_user_id:'staff',target_role:'editor',details:{from:'manager',to:'editor'},created_at:'2026-10-25T00:00:00Z',unread:true}];
@@ -1375,12 +1469,12 @@ test('branch navigation offers a read-only staff directory and hides the email-d
 });
 test('Save changes closes an unchanged profile without changing its password or dismissing the first-login reminder',async t=>{
  const h=await harness(t);h.backend.passwordReminder=true;await act(async()=>h.site.refreshStaffProfile());
- await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ await openStaffProfile(h);
  const form=h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});assert.ok(form.findAllByType('button').some(b=>b.children.includes('Save changes')));
  await act(async()=>{await form.props.onSubmit({preventDefault(){}});});assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,0);assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.backend.passwordReminder,true);assert.equal(h.backend.rpcCalls.some(c=>c.name==='acknowledge_staff_password_reminder'),false);assert.match(JSON.stringify(h.renderer.toJSON()),/Your profile is up to date/);
 });
 test('profile password mismatches and Auth failures keep the dialog open without claiming a successful save',async t=>{
- const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ const h=await harness(t);await openStaffProfile(h);
  const form=()=>h.renderer.root.findByProps({className:'enquiry-form staff-password-form'});
  await act(async()=>{form().findByProps({name:'password'}).props.onChange({target:{value:'A private new staff password'}});form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A mismatching password'}});});
  await act(async()=>{await form().props.onSubmit({preventDefault(){}});});assert.equal(h.backend.passwordCalls.length,0);assert.equal(h.renderer.root.findAllByProps({role:'dialog'}).length,1);
@@ -1391,7 +1485,7 @@ test('profile password mismatches and Auth failures keep the dialog open without
 
 test('an unconfirmed photo write cannot be acknowledged by Save changes',async t=>{
  const h=await harness(t);h.backend.upload=deferred();h.backend.writeErrors.set('staff_profiles',{code:'42501',message:'Profile write denied'});
- await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit staff profile'}).props.onClick());
+ await openStaffProfile(h);
  const upload=h.renderer.root.findAllByType('input').find(n=>n.props.type==='file');
  await act(async()=>{upload.props.onChange({target:{files:[{type:'image/png',size:1024,name:'portrait.png'}],value:'portrait.png'}});await delay(5);});
  await act(async()=>{h.backend.upload.resolve({data:{path:'stored'},error:null});await delay(8);});
@@ -1715,7 +1809,8 @@ test('CRM drafts survive same-account reauthentication but clear on explicit sig
  await h.emit(null);await h.emit(authSession('owner'));assert.equal(detail().findAllByType('input')[0].props.value,'Unsaved CRM draft');
  await h.emit(null);await h.emit(authSession('another-owner'));assert.equal(h.renderer.root.findAllByProps({className:'admin-panel customer-detail'}).length,0);
  await add('Another private draft');
- await act(async()=>{h.renderer.root.findByProps({'aria-label':'Sign out'}).props.onClick();await delay(10);});
+ const account=staffAccount(h);await account.toggle();
+ await act(async()=>{account.panel().findByProps({className:'header-account-signout'}).props.onClick();await delay(10);});
  await h.emit(authSession('another-owner'));assert.equal(h.renderer.root.findAllByProps({className:'admin-panel customer-detail'}).length,0);
 });
 

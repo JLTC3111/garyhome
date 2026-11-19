@@ -1582,6 +1582,17 @@ test('a pending guest-favourite transfer never crosses into another account',asy
  await act(async()=>{pending.resolve({data:[{property_id:id}],error:null});await delay(10);});assert.equal(h.site.user.id,'other-customer');assert.ok(!h.site.saved.includes(id));assert.ok(h.stored.get('gary-saved')?.includes(id));
 });
 
+test('Apartments opens on desktop hover with the same menu behavior as About Us',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/'}),apartments=()=>h.renderer.root.findByProps({className:'district-navigation'}),about=()=>h.renderer.root.findByProps({className:'about-navigation'}),apartmentTrigger=()=>h.renderer.root.findByProps({'aria-controls':'apartment-districts'}),aboutTrigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});
+ await act(async()=>apartments().props.onPointerEnter({pointerType:'mouse'}));assert.equal(apartmentTrigger().props['aria-expanded'],true);assert.equal(aboutTrigger().props['aria-expanded'],false);
+ await act(async()=>about().props.onPointerEnter({pointerType:'mouse'}));assert.equal(apartmentTrigger().props['aria-expanded'],false);assert.equal(aboutTrigger().props['aria-expanded'],true);
+ await act(async()=>apartments().props.onPointerEnter({pointerType:'mouse'}));await act(async()=>apartments().props.onPointerLeave({pointerType:'mouse'}));assert.equal(apartmentTrigger().props['aria-expanded'],false);
+ await act(async()=>apartments().props.onPointerEnter({pointerType:'touch'}));assert.equal(apartmentTrigger().props['aria-expanded'],false);
+ await act(async()=>apartmentTrigger().props.onClick());assert.equal(apartmentTrigger().props['aria-expanded'],true);
+ await act(async()=>apartments().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:null}));assert.equal(apartmentTrigger().props['aria-expanded'],true,'touch blur must keep the apartment menu open');
+ await act(async()=>apartments().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:{}}));assert.equal(apartmentTrigger().props['aria-expanded'],false);
+});
+
 test('About Us opens on desktop hover, closes outside its container and stays click-operated on touch',async t=>{
  const h=await harness(t,{guest:true,page:'header',path:'/'}),about=()=>h.renderer.root.findByProps({className:'about-navigation'}),trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});
  await act(async()=>about().props.onPointerEnter({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onPointerLeave({pointerType:'mouse'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>about().props.onPointerEnter({pointerType:'touch'}));assert.equal(trigger().props['aria-expanded'],false);await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);await act(async()=>about().props.onBlur({currentTarget:{contains:()=>false},relatedTarget:{}}));assert.equal(trigger().props['aria-expanded'],false);

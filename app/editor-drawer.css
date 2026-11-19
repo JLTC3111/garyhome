@@ -136,7 +136,30 @@
 .editor-dock.gw-maximized>.editor-drawer{border-left:0;box-shadow:none}
 @keyframes home-editor-slide-in{from{transform:translateX(28px);opacity:.7}to{transform:translateX(0);opacity:1}}
 @keyframes editor-edge-flow{0%,100%{background-position:0 0}50%{background-position:0 100%}}
-@media(prefers-reduced-motion:reduce){.editor-dock{animation:none}.editor-flowing-edge{animation:none}}
+/* Paint the wave on a child so the dark-mode glow follows the mask instead of being clipped by it. */
+html[data-home-theme=dark] .editor-flowing-edge{
+  background:none;
+  mask:none;
+  -webkit-mask:none;
+  animation:none;
+  filter:drop-shadow(-1px 0 1.5px rgb(229 217 173 / .38)) drop-shadow(-6px 0 10px rgb(199 214 182 / .16));
+  transition:filter .28s ease;
+}
+html[data-home-theme=dark] .editor-flowing-edge::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:linear-gradient(90deg,rgb(229 217 173 / .22),transparent 58%),linear-gradient(180deg,#E5D9AD 0%,#c7d6b6 22%,#8ea48a 50%,#c7d6b6 78%,#E5D9AD 100%);
+  background-size:100% 100%,100% 300%;
+  animation:editor-edge-flow 10s ease-in-out infinite;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='120' viewBox='0 0 12 120'%3E%3Cpath d='M12 0H5C-2 20 12 40 5 60S-2 100 5 120H12Z' fill='black'/%3E%3C/svg%3E") left top/12px 120px repeat-y;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='120' viewBox='0 0 12 120'%3E%3Cpath d='M12 0H5C-2 20 12 40 5 60S-2 100 5 120H12Z' fill='black'/%3E%3C/svg%3E") left top/12px 120px repeat-y;
+}
+@media(prefers-reduced-motion:reduce){
+  .editor-dock{animation:none}
+  .editor-flowing-edge,
+  html[data-home-theme=dark] .editor-flowing-edge::before{animation:none}
+}
 /* Use the Studio palette for the shared editor workspace controls. */
 html[data-home-theme=dark] .editor-dock.gw-drawer{--paper:var(--home-surface);--gw-surface:var(--home-surface);--gw-ink:var(--home-text);--gw-line:var(--home-border);--gw-accent:var(--home-accent)}
 html[data-home-theme=dark] .editor-dock :is(.gw-editor-header,.gw-editor-actions){background:var(--gw-surface);color:var(--gw-ink);border-color:var(--gw-line)}

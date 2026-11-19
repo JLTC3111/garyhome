@@ -21,7 +21,7 @@
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar>.brand img{width:52px}
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar>.brand .brand-tagline,.admin-shell[data-sidebar="collapsed"] .admin-sidebar>.studio-label,.admin-shell[data-sidebar="collapsed"] .admin-sidebar-identity{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar nav.branched-menu{margin-top:8px;gap:7px;padding-right:0}
-.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu button,.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__tree>.branched-menu__item{justify-content:center;padding:0;gap:0}
+.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu button,.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__tree>.branched-menu__item{justify-content:center;width:100%;margin-left:0;padding:0;gap:0}
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu button>span.branched-menu__label,.admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu button>span.branched-menu__heading-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__head{background:#e0e8d6;border-radius:8px}
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar .branched-menu .branched-menu__head>.branched-menu__chevron{position:absolute;right:1px;bottom:3px;width:11px;height:11px}
@@ -31,7 +31,7 @@
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar-bottom{padding-top:8px}
 .admin-shell[data-sidebar="collapsed"] .admin-sidebar-bottom>div{flex-direction:column;align-items:center;gap:10px}
 .admin-sidebar>.studio-label{color:#4b624d;font-size:10px;font-weight:600;letter-spacing:.15em}
-.admin-sidebar nav.branched-menu{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#afbea5 transparent;display:flex;flex-direction:column;gap:4px;margin-top:14px;padding:0 2px 16px 0}
+.admin-sidebar nav.branched-menu{--studio-nav-indent:28px;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#afbea5 transparent;display:flex;flex-direction:column;gap:4px;margin-top:14px;padding:0 2px 16px 0}
 .admin-sidebar nav.branched-menu > *{flex-shrink:0}
 .admin-sidebar nav.branched-menu:focus-visible{outline:2px solid var(--studio-focus,var(--orange));outline-offset:-2px}
 .admin-sidebar .branched-menu button{width:100%;border:0;border-radius:9px;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 11px;text-align:left;font-family:var(--sans);font-size:14px;line-height:1.4;color:#344f3d;background:transparent;position:relative;flex-shrink:0}
@@ -50,8 +50,8 @@
 .branched-menu__section[data-open="true"]>.branched-menu__body{grid-template-rows:1fr}
 .branched-menu__fold{min-height:0;overflow:hidden}
 .branched-menu__tree{position:relative;padding:6px 0;box-sizing:border-box}
-.admin-sidebar .branched-menu .branched-menu__tree>.branched-menu__item{height:44px;min-height:44px;padding-left:32px;padding-right:8px}
-.branched-menu__lines{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:1}
+.admin-sidebar .branched-menu .branched-menu__tree>.branched-menu__item{position:relative;z-index:1;height:44px;min-height:44px;width:calc(100% - var(--studio-nav-indent));margin-left:var(--studio-nav-indent);padding-left:11px;padding-right:8px}
+.branched-menu__lines{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;z-index:0}
 .branched-menu__base,.branched-menu__reach{fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .branched-menu__base{stroke:#b5c4ab}
 .branched-menu__reach{stroke:#436d36;transition:stroke-dashoffset 260ms cubic-bezier(.22,.8,.3,1)}
@@ -81,7 +81,7 @@
 @media(max-width:680px){
  .admin-shell{--studio-sidebar-width:72px}.admin-sidebar{padding:18px 7px 13px}.admin-sidebar>.brand{padding:0}.admin-sidebar>.studio-label{font-size:0;height:8px;margin:0}
  .admin-sidebar nav.branched-menu{margin-top:8px;gap:7px;padding-right:0}
- .admin-sidebar .branched-menu button,.admin-sidebar .branched-menu .branched-menu__tree>.branched-menu__item{justify-content:center;padding:0;gap:0}
+ .admin-sidebar .branched-menu button,.admin-sidebar .branched-menu .branched-menu__tree>.branched-menu__item{justify-content:center;width:100%;margin-left:0;padding:0;gap:0}
  .admin-sidebar .branched-menu button>span.branched-menu__label,.admin-sidebar .branched-menu button>span.branched-menu__heading-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  .admin-sidebar .branched-menu .branched-menu__head{background:#e0e8d6;border-radius:8px}
  .admin-sidebar .branched-menu .branched-menu__head>.branched-menu__chevron{position:absolute;right:1px;bottom:3px;width:11px;height:11px}

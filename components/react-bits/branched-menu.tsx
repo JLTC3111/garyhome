@@ -5,13 +5,14 @@
 // MIT + Commons Clause; retained in THIRD_PARTY_NOTICES.md.
 // Gary Home: controlled navigation, existing Lucide icons, native disclosure
 // semantics, keyboard controls, badges and a responsive compact sidebar.
-import { useId,useRef,useState,type KeyboardEvent,type ReactNode } from "react";
+import { useId,useRef,useState,type CSSProperties,type KeyboardEvent,type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 export type BranchedMenuChild={value:string;label:string;icon?:ReactNode;badge?:number};
 export type BranchedMenuItem=BranchedMenuChild&{children?:BranchedMenuChild[]};
 type Props={items:BranchedMenuItem[];active:string;onSelect:(value:string)=>void;label:string};
-const ROW=44,PAD=6,TRUNK=10,RADIUS=8,END=25;
+// END is the child inset (--studio-nav-indent). Connectors stop at that edge.
+const ROW=44,PAD=6,TRUNK=10,RADIUS=8,END=28;
 
 export function BranchedMenu({items,active,onSelect,label}:Props){
  const [open,setOpen]=useState(()=>new Set(items.filter(item=>item.children).map(item=>item.value)));
@@ -27,7 +28,7 @@ export function BranchedMenu({items,active,onSelect,label}:Props){
   buttons[event.key==="Home"?0:event.key==="End"?buttons.length-1:(current+(event.key==="ArrowDown"?1:-1)+buttons.length)%buttons.length]?.focus();
  }
  function content(item:BranchedMenuChild){return <>{item.icon&&<span className="branched-menu__icon" aria-hidden="true">{item.icon}</span>}<span className="branched-menu__label admin-nav-label">{item.label}</span>{!!item.badge&&<span className="studio-menu-count">{item.badge}</span>}</>;}
- return <nav ref={nav} className="branched-menu studio-branched-menu" aria-label={label} tabIndex={0} onKeyDown={keyboard}>
+ return <nav ref={nav} className="branched-menu studio-branched-menu" style={{"--studio-nav-indent":`${END}px`} as CSSProperties} aria-label={label} tabIndex={0} onKeyDown={keyboard}>
   {items.map(item=>{
    if(!item.children)return <button key={item.value} className={`branched-menu__item branched-menu__root ${active===item.value?"selected":""}`} type="button" data-id={item.value} aria-current={active===item.value?"page":undefined} aria-label={item.label} title={item.label} onClick={()=>onSelect(item.value)}>{content(item)}</button>;
    const expanded=open.has(item.value),children=item.children,height=PAD*2+children.length*ROW;
@@ -40,7 +41,7 @@ export function BranchedMenu({items,active,onSelect,label}:Props){
     </button>
     <div id={id+"-"+item.value} className="branched-menu__body" aria-hidden={!expanded} inert={!expanded}>
      <div className="branched-menu__fold"><div className="branched-menu__tree" style={{height}}>
-      <svg className="branched-menu__lines" width="32" height={height} aria-hidden="true"><path className="branched-menu__base" d={`M ${TRUNK} 0 V ${rowY(children.length-1)-RADIUS}`}/>{children.map((child,index)=><path key={child.value} className="branched-menu__base" d={branch(index)}/>)}{children.map((child,index)=><path key={child.value} className="branched-menu__reach" d={reach(index)} pathLength={1} strokeDasharray={1} strokeDashoffset={active===child.value?0:1}/>)}</svg>
+      <svg className="branched-menu__lines" width={END} height={height} aria-hidden="true"><path className="branched-menu__base" d={`M ${TRUNK} 0 V ${rowY(children.length-1)-RADIUS}`}/>{children.map((child,index)=><path key={child.value} className="branched-menu__base" d={branch(index)}/>)}{children.map((child,index)=><path key={child.value} className="branched-menu__reach" d={reach(index)} pathLength={1} strokeDasharray={1} strokeDashoffset={active===child.value?0:1}/>)}</svg>
       {children.map(child=><button key={child.value} className={`branched-menu__item ${active===child.value?"selected":""}`} type="button" data-id={child.value} aria-current={active===child.value?"page":undefined} aria-label={child.label} title={child.label} tabIndex={expanded?0:-1} onClick={()=>{if(expanded)onSelect(child.value);}}>{content(child)}</button>)}
      </div></div>
     </div>

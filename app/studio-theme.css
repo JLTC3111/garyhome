@@ -85,6 +85,13 @@ html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .s
   --studio-quiet-active: var(--home-background);
   --studio-warning: #e9c796;
   --studio-warning-surface: #3e3226;
+  --studio-nav-parent: #2c4035;
+  --studio-nav-parent-hover: color-mix(in srgb, var(--studio-nav-parent) 78%, var(--home-text));
+  --studio-nav-parent-pressed: color-mix(in srgb, var(--studio-nav-parent) 70%, var(--home-background));
+  --studio-nav-child-active: #3b5343;
+  --studio-nav-child-active-hover: color-mix(in srgb, var(--studio-nav-child-active) 86%, var(--home-text));
+  --studio-nav-item-hover: color-mix(in srgb, var(--home-surface) 72%, var(--home-text));
+  --studio-nav-item-pressed: color-mix(in srgb, var(--studio-nav-child-active) 78%, var(--home-background));
 
   /* Navigation and menus */
   & .admin-shell { background-color: var(--home-background); }
@@ -97,10 +104,36 @@ html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .s
   }
   & .admin-sidebar nav.branched-menu { scrollbar-color: var(--studio-control-border) transparent; }
   & .admin-sidebar .branched-menu button { color: var(--ink); }
-  & .admin-sidebar .branched-menu .branched-menu__head { color: var(--muted); background-color: var(--paper); }
-  & .admin-sidebar .branched-menu button:is(:hover, :focus-visible, .selected) { color: var(--ink); background-color: var(--warm); }
-  & .admin-sidebar .branched-menu button.selected { box-shadow: inset 0 0 0 1px var(--studio-control-border); }
-  & .admin-sidebar .branched-menu button:active { background-color: var(--paper); }
+  & .admin-sidebar .branched-menu .branched-menu__head {
+    color: var(--muted); background-color: var(--studio-nav-parent);
+  }
+  & .admin-sidebar .branched-menu .branched-menu__section[data-open="true"] > .branched-menu__head {
+    color: var(--ink); box-shadow: inset 0 -2px 0 var(--studio-focus);
+  }
+  & .admin-sidebar .branched-menu .branched-menu__head:is(:hover, :focus-visible) {
+    color: var(--ink); background-color: var(--studio-nav-parent-hover);
+  }
+  & .admin-sidebar .branched-menu .branched-menu__head:focus-visible {
+    outline: 2px solid var(--studio-focus); outline-offset: -2px;
+  }
+  & .admin-sidebar .branched-menu .branched-menu__head:active {
+    color: var(--ink); background-color: var(--studio-nav-parent-pressed);
+  }
+  & .admin-sidebar .branched-menu .branched-menu__item:is(:hover, :focus-visible) {
+    color: var(--ink); background-color: var(--studio-nav-item-hover);
+  }
+  & .admin-sidebar .branched-menu .branched-menu__item:focus-visible {
+    outline: 2px solid var(--studio-focus); outline-offset: -2px;
+  }
+  & .admin-sidebar .branched-menu .branched-menu__item:active { background-color: var(--studio-nav-item-pressed); }
+  & .admin-sidebar .branched-menu .branched-menu__item.selected {
+    color: var(--ink); background-color: var(--studio-nav-child-active); font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--studio-focus);
+  }
+  & .admin-sidebar .branched-menu .branched-menu__item.selected:is(:hover, :focus-visible) {
+    background-color: var(--studio-nav-child-active-hover);
+  }
+  & .admin-sidebar .branched-menu .branched-menu__item.selected:active { background-color: var(--studio-nav-item-pressed); }
   & .branched-menu__base { stroke: var(--studio-control-border); }
   & .branched-menu__reach { stroke: var(--green); }
   & .admin-sidebar-resize:is(:hover, :focus-visible)::before { background-color: var(--studio-focus); }

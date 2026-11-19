@@ -81,6 +81,49 @@ test('gallery keeps its current image on translation, supports keyboard navigati
  assert.equal(p.dialog.open,false);assert.equal(p.page.activeElement,p.opener);assert.equal(p.page.body.style.overflow,'clip');
 });
 
+test('fullscreen metadata changes with arrows, keyboard, swipes and thumbnails',async t=>{
+ const p=await platform(t),site={current:{t:en=>en,language:'en'}}, {gallery:{PropertyGallery}}=loadComponents(site);
+ const images=['/images/front-room.jpg','/images/balcony.jpg','https://storage.example/photos/d2f782a3-1001-4000-8000-112233445566.jpg'];
+ const metadata={
+  [images[0]]:{description_en:'Morning sun',alt_en:'A sofa by the window',public_filename:'Front room.JPG'},
+  [images[1]]:{alt_en:'Overlooking the garden',alt_vi:'Nhìn ra vườn'}
+ };
+ const view=()=>React.createElement(PropertyGallery,{images,metadata,title:'Rental'});
+ const renderer=await p.mount(view());
+ const button=label=>renderer.root.findAllByType('button').find(n=>n.props['aria-label']===label);
+ const caption=()=>renderer.root.findByProps({className:'rental-lightbox-caption'});
+ const modal=()=>renderer.root.findByType('dialog');
+ const stage=()=>renderer.root.findByProps({className:'rental-lightbox-stage'});
+ await act(async()=>button('Open property gallery').props.onClick());
+ assert.equal(caption().findByType('p').props.children,'Morning sun');
+ assert.match(caption().findByType('small').props.children.join(''),/Front room.JPG/);
+ assert.equal(stage().findByType('img').props.alt,'A sofa by the window');
+ assert.ok(modal().children.indexOf(caption())<modal().children.indexOf(renderer.root.findByProps({className:'rental-lightbox-thumbs'})));
+ await act(async()=>button('Next photo').props.onClick());
+ assert.equal(caption().findByType('p').props.children,'Overlooking the garden');
+ await act(async()=>modal().props.onKeyDown({key:'ArrowRight',preventDefault(){}}));
+ assert.equal(caption().findByType('p').props.children,'Photo 3 of 3');
+ assert.equal(caption().findAllByType('small').length,0);
+ const point=(x,y)=>({identifier:1,clientX:x,clientY:y});
+ const target={closest:()=>null};
+ await act(async()=>{
+  stage().props.onTouchStart({target,touches:[point(40,60)]});
+  stage().props.onTouchEnd({touches:[],changedTouches:[point(140,65)]});
+ });
+ assert.equal(caption().findByType('p').props.children,'Overlooking the garden');
+ await act(async()=>{
+  stage().props.onTouchStart({target,touches:[point(40,60),point(80,60)]});
+  stage().props.onTouchEnd({touches:[],changedTouches:[point(150,60)]});
+ });
+ assert.equal(caption().findByType('p').props.children,'Overlooking the garden');
+ await act(async()=>button('Photo 1').props.onClick());
+ assert.equal(caption().findByType('p').props.children,'Morning sun');
+ site.current={t:(_en,vi)=>vi,language:'vi'};
+ await act(async()=>renderer.update(view()));
+ await act(async()=>button('Ảnh 2').props.onClick());
+ assert.equal(caption().findByType('p').props.children,'Nhìn ra vườn');
+});
+
 test('legacy language preferences are migrated before paint and valid language writes persist a secure cookie',async t=>{
  const p=await platform(t);p.stored.set('gary-language','vi');
  vm.runInThisContext(LANGUAGE_BOOTSTRAP);

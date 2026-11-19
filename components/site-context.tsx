@@ -41,6 +41,8 @@ type SiteContext = {
   emailVerification:{type:PasswordLink["type"];busy:boolean;failed:boolean}|null;
   verifyEmailLink:()=>Promise<void>;
   sessionPhase: SessionPhase; sessionResolved: boolean; reconnect: () => Promise<void>;
+  sessionExpired: boolean; staffAccessRevoked: boolean;
+  revalidateSession: () => Promise<void>; signOutSession: () => Promise<void>;
   editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>, timeoutMs?: number | null) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
   studioDataReady: boolean; enquiries: Enquiry[]; setEnquiries: (list: Update<Enquiry[]>) => void; refresh: () => Promise<void>;
@@ -115,6 +117,8 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("checking");
   const [sessionResolved, setSessionResolved] = useState(!initial.configured);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [staffAccessRevoked, setStaffAccessRevoked] = useState(false);
   const [demo, setDemo] = useState(false);
   const [studioDataReady, setStudioDataReady] = useState(false);
   const [enquiries, updateEnquiries] = useState<Enquiry[]>([]);
@@ -127,7 +131,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   }, []);
   const clientRef = useRef<SupabaseClient | null>(null);
   const sessionRef = useRef<SessionRecovery | null>(null);
-  const snapshotRef = useRef<SessionState>({ user: null, editor: false, role: null, resolved: false, phase: "checking", generation: 0 });
+  const snapshotRef = useRef<SessionState>({ user: null, editor: false, role: null, resolved: false, phase: "checking", generation: 0, expired: false, staffRevoked: false });
   const initialRef = useRef(initial.content);
   useEffect(() => { initialRef.current = initial.content; }, [initial.content]);
   const version = useRef(0);
@@ -251,6 +255,22 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     await publicRecovery;
   }, [refresh, recoverPublicContent]);
 
+  const revalidateSession = useCallback(async () => {
+    if (sessionRef.current) await sessionRef.current.recover();
+    else await connectRef.current();
+  }, []);
+
+  const signOutSession = useCallback(async () => {
+    const db = clientRef.current, recovery = sessionRef.current;
+    if (!db || !recovery?.state.user) return;
+    const { generation } = recovery.state;
+    const { error } = await request(() => db.auth.signOut({ scope: "local" }));
+    if (error) throw error;
+    // SDK notifications normally arrive before completion. Also clear the
+    // confirmed session here if the callback was missed.
+    if (sessionRef.current === recovery && recovery.state.generation === generation) recovery.observe(null);
+  }, []);
+
   const editorTask = useCallback(async <T,>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>, timeoutMs: number | null = 20000): Promise<T> => {
     const expectedGeneration = snapshotRef.current.generation;
     if (!activeUserId || snapshotRef.current.user?.id !== activeUserId) throw new Error("Your account changed. Sign in again before continuing.");
@@ -347,6 +367,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
               if (!active) return;
               const previous = snapshotRef.current; snapshotRef.current = next;
               setUser(next.user); setEditor(next.editor); setStaffRole(next.role); setSessionPhase(next.phase); setSessionResolved(next.resolved);
+              setSessionExpired(next.expired); setStaffAccessRevoked(next.staffRevoked);
               if (previous.user?.id !== next.user?.id) {
                 setStaffProfile(null);savedVersion.current++; setSavedAccount(null); setSavedError(""); setGuestImportError(false); setPendingSaved([]);
                 if (next.user) setSaved([]);
@@ -507,7 +528,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
 
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : "We couldn’t verify your connection. Your edits are still here.";
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
     {initial.configured && sessionResolved && user && (sessionPhase === "offline" || sessionPhase === "error") &&
       <div className="session-banner" role="status">{studioText(sessionMessage, language)} <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button></div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}

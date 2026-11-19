@@ -52,7 +52,7 @@ test('expired/revoked session returns to sign-in instead of remaining in recover
  const {recovery,deps}=setup(t);await recovery.recover();
  deps.getSession=async()=>({data:{session:null},error:null});
  assert.equal(await recovery.recover(),false);assert.equal(recovery.state.user,null);
- assert.equal(recovery.state.editor,false);assert.equal(recovery.state.phase,'ready');assert.equal(recovery.state.resolved,true);
+ assert.equal(recovery.state.editor,false);assert.equal(recovery.state.phase,'ready');assert.equal(recovery.state.resolved,true);assert.equal(recovery.state.expired,true);
 });
 
 test('an expired refresh token clears access while a transport error keeps the verified workspace',async t=>{
@@ -60,14 +60,20 @@ test('an expired refresh token clears access while a transport error keeps the v
  deps.getSession=async()=>{throw new TypeError('Connection interrupted');};
  assert.equal(await recovery.recover(),false);assert.equal(recovery.state.editor,true);
  assert.equal(recovery.state.phase,'error');assert.equal(recovery.state.resolved,true);
- deps.getSession=async()=>({data:{session:null},error:{code:'refresh_token_not_found'}});
+ deps.getSession=async()=>{
+  recovery.observe(null,'SIGNED_OUT');
+  return {data:{session:null},error:{code:'refresh_token_not_found'}};
+ };
  assert.equal(await recovery.recover(),false);assert.equal(recovery.state.user,null);
  assert.equal(recovery.state.editor,false);assert.equal(recovery.state.phase,'ready');assert.equal(recovery.state.resolved,true);
+ assert.equal(recovery.state.expired,true);
 });
 
 test('confirmed role revocation removes editor access',async t=>{
  const {recovery,deps}=setup(t);await recovery.recover();deps.getRole=async()=>null;
  assert.equal(await recovery.recover(),false);assert.equal(recovery.state.editor,false);assert.equal(recovery.state.phase,'ready');
+ assert.equal(recovery.state.staffRevoked,true);
+ deps.getRole=async()=> 'editor';assert.equal(await recovery.recover(),true);assert.equal(recovery.state.staffRevoked,false);
 });
 
 test('late role response cannot restore a signed-out user',async t=>{

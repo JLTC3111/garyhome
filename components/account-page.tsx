@@ -5,6 +5,7 @@ import { PasswordInput } from "./password-input";
 import { SelectField } from "./select-field";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { BookOpen, ArrowRight, ArrowUpRight, CalendarDays, Check, Heart, LayoutDashboard, LoaderCircle, LogOut, MessageSquare, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { SubmissionHistory } from "./submission-history";
@@ -18,7 +19,8 @@ import { appointmentLabel, customerError, ENQUIRY_FIELDS, enquiryLabel } from "@
 import type { CustomerEnquiry, CustomerProfile } from "@/lib/types";
 import { STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
 
-type AccountTab = "overview" | "saved" | "enquiries" | "viewings" | "profile" | "submissions" | "help";
+const accountTabs = ["overview", "saved", "enquiries", "viewings", "profile", "submissions", "help"] as const;
+type AccountTab = typeof accountTabs[number];
 type Draft = { userId: string; value: CustomerProfile } | null;
 
 export function AccountPage() {
@@ -113,7 +115,19 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   clearDraft: () => void;
 }) {
   const { t, content, language, client, user: currentUser, editor, sessionPhase, accountTask, reconnect, saved, savedReady, savedError, importSaved, notice } = useSite();
-  const [tab, setTab] = useState<AccountTab>("overview"), [enquiries, setEnquiries] = useState<CustomerEnquiry[]>([]);
+  const tabParam = useSearchParams().get("tab");
+  const requestedTab = accountTabs.find(value => value === tabParam) ?? "overview";
+  const [selection, setSelection] = useState({ requested: requestedTab, active: requestedTab });
+  const tab = selection.requested === requestedTab ? selection.active : requestedTab;
+  if (selection.requested !== requestedTab) setSelection({ requested: requestedTab, active: requestedTab });
+  function setTab(next: AccountTab) {
+    const url = new URL(window.location.href);
+    if (next === "overview") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    if (url.href !== window.location.href) window.history.replaceState(null, "", url);
+    setSelection({ requested: requestedTab, active: next });
+  }
+  const [enquiries, setEnquiries] = useState<CustomerEnquiry[]>([]);
   const [profile, setProfile] = useState<CustomerProfile | null>(null), [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState("");
   const [now, setNow] = useState(() => Date.now());

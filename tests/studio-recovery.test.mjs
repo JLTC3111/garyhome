@@ -90,7 +90,12 @@ async function harness(t, options={}){
   return query;
  }};
  const client={
-  auth:{getSession:async()=>{sessionReads++;return backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null});},onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};},
+  auth:{getSession:async()=>{sessionReads++;return backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null});},onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async options=>{
+    backend.signOutCalls??=[];backend.signOutCalls.push(options);
+    if(backend.signOutPending)await backend.signOutPending.promise;
+    if(backend.signOutError)return {error:backend.signOutError};
+    session=null;if(!backend.withholdSignOutEvent)callback?.('SIGNED_OUT',null);return {error:null};
+   },
    signUp:async input=>{backend.authCalls.push({method:'signup',input});return {data:{session:null},error:null};},
    signInWithPassword:async input=>{backend.authCalls.push({method:'password',input});if(backend.signInError)return {data:{session:null},error:backend.signInError};session=authSession('customer');callback?.('SIGNED_IN',session);return {data:{session},error:null};},
    verifyOtp:async input=>{backend.authCalls.push({method:'verify',input});if(backend.verifyError)return {data:{session:null,user:null},error:backend.verifyError};session=authSession(options.verifyUser??'invited-staff');callback?.(input.type==='recovery'?'PASSWORD_RECOVERY':'SIGNED_IN',session);const verified=session;if(backend.verifySwitch){session=authSession('other-account');callback?.('SIGNED_IN',session);}return {data:{session:verified,user:verified.user},error:null};},
@@ -307,14 +312,134 @@ test('a customer opening staff login receives a customer return link without sta
  assert.match(JSON.stringify(h.renderer.toJSON()),/Mở cổng khách hàng/);
 });
 
-test('public navigation labels both login destinations and keeps one preferences menu outside the mobile navigation',async t=>{
- const h=await harness(t,{guest:true,page:'header',path:'/login'}),band=h.renderer.root.findByProps({className:'top-strip-actions'}),logins=band.findAllByType('a').filter(node=>node.props.className?.includes('desktop-band-control')&&['/account','https://staff.garyhome.vn/admin'].includes(node.props.href));
- assert.deepEqual(logins.map(n=>n.props.href),['/account','https://staff.garyhome.vn/admin']);assert.deepEqual(logins.map(n=>n.props['aria-label']),['Customer Login','Staff Login']);assert.ok(logins.every(n=>n.props.className.includes('desktop-band-control')));
- assert.deepEqual(logins.map(n=>n.findByType('span').children.join('')),['Customer Login','Staff Login']);
- const mobile=h.renderer.root.findByProps({className:'mobile-nav-tools'});assert.deepEqual(mobile.findAllByType('a').map(node=>node.props.href),['/account','https://staff.garyhome.vn/admin']);assert.equal(mobile.findAllByType('button').length,0);
- assert.equal(h.renderer.root.findAllByProps({className:'site-preferences-trigger'}).length,1);assert.equal(h.renderer.root.findByProps({id:'site-navigation'}).findAllByProps({className:'site-preferences'}).length,0);
- const toggle=()=>h.renderer.root.findAllByType('button').find(node=>node.props['aria-controls']==='site-navigation');await act(async()=>toggle().props.onClick());assert.equal(toggle().props['aria-expanded'],true);await act(async()=>mobile.findAllByType('a')[0].props.onClick());assert.equal(toggle().props['aria-expanded'],false);
- assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'HANOI RENTALS');await act(async()=>h.site.setLanguage('vi'));assert.equal(logins[0].props['aria-label'],'Đăng nhập khách hàng');assert.equal(logins[1].props['aria-label'],'Đăng nhập nhân viên');assert.equal(h.renderer.root.findByProps({className:'brand-tagline'}).children.join(''),'NHÀ CHO THUÊ HÀ NỘI');await h.emit(authSession('customer'));assert.equal(logins[0].props.href,'/account');assert.equal(logins[0].findAllByType('img').length,0);
+function headerAccount(h) {
+ const root=()=>h.renderer.root.findByProps({className:'header-account-menu'});
+ const trigger=()=>root().findByProps({className:'header-account-trigger'});
+ const panel=()=>root().findByProps({className:'header-account-panel'});
+ const menuText=()=>JSON.stringify(h.renderer.toJSON());
+ const links=()=>panel().findAllByType('a').map(a=>a.props.href);
+ const toggle=async()=>{await act(async()=>{trigger().props.onClick();await delay(5);});};
+ return {root,trigger,panel,menuText,links,toggle};
+}
+
+test('header account shares one guest disclosure on desktop and mobile and closes on Escape',async t=>{
+ const h=await harness(t,{guest:true,page:'header',path:'/login',url:'https://www.garyhome.vn/login'}),account=headerAccount(h);
+ assert.equal(h.renderer.root.findAllByProps({className:'header-account-menu'}).length,1);
+ assert.equal(account.trigger().props['aria-label'],'Sign in');assert.deepEqual(account.links(),[]);
+ assert.equal(h.renderer.root.findAllByProps({className:'site-preferences-trigger'}).length,1);
+ const mobile=()=>h.renderer.root.findByProps({className:'mobile-menu icon-button'});
+ await act(async()=>mobile().props.onClick());
+ assert.equal(mobile().props['aria-expanded'],true);
+ await account.toggle();
+ assert.equal(mobile().props['aria-expanded'],false);
+ assert.equal(account.trigger().props['aria-expanded'],true);
+ assert.deepEqual(account.links(),['/account','https://staff.garyhome.vn/admin']);
+ assert.match(account.menuText(),/Customer Login/);assert.match(account.menuText(),/Staff Login/);
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(account.trigger().props['aria-label'],'Đăng nhập');assert.match(account.menuText(),/Đăng nhập nhân viên/);
+ let prevented=false,stopped=false;
+ await act(async()=>account.root().props.onKeyDown({key:'Escape',preventDefault(){prevented=true;},stopPropagation(){stopped=true;}}));
+ assert.ok(prevented&&stopped);assert.equal(account.panel().props.hidden,true);assert.deepEqual(account.links(),[]);
+});
+
+test('header account suppresses sign-in during restoration and verifies customer-only access with an empty profile',async t=>{
+ const auth=deferred(),h=await harness(t,{page:'header',customer:true,path:'/vi/homes',url:'https://www.garyhome.vn/vi/homes',authPending:auth});
+ const account=headerAccount(h);
+ assert.equal(h.site.sessionResolved,false);assert.equal(account.trigger().type,'span');
+ assert.equal(account.trigger().props.role,'status');assert.equal(account.root().findAllByType('a').length,0);
+ h.backend.sessionRead=null;
+ await act(async()=>{auth.resolve({data:{session:authSession('customer')},error:null});await delay(8);});
+ assert.equal(h.site.sessionResolved,true);assert.equal(account.trigger().type,'button');
+ await account.toggle();
+ assert.deepEqual(account.links(),['/account','/account?tab=profile','/saved']);
+ assert.equal(account.root().findByType('strong').children.join(''),'customer@example.invalid');
+ assert.match(account.menuText(),/Khách hàng/);
+ const previousReads=h.sessionReads;
+ await h.navigate('/vi/contact');
+ assert.equal(h.sessionReads,previousReads);assert.equal(account.panel().props.hidden,true);
+ assert.equal(h.renderer.root.findAllByProps({className:'header-account-menu'}).length,1);
+});
+
+test('header account shows dual access and removes the staff badge, portrait and link on revocation',async t=>{
+ const h=await harness(t,{page:'header',role:'admin',path:'/en/homes',url:'https://www.garyhome.vn/en/homes'}),account=headerAccount(h);
+ h.backend.profilePaths=new Map([['owner','owner/private-staff-avatar.png']]);
+ await act(async()=>h.site.refreshStaffProfile());
+ await account.toggle();
+ assert.deepEqual(account.links(),['https://staff.garyhome.vn/admin','/account','/account?tab=profile','/saved']);
+ const badges=()=>account.root().findByProps({className:'header-account-badges'}).findAllByType('span').map(badge=>badge.children.join(''));
+ assert.deepEqual(badges(),['Staff · Admin','Customer']);
+ assert.ok(account.root().findAllByType('img').some(image=>image.props.src.includes('private-staff-avatar.png')));
+ assert.equal(h.backend.privateReads.filter(table=>table==='properties').length,0,'opening the menu does not load the Studio');
+ h.backend.role=null;
+ await act(async()=>h.site.revalidateSession());
+ assert.equal(h.site.staffAccessRevoked,true);
+ assert.deepEqual(account.links(),['/account','/account?tab=profile','/saved']);
+ assert.deepEqual(badges(),['Customer']);assert.equal(account.root().findAllByType('img').length,0);
+ assert.match(account.menuText(),/Your staff access was removed/);
+});
+
+test('header account distinguishes staff-only and authenticated accounts with no verified portal access',async t=>{
+ const denied={code:'42501'},h=await harness(t,{page:'header',role:'editor',path:'/en',url:'https://www.garyhome.vn/en',readErrors:{customer_profiles:denied,saved_homes:denied}});
+ const account=headerAccount(h);
+ await account.toggle();assert.deepEqual(account.links(),['https://staff.garyhome.vn/admin']);
+ h.backend.role=null;
+ const visitor=authSession('visitor');
+ visitor.user.user_metadata={full_name:'Visitor Name',role:'admin',staff:true};
+ await h.emit(visitor);
+ await account.toggle();
+ assert.deepEqual(account.links(),[]);
+ assert.match(account.menuText(),/Visitor Name/);assert.match(account.menuText(),/no Gary Home portal access/);
+ assert.ok(account.panel().findAllByType('button').some(control=>control.children.includes('Sign Out')));
+ assert.doesNotMatch(account.menuText(),/Staff Dashboard|Customer Login|Staff Login/);
+});
+
+test('header account reads a persisted customer name and hides independently denied Saved Homes',async t=>{
+ const h=await harness(t,{page:'header',customer:true,path:'/en',url:'https://www.garyhome.vn/en',readErrors:{saved_homes:{code:'42501'}}}),account=headerAccount(h);
+ h.backend.rows.customer_profiles=[{user_id:'customer',full_name:'Customer Full Name'}];
+ await account.toggle();
+ assert.deepEqual(account.links(),['/account','/account?tab=profile']);
+ assert.equal(account.root().findByType('strong').children.join(''),'Customer Full Name');
+ assert.equal(account.root().findByType('small').children.join(''),'customer@example.invalid');
+});
+
+test('header account signs out only after backend confirmation and resets without navigation',async t=>{
+ const h=await harness(t,{page:'header',customer:true,path:'/en',url:'https://www.garyhome.vn/en'}),account=headerAccount(h);
+ await account.toggle();
+ const action=()=>account.panel().findByProps({className:'header-account-signout'});
+ h.backend.signOutError={code:'unavailable'};
+ await act(async()=>{action().props.onClick();await delay(5);});
+ assert.match(account.menuText(),/Couldn’t sign out/);assert.equal(h.site.user.id,'customer');
+ const pending=deferred();h.backend.signOutError=null;h.backend.signOutPending=pending;h.backend.withholdSignOutEvent=true;
+ await act(async()=>{action().props.onClick();await delay(5);});
+ assert.equal(action().props.disabled,true);assert.equal(h.site.user.id,'customer');
+ await act(async()=>{pending.resolve();await delay(5);});
+ assert.equal(h.site.user,null);assert.equal(account.trigger().props['aria-label'],'Sign in');assert.equal(account.panel().props.hidden,true);
+ assert.deepEqual(h.backend.signOutCalls,[{scope:'local'},{scope:'local'}]);
+ assert.deepEqual(h.backend.navigation,[]);
+});
+
+test('header account offers sign-in again for an expired session',async t=>{
+ const h=await harness(t,{page:'header',customer:true,path:'/en',url:'https://www.garyhome.vn/en'}),account=headerAccount(h);
+ await account.toggle();
+ h.backend.sessionRead={promise:Promise.resolve({data:{session:null},error:{code:'session_expired'}})};
+ await act(async()=>h.site.revalidateSession());
+ assert.equal(h.site.sessionExpired,true);assert.equal(h.site.user,null);assert.deepEqual(account.links(),[]);
+ await account.toggle();
+ assert.match(account.menuText(),/Your session expired/);
+ assert.deepEqual(account.links(),['/account','https://staff.garyhome.vn/admin']);
+});
+
+test('customer profile deep link selects the existing profile tab and its sibling overview route',async t=>{
+ const h=await harness(t,{customer:true,url:'https://www.garyhome.vn/account?tab=profile'});
+ const section=()=>h.renderer.root.findByProps({className:'account-section-heading'}).findByType('h2').children.join('');
+ assert.equal(section(),'My details');
+ assert.equal(h.renderer.root.findAllByProps({className:'enquiry-form account-details-form'}).length,1);
+ const reads=h.sessionReads;
+ await h.navigate('/account');assert.equal(section(),'Overview');
+ const details=h.renderer.root.findByProps({'data-id':'profile'});
+ await act(async()=>details.props.onClick());
+ assert.equal(section(),'My details');assert.equal(h.browser.location.searchParams.get('tab'),'profile');
+ assert.equal(h.sessionReads,reads);
 });
 
 test('the combined preferences menu changes and persists both choices independently and dismisses accessibly',async t=>{
@@ -1276,9 +1401,8 @@ test('password visibility controls reveal only the primary field and mask it aga
  await act(async()=>h.site.setLanguage('vi'));assert.ok(form().findByProps({'aria-label':'Ẩn mật khẩu'}));assert.equal(form().findByProps({name:'password'}).props.value,'A private password to reveal');
  await act(async()=>form().findByProps({name:'password'}).props.onChange({target:{value:''}}));assert.equal(form().findByProps({name:'password'}).props.type,'password');
 });
-test('the customer header never borrows a signed-in owner staff photo; About Us excludes agent and testimonial links',async t=>{
- const h=await harness(t,{page:'header',path:'/'});h.backend.profilePaths=new Map([['owner','owner/private-staff-avatar.png']]);await act(async()=>h.site.refreshStaffProfile());
- for(const link of h.renderer.root.findAllByType('a').filter(n=>n.props.className?.includes('customer-login-link')))assert.equal(link.findAllByType('img').length,0);
+test('the public header About Us menu excludes agent and testimonial links',async t=>{
+ const h=await harness(t,{page:'header',path:'/'});
  const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);
  const menu=h.renderer.root.findByProps({id:'about-navigation-links'}),paths=menu.findAllByType('a').map(n=>n.props.href);assert.deepEqual(paths,['/en/services','/en/vinhomes','/en/tips-and-news','/en/contact','/en/landlords']);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Agents|Testimonials/);
  await act(async()=>h.site.setLanguage('vi'));assert.ok(h.renderer.root.findByProps({id:'about-navigation-links'}).findAllByType('a').some(link=>link.props.href==='/vi/services'&&link.children.includes('Dịch vụ khác')));

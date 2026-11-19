@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {propertyPhotoFilename,propertyPhotoPath,propertyPhotoUrl} from '../lib/property-photo-files.ts';
+import {propertyPhotoFilename,propertyPhotoPath,propertyPhotoUrl,replacePropertyPhotoUrl} from '../lib/property-photo-files.ts';
 import {propertyPhotoRenameHistory,renamePropertyPhoto,retirePropertyPhoto} from '../lib/property-photo-rename-server.ts';
+import {syncRenamedListingDraft} from '../lib/property-photo-rename-state.ts';
 
 const origin='https://storage.example.test', bucket='property-media';
 const first='10101010-1111-4111-8111-111111111111', second='20202020-2222-4222-8222-222222222222';
@@ -70,8 +71,9 @@ async function setup(t) {
  // maintains its catalogue to emulate the provider's API side effects.
  await pg.query('insert into storage.objects values($1,$2)',[bucket,oldKey]);
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119054408_property_photo_storage_rename.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../supabase/migrations/20261119073707_property_photo_rename_completion.sql',import.meta.url),'utf8'));
  const files=new Map([[oldKey,{mime:'image/jpeg',bytes:jpeg}]]), calls=[];
- let onCopy=()=>{};
+ let onCopy=()=>{}, onRemove=()=>{};
  const original=globalThis.fetch;
  globalThis.fetch=async target=>{
   const key=propertyPhotoPath(String(target),origin);
@@ -80,6 +82,7 @@ async function setup(t) {
   return file?new Response(file.bytes,{headers:{'Content-Type':file.mime}}):new Response(null,{status:404});
  };
  t.after(()=>{globalThis.fetch=original;});
+ const listing=async id=>(await pg.query('select to_jsonb(p) listing from public.properties p where id=$1',[id])).rows[0]?.listing||null;
  const client=(as,actor)=>({
   rpc(name,params){return {abortSignal:async()=>{
    const args=Object.values(params);
@@ -89,7 +92,7 @@ async function setup(t) {
   }};},
   from(table){
    assert.equal(table,'properties');
-   return {select:()=>({eq:(_,id)=>({abortSignal:()=>({maybeSingle:async()=>({data:(await pg.query('select * from public.properties where id=$1',[id])).rows[0]||null})})})})};
+   return {select:()=>({eq:(_,id)=>({abortSignal:()=>({maybeSingle:async()=>({data:await listing(id)})})})})};
   },
   storage:{from(name){
    assert.equal(as,'service_role');assert.equal(name,bucket);
@@ -105,20 +108,22 @@ async function setup(t) {
     },
     async remove(paths){
      assert.equal(paths.length,1);calls.push(['remove',...paths]);
+     await onRemove(paths[0]);
      for(const key of paths){files.delete(key);await pg.query('delete from storage.objects where bucket_id=$1 and name=$2',[bucket,key]);}
      return {error:null};
     },
    };
   }},
  });
- return {pg,role,client,files,calls,caption,onCopy:callback=>{onCopy=callback;}};
+ return {pg,role,client,files,calls,caption,listing,
+  onCopy:callback=>{onCopy=callback;},onRemove:callback=>{onRemove=callback;}};
 }
 
 test('guarded copy, stale edit retry, atomic references, retained originals and explicit removal',async t=>{
  const h=await setup(t), write=h.client('authenticated',admin), system=h.client('service_role');
  const input={propertyId:first,source:oldUrl,filename:'room.jpg (3).jpg',version};
  const rename=(db=write,extra={})=>renamePropertyPhoto(db,system,origin,{...input,...extra},signal());
- const photos=async id=>(await h.pg.query('select * from public.properties where id=$1',[id])).rows[0];
+ const photos=h.listing;
  for(const actor of [editor,manager])await assert.rejects(rename(h.client('authenticated',actor)),/forbidden/);
  assert.equal(h.calls.length,0);
  const active=h.client('authenticated',owner);
@@ -144,6 +149,8 @@ test('guarded copy, stale edit retry, atomic references, retained originals and 
  const result=await rename(write,{version:changedVersion});
  assert.equal(result.url,newUrl);
  assert.equal(result.properties.length,2);
+ assert.deepEqual(result.cleanup,{status:'pending',reason:'review_required'});
+ assert.deepEqual(result.savedListing,await photos(first));
  assert.deepEqual((await photos(first)).images,[newUrl,another]);
  assert.deepEqual((await photos(second)).images,[another,transformedNew]);
  assert.deepEqual((await photos(first)).image_metadata,{[newUrl]:h.caption});
@@ -156,6 +163,9 @@ test('guarded copy, stale edit retry, atomic references, retained originals and 
  assert.equal(h.files.has(oldKey),true,'the old URL remains available by default');
  await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('update public.properties set images=$1 where id=$2',[[transformed],first])),/stale_reference/);
  assert.equal((await rename()).id,result.id,'a lost success response can be retried');
+ assert.deepEqual((await rename(write,{cleanupConfirmed:true})).cleanup,{status:'pending',reason:'review_required'},
+  'retrying an older operation cannot upgrade it to automatic removal');
+ assert.equal(h.calls.filter(call=>call[0]==='remove').length,0);
  await assert.rejects(h.role('authenticated',admin,()=>h.pg.query('select public.home_photo_rename_request_removal($1,false)',[result.id])),/confirm_required/);
  h.files.set(newKey,{mime:'image/jpeg',bytes:new Uint8Array([255,216,255,224,0,0,0,2])});
  await assert.rejects(retirePropertyPhoto(write,system,origin,result.id,signal()),/integrity_failed/);
@@ -168,4 +178,69 @@ test('guarded copy, stale edit retry, atomic references, retained originals and 
  await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('insert into storage.objects values($1,$2)',[bucket,oldKey])),/policy/);
  assert.equal(h.calls.filter(call=>call[0]==='remove').length,1);
  assert.ok((await propertyPhotoRenameHistory(write,first,signal()))[0].removed_at);
+});
+
+test('confirmed cleanup is recoverable after a stale update, failed removal, and lost response',async t=>{
+ const h=await setup(t), db=h.client('authenticated',admin), system=h.client('service_role');
+ const input={propertyId:first,source:oldUrl,filename:'room-03',version,cleanupConfirmed:true};
+ const rename=extra=>renamePropertyPhoto(db,system,origin,{...input,...extra},signal());
+ const read=()=>h.listing(first);
+ h.onCopy(()=>h.pg.query('update public.properties set updated_at=$1 where id=$2',[changedVersion,first]));
+ await assert.rejects(rename(),/stale_listing/);
+ assert.deepEqual((await read()).images,[oldUrl,another]);
+ assert.ok(h.files.has(oldKey)&&h.files.has(newKey));
+ assert.equal(h.calls.some(call=>call[0]==='remove'),false);
+ h.onCopy(()=>{});
+
+ h.onRemove(()=>{throw new Error('Simulated Storage failure');});
+ const result=await rename({version:changedVersion});
+ assert.deepEqual(result.cleanup,{status:'pending',reason:'remove_failed'});
+ assert.deepEqual(result.savedListing,await read(),'the returned listing comes from a fresh saved read');
+ assert.deepEqual(result.savedListing.images,[newUrl,another]);
+ assert.deepEqual(result.savedListing.image_metadata,{[newUrl]:h.caption});
+ assert.deepEqual(result.savedListing.image_filenames,{[newUrl]:'Room.JPG'});
+ assert.ok(h.files.has(oldKey));
+ const pending=(await propertyPhotoRenameHistory(db,first,signal()))[0];
+ assert.equal(pending.auto_cleanup_requested,true);
+ assert.equal(pending.removed_at,null);
+
+ h.onRemove(()=>{});
+ const callsBefore=h.calls.length;
+ const resumed=await rename();
+ assert.equal(resumed.id,result.id);
+ assert.deepEqual(resumed.cleanup,{status:'removed'});
+ assert.deepEqual(h.calls.slice(callsBefore),[['remove',oldKey]],'a bare basename resumes without another copy');
+ assert.equal(h.files.has(oldKey),false);
+ assert.deepEqual((await rename()).cleanup,{status:'removed'});
+ assert.equal(h.calls.length,callsBefore+1,'retry after losing the success response performs no Storage writes');
+
+ const current=await read();
+ const repeated=await renamePropertyPhoto(h.client('authenticated',owner),system,origin,{
+  ...input,source:newUrl,filename:'living-room.jpg',version:current.updated_at,
+ },signal());
+ assert.deepEqual(repeated.cleanup,{status:'removed'});
+ assert.deepEqual((await read()).images,[repeated.url,another]);
+ assert.deepEqual((await read()).image_metadata,{[repeated.url]:h.caption});
+ assert.deepEqual(h.files.get(propertyPhotoPath(repeated.url,origin))?.bytes,jpeg);
+ assert.equal(h.files.has(newKey),false);
+});
+
+test('authoritative rename refresh merges open edits and retains the stale-save guard on competing writes',()=>{
+ const before={id:first,title_en:'Saved title',images:[oldUrl,another],updated_at:version,
+  image_filenames:{[oldUrl]:'Room.JPG'},image_metadata:{[oldUrl]:{description_en:'Saved caption'}}};
+ const savedListing={...before,images:[newUrl,another],updated_at:changedVersion,
+  image_filenames:{[newUrl]:'Room.JPG'},image_metadata:{[newUrl]:{description_en:'Saved caption'}}};
+ const result={savedListing,properties:[{id:first,previous_updated_at:version,updated_at:changedVersion}]};
+ const replace=url=>replacePropertyPhotoUrl(url,origin,oldKey,newUrl);
+ assert.equal(syncRenamedListingDraft({...before},before,result,replace),savedListing);
+ const draft={...before,title_en:'Unsaved title',images:[another,oldUrl],
+  image_metadata:{[oldUrl]:{description_en:'Unsaved caption'}}};
+ const synced=syncRenamedListingDraft(draft,before,result,replace);
+ assert.deepEqual(synced,{...savedListing,title_en:'Unsaved title',images:[another,newUrl],
+  image_metadata:{[newUrl]:{description_en:'Unsaved caption'}}});
+ const competing={...result,savedListing:{...savedListing,updated_at:'2026-11-19T01:05:00.000Z'}};
+ const stale=syncRenamedListingDraft(draft,before,competing,replace);
+ assert.equal(stale.updated_at,version);
+ assert.equal(stale.title_en,'Unsaved title');
+ assert.deepEqual(stale.images,[another,newUrl]);
 });

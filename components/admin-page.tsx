@@ -40,6 +40,7 @@ import { ListingUploadStatus } from "./listing-upload-status";
 import { EditorModal } from "./editor-modal";
 import { preparePropertyImage, uploadPropertyImage, imageUploadError } from "@/lib/property-image-upload";
 import { replacePropertyPhotoUrl } from "@/lib/property-photo-files";
+import { remapListingPhotos, syncRenamedListingDraft } from "@/lib/property-photo-rename-state";
 import type { PhotoRenameHistory, RenamePhotoResult } from "@/lib/property-photo-rename-server";
 import type { PhotoRenameControls } from "./property-photo-rename";
 import { propertyVideoUrlError } from "@/lib/property-video";
@@ -179,21 +180,19 @@ export function AdminPage() {
   }
   async function renamePhoto(property:Property,source:string,filename:string) {
     if(busy)throw new Error("unavailable");
+    const savedBefore=content.properties.find(p=>p.id===property.id);
     setBusy(true);setError("");
     try{
       const result=await photoRequest<RenamePhotoResult>({
-        action:"rename",propertyId:property.id,source,filename,version:property.updated_at,
+        action:"rename",propertyId:property.id,source,filename,version:property.updated_at,cleanupConfirmed:true,
       });
       const origin=new URL(result.url).origin;
       const replace=(url:string)=>replacePropertyPhotoUrl(url,origin,result.oldKey,result.url);
-      const replaceKeys=<T,>(fields?:Record<string,T>)=>fields&&Object.fromEntries(Object.entries(fields).map(([key,value])=>[replace(key),value]));
       const apply=(p:Property)=>{
+        if(p.id===result.savedListing.id)return result.savedListing;
         const version=result.properties.find(row=>row.id===p.id);
         if(!version)return p;
-        const matched=p.updated_at===version.previous_updated_at;
-        return {...p,images:p.images.map(replace),image_filenames:replaceKeys(p.image_filenames),image_metadata:replaceKeys(p.image_metadata),
-          source_url:p.source_url?replace(p.source_url):p.source_url,
-          updated_at:matched?version.updated_at:p.updated_at};
+        return {...remapListingPhotos(p,replace),updated_at:p.updated_at===version.previous_updated_at?version.updated_at:p.updated_at};
       };
       setContent(previous=>({...previous,properties:previous.properties.map(apply),
         settings:{...previous.settings,hero_image:replace(previous.settings.hero_image)},
@@ -201,8 +200,13 @@ export function AdminPage() {
         authors:previous.authors?.map(row=>({...row,portrait_url:replace(row.portrait_url)})),
         activities:previous.activities?.map(row=>({...row,image_url:replace(row.image_url),source_url:replace(row.source_url)})),
         editorial:previous.editorial?.map(row=>({...row,image_url:replace(row.image_url),sources:row.sources?.map(item=>({...item,url:replace(item.url)}))||[]}))}));
-      setEditing(previous=>previous?.id===property.id?apply(previous):previous);
-      notice(site.t("Storage photo renamed. The old copy is retained.","Đã đổi tên tệp ảnh lưu trữ. Bản cũ vẫn được giữ."));
+      const syncDraft=(draft:Property)=>syncRenamedListingDraft(draft,savedBefore,result,replace);
+      setEditing(previous=>previous?.id===property.id?syncDraft(previous):previous);
+      if(result.cleanup.status==="removed")notice(site.t("Photo renamed and old Storage copy removed.","Đã đổi tên ảnh và xóa bản cũ khỏi kho lưu trữ."));
+      else if(result.cleanup.reason==="review_required")notice(site.t("Photo renamed. The old copy is retained for review.","Đã đổi tên ảnh. Bản cũ được giữ lại để kiểm tra."),"warning");
+      else notice(site.t("Photo renamed. Removal is pending. Open Rename history to retry.","Đã đổi tên ảnh. Chưa xác nhận đã xóa bản cũ. Mở lịch sử đổi tên để thử lại."),"warning");
+      if(syncDraft(property).updated_at!==result.savedListing.updated_at)
+        setError(site.t("The saved listing also changed. Review your open edits against the saved version before saving.","Tin đăng đã lưu cũng thay đổi. Hãy đối chiếu các chỉnh sửa đang mở với bản đã lưu trước khi lưu."));
       return result.selectedUrl;
     }finally{setBusy(false);}
   }

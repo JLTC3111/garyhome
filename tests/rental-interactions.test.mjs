@@ -60,10 +60,14 @@ test('gallery survives image shrink/removal, unlocks scrolling and reopens witho
  await act(async()=>renderer.update(view([])));
  assert.equal(p.dialog.open,false);assert.equal(p.page.body.style.overflow,'clip');
  assert.equal(renderer.root.findAllByType('dialog').length,0);
- await act(async()=>renderer.update(view(['new.jpg'])));
+ const renamed='https://storage.example.test/storage/v1/object/public/property-media/properties/renamed/listing/new.jpg';
+ await act(async()=>renderer.update(view([renamed])));
+ assert.equal(renderer.root.findByProps({className:'rental-gallery-cover'}).findByType('img').props.src,renamed);
+ assert.equal(renderer.root.findByProps({className:'rental-inline-thumbs'}).findByType('img').props.src,renamed);
  await act(async()=>button('Open property gallery').props.onClick());
  assert.equal(p.dialog.open,true);
- assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,'new.jpg');
+ assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,renamed);
+ assert.equal(renderer.root.findByProps({className:'rental-lightbox-thumbs'}).findByType('img').props.src,renamed);
  await act(async()=>button('Close gallery').props.onClick());
  assert.equal(p.page.body.style.overflow,'clip');assert.equal(p.opener.focused,true);
 });

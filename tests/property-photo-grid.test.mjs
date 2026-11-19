@@ -144,6 +144,20 @@ test('a saved Storage photo exposes an inline rename and a read-only normalized 
  const form=()=>h.renderer.root.findByProps({className:'editor-photo-rename'});
  assert.equal(form().findByType('input').props.value,'room-03.jpg');
  assert.deepEqual(calls,[],'opening the preview performs no Storage action');
- await act(async()=>form().findAllByType('button').find(button=>button.children.join('')==='Rename photo').props.onClick());
+ await act(async()=>form().findAllByType('button').find(button=>button.children.join('')==='Rename and remove old copy').props.onClick());
  assert.deepEqual(calls,[[saved,'room-03.jpg']]);
+});
+
+test('a reopened editor displays the saved Storage basename separately from the historical upload name',async t=>{
+ const renamed='https://media.example/storage/v1/object/public/property-media/properties/renamed/room-03.jpg';
+ const original='Room.jpg (3).jpg';
+ const h=await harness(t,{images:[renamed],filenames:{[renamed]:original},
+  metadata:{[renamed]:{description_vi:'Phòng khách',public_filename:original}},onMetadataChange(){}});
+ const caption=h.renderer.root.findByType('figcaption');
+ assert.deepEqual(caption.findAllByType('span').map(span=>span.children.join('')),['Current Storage filename','room-03.jpg']);
+ assert.equal(caption.findByType('small').children.join(''),'Original upload filename · '+original);
+ const panel=h.renderer.root.findByProps({className:'editor-photo-panel'});
+ assert.equal(panel.findByType('img').props.src,renamed);
+ assert.equal(panel.findAllByType('textarea')[1].props.value,'Phòng khách');
+ assert.equal(panel.findByType('input').props.checked,true);
 });

@@ -21,14 +21,18 @@ export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChang
   const [selectedSrc, setSelectedSrc] = useState<string | undefined>(() => images[0]);
   const [renameSrc,setRenameSrc] = useState<string>();
   const panelId = useId(), panel = useRef<HTMLElement>(null);
-  const namedPhotos = images.map(src => ({ src, ...imageFilenameDetails(src, filenames) }));
+  const namedPhotos = images.map(src => ({
+    src, ...imageFilenameDetails(src, filenames), storageName: propertyPhotoPath(src)?.split("/").at(-1),
+  }));
   const selectedIndex = selectedSrc ? Math.max(0, images.indexOf(selectedSrc)) : 0;
   const selected = namedPhotos[selectedIndex];
   const entry = selected ? photoMetadata(selected.src, metadata) : {};
   const original = selected?.source === "original" ? publicPhotoFilename(selected.filename) : "";
   const filenameLabel = (source: string) => text(source === "original" ? "Original filename" : source === "stored" ? "Stored filename" : "Filename");
+  const storageLabel = t("Current Storage filename", "Tên tệp lưu trữ hiện tại");
+  const originalLabel = t("Original upload filename", "Tên tệp khi tải lên");
 
-  return <><div className="editor-photo-grid">{namedPhotos.map(({ src, filename, source }, index) => {
+  return <><div className="editor-photo-grid">{namedPhotos.map(({ src, filename, source, storageName }, index) => {
     const photo = <img src={src} alt={onMetadataChange ? "" : text("Property photo {number}", { number: index + 1 })}/>;
     return <figure className="editor-photo-card" key={`${index}-${src}`} data-photo-selected={onMetadataChange && selectedIndex === index ? "true" : undefined}>
       <div className="editor-photo-preview">
@@ -44,9 +48,10 @@ export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChang
           }} aria-label={text("Remove photo {number}", { number: index + 1 })}><X size={14}/></button>
         </div>
       </div>
-      <figcaption className="editor-photo-filename" data-filename-source={source}>
-        <span>{filenameLabel(source)}</span><span>{filename || text("Filename unavailable")}</span>
-        {rename?.savedImages.includes(src)&&propertyPhotoPath(src)&&<button type="button" className="editor-photo-rename-trigger"
+      <figcaption className="editor-photo-filename" data-filename-source={storageName ? "stored" : source}>
+        <span>{storageName ? storageLabel : filenameLabel(source)}</span><span>{storageName || filename || text("Filename unavailable")}</span>
+        {storageName && source === "original" && storageName !== filename && <small className="muted">{originalLabel} · {filename}</small>}
+        {rename?.savedImages.includes(src)&&storageName&&<button type="button" className="editor-photo-rename-trigger"
           disabled={disabled} aria-controls={panelId} aria-label={t(`Rename photo ${index+1}`,`Đổi tên ảnh ${index+1}`)}
           onClick={()=>{setSelectedSrc(src);setRenameSrc(src);}}>{t("Rename","Đổi tên")}</button>}
       </figcaption>
@@ -57,8 +62,10 @@ export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChang
         <img src={selected.src} alt=""/>
         <div>
           <h3 id={`${panelId}-title`}>{t(`Photo ${selectedIndex + 1} of ${images.length}`, `Ảnh ${selectedIndex + 1} trên ${images.length}`)}</h3>
-          <p className="muted">{filenameLabel(selected.source)}</p>
-          <p>{selected.filename || text("Filename unavailable")}</p>
+          <p className="muted">{selected.storageName ? storageLabel : filenameLabel(selected.source)}</p>
+          <p className="editor-photo-current-name">{selected.storageName || selected.filename || text("Filename unavailable")}</p>
+          {selected.storageName && selected.source === "original" && selected.storageName !== selected.filename &&
+            <p className="muted editor-photo-current-name">{originalLabel} · {selected.filename}</p>}
           {move && images.length > 1 && <div className="editor-photo-panel-actions">
             <button type="button" className="text-link" disabled={disabled || selectedIndex === 0}
               onClick={() => { setSelectedSrc(selected.src); move(selectedIndex, selectedIndex - 1); }}>{t("Move earlier", "Chuyển lên trước")}</button>

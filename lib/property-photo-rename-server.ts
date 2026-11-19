@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Property } from "./types";
+import { request } from "./requests.ts";
 import {
   PROPERTY_IMAGE_BUCKET, PROPERTY_IMAGE_MAX_BYTES, propertyImageFormat,
   propertyPhotoExtension, propertyPhotoFilename, propertyPhotoPath, propertyPhotoUrl, replacePropertyPhotoUrl,
@@ -8,7 +10,7 @@ type PhotoVersion = {id:string; updated_at:string; previous_updated_at:string};
 type RenameJob = {
   id:string; origin:string; property_id:string; old_key:string; new_key:string;
   sha256:string|null; applied_at:string|null; removed_at:string|null;
-  properties:PhotoVersion[]; current_key?:string;
+  properties:PhotoVersion[]; current_key?:string; auto_cleanup_requested?:boolean;
 };
 type ListingPhotoState = {id:string; images:string[]; updated_at:string};
 
@@ -67,9 +69,11 @@ async function readPhoto(origin:string,key:string,signal:AbortSignal) {
   return {sha256,format,contentType:response.headers.get("content-type")?.split(";")[0].trim().toLowerCase()};
 }
 
-export type RenamePhotoInput = {propertyId:string; source:string; filename:string; version:string};
+export type RenamePhotoInput = {propertyId:string; source:string; filename:string; version:string; cleanupConfirmed?:boolean};
 export type RenamePhotoResult = {
   id:string; oldKey:string; url:string; selectedUrl:string; properties:PhotoVersion[];
+  savedListing:Property;
+  cleanup:{status:"removed"}|{status:"pending"; reason:string};
 };
 
 export async function renamePropertyPhoto(
@@ -77,13 +81,14 @@ export async function renamePropertyPhoto(
 ):Promise<RenamePhotoResult> {
   const oldKey = propertyPhotoPath(input.source,origin);
   if (!oldKey) throw new PhotoRenameError("unsupported_source",400);
-  const proposedExtension = propertyPhotoExtension(input.filename);
   const lookupArgs = {p_property:input.propertyId,p_origin:origin,p_old_key:oldKey};
-  // A retry after a lost response succeeds even though the old URL is no
-  // longer in the listing. The lookup is scoped to the same listing and name.
-  let job = proposedExtension ? await rpc<RenameJob|null>(db,"lookup",{
-    ...lookupArgs,p_name:propertyPhotoFilename(input.filename,proposedExtension,true),
-  },signal) : null;
+  // Resume against the recorded format, even when the initial request used
+  // a bare basename and the original has already been removed.
+  let job = await rpc<RenameJob|null>(db,"resume",lookupArgs,signal);
+  if (job) {
+    const name=job.new_key.split("/").at(-1)||"", extension=propertyPhotoExtension(name);
+    if(!extension||propertyPhotoFilename(input.filename,extension,true)!==name)throw new PhotoRenameError("pending_name");
+  }
   if (!job?.applied_at) {
     const listing = await listingPhotos(db,input.propertyId,signal);
     if (!listing || !listing.images.some(url=>propertyPhotoPath(url,origin)===oldKey))
@@ -92,7 +97,9 @@ export async function renamePropertyPhoto(
     const filename = propertyPhotoFilename(input.filename,source.format.extension,true);
     if (!filename) throw new PhotoRenameError("invalid_name",400);
     if (filename===oldKey.split("/").at(-1)) throw new PhotoRenameError("same_name",400);
-    job = await rpc<RenameJob>(db,"reserve",{...lookupArgs,p_name:filename,p_version:input.version},signal);
+    job = await rpc<RenameJob>(db,"reserve_v2",{
+      ...lookupArgs,p_name:filename,p_version:input.version,p_cleanup_confirmed:input.cleanupConfirmed===true,
+    },signal);
     if (!job.applied_at) {
       signal.throwIfAborted();
       const result = await system.storage.from(PROPERTY_IMAGE_BUCKET).copy(job.old_key,job.new_key);
@@ -110,14 +117,25 @@ export async function renamePropertyPhoto(
       job = await rpc<RenameJob>(db,"apply",{p_id:job.id,p_version:input.version},signal);
     }
   }
-  const listing = await listingPhotos(db,input.propertyId,signal);
+  const {data,error} = await db.from("properties").select("*").eq("id",input.propertyId).abortSignal(signal).maybeSingle();
+  if(error||!data)throw new PhotoRenameError("confirm_listing");
+  const savedListing=data as Property;
   const url = propertyPhotoUrl(origin,job.new_key), expected = replacePropertyPhotoUrl(input.source,origin,oldKey,url);
-  const selectedUrl = listing?.images.includes(expected) ? expected : listing?.images.find(src=>propertyPhotoPath(src,origin)===job.new_key);
+  const selectedUrl = savedListing.images.includes(expected) ? expected : savedListing.images.find(src=>propertyPhotoPath(src,origin)===job.new_key);
   if (!selectedUrl) throw new PhotoRenameError("confirm_listing");
-  return {id:job.id,oldKey,url,selectedUrl,properties:job.properties};
+  let cleanup:RenamePhotoResult["cleanup"]=job.removed_at ? {status:"removed"} : {status:"pending",reason:"review_required"};
+  if(!job.removed_at&&job.auto_cleanup_requested){
+    try {
+      await request(cleanupSignal=>retirePropertyPhoto(db,system,origin,job.id,AbortSignal.any([signal,cleanupSignal])),10000);
+      cleanup={status:"removed"};
+    } catch(error) {
+      cleanup={status:"pending",reason:error instanceof PhotoRenameError?error.code:"unavailable"};
+    }
+  }
+  return {id:job.id,oldKey,url,selectedUrl,properties:job.properties,savedListing,cleanup};
 }
 
-export type PhotoRenameHistory = {id:string;old_key:string;new_key:string;applied_at:string|null;removed_at:string|null};
+export type PhotoRenameHistory = {id:string;old_key:string;new_key:string;applied_at:string|null;removed_at:string|null;auto_cleanup_requested?:boolean};
 export function propertyPhotoRenameHistory(db:SupabaseClient,propertyId:string,signal:AbortSignal) {
   return rpc<PhotoRenameHistory[]>(db,"history",{p_property:propertyId},signal);
 }

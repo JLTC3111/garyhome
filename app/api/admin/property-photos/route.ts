@@ -30,6 +30,7 @@ export async function POST(req:Request) {
           Number.isFinite(Date.parse(input.version))) {
         return json(await renamePropertyPhoto(db,system,origin,{
           propertyId:input.propertyId,source:input.source,filename:input.filename,version:input.version,
+          cleanupConfirmed:input.cleanupConfirmed===true,
         },signal));
       }
       return json({error:"invalid_request"},400);

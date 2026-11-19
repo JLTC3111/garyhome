@@ -104,6 +104,9 @@ input[data-form-invalid=true],textarea[data-form-invalid=true],select[data-form-
 @media(max-width:680px){.property-map>iframe{height:290px}.property-map-caption,.property-map-footer{padding:14px}.property-map-footer{gap:8px}.property-map-footer>.text-link{min-height:44px}}
 
 .rental-lightbox[data-photo-caption][open]{grid-template-rows:auto minmax(0,1fr) auto auto}
+.rental-lightbox[data-photo-caption] .rental-lightbox-thumbs{min-width:0;padding-inline:8px;scroll-padding-inline:8px}
+.rental-lightbox[data-photo-caption] .rental-lightbox-thumbs>button:first-child{margin-inline-start:auto}
+.rental-lightbox[data-photo-caption] .rental-lightbox-thumbs>button:last-child{margin-inline-end:auto}
 .rental-lightbox-caption{min-width:0;padding:6px 10px;border-radius:6px;background:#23392d;color:#fff;text-align:center;overflow:auto;max-block-size:min(7rem,20dvh);overflow-wrap:anywhere}
 .rental-lightbox-caption p{margin:0;color:inherit;font-size:.875rem;line-height:1.45}
 .rental-lightbox-caption small{display:block;margin-top:2px;font-size:.75rem;line-height:1.4;color:#dce6d7}

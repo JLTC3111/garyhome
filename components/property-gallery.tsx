@@ -1,14 +1,31 @@
 "use client";
 
-import { useEffect, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from "react";
 import { Camera, ChevronLeft, ChevronRight, ImageOff, X } from "lucide-react";
 import { galleryPhotoMetadata, type ImageMetadata } from "@/lib/image-metadata";
 import { useSite } from "./site-context";
+
+function revealActiveThumbnail(strip: HTMLDivElement, behavior: ScrollBehavior) {
+  if (strip.scrollWidth <= strip.clientWidth) return false;
+  const active = strip.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
+  if (!active) return false;
+
+  const thumb = active.getBoundingClientRect();
+  const padding = window.getComputedStyle(strip);
+  const viewportLeft = strip.getBoundingClientRect().left + strip.clientLeft;
+  const start = viewportLeft + Number.parseFloat(padding.paddingLeft);
+  const end = viewportLeft + strip.clientWidth - Number.parseFloat(padding.paddingRight);
+  const delta = thumb.left < start ? thumb.left - start : Math.max(0, thumb.right - end);
+  if (Math.abs(delta) < 1) return false;
+  strip.scrollBy({ left: delta, behavior });
+  return true;
+}
 
 export function PropertyGallery({images,title,metadata,variant="property"}:{images:string[];title:string;metadata?:ImageMetadata;variant?:"property"|"feedback"}) {
   const feedback=variant==="feedback";
   const {t,language}=useSite();const [photo,setPhoto]=useState(0),[open,setOpen]=useState(false),[failed,setFailed]=useState<string[]>([]);
   const dialog=useRef<HTMLDialogElement>(null),restoreFocus=useRef<HTMLElement|null>(null);
+  const thumbnails=useRef<HTMLDivElement>(null);
   const touch=useRef<{id:number;x:number;y:number}|null>(null);
   const hasImages=images.length>0;
   // Close before committing an empty collection, including a live CMS update.
@@ -39,6 +56,29 @@ export function PropertyGallery({images,title,metadata,variant="property"}:{imag
     document.body.style.overflow="hidden";
     return()=>{document.body.style.overflow=overflow;if(node.open)node.close?.();};
   },[open,hasImages]);
+  useLayoutEffect(() => {
+    const strip = thumbnails.current;
+    if (!open || !strip) return;
+    revealActiveThumbnail(strip, "auto");
+    if (!window.ResizeObserver) return;
+
+    let width = strip.clientWidth;
+    const observer = new window.ResizeObserver(() => {
+      if (strip.clientWidth === width) return;
+      width = strip.clientWidth;
+      revealActiveThumbnail(strip, "auto");
+    });
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, [open, feedback]);
+  useLayoutEffect(() => {
+    const strip = thumbnails.current;
+    if (!open || !strip) return;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const moved = revealActiveThumbnail(strip, reducedMotion ? "auto" : "smooth");
+    // Cancel a pending smooth scroll if the selection changes before it ends.
+    if (moved && !reducedMotion) return () => strip.scrollTo({ left: strip.scrollLeft, behavior: "auto" });
+  }, [open, feedback, index, source, images.length]);
   function picture(src:string,alt:string,priority=false){return failed.includes(src)?<div className="photo-unavailable"><ImageOff size={28}/><span>{t("This photo is unavailable.","Ảnh này hiện chưa xem được.")}</span></div>:<img src={src} alt={alt} width={feedback?900:1200} height={feedback?1600:800} loading={priority?"eager":"lazy"} fetchPriority={priority?"high":"auto"} onError={()=>setFailed(previous=>[...new Set([...previous,src])])}/>;}
   if(!images.length)return <div className="rental-gallery-empty"><ImageOff size={35}/>{t("Ask the team for property photographs.","Liên hệ đội ngũ để nhận ảnh bất động sản.")}</div>;
   return <div className={feedback?"rental-gallery rental-gallery-feedback":"rental-gallery"}>
@@ -54,7 +94,7 @@ export function PropertyGallery({images,title,metadata,variant="property"}:{imag
         <p>{info.caption}</p>
         {info.filename&&<small>{t("Original filename", "Tên tệp gốc")} · {info.filename}</small>}
       </div>}
-      <div className="rental-lightbox-thumbs">{images.map((src,i)=><button key={src+i} type="button" aria-pressed={index===i} aria-label={t(`Photo ${i+1}`,`Ảnh ${i+1}`)} onClick={()=>setPhoto(i)}>{picture(src,"")}</button>)}</div>
+      <div ref={feedback?undefined:thumbnails} className="rental-lightbox-thumbs">{images.map((src,i)=><button key={src+i} type="button" aria-pressed={index===i} aria-label={t(`Photo ${i+1}`,`Ảnh ${i+1}`)} onClick={()=>setPhoto(i)}>{picture(src,"")}</button>)}</div>
     </dialog>
   </div>;
 }

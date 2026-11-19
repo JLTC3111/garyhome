@@ -29,7 +29,7 @@ function loadComponents(site){
  return {gallery:load(path.join(root,'components/property-gallery.tsx'))};
 }
 
-async function platform(t){
+async function platform(t,thumbs=null){
  const old=new Map(),stored=new Map();
  class HTMLElement {focus(){page.activeElement=this;this.focused=true;}}
  const opener=new HTMLElement(),first=new HTMLElement(),last=new HTMLElement();
@@ -39,7 +39,13 @@ async function platform(t){
  let renderer;
  t.after(async()=>{if(renderer)await act(async()=>renderer.unmount());for(const [key,value]of old){if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key];}});
  const dialog={open:false,showModal(){this.open=true;},close(){this.open=false;},querySelectorAll(){return [first,last];}};
- return {page,stored,opener,dialog,first,last,async mount(element){await act(async()=>{renderer=TestRenderer.create(element,{createNodeMock:node=>node.type==='dialog'?dialog:null});});return renderer;}};
+ return {page,stored,opener,dialog,first,last,window:values.window,async mount(element){
+  await act(async()=>{renderer=TestRenderer.create(element,{createNodeMock:node=>{
+   if(node.type==='dialog')return dialog;
+   return node.props.className==='rental-lightbox-thumbs'?thumbs:null;
+  }});});
+  return renderer;
+ }};
 }
 
 test('gallery survives image shrink/removal, unlocks scrolling and reopens without an undefined photo',async t=>{
@@ -122,6 +128,56 @@ test('fullscreen metadata changes with arrows, keyboard, swipes and thumbnails',
  await act(async()=>renderer.update(view()));
  await act(async()=>button('Ảnh 2').props.onClick());
  assert.equal(caption().findByType('p').props.children,'Nhìn ra vườn');
+});
+
+test('the fullscreen strip scrolls only enough to reveal an overflowing selection',async t=>{
+ const images=Array.from({length:5},(_,i)=>`/images/room-${i+1}.jpg`);
+ const calls=[];
+ let renderer,count=1,resize,reduced=false;
+ const strip={
+  clientWidth:320,clientLeft:0,scrollLeft:0,
+  get scrollWidth(){return Math.max(this.clientWidth,16+count*92+(count-1)*9);},
+  getBoundingClientRect(){return {left:20};},
+  querySelector(){
+   const thumbs=renderer.root.findByProps({className:'rental-lightbox-thumbs'});
+   const index=thumbs.children.findIndex(button=>button.props['aria-pressed']);
+   return {getBoundingClientRect:()=>{
+    const left=20+8+index*101-this.scrollLeft;
+    return {left,right:left+92};
+   }};
+  },
+  scrollBy(options){calls.push(options);this.scrollLeft+=options.left;},
+  scrollTo({left}){this.scrollLeft=left;}
+ };
+ const p=await platform(t,strip),site={current:{t:en=>en,language:'en'}}, {gallery:{PropertyGallery}}=loadComponents(site);
+ p.window.getComputedStyle=()=>({paddingLeft:'8px',paddingRight:'8px'});
+ p.window.matchMedia=()=>({matches:reduced});
+ p.window.ResizeObserver=class{constructor(callback){resize=callback;}observe(){}disconnect(){resize=undefined;}};
+ const view=()=>React.createElement(PropertyGallery,{images:images.slice(0,count),title:'Rental'});
+ renderer=await p.mount(view());
+ const click=label=>act(async()=>renderer.root.findByProps({'aria-label':label}).props.onClick());
+ await click('Open property gallery');
+ for(const size of [1,2,3]){
+  count=size;
+  await act(async()=>renderer.update(view()));
+  await click(`Photo ${size}`);
+ }
+ assert.deepEqual(calls,[]);
+
+ count=5;
+ await act(async()=>renderer.update(view()));
+ await click('Photo 5');
+ await act(async()=>renderer.root.findByType('dialog').props.onKeyDown({key:'ArrowRight',preventDefault(){}}));
+ await click('Photo 3');
+ assert.deepEqual(calls,[{left:192,behavior:'smooth'},{left:-192,behavior:'smooth'}]);
+
+ strip.clientWidth=230;
+ resize();
+ reduced=true;
+ await click('Photo 1');
+ assert.deepEqual(calls.slice(2),[{left:80,behavior:'auto'},{left:-80,behavior:'auto'}]);
+ await click('Close gallery');
+ assert.equal(resize,undefined);
 });
 
 test('legacy language preferences are migrated before paint and valid language writes persist a secure cookie',async t=>{

@@ -29,8 +29,11 @@ async function harness(t, options={}){
  browser.history={state:null,replaceState(_state,_title,url){browser.location=new URL(url,browser.location);}};
  // Headless controls inspect DOM constructors even when test-renderer refs are null.
  class TestElement {} class TestHTMLElement extends TestElement {}
- Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement,innerWidth:1440,matchMedia:media=>Object.assign(new EventTarget(),{media,matches:false})});
+ const requestFrame=callback=>setTimeout(()=>callback(performance.now()),16);
+ Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement,innerWidth:1440,requestAnimationFrame:requestFrame,cancelAnimationFrame:clearTimeout,
+  matchMedia:media=>Object.assign(new EventTarget(),{media,matches:false})});
  setGlobal('Element',TestElement);setGlobal('HTMLElement',TestHTMLElement);
+ setGlobal('requestAnimationFrame',requestFrame);setGlobal('cancelAnimationFrame',clearTimeout);
  setGlobal('IS_REACT_ACT_ENVIRONMENT',true);setGlobal('window',browser);setGlobal('document',page);setGlobal('navigator',network);
  setGlobal('localStorage',{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)});
  setGlobal('FormData',class{constructor(form){this.form=form;}get(key){return this.form.fields?.[key]??null;}});
@@ -699,7 +702,7 @@ test('a title edited during first publication keeps its draft and the URL assign
  await act(async()=>field('Property title · English').props.onChange({target:{value:'Edited after publish click'}}));
  await act(async()=>{pending.resolve({data:{...submitted,listing_code:'GH-900001',updated_at:'2026-11-06T10:00:00.123456Z'},error:null});await delay(10);});
  assert.equal(field('Property title · English').props.value,'Edited after publish click');
- assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://garyhome.vn/homes/first-published-title');
+ assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://www.garyhome.vn/homes/first-published-title');
  h.backend.writes.delete('properties');await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
  const saved=h.backend.calls.filter(call=>call.table==='properties').at(-1).payload;assert.equal(saved.slug,'first-published-title');assert.equal(saved.title_en,'Edited after publish click');
 });
@@ -1677,6 +1680,85 @@ test('closing the listing editor stops the remaining files in an image upload ba
  await act(async()=>{pending=picker.props.onChange({target:{files:[jpegFile('first.JPG'),jpegFile('second.JPG')],value:'selected'}});await delay(5);});
  assert.equal(h.backend.imageUploads.length,1);await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
  await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});assert.equal(h.backend.imageUploads.length,1);
+});
+
+test('listing thumbnails and titles use the same canonical localized URL and leave editing separate',async t=>{
+ const h=await harness(t,{role:'admin',path:'/admin',url:'https://staff.garyhome.vn/admin'});
+ const published={...fixture.properties[0],slug:'original-public-slug',title_en:'Renamed listing',title_vi:'Tin đã đổi tên',listing_type:'rent',status:'published',availability:'available'};
+ const draft={...published,id:'draft-listing',slug:'saved-draft-slug',title_en:'Unpublished draft',title_vi:'Tin nháp',status:'draft'};
+ const unavailable={...published,id:'unavailable-listing',slug:'unavailable-listing',title_en:'Unavailable rental',title_vi:'Tin đã đóng',availability:'unavailable'};
+ await act(async()=>h.site.setContent(previous=>({...previous,properties:[published,draft,unavailable]})));
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ const table=()=>h.renderer.root.findByProps({className:'admin-table admin-table--listings'});
+ const cell=title=>table().findAllByProps({className:'admin-property-cell'}).find(node=>{
+  const heading=node.findByType('strong');
+  return heading.children.includes(title)||heading.findAllByType('a').some(link=>link.children.includes(title));
+ });
+ const check=(language,title,label)=>{
+  const propertyCell=cell(title);
+  const thumbnail=propertyCell.findByProps({className:'listing-thumbnail-link'});
+  const titleLink=propertyCell.findByProps({className:'listing-title-link'});
+  const href=`https://www.garyhome.vn/${language}/homes/${published.slug}`;
+  assert.equal(thumbnail.props.href,href);
+  assert.equal(titleLink.props.href,href);
+  assert.equal(thumbnail.props['aria-label'],label);
+  assert.equal(thumbnail.findByType('img').props.alt,'');
+  for(const link of [thumbnail,titleLink]){assert.equal(link.props.target,undefined);assert.equal(link.props.onClick,undefined);}
+  const actions=propertyCell.parent.parent.findByProps({className:'row-actions'});
+  assert.equal(actions.findByType('a').props.href,href);
+  assert.ok(actions.findAllByType('button').some(button=>button.children.includes(language==='en'?'Edit':'Chỉnh sửa')));
+ };
+ check('en','Renamed listing','View Renamed listing');
+ assert.equal(cell(draft.title_en).parent.parent.findAllByType('a').length,0);
+ assert.equal(cell(unavailable.title_en).parent.parent.findAllByType('a').length,0);
+ await act(async()=>h.site.setLanguage('vi'));
+ check('vi','Tin đã đổi tên','Xem Tin đã đổi tên');
+ const actions=cell(draft.title_vi).parent.parent.findByProps({className:'row-actions'});
+ await act(async()=>actions.findAllByType('button').find(button=>button.children.includes('Chỉnh sửa')).props.onClick());
+ assert.ok(h.renderer.root.findByProps({className:'editor-form'}));
+});
+
+test('listing editor puts Save Listing first and waits for a confirmed write',async t=>{
+ const h=await harness(t,{role:'admin'});
+ await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'});
+ const actions=()=>form().findByProps({className:'editor-actions gw-editor-actions listing-editor-actions'}).findAllByType('button');
+ const submit=()=>act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const toast=()=>JSON.stringify(h.renderer.toJSON());
+ assert.deepEqual(actions().map(button=>button.props.type),['submit','button']);
+ assert.ok(actions()[0].children.includes('Save Listing'));
+ assert.match(actions()[1].props.className,/\bbutton-outline\b/);
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.ok(actions()[0].children.includes('Lưu tin đăng'));
+ assert.ok(actions()[1].children.includes('Hủy'));
+ await act(async()=>h.site.setLanguage('en'));
+ await submit();
+ assert.match(form().findByProps({role:'alert'}).children.join(''),/both property titles/);
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);
+
+ for(const [label,value] of [['Property title · English','Save hierarchy test'],['Property title · Vietnamese','Thử lưu tin đăng'],['Public location / street','Tây Hồ']]){
+  const input=form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
+  await act(async()=>input.props.onChange({target:{value}}));
+ }
+ const unconfirmed=deferred();
+ h.backend.writes.set('properties',unconfirmed);
+ await submit();
+ assert.ok(actions()[0].children.includes('Saving…'));
+ assert.equal(actions()[0].props['aria-busy'],true);
+ assert.ok(actions().every(button=>button.props.disabled));
+ assert.doesNotMatch(toast(),/Listing draft saved\./);
+ await act(async()=>{unconfirmed.resolve({data:null,error:null});await delay(5);});
+ assert.match(form().findByProps({role:'alert'}).children.join(''),/save could not be confirmed/);
+ assert.ok(actions().every(button=>!button.props.disabled));
+ assert.doesNotMatch(toast(),/Listing draft saved\./);
+
+ const confirmed=deferred();
+ h.backend.writes.set('properties',confirmed);
+ await submit();
+ const saved=h.backend.calls.filter(call=>call.table==='properties').at(-1).payload;
+ assert.equal(saved.title_en,'Save hierarchy test');
+ await act(async()=>{confirmed.resolve({data:{...saved,listing_code:'GH-900001'},error:null});await delay(5);});
+ assert.match(toast(),/Listing draft saved\./);
 });
 
 test('listing management shows localized creation times and verified creator snapshots rather than editable contacts',async t=>{

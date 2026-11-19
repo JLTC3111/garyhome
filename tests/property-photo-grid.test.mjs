@@ -20,6 +20,7 @@ function loadGrid(){
   function dependency(id){
    if(id==='./use-studio-text')return {useStudioText:()=>((message,values={})=>message.replace(/\{(\w+)\}/g,(_,key)=>String(values[key])))};
    if(id==='./site-context')return {useSite:()=>({t:en=>en})};
+   if(id==='./property-photo-rename')return load(path.resolve(path.dirname(file),id+'.tsx'));
    if(id.startsWith('@/'))return load(path.join(root,id.slice(2))+'.ts');
    if(id.startsWith('.')&&id.endsWith('.ts'))return load(path.resolve(path.dirname(file),id));
    return require(id);
@@ -128,4 +129,21 @@ test('photo editor uses a width-gated field grid and draws a single thumbnail fo
  assert.match(css,/\.editor-photo-filename-option\s*\{[^}]*grid-template-columns:auto minmax\(0,1fr\)/);
  assert.match(css,/\.editor-photo-card:has\(\.editor-photo-select:focus-visible\)\s*\{[^}]*outline:2px[^}]*outline-offset:2px[^}]*box-shadow:none/);
  assert.match(css,/\.editor-photo-select:focus-visible\s*\{\s*outline:none/);
+});
+
+test('a saved Storage photo exposes an inline rename and a read-only normalized preview',async t=>{
+ const saved='https://media.example/storage/v1/object/public/property-media/properties/room.jpg%20(3).jpg', calls=[];
+ const request={savedImages:[saved],history:async()=>[],retire:async()=>{},run:async(source,name)=>{
+  calls.push([source,name]);
+  return 'https://media.example/storage/v1/object/public/property-media/properties/renamed/room-03.jpg';
+ }};
+ const h=await harness(t,{images:[saved,sourceB],onMetadataChange(){},rename:request});
+ assert.equal(h.renderer.root.findAllByProps({'aria-label':'Rename photo 2'}).length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'editor-photo-rename'}).length,0);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Rename photo 1'}).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-photo-rename'});
+ assert.equal(form().findByType('input').props.value,'room-03.jpg');
+ assert.deepEqual(calls,[],'opening the preview performs no Storage action');
+ await act(async()=>form().findAllByType('button').find(button=>button.children.join('')==='Rename photo').props.onClick());
+ assert.deepEqual(calls,[[saved,'room-03.jpg']]);
 });

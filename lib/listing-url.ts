@@ -1,4 +1,8 @@
-import type { Property } from "./types";
+import { localizedPath } from "./localized-routes.ts";
+import { publicUrlFor } from "./public-url.ts";
+import { isPublicRental } from "./rentals.ts";
+import { CANONICAL_SITE_ORIGIN } from "./site-origin.ts";
+import type { Language, Property } from "./types";
 
 const MAX_SLUG_LENGTH = 180;
 type ListingTitle = Pick<Property, "id" | "title_en" | "title_vi">;
@@ -6,6 +10,15 @@ type ExistingListing = Pick<Property, "id" | "slug">;
 
 export function isListingUrlAutomatic(isNew: boolean, original?: Pick<Property, "status" | "published_at">): boolean {
   return isNew || !!original && original.status === "draft" && !original.published_at;
+}
+
+export function publishedListingUrl(property: Pick<Property, "slug" | "status" | "listing_type" | "availability">, language: Language): string | undefined {
+  if (!isPublicRental(property)) return;
+  const address = publicUrlFor(property.slug, CANONICAL_SITE_ORIGIN);
+  if (address === property.slug) return;
+  const url = new URL(address);
+  url.pathname = localizedPath(url.pathname, language);
+  return url.href;
 }
 
 function addressWords(value: string): string {

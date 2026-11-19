@@ -4,18 +4,22 @@ import { Eye, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { imageFilenameDetails, type ImageFilenames } from "@/lib/image-filenames";
 import { photoMetadata, PHOTO_TEXT_LIMIT, publicPhotoFilename, type ImageMetadata, type PhotoMetadata } from "@/lib/image-metadata";
+import { propertyPhotoPath } from "@/lib/property-photo-files";
+import { PropertyPhotoRenameForm, PropertyPhotoRenameTools, type PhotoRenameControls } from "./property-photo-rename";
 import { useSite } from "./site-context";
 import { useStudioText } from "./use-studio-text";
 
-export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChange, makeCover, move, remove, disabled = false }: {
+export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChange, makeCover, move, remove, rename, disabled = false }: {
   images: string[]; filenames?: ImageFilenames; makeCover: (index: number) => void;
   metadata?: ImageMetadata; onMetadataChange?: (src: string, patch: PhotoMetadata) => void;
   move?: (from: number, to: number) => void;
+  rename?: PhotoRenameControls;
   remove: (index: number) => void; disabled?: boolean;
 }) {
   const text = useStudioText();
   const { t } = useSite();
   const [selectedSrc, setSelectedSrc] = useState<string | undefined>(() => images[0]);
+  const [renameSrc,setRenameSrc] = useState<string>();
   const panelId = useId(), panel = useRef<HTMLElement>(null);
   const namedPhotos = images.map(src => ({ src, ...imageFilenameDetails(src, filenames) }));
   const selectedIndex = selectedSrc ? Math.max(0, images.indexOf(selectedSrc)) : 0;
@@ -42,6 +46,9 @@ export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChang
       </div>
       <figcaption className="editor-photo-filename" data-filename-source={source}>
         <span>{filenameLabel(source)}</span><span>{filename || text("Filename unavailable")}</span>
+        {rename?.savedImages.includes(src)&&propertyPhotoPath(src)&&<button type="button" className="editor-photo-rename-trigger"
+          disabled={disabled} aria-controls={panelId} aria-label={t(`Rename photo ${index+1}`,`Đổi tên ảnh ${index+1}`)}
+          onClick={()=>{setSelectedSrc(src);setRenameSrc(src);}}>{t("Rename","Đổi tên")}</button>}
       </figcaption>
     </figure>;
   })}</div>
@@ -76,7 +83,10 @@ export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChang
           onChange={event => onMetadataChange(selected.src, { public_filename: event.target.checked ? original : "" })}/>
         <span>{t("Show original filename on the public listing", "Hiển thị tên tệp gốc trên tin đăng công khai")}</span>
       </label>}
+      {rename&&renameSrc===selected.src&&<PropertyPhotoRenameForm key={selected.src} source={selected.src} rename={rename} disabled={disabled}
+        onComplete={url=>{setSelectedSrc(url);setRenameSrc(undefined);panel.current?.focus();}} onCancel={()=>setRenameSrc(undefined)}/>}
     </section>}
+    {rename&&<PropertyPhotoRenameTools rename={rename} disabled={disabled}/>}
     {namedPhotos.some(photo => photo.source === "stored") && <p className="small muted image-filename-note">{text("Older photos show their complete stored filenames. Original upload names were not recorded.")}</p>}
   </>;
 }

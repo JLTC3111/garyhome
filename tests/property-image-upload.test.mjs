@@ -65,11 +65,11 @@ test('image uploads use resumable transport with random keys, normalized MIME an
  const h=harness(t),names=['3-bedroom-apartment-tay-ho-*-*-*.jpg','Căn hộ 3 phòng ngủ (lake view).JPG','same-name.jpg','same-name.jpg'];
  for(const name of names){
   const url=await h.uploadPropertyImage(h.db,new File([jpeg],name,{type:''}));
-  assert.match(url,/^https:\/\/unit-test\.invalid\/storage\/v1\/object\/public\/property-media\/properties\/[\da-f-]{36}\.jpg$/);
+  assert.match(url,/^https:\/\/unit-test\.invalid\/storage\/v1\/object\/public\/property-media\/properties\/[\da-f-]{36}\/[a-z0-9-]+\.jpg$/);
  }
  assert.equal(new Set(h.calls.map(call=>call.path)).size,names.length);
  for(const [index,call] of h.calls.entries()){
-  assert.match(call.path,/^properties\/[\da-f-]{36}\.jpg$/);assert.equal(call.bucket,'property-media');
+  assert.match(call.path,/^properties\/[\da-f-]{36}\/[a-z0-9-]+\.jpg$/);assert.equal(call.bucket,'property-media');
   assert.equal(call.file.type,'image/jpeg');assert.equal(call.contentType,'image/jpeg');
   assert.equal(call.originalFilename,names[index]);assert.equal(call.resumeKey.name,names[index]);
  }

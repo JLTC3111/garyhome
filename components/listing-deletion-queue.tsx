@@ -55,7 +55,7 @@ export function ListingDeletionQueue({latest}: {latest: ListingDeletion | null})
     finally{setBusy(false);}
   }
   const pending=rows?.filter(needsWork);
-  return <details className="admin-panel" onToggle={event=>{if(event.currentTarget.open&&!busy)void load();}}>
+  return <details className="admin-panel listing-deletion-queue" onToggle={event=>{if(event.currentTarget.open&&!busy)void load();}}>
     <summary>{t("Listing media cleanup","Dọn tệp của tin đăng")}{pending?.length ? ` (${pending.length})` : ""}</summary>
     <button type="button" className="text-link" disabled={busy} onClick={()=>void load()}>{t("Refresh status","Làm mới trạng thái")}</button>
     {!!pending?.length&&<ul>{pending.map(job=><li key={job.propertyId}>

@@ -1906,11 +1906,11 @@ test('cold saved-session restoration verifies access before showing the shell an
  const sidebar=h.renderer.root.findByProps({className:'admin-sidebar'});
  assert.equal(h.site.sessionResolved,true);assert.equal(h.site.editor,true);assert.equal(h.site.studioDataReady,false);
  assert.equal(h.renderer.root.findAllByProps({className:'session-placeholder'}).length,0);
- assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--stats'}).length,1);
+ assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--rows'}).length,1);
  await act(async()=>{h.backend.pending.delete('properties');data.resolve({data:fixture.properties,error:null});await delay(10);});
  assert.equal(h.site.studioDataReady,true);
  assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
- assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--stats'}).length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--rows'}).length,0);
 });
 
 test('public navigation uses contextual skeletons without restarting auth',async t=>{
@@ -2008,7 +2008,7 @@ test('listing thumbnails and titles use the same canonical localized URL and lea
   assert.equal(titleLink.props.href,href);
   assert.equal(thumbnail.props['aria-label'],label);
   assert.equal(thumbnail.findByType('img').props.alt,'');
-  for(const link of [thumbnail,titleLink]){assert.equal(link.props.target,undefined);assert.equal(link.props.onClick,undefined);}
+  for(const link of [thumbnail,titleLink]){assert.equal(link.props.target,'_blank');assert.equal(link.props.rel,'noopener noreferrer');assert.equal(link.props.onClick,undefined);}
   const actions=propertyCell.parent.parent.findByProps({className:'row-actions'});
   assert.equal(actions.findByType('a').props.href,href);
   assert.ok(actions.findAllByType('button').some(button=>button.children.includes(language==='en'?'Edit':'Chỉnh sửa')));
@@ -2070,6 +2070,7 @@ test('listing editor puts Save Listing first and waits for a confirmed write',as
 test('listing management shows localized creation times and verified creator snapshots rather than editable contacts',async t=>{
  const h=await harness(t,{url:'https://garyhome.vn/admin'}),record=h.site.content.properties[0];
  h.backend.rows.property_creation_records=[{property_id:record.id,created_at:'2026-11-10T18:04:00Z',actor_name:'Recorded original poster'}];
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Overview'}).props.onClick());
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  const table=()=>h.renderer.root.findByProps({className:'admin-table admin-table--listings'});
  const content=node=>typeof node==='string'?node:(node?.children||[]).map(content).join(' ');
@@ -2094,6 +2095,9 @@ test('switching language on a legacy listing creates a shareable locale URL and 
 
 test('staff Contact link opens the localized public page as a normal document',async t=>{
  const h=await harness(t,{page:'staff',path:'/admin',url:'https://staff.garyhome.vn/admin'});
+ assert.match(h.renderer.root.findByProps({className:'admin-breadcrumb'}).findByType('strong').children.join(''),/Listings/);
+ assert.equal(h.renderer.root.findByProps({'aria-label':'Listing workspace'}).findAllByType('button')[0].props['aria-pressed'],true);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Overview'}).props.onClick());
  const contact=()=>h.renderer.root.findAllByType('a').find(node=>node.parent.props.className==='admin-empty');
  assert.equal(contact()?.props.href,'https://www.garyhome.vn/en/contact');
  assert.equal(contact().props.target,'_blank');

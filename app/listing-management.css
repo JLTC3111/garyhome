@@ -2,6 +2,10 @@
 .admin-table--listings .listing-thumbnail-link { display:block; flex:none; border-radius:4px; }
 .admin-table--listings .listing-thumbnail-link img { display:block; }
 .admin-table--listings .listing-title-link { text-decoration:underline; text-underline-offset:.16em; }
+.listing-deletion-queue{padding:14px 21px}
+.listing-search-tools>label{max-width:520px;flex:1 1 440px}
+.listing-search-tools input{min-height:42px;padding:10px 14px;font-size:13px;border-radius:6px}
+@media(max-width:680px){.listing-search-tools>label{max-width:none;flex-basis:100%}.listing-search-tools input{font-size:16px}}
 .admin-table--listings :is(.listing-thumbnail-link,.listing-title-link):focus-visible {
   outline:2px solid var(--studio-focus,var(--olive));
   outline-offset:3px;

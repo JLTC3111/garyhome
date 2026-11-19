@@ -22,7 +22,9 @@ export class SessionRecovery {
   state: SessionState = { user: null, editor: false, role: null, resolved: false, phase: "checking", generation: 0, expired: false, staffRevoked: false };
   private stopped = false;
   private recovery: Promise<boolean> | null = null;
-  private role: { generation: number; promise: Promise<boolean> } | null = null;
+  private storageRevision = 0;
+  private storageRecovery: Promise<boolean> | null = null;
+  private role: { generation: number; storageRevision: number; promise: Promise<boolean> } | null = null;
   private scheduled: ReturnType<typeof setTimeout> | undefined;
   private accessToken: string | null = null;
 
@@ -60,40 +62,51 @@ export class SessionRecovery {
   private checkRole(): Promise<boolean> {
     clearTimeout(this.scheduled);
     const { user, generation } = this.state;
+    const storageRevision = this.storageRevision;
     if (!user || this.stopped) return Promise.resolve(false);
     if (!this.deps.online()) { this.offline(); return Promise.resolve(false); }
-    if (this.role?.generation === generation) return this.role.promise;
+    if (this.role?.generation === generation && this.role.storageRevision === storageRevision) return this.role.promise;
     const promise = Promise.resolve().then(async () => {
       try {
         const role = await request(signal => this.deps.getRole(user.id, signal), this.deps.timeoutMs ?? 12000);
-        if (this.stopped || this.state.generation !== generation) return false;
+        if (this.stopped || this.state.generation !== generation || this.storageRevision !== storageRevision) return false;
         const editor = isStaffRole(role);
         const staffRevoked = !editor && (this.state.editor || this.state.staffRevoked);
         this.publish({ editor, role: editor ? role : null, resolved: true, phase: "ready", staffRevoked });
         return editor;
       } catch {
-        if (!this.stopped && this.state.generation === generation) this.publish({ phase: this.deps.online() ? "error" : "offline" });
+        if (!this.stopped && this.state.generation === generation && this.storageRevision === storageRevision) this.publish({ phase: this.deps.online() ? "error" : "offline" });
         // Preserve an already verified user's workspace during transient failure.
         // Mutations still require a successful fresh recovery, and RLS remains authoritative.
         return false;
       } finally { if (this.role?.promise === promise) this.role = null; }
     });
-    this.role = { generation, promise };
+    this.role = { generation, storageRevision, promise };
     return promise;
   }
 
-  recover(): Promise<boolean> {
+  recover(reason: "check" | "storage-change" = "check"): Promise<boolean> {
     if (this.stopped) return Promise.resolve(false);
+    if (reason === "storage-change") this.storageRevision++;
     if (!this.deps.online()) { this.offline(); return Promise.resolve(false); }
-    if (this.recovery) return this.recovery;
+    if (this.recovery) {
+      if (reason === "check") return this.recovery;
+      // An older read cannot stand in for a change to the shared session.
+      this.storageRecovery ??= this.recovery.then(() => {
+        this.storageRecovery = null;
+        return this.recover("storage-change");
+      });
+      return this.storageRecovery;
+    }
     const { generation, resolved } = this.state;
     const accessToken = this.accessToken;
+    const storageRevision = this.storageRevision;
     // A known workspace stays active while the browser revalidates its session.
     if (!resolved) this.publish({ phase: this.state.user ? "recovering" : "checking" });
     const promise = Promise.resolve().then(async () => {
       try {
         const { data, error } = await request(() => this.deps.getSession(), this.deps.timeoutMs ?? 12000);
-        if (this.stopped) return false;
+        if (this.stopped || this.storageRevision !== storageRevision) return false;
         const expired = !!error && sessionEnded(error);
         if (generation !== this.state.generation || accessToken !== this.accessToken) {
           // The SDK can emit SIGNED_OUT while processing an expired refresh token.
@@ -102,11 +115,14 @@ export class SessionRecovery {
           return this.state.user ? this.checkRole() : false;
         }
         if (error && !expired) throw error;
-        if (expired || !data.session) { this.clearSession(expired || !!this.state.user || this.state.expired); return false; }
+        if (expired || !data.session) {
+          this.clearSession(expired || this.state.expired || (reason !== "storage-change" && !!this.state.user));
+          return false;
+        }
         this.observe(data.session);
         return await this.checkRole();
       } catch {
-        if (!this.stopped && generation === this.state.generation && accessToken === this.accessToken) {
+        if (!this.stopped && generation === this.state.generation && accessToken === this.accessToken && this.storageRevision === storageRevision) {
           this.publish({ phase: this.deps.online() ? "error" : "offline" });
         }
         return false;

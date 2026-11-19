@@ -218,7 +218,8 @@ async function harness(t, options={}){
  const mountPage=async()=>{await act(async()=>{renderer.update(render(true));await delay(5);});};
  const emitEvent=async(event,next)=>{await act(async()=>{session=next;callback?.(event,next);await delay(5);});};
  const navigate=async next=>{await act(async()=>{pathname=next;browser.location=new URL(next,browser.location);renderer.update(render(true));await delay(5);});};
- return {renderer,backend,network,browser,page,stored,emit,emitEvent,mountPage,editSettings,navigate,get site(){return site;},get sessionReads(){return sessionReads;}};
+ const setStoredSession=next=>{session=next;};
+ return {renderer,backend,network,browser,page,stored,emit,emitEvent,mountPage,editSettings,navigate,setStoredSession,get site(){return site;},get sessionReads(){return sessionReads;}};
 }
 
 test('portal chooser identifies both destinations without changing authentication',async t=>{
@@ -376,6 +377,22 @@ test('header account shows dual access and removes the staff badge, portrait and
  assert.deepEqual(account.links(),['/account','/account?tab=profile','/saved']);
  assert.deepEqual(badges(),['Customer']);assert.equal(account.root().findAllByType('img').length,0);
  assert.match(account.menuText(),/Your staff access was removed/);
+});
+
+test('header account updates after a staff-host sign-in and sign-out in the shared store',async t=>{
+ const h=await harness(t,{page:'header',guest:true,path:'/en',url:'https://www.garyhome.vn/en'}),account=headerAccount(h);
+ assert.equal(account.trigger().props['aria-label'],'Sign in');
+ const storageChanged=key=>act(async()=>{h.browser.dispatchEvent(Object.assign(new Event('storage'),{key}));await delay(5);});
+ const before=h.sessionReads;
+ await storageChanged('gary-home-theme');assert.equal(h.sessionReads,before);
+ h.backend.role='admin';h.setStoredSession(authSession('staff-user'));
+ await storageChanged('sb-unit-test-auth-token');
+ assert.equal(account.trigger().props['aria-label'],'My account');assert.equal(h.site.staffRole,'admin');
+ await account.toggle();assert.equal(account.links()[0],'https://staff.garyhome.vn/admin');
+ h.setStoredSession(null);
+ await storageChanged('sb-unit-test-auth-token');
+ assert.equal(account.trigger().props['aria-label'],'Sign in');assert.equal(h.site.sessionExpired,false);
+ assert.deepEqual(account.links(),[]);assert.deepEqual(h.backend.navigation,[]);
 });
 
 test('header account distinguishes staff-only and authenticated accounts with no verified portal access',async t=>{

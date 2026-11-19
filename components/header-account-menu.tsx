@@ -118,7 +118,7 @@ export function HeaderAccountMenu({ onOpen }: { onOpen: () => void }) {
   const photo = staff?.avatar_path && client ? client.storage.from("staff-avatars").getPublicUrl(staff.avatar_path).data.publicUrl : "";
   const email = user?.email ?? "";
   const signupName = user?.user_metadata?.full_name;
-  const name = staff?.display_name.trim() || customer?.name || (typeof signupName === "string" ? signupName.trim() : "") || email;
+  const name = staff?.display_name?.trim() || customer?.name || (typeof signupName === "string" ? signupName.trim() : "") || email;
   const verified = sessionPhase === "ready" && !checking && customer !== null;
   const showStaff = verified && !!role;
   const showProfile = verified && customer.profile;

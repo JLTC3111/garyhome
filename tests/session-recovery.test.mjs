@@ -110,6 +110,20 @@ test('auth events and the startup read share one membership check',async t=>{
  assert.equal(reads,1);
 });
 
+test('shared storage changes replace pending session reads and coalesce bursts',async t=>{
+ const {recovery,deps}=setup(t);await recovery.recover();
+ const pending=deferred();let reads=0;
+ deps.getSession=()=>{reads++;return pending.promise;};
+ const stale=recovery.recover();await delay(2);
+ deps.getSession=async()=>{reads++;return {data:{session:null},error:null};};
+ const changed=recovery.recover('storage-change');
+ assert.equal(changed,recovery.recover('storage-change'));
+ pending.resolve({data:{session:session('owner')},error:null});
+ assert.equal(await stale,false);assert.equal(await changed,false);
+ assert.equal(reads,2);assert.equal(recovery.state.user,null);
+ assert.equal(recovery.state.editor,false);assert.equal(recovery.state.expired,false);
+});
+
 test('a hung session read times out, releases the recovery slot, and can be retried',async t=>{
  const {recovery,deps}=setup(t,{getSession:()=>new Promise(()=>{}),timeoutMs:5});
  assert.equal(await recovery.recover(),false);assert.equal(recovery.state.phase,'error');

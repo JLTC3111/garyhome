@@ -1,9 +1,11 @@
 "use client";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { homeAuthStorageKey, staffSessionStorage } from "./home-session-bridge";
 import { fetchWithDeadline } from "./requests";
 
 // Only called in a browser effect; never share a user session across server requests.
 let current: { url: string; key: string; client: SupabaseClient } | undefined;
+let connecting: { url: string; key: string; promise: Promise<SupabaseClient> } | undefined;
 let publicCurrent: { url: string; key: string; client: SupabaseClient } | undefined;
 
 // Public connection settings only; resumable uploads authenticate with the
@@ -19,12 +21,22 @@ export function publicBrowserClient(url: string, key: string) {
   }
   return publicCurrent.client;
 }
-export function browserClient(url: string, key: string) {
-  if (!current || current.url !== url || current.key !== key) {
-    current = { url, key, client: createClient(url, key, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+export async function browserClient(url: string, key: string) {
+  if (current?.url === url && current.key === key) return current.client;
+  if (connecting?.url === url && connecting.key === key) return connecting.promise;
+
+  const promise = Promise.resolve().then(async () => {
+    const storageKey = homeAuthStorageKey(url);
+    const storage = await staffSessionStorage(storageKey);
+    const client = createClient(url, key, {
+      auth: { storageKey, storage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
       global: { fetch: fetchWithDeadline },
-    }) };
-  }
-  return current.client;
+    });
+    if (connecting?.promise === promise) current = { url, key, client };
+    return client;
+  }).finally(() => {
+    if (connecting?.promise === promise) connecting = undefined;
+  });
+  connecting = { url, key, promise };
+  return promise;
 }

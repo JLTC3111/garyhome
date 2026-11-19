@@ -11,6 +11,7 @@ import { localizedPath, localizedRoute, isPublicPagePath } from "@/lib/localized
 import { CURRENCY_COOKIE, currencyValue, persistCurrency, usableExchangeRate } from "@/lib/currency";
 import { studioText } from "@/lib/studio-i18n";
 import { browserClient, publicBrowserClient } from "@/lib/browser-client";
+import { watchHomeSessionStorage } from "@/lib/home-session-bridge";
 import { readPublishedContent } from "@/lib/public-content";
 import { installRecoveryEvents } from "@/lib/recovery-events";
 import { fetchWithDeadline, request } from "@/lib/requests";
@@ -353,7 +354,8 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
           if (publicContentNeeded.current) {
             void recoverPublicContent();
           }
-          const db = browserClient(config.url, config.publishableKey);
+          const db = await browserClient(config.url, config.publishableKey);
+          if (!active) return;
           clientRef.current = db; setClient(db);
           const recovery = new SessionRecovery({
             getSession: () => db.auth.getSession(),
@@ -397,7 +399,8 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
               queueMicrotask(()=>{if(active&&latestAuthUser===link.userId&&window.location.pathname!==path)routerRef.current.replace(path);});
             }
           });
-          unsubscribe = () => data.subscription.unsubscribe();
+          const stopWatching = watchHomeSessionStorage(config.url, () => void recovery.recover("storage-change"));
+          unsubscribe = () => { stopWatching(); data.subscription.unsubscribe(); };
           await recovery.recover();
         } catch { if (active) setSessionPhase(navigator.onLine ? "error" : "offline"); }
         finally { if (active) setReady(true); }

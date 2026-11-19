@@ -46,6 +46,7 @@ import "./public-theme.css";
 import "./gary-network-cards.css";
 import "./studio-theme.css";
 import "./ui-motion.css";
+import "./action-buttons.css";
 
 // Read CMS content at request time so publishing edits does not need a rebuild.
 export const dynamic = "force-dynamic";

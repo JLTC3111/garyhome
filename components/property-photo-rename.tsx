@@ -64,8 +64,8 @@ export function PropertyPhotoRenameForm({source,rename,disabled,onComplete,onCan
     <p className="muted">{t("The server verifies the new file and removes the old copy once no saved references remain. Previously shared image links may stop working.",
       "Máy chủ xác minh tệp mới và xóa bản cũ khi không còn tham chiếu đã lưu. Các liên kết ảnh đã chia sẻ có thể ngừng hoạt động.")}</p>
     <div className="editor-photo-panel-actions">
-      <button type="button" className="button" disabled={!filename.trim()||preview===current} onClick={()=>void save()}>{t("Rename and remove old copy","Đổi tên và xóa bản cũ")}</button>
-      <button type="button" className="text-link" onClick={onCancel}>{t("Cancel","Hủy")}</button>
+      <button data-button-variant="confirm" type="button" className="button" disabled={!filename.trim()||preview===current} onClick={()=>void save()}>{t("Rename and remove old copy","Đổi tên và xóa bản cũ")}</button>
+      <button data-button-variant="cancel" type="button" className="text-link" onClick={onCancel}>{t("Cancel","Hủy")}</button>
     </div>
     {pending&&<p role="status">{t("Verifying the new file, updating references, and checking cleanup…","Đang xác minh tệp mới, cập nhật tham chiếu và kiểm tra bản cũ…")}</p>}
     {error&&<p role="alert">{error}</p>}
@@ -109,7 +109,7 @@ export function PropertyPhotoRenameTools({rename,disabled}: {rename:PhotoRenameC
         <span>{basename(row.old_key)} → {basename(row.new_key)}</span>
         <small>{row.removed_at?t("Old copy removed","Đã xóa bản cũ"):!row.applied_at?t("Rename pending","Đang chờ hoàn tất đổi tên"):
           row.auto_cleanup_requested?t("Cleanup pending confirmation","Chưa xác nhận đã xóa bản cũ"):t("Old copy retained for review","Đang giữ bản cũ để kiểm tra")}</small>
-        {row.applied_at&&!row.removed_at&&<button type="button" className="text-link" disabled={disabled||busy}
+        {row.applied_at&&!row.removed_at&&<button data-button-variant="danger" type="button" className="text-link" disabled={disabled||busy}
           onClick={()=>void retire(row.id)}>{t("Remove old copy","Xóa bản cũ")}</button>}
       </li>)}</ul> : history&&<p>{t("No renames for this listing.","Tin đăng này chưa đổi tên ảnh.")}</p>}
       {busy&&<p role="status">{t("Checking Storage references…","Đang kiểm tra tham chiếu lưu trữ…")}</p>}

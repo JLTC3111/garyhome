@@ -11,6 +11,6 @@ export function DeleteConfirmation({title,description,target,busy,error,onCancel
  return <dialog ref={dialog} data-ui-exiting={exiting || undefined} inert={exiting} className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} onCancel={event=>{event.preventDefault();if(!busy)onCancel();}} onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}>
   <h2 id={`${id}-title`}>{title}</h2><strong className="delete-target">{target}</strong><p id={`${id}-description`}>{description}</p>
   {error&&<p className="form-error" role="alert">{error}</p>}
-  <div className="delete-dialog-actions"><button autoFocus type="button" className="button button-outline" disabled={busy} onClick={onCancel}>{t("Cancel","Hủy")}</button><button type="button" className="button button-danger" disabled={busy} onClick={onConfirm}><Trash2 size={17}/>{busy?t("Deleting…","Đang xóa…"):confirmLabel||t("Delete","Xóa")}</button></div>
+  <div className="delete-dialog-actions"><button data-button-variant="cancel" autoFocus type="button" className="button button-outline" disabled={busy} onClick={onCancel}>{t("Cancel","Hủy")}</button><button data-button-variant="danger-primary" type="button" className="button button-danger" disabled={busy} onClick={onConfirm}><Trash2 size={17}/>{busy?t("Deleting…","Đang xóa…"):confirmLabel||t("Delete","Xóa")}</button></div>
  </dialog>;
 }

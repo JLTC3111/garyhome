@@ -630,13 +630,13 @@ test('automatic listing URLs use Vietnamese when English is blank and choose an 
 
 test('published listing title edits preserve the existing URL while never-published drafts follow their final title',async t=>{
  const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
- const original=fixture.properties[0],row=title=>h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(strong=>strong.children.includes(title)));
+ const original=fixture.properties[0],row=title=>h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(strong=>strong.children.includes(title)||strong.findAllByType('a').some(link=>link.children.includes(title))));
  await act(async()=>row(original.title_en).findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
  const form=()=>h.renderer.root.findByProps({className:'editor-form'}),url=()=>form().findByProps({name:'listing_url'});
  const field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
- assert.equal(url().props.readOnly,true);assert.equal(url().props.value,'https://garyhome.vn/homes/'+original.slug);
+ assert.equal(url().props.readOnly,true);assert.equal(url().props.value,'https://www.garyhome.vn/homes/'+original.slug);
  await act(async()=>field('Property title · English').props.onChange({target:{value:'Updated published title with PETS ALLOWED and LAKE VIEW'}}));
- await act(async()=>h.site.setLanguage('vi'));assert.equal(url().props.value,'https://garyhome.vn/homes/'+original.slug);
+ await act(async()=>h.site.setLanguage('vi'));assert.equal(url().props.value,'https://www.garyhome.vn/homes/'+original.slug);
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
  assert.equal(h.backend.calls.filter(call=>call.table==='properties').at(-1).payload.slug,original.slug);
  await act(async()=>h.site.setLanguage('en'));
@@ -644,9 +644,10 @@ test('published listing title edits preserve the existing URL while never-publis
  h.backend.rows.properties=[...structuredClone(fixture.properties),draft];await act(async()=>h.site.setContent(previous=>({...previous,properties:[...previous.properties,draft]})));
  await act(async()=>row(draft.title_en).findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
  await act(async()=>field('Property title · English').props.onChange({target:{value:'Final draft title — LAKE VIEW'}}));
- assert.equal(url().props.value,'https://garyhome.vn/homes/final-draft-title-lake-view');
+ assert.equal(url().props.value,'https://www.garyhome.vn/homes/final-draft-title-lake-view');
  const publication=form().findAllByType('label').find(node=>node.children.includes('Publication status')).findAll(node=>typeof node.props.onValueChange==='function')[0];
- await act(async()=>publication.props.onValueChange('published'));assert.equal(url().props.value,'https://garyhome.vn/homes/final-draft-title-lake-view');
+ await act(async()=>publication.props.onValueChange('published'));assert.equal(url().props.value,'https://www.garyhome.vn/homes/final-draft-title-lake-view');
+ assert.equal(form().findAllByType('button').find(button=>button.props.type==='submit').props['data-button-variant'],'save');
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
  assert.equal(h.backend.calls.filter(call=>call.table==='properties').at(-1).payload.slug,'final-draft-title-lake-view');
 });
@@ -1651,7 +1652,7 @@ test('admin image uploads retain full original names through cover changes, remo
   await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});
  }
  assert.deepEqual(captions(),names);assert.equal(h.backend.imageUploads.length,2);
- for(const [index,upload] of h.backend.imageUploads.entries()){assert.equal(upload.bucket,'property-media');assert.match(upload.path,/^properties\/[0-9a-f-]+\.jpg$/);assert.equal(upload.file.type,'image/jpeg');assert.equal(upload.options.metadata.original_filename,names[index]);}
+ for(const [index,upload] of h.backend.imageUploads.entries()){assert.equal(upload.bucket,'property-media');assert.match(upload.path,/^properties\/[0-9a-f-]+\/[a-z0-9-]+\.jpg$/);assert.equal(upload.file.type,'image/jpeg');assert.equal(upload.options.metadata.original_filename,names[index]);}
  await act(async()=>photos().findByProps({'aria-label':'Make photo 2 cover'}).props.onClick());assert.deepEqual(captions(),[names[1],names[0]]);
  await act(async()=>photos().findByProps({'aria-label':'Remove photo 2'}).props.onClick());assert.deepEqual(captions(),[names[1]]);
  for(const [label,value] of [['Property title · English','Image filename QA'],['Property title · Vietnamese','Kiểm tra tên ảnh'],['Public location / street','Tây Hồ']])await act(async()=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input').props.onChange({target:{value}}));
@@ -1726,6 +1727,7 @@ test('listing editor puts Save Listing first and waits for a confirmed write',as
  const submit=()=>act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(5);});
  const toast=()=>JSON.stringify(h.renderer.toJSON());
  assert.deepEqual(actions().map(button=>button.props.type),['submit','button']);
+ assert.deepEqual(actions().map(button=>button.props['data-button-variant']),['save-draft','cancel']);
  assert.ok(actions()[0].children.includes('Save Listing'));
  assert.match(actions()[1].props.className,/\bbutton-outline\b/);
  await act(async()=>h.site.setLanguage('vi'));

@@ -25,7 +25,7 @@ export function StaffTemporaryPassword({member,busy,error,close,save}:{member:St
    <label>{text("Confirm password")}<input name="confirm_temporary_password" type="password" autoComplete="new-password" minLength={12} maxLength={128} value={confirmation} required disabled={busy} onChange={event=>setConfirmation(event.target.value)}/></label>
    <p className="small muted">{text("They sign in at the regular Staff portal using this password, then change it in their profile. Share the password privately.")}</p>
    {(error||validation)&&<p className="form-error" role="alert">{text(error||validation)}</p>}
-   <div className="temporary-password-actions"><button type="button" className="button button-outline" disabled={busy} onClick={close}>{text("Cancel")}</button><button className="button" disabled={busy}>{busy?<LoaderCircle size={16} className="spin"/>:<KeyRound size={16}/>} {text(busy?"Saving…":"Replace password")}</button></div>
+   <div className="temporary-password-actions"><button data-button-variant="cancel" type="button" className="button button-outline" disabled={busy} onClick={close}>{text("Cancel")}</button><button className="button" data-button-variant="save" disabled={busy}>{busy?<LoaderCircle size={16} className="spin"/>:<KeyRound size={16}/>} {text(busy?"Saving…":"Replace password")}</button></div>
   </form>
  </dialog>;
 }

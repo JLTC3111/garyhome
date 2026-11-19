@@ -71,7 +71,7 @@ export function PropertyVideoField({ property, onChange, onUploadingChange, disa
   return <div className="property-video-field">
     <div className="editor-section-title">{text("Property video (optional)")}</div>
     <p className="form-info">{text("Add one MP4 video smaller than 50 MB. Uploading a new video replaces the current video when you save the listing.")}</p>
-    {property.video_url && <><PropertyVideo url={property.video_url}/><button className="button button-outline button-small" type="button" disabled={busy || disabled}
+    {property.video_url && <><PropertyVideo url={property.video_url}/><button data-button-variant="danger" className="button button-outline button-small" type="button" disabled={busy || disabled}
       onClick={() => { onChange(null); setIssue({ id: property.id, message: "" }); }}><X size={15}/>{text("Remove video")}</button></>}
     <label className="upload-label"><Upload size={18}/>{busy ? text("Uploading video…") : property.video_url ? text("Replace MP4 video") : text("Upload MP4 video")}
       <input key={property.id} name="property_video" type="file" accept="video/mp4,.mp4" disabled={busy || disabled || demo || !user}

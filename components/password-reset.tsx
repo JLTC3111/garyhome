@@ -82,7 +82,7 @@ function PasswordResetBody({invitation,expectedUser}:{invitation:boolean;expecte
           <label>{t("Confirm password","Xác nhận mật khẩu")}<input type={showPassword?"text":"password"} name="confirm" minLength={12} required autoComplete="new-password" disabled={busy}/></label>
           <div className="password-input-tools"><small id="password-requirements">{t("Use at least 12 characters and a password you don’t use elsewhere.","Dùng ít nhất 12 ký tự và mật khẩu chưa sử dụng ở nơi khác.")}</small><button type="button" className="text-link" aria-pressed={showPassword} onClick={()=>setShowPassword(!showPassword)}>{showPassword?<EyeOff size={15}/>:<Eye size={15}/>} {showPassword?t("Hide password","Ẩn mật khẩu"):t("Show password","Hiện mật khẩu")}</button></div>
           {error&&<div className="form-error" role="alert">{text(error)}</div>}
-          <button className="button" disabled={busy}>{busy?<LoaderCircle size={17} className="spin"/>:<ShieldCheck size={17}/>} {busy?t("Updating…","Đang cập nhật…"):t("Save password","Lưu mật khẩu")}</button>
+          <button data-button-variant="save" className="button" disabled={busy}>{busy?<LoaderCircle size={17} className="spin"/>:<ShieldCheck size={17}/>} {busy?t("Updating…","Đang cập nhật…"):t("Save password","Lưu mật khẩu")}</button>
         </form>
         <p className="password-access-footnote">{staffPortal?t("Your administrator assigns your access. Only you choose your password.","Quản trị viên cấp quyền truy cập. Chỉ bạn tự chọn mật khẩu."):t("Your password is private. Never share it with anyone.","Mật khẩu là thông tin riêng tư. Không chia sẻ mật khẩu với bất kỳ ai.")}</p>
       </>}

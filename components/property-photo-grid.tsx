@@ -42,7 +42,7 @@ export function PropertyPhotoGrid({ images, filenames, metadata, onMetadataChang
         <span className="editor-photo-order">{index === 0 ? text("COVER") : index + 1}</span>
         <div className="editor-photo-actions">
           {index > 0 && <button type="button" disabled={disabled} onClick={() => { setSelectedSrc(selected?.src); makeCover(index); }} aria-label={text("Make photo {number} cover", { number: index + 1 })}><Eye size={13}/></button>}
-          <button type="button" disabled={disabled} onClick={() => {
+          <button data-button-variant="danger" type="button" disabled={disabled} onClick={() => {
             if (src === selected?.src) setSelectedSrc(images[index + 1] ?? images[index - 1]);
             remove(index);
           }} aria-label={text("Remove photo {number}", { number: index + 1 })}><X size={14}/></button>

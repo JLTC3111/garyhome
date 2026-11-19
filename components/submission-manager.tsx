@@ -56,7 +56,7 @@ function Manager({kind}:{kind:"feedback"|"assistance"}){
     <label>{t("Decision","Quyết định")}<SelectField name="decision" defaultValue={report.status==="submitted"?"needs_details":report.status}><option value="verified">{t("Verified — confirm credit","Đã xác minh — ghi nhận hoa hồng")}</option><option value="needs_details">{t("More details needed","Cần thêm thông tin")}</option><option value="declined">{t("Not verified","Không được xác minh")}</option></SelectField></label>
     {review&&<p className="muted small">{t("Last reviewed","Xem xét gần nhất")}: {new Date(review.reviewed_at).toLocaleString(language==="vi"?"vi-VN":"en-GB",{timeZone:"Asia/Ho_Chi_Minh"})}</p>}
    </>}
-   <div className="property-order-actions"><button className="button" type="submit" disabled={busy}>{busy?t("Saving…","Đang lưu…"):t("Save decision","Lưu quyết định")}</button><button className="button button-outline" type="button" disabled={busy} onClick={()=>setSelected(null)}>{t("Close","Đóng")}</button></div>
+   <div className="property-order-actions"><button data-button-variant="save" className="button" type="submit" disabled={busy}>{busy?t("Saving…","Đang lưu…"):t("Save decision","Lưu quyết định")}</button><button className="button button-outline" type="button" disabled={busy} onClick={()=>setSelected(null)}>{t("Close","Đóng")}</button></div>
   </form>}
  </section>;
 }

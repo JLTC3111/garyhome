@@ -19,7 +19,9 @@ function loadGrid(){
   const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='./use-studio-text')return {useStudioText:()=>((message,values={})=>message.replace(/\{(\w+)\}/g,(_,key)=>String(values[key])))};
+   if(id==='./site-context')return {useSite:()=>({t:en=>en})};
    if(id.startsWith('@/'))return load(path.join(root,id.slice(2))+'.ts');
+   if(id.startsWith('.')&&id.endsWith('.ts'))return load(path.resolve(path.dirname(file),id));
    return require(id);
   }
   vm.runInThisContext('(function(exports,require,module){'+js+'\n})',{filename:file})(loaded.exports,dependency,loaded);
@@ -83,4 +85,47 @@ test('existing UUID uploads show the complete stored basename and extension with
  await h.update({images:[url],filenames:{[url]:'3-bedroom-apartment-tay-ho-lake-view-001.JPG'}});
  assert.equal(h.renderer.root.findByType('figcaption').props['data-filename-source'],'original');
  assert.equal(h.renderer.root.findAllByProps({className:'small muted image-filename-note'}).length,0);
+});
+
+test('one photo editor opens by default and retains independent edits across selection and reordering',async t=>{
+ let metadata={[sourceA]:{description_en:'First caption',description_vi:'Chú thích đầu',alt_en:'First alt'},
+  [sourceB]:{description_en:'Second caption',alt_vi:'Ảnh sau'}};
+ const filenames={[sourceA]:'Living room.JPG',[sourceB]:'Balcony.JPG'},moves=[];
+ const h=await harness(t,{filenames,metadata,move:(from,to)=>moves.push([from,to]),
+  onMetadataChange:(src,patch)=>{metadata={...metadata,[src]:{...metadata[src],...patch}};}});
+ const panel=()=>h.renderer.root.findByProps({className:'editor-photo-panel'});
+ const values=()=>panel().findAllByType('textarea').map(field=>field.props.value);
+ const button=label=>h.renderer.root.findByProps({'aria-label':label});
+ assert.equal(h.renderer.root.findAllByType('details').length,0);
+ assert.equal(button('Edit photo 1').props['aria-pressed'],true);
+ assert.deepEqual(values(),['First caption','Chú thích đầu','First alt','']);
+ const newValue={target:{value:'Ảnh phòng khách'}};
+ await act(async()=>panel().findAllByType('textarea')[3].props.onChange(newValue));
+ await act(async()=>panel().findByType('input').props.onChange({target:{checked:true}}));
+ await h.update({metadata});
+ await act(async()=>button('Edit photo 2').props.onClick());
+ assert.deepEqual(values(),['Second caption','','','Ảnh sau']);
+ assert.equal(panel().findByType('input').props.checked,false);
+ await act(async()=>button('Edit photo 1').props.onClick());
+ assert.deepEqual(values(),['First caption','Chú thích đầu','First alt','Ảnh phòng khách']);
+ assert.equal(panel().findByType('input').props.checked,true);
+ await act(async()=>panel().findAllByType('button').find(control=>control.children.join('')==='Move later').props.onClick());
+ assert.deepEqual(moves,[[0,1]]);
+ await h.update({images:[sourceB,sourceA],metadata});
+ assert.equal(button('Edit photo 2').props['aria-pressed'],true);
+ assert.equal(panel().findByType('img').props.src,sourceA);
+ assert.equal(values()[3],'Ảnh phòng khách');
+ await h.update({images:[sourceB,'https://media.example/properties/replacement.jpg'],metadata});
+ assert.equal(values()[0],'Second caption');
+ await act(async()=>button('Edit photo 2').props.onClick());
+ assert.deepEqual(values(),['','','','']);
+});
+
+test('photo editor uses a width-gated field grid and draws a single thumbnail focus ring',()=>{
+ const css=fs.readFileSync(path.join(root,'app/editor-drawer.css'),'utf8');
+ assert.match(css,/\.editor-photo-fields\s*\{[^}]*grid-template-columns:minmax\(0,1fr\)/);
+ assert.match(css,/@container listing-photo \(min-width:520px\)\s*\{\s*\.editor-photo-fields\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.editor-photo-filename-option\s*\{[^}]*grid-template-columns:auto minmax\(0,1fr\)/);
+ assert.match(css,/\.editor-photo-card:has\(\.editor-photo-select:focus-visible\)\s*\{[^}]*outline:2px[^}]*outline-offset:2px[^}]*box-shadow:none/);
+ assert.match(css,/\.editor-photo-select:focus-visible\s*\{\s*outline:none/);
 });

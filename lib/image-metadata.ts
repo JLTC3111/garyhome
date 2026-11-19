@@ -1,4 +1,4 @@
-import { imageFilenameDetails, imageFilenameKey } from "./image-filenames.ts";
+import { imageFilenameKey } from "./image-filenames.ts";
 import type { Language } from "./types";
 
 export const PHOTO_TEXT_LIMIT = 240;
@@ -50,10 +50,8 @@ export function galleryPhotoMetadata(src: string, records: ImageMetadata | undef
   const description = photoText(entry[`description_${language}`]) || photoText(entry[`description_${other}`]);
   const alt = photoText(entry[`alt_${language}`]) || photoText(entry[`alt_${other}`]);
   const filename = publicPhotoFilename(entry.public_filename);
-  // Built-in listing assets are editorially supplied. Uploaded Storage keys are never captions.
-  const assetName = src.startsWith("/images/") ? publicPhotoFilename(imageFilenameDetails(src).filename) : "";
-  const stem = (filename || assetName).replace(imageExtension, "");
-  const readable = /^(?:img|dsc|dscf|pxl|image|photo|pic)?[ _-]*\d+$/iu.test(stem) ? ""
+  const stem = filename.replace(imageExtension, "");
+  const readable = /^(?:img|dsc|dscf|pxl|image|photo|pic)?[ _-]*\d+$/iu.test(stem) ? filename
     : stem.replace(/[-_]+/g, " ").trim();
   return { caption: description || alt || readable || fallback, filename, alt };
 }

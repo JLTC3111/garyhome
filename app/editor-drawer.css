@@ -10,6 +10,74 @@
 .editor-drawer .editor-toolbar{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .editor-scroll-body{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;container-type:inline-size;container-name:editor;scroll-padding-block:16px 100px}
 .editor-scroll-body>.editor-form,.editor-scroll-body>.help-editor-form{width:100%;max-width:1000px;margin:0 auto;padding:32px 40px 0;box-sizing:border-box}
+.editor-scroll-body .editor-photo-grid .editor-photo-select {
+  display:block;
+  width:100%;
+  height:auto;
+  padding:0;
+  border:0;
+  border-radius:0;
+}
+.editor-photo-grid .editor-photo-order { pointer-events:none; }
+.editor-photo-card[data-photo-selected="true"] { border-color:var(--studio-focus,var(--olive)); }
+.editor-photo-panel {
+  container:listing-photo / inline-size;
+  min-width:0;
+  display:grid;
+  gap:16px;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--warm);
+}
+.editor-photo-panel-header {
+  display:grid;
+  grid-template-columns:minmax(0,144px) minmax(0,1fr);
+  gap:14px;
+  align-items:start;
+  overflow-wrap:anywhere;
+}
+.editor-photo-panel-header > img {
+  width:100%;
+  max-height:170px;
+  object-fit:contain;
+  object-position:top;
+  border-radius:4px;
+}
+.editor-photo-panel-header :is(h3,p) { margin:0 0 4px; }
+.editor-photo-panel-actions { display:flex; gap:4px 12px; flex-wrap:wrap; }
+.editor-photo-panel-actions button { min-height:40px; }
+.editor-photo-fields {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:12px 16px;
+}
+.editor-photo-fields label { min-width:0; overflow-wrap:anywhere; }
+.editor-photo-fields textarea { display:block; width:100%; min-width:0; resize:vertical; }
+.editor-scroll-body .editor-photo-panel .editor-photo-filename-option {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:start;
+  gap:8px;
+}
+.editor-photo-panel .editor-photo-filename-option input[type="checkbox"] { width:auto; margin:0.2em 0 0; padding:0; }
+.editor-photo-filename-option span { overflow-wrap:anywhere; }
+.editor-scroll-body .editor-photo-grid button:focus-visible,
+.editor-scroll-body .editor-photo-panel :is(textarea,input,button):focus-visible,
+.editor-scroll-body .editor-photo-panel:focus-visible,
+.editor-scroll-body .editor-photo-card:has(.editor-photo-select:focus-visible) {
+  outline:2px solid var(--studio-focus,var(--olive));
+  outline-offset:2px;
+  box-shadow:none;
+}
+/* Place the thumbnail ring on its card, outside the clipped image. */
+.editor-scroll-body .editor-photo-grid .editor-photo-select:focus-visible { outline:none; }
+@container listing-photo (min-width:520px) {
+  .editor-photo-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@container listing-photo (max-width:340px) {
+  .editor-photo-panel-header { grid-template-columns:minmax(0,1fr); }
+}
 .editor-scroll-body .gw-editor-actions{position:sticky;bottom:0;z-index:4;display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:16px 0;margin-top:24px;background:var(--paper,#faf9f6);border-top:1px solid var(--line,#d9dfd3);box-shadow:0 -10px 16px var(--paper,#faf9f6)}
 .editor-scroll-body .gw-editor-actions>.button{min-height:44px}
 .editor-scroll-body input,.editor-scroll-body textarea,.editor-scroll-body select{max-width:100%;min-width:0}

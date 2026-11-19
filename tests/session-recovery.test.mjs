@@ -18,12 +18,16 @@ function setup(t,overrides={}){
 test('same-user token refresh and tab refocus never remove editor access',async t=>{
  const {recovery,history,deps}=setup(t);
  assert.equal(await recovery.recover(),true);
- const before=history.length, pending=deferred();deps.getRole=()=>pending.promise;
- recovery.observe(session('owner'));
- assert.equal(recovery.state.editor,true);
+ const before=history.length,pending=deferred();let reads=0;
+ deps.getRole=()=>{reads++;return pending.promise;};
+ recovery.observe(session('owner'),'SIGNED_IN');
+ await delay(2);assert.equal(reads,0);
+ recovery.observe({...session('owner'),access_token:'refreshed'},'TOKEN_REFRESHED');
+ assert.equal(recovery.state.editor,true);assert.equal(recovery.state.resolved,true);
  await delay(2);assert.equal(recovery.state.editor,true);
  pending.resolve('owner');await delay(2);
- assert.ok(history.slice(before).every(s=>s.editor&&s.user.id==='owner'));
+ assert.equal(reads,1);
+ assert.ok(history.slice(before).every(s=>s.editor&&s.user.id==='owner'&&s.phase==='ready'));
 });
 
 test('auth event callback defers all SDK-dependent work',async t=>{
@@ -48,7 +52,17 @@ test('expired/revoked session returns to sign-in instead of remaining in recover
  const {recovery,deps}=setup(t);await recovery.recover();
  deps.getSession=async()=>({data:{session:null},error:null});
  assert.equal(await recovery.recover(),false);assert.equal(recovery.state.user,null);
- assert.equal(recovery.state.editor,false);assert.equal(recovery.state.phase,'ready');
+ assert.equal(recovery.state.editor,false);assert.equal(recovery.state.phase,'ready');assert.equal(recovery.state.resolved,true);
+});
+
+test('an expired refresh token clears access while a transport error keeps the verified workspace',async t=>{
+ const {recovery,deps}=setup(t);await recovery.recover();
+ deps.getSession=async()=>{throw new TypeError('Connection interrupted');};
+ assert.equal(await recovery.recover(),false);assert.equal(recovery.state.editor,true);
+ assert.equal(recovery.state.phase,'error');assert.equal(recovery.state.resolved,true);
+ deps.getSession=async()=>({data:{session:null},error:{code:'refresh_token_not_found'}});
+ assert.equal(await recovery.recover(),false);assert.equal(recovery.state.user,null);
+ assert.equal(recovery.state.editor,false);assert.equal(recovery.state.phase,'ready');assert.equal(recovery.state.resolved,true);
 });
 
 test('confirmed role revocation removes editor access',async t=>{
@@ -77,6 +91,17 @@ test('focus, visibility, and reconnect bursts share one session and membership r
  assert.equal(first,second);assert.equal(second,third);
  pending.resolve({data:{session:session('owner')},error:null});
  assert.deepEqual(await Promise.all([first,second,third]),[true,true,true]);assert.equal(sessions,1);assert.equal(roles,1);
+});
+
+test('auth events and the startup read share one membership check',async t=>{
+ const pending=deferred();let reads=0;
+ const {recovery}=setup(t,{getSession:()=>pending.promise,getRole:async()=>{reads++;return 'owner';}});
+ const restoring=recovery.recover();
+ recovery.observe(session('owner'),'TOKEN_REFRESHED');
+ pending.resolve({data:{session:session('owner')},error:null});
+ assert.equal(await restoring,true);
+ await delay(5);
+ assert.equal(reads,1);
 });
 
 test('a hung session read times out, releases the recovery slot, and can be retried',async t=>{

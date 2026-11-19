@@ -1,9 +1,9 @@
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { request } from "./requests.ts";
 import { isStaffRole, type StaffRole } from "./staff.ts";
 
 export type SessionPhase = "checking" | "ready" | "recovering" | "offline" | "error";
-export type SessionState = { user: User | null; editor: boolean; role: StaffRole | null; phase: SessionPhase; generation: number };
+export type SessionState = { user: User | null; editor: boolean; role: StaffRole | null; resolved: boolean; phase: SessionPhase; generation: number };
 type Dependencies = {
   getSession: () => PromiseLike<{ data: { session: Session | null }; error: unknown }>;
   getRole: (userId: string, signal: AbortSignal) => PromiseLike<string | null>;
@@ -12,12 +12,19 @@ type Dependencies = {
   timeoutMs?: number;
 };
 
+function sessionEnded(error: unknown) {
+  const issue = error as { name?: string; code?: string };
+  return issue.name === "AuthSessionMissingError" ||
+    ["session_expired", "session_not_found", "refresh_token_not_found", "refresh_token_already_used"].includes(issue.code ?? "");
+}
+
 export class SessionRecovery {
-  state: SessionState = { user: null, editor: false, role: null, phase: "checking", generation: 0 };
+  state: SessionState = { user: null, editor: false, role: null, resolved: false, phase: "checking", generation: 0 };
   private stopped = false;
   private recovery: Promise<boolean> | null = null;
   private role: { generation: number; promise: Promise<boolean> } | null = null;
   private scheduled: ReturnType<typeof setTimeout> | undefined;
+  private accessToken: string | null = null;
 
   private deps: Dependencies;
   constructor(deps: Dependencies) { this.deps = deps; }
@@ -29,17 +36,20 @@ export class SessionRecovery {
   }
 
   // Called synchronously by onAuthStateChange. No SDK calls or awaited work here.
-  observe(session: Session | null) {
+  observe(session: Session | null, event?: AuthChangeEvent) {
     if (this.stopped) return;
     if (!session) {
       clearTimeout(this.scheduled);
       this.recovery = null;
       this.role = null;
-      this.publish({ user: null, editor: false, role: null, phase: "ready", generation: this.state.generation + 1 });
+      this.accessToken = null;
+      this.publish({ user: null, editor: false, role: null, resolved: true, phase: "ready", generation: this.state.generation + 1 });
       return;
     }
     const changed = session.user.id !== this.state.user?.id;
-    this.publish({ user: session.user, ...(changed ? { editor: false, role: null, phase: "recovering", generation: this.state.generation + 1 } : {}) });
+    if (event === "SIGNED_IN" && !changed && this.state.phase === "ready" && this.accessToken === session.access_token) return;
+    this.accessToken = session.access_token;
+    this.publish({ user: session.user, ...(changed ? { editor: false, role: null, resolved: false, phase: "recovering", generation: this.state.generation + 1 } : {}) });
     clearTimeout(this.scheduled);
     this.scheduled = setTimeout(() => { void this.checkRole(); }, 0);
   }
@@ -47,6 +57,7 @@ export class SessionRecovery {
   offline() { this.publish({ phase: "offline" }); }
 
   private checkRole(): Promise<boolean> {
+    clearTimeout(this.scheduled);
     const { user, generation } = this.state;
     if (!user || this.stopped) return Promise.resolve(false);
     if (!this.deps.online()) { this.offline(); return Promise.resolve(false); }
@@ -56,7 +67,7 @@ export class SessionRecovery {
         const role = await request(signal => this.deps.getRole(user.id, signal), this.deps.timeoutMs ?? 12000);
         if (this.stopped || this.state.generation !== generation) return false;
         const editor = isStaffRole(role);
-        this.publish({ editor, role: editor ? role : null, phase: "ready" });
+        this.publish({ editor, role: editor ? role : null, resolved: true, phase: "ready" });
         return editor;
       } catch {
         if (!this.stopped && this.state.generation === generation) this.publish({ phase: this.deps.online() ? "error" : "offline" });
@@ -73,23 +84,27 @@ export class SessionRecovery {
     if (this.stopped) return Promise.resolve(false);
     if (!this.deps.online()) { this.offline(); return Promise.resolve(false); }
     if (this.recovery) return this.recovery;
-    const generation = this.state.generation;
-    this.publish({ phase: this.state.user ? "recovering" : "checking" });
+    const { generation, resolved } = this.state;
+    const accessToken = this.accessToken;
+    // A known workspace stays active while the browser revalidates its session.
+    if (!resolved) this.publish({ phase: this.state.user ? "recovering" : "checking" });
     const promise = Promise.resolve().then(async () => {
       try {
         const { data, error } = await request(() => this.deps.getSession(), this.deps.timeoutMs ?? 12000);
         if (this.stopped) return false;
-        if (generation !== this.state.generation) {
+        if (generation !== this.state.generation || accessToken !== this.accessToken) {
           // Auth events are newer than the session read. Never restore an old identity.
           return this.state.user ? this.checkRole() : false;
         }
-        if (error) throw error;
+        if (error && !sessionEnded(error)) throw error;
+        if (error) { this.observe(null); return false; }
         if (!data.session) { this.observe(null); return false; }
         this.observe(data.session);
-        clearTimeout(this.scheduled);
         return await this.checkRole();
       } catch {
-        if (!this.stopped && generation === this.state.generation) this.publish({ phase: this.deps.online() ? "error" : "offline" });
+        if (!this.stopped && generation === this.state.generation && accessToken === this.accessToken) {
+          this.publish({ phase: this.deps.online() ? "error" : "offline" });
+        }
         return false;
       } finally { if (this.recovery === promise) this.recovery = null; }
     });

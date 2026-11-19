@@ -19,8 +19,8 @@ function loadGrid(){
   const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='./use-studio-text')return {useStudioText:()=>((message,values={})=>message.replace(/\{(\w+)\}/g,(_,key)=>String(values[key])))};
-   if(id==='./site-context')return {useSite:()=>({t:en=>en})};
-   if(id==='./property-photo-rename')return load(path.resolve(path.dirname(file),id+'.tsx'));
+   if(id==='./site-context')return {useSite:()=>({t:en=>en,language:'en'})};
+   if(id==='./property-photo-rename'||id==='./property-gallery')return load(path.resolve(path.dirname(file),id+'.tsx'));
    if(id.startsWith('@/'))return load(path.join(root,id.slice(2))+'.ts');
    if(id.startsWith('.')&&id.endsWith('.ts'))return load(path.resolve(path.dirname(file),id));
    return require(id);
@@ -33,11 +33,16 @@ function loadGrid(){
 
 async function harness(t,props){
  const previous=Object.getOwnPropertyDescriptor(globalThis,'IS_REACT_ACT_ENVIRONMENT');globalThis.IS_REACT_ACT_ENVIRONMENT=true;
- const Grid=loadGrid(),covers=[],removals=[];let renderer;
+ const Grid=loadGrid(),covers=[],removals=[],focused=[];let renderer;
+ const dialog={open:false,showModal(){this.open=true;},close(){this.open=false;}};
  const allProps={images:[sourceA,sourceB],makeCover:index=>covers.push(index),remove:index=>removals.push(index),...props};
- await act(async()=>{renderer=TestRenderer.create(React.createElement(Grid,allProps));});
+ await act(async()=>{renderer=TestRenderer.create(React.createElement(Grid,allProps),{createNodeMock:node=>{
+   if(node.type==='dialog')return dialog;
+   if(node.props.className==='editor-photo-grid')return {querySelector:selector=>({focus:()=>focused.push(selector)})};
+   return null;
+ }});});
  t.after(async()=>{await act(async()=>renderer.unmount());if(previous)Object.defineProperty(globalThis,'IS_REACT_ACT_ENVIRONMENT',previous);else delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
- return {renderer,covers,removals,async update(next){await act(async()=>renderer.update(React.createElement(Grid,{...allProps,...next})));}};
+ return {renderer,covers,removals,dialog,focused,async update(next){await act(async()=>renderer.update(React.createElement(Grid,{...allProps,...next})));}};
 }
 
 test('photo captions contain the complete long, special and Unicode filename with its original extension',async t=>{
@@ -71,12 +76,60 @@ test('legacy URLs show their full decoded stored filename while unnamed inline i
 
 test('cover and removal controls target the correct image and are disabled during a listing save',async t=>{
  const h=await harness(t,{}),buttons=()=>h.renderer.root.findAllByType('button');
- assert.equal(buttons().length,3);assert.ok(!buttons().some(button=>button.props['aria-label']==='Make photo 1 cover'));
- await act(async()=>buttons().find(button=>button.props['aria-label']==='Make photo 2 cover').props.onClick());
+ assert.equal(buttons().length,5);assert.ok(!buttons().some(button=>button.props['aria-label']?.startsWith('Set photo 1 as cover')));
+ const setCover=buttons().find(button=>button.props['aria-label']?.startsWith('Set photo 2 as cover'));
+ assert.match(setCover.props.title,/first position/);
+ await act(async()=>setCover.props.onClick());
  await act(async()=>buttons().find(button=>button.props['aria-label']==='Remove photo 1').props.onClick());
  assert.deepEqual(h.covers,[1]);assert.deepEqual(h.removals,[0]);
  await h.update({disabled:true});assert.ok(buttons().every(button=>button.props.disabled===true));
  assert.equal(h.renderer.root.findAllByProps({className:'editor-photo-order'})[0].children.join(''),'COVER');
+});
+
+test('Eye opens the actual clicked image without editing and Escape keeps the drawer open',async t=>{
+ const operations=[];
+ const h=await harness(t,{metadata:{[sourceB]:{description_en:'Balcony caption'}},onMetadataChange:()=>operations.push('metadata'),move:()=>operations.push('move')});
+ const btn=label=>h.renderer.root.findByProps({'aria-label':label});
+ const opener={focus(options){operations.push(options);}};
+ assert.equal(btn('Edit photo 1').props['aria-pressed'],true);
+ await act(async()=>btn('Preview photo 2').props.onClick({currentTarget:opener}));
+ assert.equal(h.dialog.open,true);
+ assert.equal(h.renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,sourceB);
+ assert.match(h.renderer.root.findByProps({className:'rental-lightbox-caption'}).findByType('p').props.children,/Balcony caption/);
+ const modal=h.renderer.root.findByType('dialog');
+ await act(async()=>modal.props.onKeyDown({key:'ArrowRight',preventDefault(){},stopPropagation(){}}));
+ assert.equal(h.renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,sourceA);
+ let stopped=false;
+ await act(async()=>modal.props.onKeyDown({key:'Escape',preventDefault(){},stopPropagation(){stopped=true;}}));
+ assert.equal(stopped,true);assert.equal(h.dialog.open,false);
+ assert.deepEqual(operations,[{preventScroll:true}]);
+ assert.deepEqual(h.covers,[]);assert.deepEqual(h.removals,[]);
+ assert.equal(btn('Edit photo 1').props['aria-pressed'],true);
+});
+
+test('drag and keyboard reordering move non-cover photos and return keyboard focus',async t=>{
+ const sourceC='https://media.example/properties/c.jpg',moves=[];
+ const h=await harness(t,{images:[sourceA,sourceB,sourceC],move:(from,to)=>moves.push([from,to])});
+ const handle=position=>h.renderer.root.findByProps({'aria-label':`Reorder photo ${position}`});
+ const card=index=>h.renderer.root.findByProps({'data-photo-index':index});
+ assert.equal(card(0).props.onDrop,undefined);
+ const keyboardEvent=key=>({key,preventDefault(){}});
+ await act(async()=>handle(2).props.onKeyDown(keyboardEvent('ArrowUp')));
+ assert.deepEqual(moves,[]);
+ await act(async()=>handle(3).props.onKeyDown(keyboardEvent('ArrowUp')));
+ assert.deepEqual(moves,[[2,1]]);
+ await h.update({images:[sourceA,sourceC,sourceB]});
+ assert.deepEqual(h.focused,['[data-photo-index="1"] [data-photo-control="reorder"]']);
+ assert.match(h.renderer.root.findByProps({role:'status'}).props.children,/position 2 of 3/);
+ const transfer={setData(type,value){assert.equal(type,'text/plain');assert.equal(value,'photo');}};
+ const event={dataTransfer:transfer,preventDefault(){}};
+ await act(async()=>handle(2).props.onDragStart(event));
+ assert.equal(transfer.effectAllowed,'move');
+ await act(async()=>card(2).props.onDragOver(event));
+ assert.equal(card(2).props['data-photo-drop-target'],true);assert.equal(transfer.dropEffect,'move');
+ await act(async()=>card(2).props.onDrop(event));
+ assert.equal(card(2).props['data-photo-drop-target'],undefined);
+ assert.deepEqual(moves,[[2,1],[1,2]]);
 });
 
 test('existing UUID uploads show the complete stored basename and extension without inventing an original name',async t=>{
@@ -91,8 +144,8 @@ test('existing UUID uploads show the complete stored basename and extension with
 test('one photo editor opens by default and retains independent edits across selection and reordering',async t=>{
  let metadata={[sourceA]:{description_en:'First caption',description_vi:'Chú thích đầu',alt_en:'First alt'},
   [sourceB]:{description_en:'Second caption',alt_vi:'Ảnh sau'}};
- const filenames={[sourceA]:'Living room.JPG',[sourceB]:'Balcony.JPG'},moves=[];
- const h=await harness(t,{filenames,metadata,move:(from,to)=>moves.push([from,to]),
+ const filenames={[sourceA]:'Living room.JPG',[sourceB]:'Balcony.JPG'};
+ const h=await harness(t,{filenames,metadata,
   onMetadataChange:(src,patch)=>{metadata={...metadata,[src]:{...metadata[src],...patch}};}});
  const panel=()=>h.renderer.root.findByProps({className:'editor-photo-panel'});
  const values=()=>panel().findAllByType('textarea').map(field=>field.props.value);
@@ -110,8 +163,8 @@ test('one photo editor opens by default and retains independent edits across sel
  await act(async()=>button('Edit photo 1').props.onClick());
  assert.deepEqual(values(),['First caption','Chú thích đầu','First alt','Ảnh phòng khách']);
  assert.equal(panel().findByType('input').props.checked,true);
- await act(async()=>panel().findAllByType('button').find(control=>control.children.join('')==='Move later').props.onClick());
- assert.deepEqual(moves,[[0,1]]);
+ await act(async()=>button('Set photo 2 as cover (move to first position)').props.onClick());
+ assert.deepEqual(h.covers,[1]);
  await h.update({images:[sourceB,sourceA],metadata});
  assert.equal(button('Edit photo 2').props['aria-pressed'],true);
  assert.equal(panel().findByType('img').props.src,sourceA);

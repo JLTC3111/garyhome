@@ -23,6 +23,7 @@ export class PhotoRenameError extends Error {
 async function rpc<T>(db:SupabaseClient,name:string,args:Record<string,unknown>,signal:AbortSignal):Promise<T> {
   const {data,error} = await db.rpc("home_photo_rename_"+name,args).abortSignal(signal);
   if (error) {
+    if (error.code==="55P03") throw new PhotoRenameError("media_busy");
     if (["PGRST202","42883","42P01"].includes(error.code)) throw new PhotoRenameError("migration_required",503);
     const code = /^photo_rename\.([a-z_]+)$/.exec(error.message)?.[1];
     if (code) throw new PhotoRenameError(code,error.code==="42501"?403:409);
@@ -102,11 +103,13 @@ export async function renamePropertyPhoto(
     },signal);
     if (!job.applied_at) {
       signal.throwIfAborted();
-      const result = await system.storage.from(PROPERTY_IMAGE_BUCKET).copy(job.old_key,job.new_key);
-      // Storage will refuse an existing key. A matching copy in this reserved
-      // server-only path can also be the result of an earlier interrupted call.
+      const claimed = await rpc<boolean>(system,"claim_copy",{p_id:job.id},signal);
+      const result = claimed ? await system.storage.from(PROPERTY_IMAGE_BUCKET).copy(job.old_key,job.new_key) : null;
+      // A matching copy in this reserved path can be the result of an earlier
+      // interrupted request. Verify it without sending a competing copy.
       const copied = await readPhoto(origin,job.new_key,signal).catch(error=>{
-        if (result.error) throw new PhotoRenameError("copy_failed");
+        if (!claimed) throw new PhotoRenameError("copy_pending");
+        if (result?.error) throw new PhotoRenameError("copy_failed");
         throw error;
       });
       if (copied.sha256!==source.sha256 || copied.format.extension!==source.format.extension ||

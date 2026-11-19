@@ -82,6 +82,20 @@ test('missing authentication is explained before uploading',async t=>{
  await assert.rejects(h.uploadPropertyImage(h.db,new File([jpeg],'home.jpg')),/sign-in expired/);assert.equal(h.calls.length,0);
 });
 
+test('listing uploads reserve a per-listing path and retry the same key',async t=>{
+ const listingId='11111111-1111-4111-8111-111111111111';
+ let first=true;
+ const h=harness(t,{transport:async input=>{
+  if(first){first=false;throw new Error('Failed to fetch');}
+  return input.path;
+ }});
+ const file=new File([jpeg],'Living room.jpg.jpg');
+ await assert.rejects(h.uploadPropertyImage(h.db,file,undefined,{listingId}),/connection failed/);
+ const url=await h.uploadPropertyImage(h.db,file,undefined,{listingId});
+ assert.match(url,new RegExp('^properties/listings/'+listingId+'/[a-f0-9-]{36}/living-room\\.jpg$'));
+ assert.equal(h.calls[0].path,h.calls[1].path);
+});
+
 test('image uploads forward cancellation and progress to the resumable transport',async t=>{
  let started;const requestStarted=new Promise(resolve=>started=resolve),progress=[];
  const h=harness(t,{transport:input=>{input.onProgress({percent:40});started();return new Promise((_,reject)=>input.signal.addEventListener('abort',()=>reject(input.signal.reason),{once:true}));}});

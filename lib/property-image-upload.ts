@@ -4,7 +4,7 @@ import { uploadListingFile, type ListingUploadOptions } from "./listing-file-upl
 import { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET, propertyImageFormat, propertyPhotoFilename } from "./property-photo-files";
 
 export { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET };
-const uploadPaths = new WeakMap<File, string>();
+const uploadPaths = new WeakMap<File, { scope: string; path: string }>();
 
 const unsupportedImage = "This file is not a supported image. Choose a JPG, PNG, WebP, or AVIF file.";
 const imageTooLarge = "Images must be 8 MB or smaller.";
@@ -46,20 +46,24 @@ export function imageUploadError(error: unknown): string {
   return unknownUpload;
 }
 
-export async function uploadPropertyImage(db: SupabaseClient, file: File, signal?: AbortSignal, options: ListingUploadOptions = {}): Promise<string> {
+export type PropertyImageUploadOptions = ListingUploadOptions & { listingId?: string };
+
+export async function uploadPropertyImage(db: SupabaseClient, file: File, signal?: AbortSignal, options: PropertyImageUploadOptions = {}): Promise<string> {
   signal?.throwIfAborted();
   const prepared = await preparePropertyImage(file);
   signal?.throwIfAborted();
   const originalFilename = imageOriginalFilename(file.name);
-  let path = uploadPaths.get(file);
-  if (!path) {
+  const {listingId,...progress}=options;
+  const scope=listingId ? `properties/listings/${listingId}` : "properties";
+  let attempt = uploadPaths.get(file);
+  if (!attempt || attempt.scope!==scope) {
     const filename = propertyPhotoFilename(originalFilename, prepared.extension) || `photo.${prepared.extension}`;
-    path = `properties/${crypto.randomUUID()}/${filename}`;
-    uploadPaths.set(file, path);
+    attempt={scope,path:`${scope}/${crypto.randomUUID()}/${filename}`};
+    uploadPaths.set(file, attempt);
   }
   try {
     const url = await uploadListingFile({ client: db, file: prepared.body, resumeKey: file, bucket: PROPERTY_IMAGE_BUCKET,
-      path, contentType: prepared.contentType, originalFilename, ...options, signal });
+      path: attempt.path, contentType: prepared.contentType, originalFilename, ...progress, signal });
     uploadPaths.delete(file);
     return url;
   } catch (error) { throw new Error(imageUploadError(error)); }

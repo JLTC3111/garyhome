@@ -1,0 +1,23 @@
+{
+  "propertyId": "1de3e346-a4b0-4511-bd53-c911bd4953e4",
+  "manifest": [
+    {
+      "bucket": "property-media",
+      "name": "properties/8ceb33f3-f0a3-4026-ba39-319e70a0bf0a.jpg",
+      "id": "6a171f37-c598-4d04-9b93-6da861fadcbe",
+      "version": "7f4c6f64-9d4b-4167-8c7e-a5c921216975"
+    },
+    {
+      "bucket": "property-media",
+      "name": "properties/renamed/1de3e346-a4b0-4511-bd53-c911bd4953e4/3-bedroom-apartment-to-ngoc-van-tay-ho-living-room-2.jpg",
+      "id": "5865e27d-c62c-4f41-a330-ccdddd09e473",
+      "version": "96f5a966-9c2f-486f-a360-a1c7faec6a1c"
+    },
+    {
+      "bucket": "property-media",
+      "name": "properties/renamed/1de3e346-a4b0-4511-bd53-c911bd4953e4/3-bedroom-apartment-to-ngoc-van-tay-ho-living-room.jpg",
+      "id": "7fc28903-f320-44b8-a152-8382be12f953",
+      "version": "a864ba6a-bff7-4989-ae45-f332adb23206"
+    }
+  ]
+}

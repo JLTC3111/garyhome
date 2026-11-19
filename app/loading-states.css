@@ -1,0 +1,30 @@
+.session-gate { max-width: 36rem; padding-block: clamp(2rem, 9vw, 5rem); }
+.session-gate > header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.session-placeholder { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; }
+.session-placeholder p { margin: 0; color: var(--muted); }
+html[data-home-theme="dark"] .session-gate,
+html[data-home-theme="dark"] .session-placeholder p { color: var(--home-secondary); }
+
+.content-skeleton { --skeleton-fill: color-mix(in srgb, var(--ink) 10%, var(--paper)); }
+html[data-home-theme="dark"] .content-skeleton { --skeleton-fill: var(--home-elevated); }
+.skeleton-line, .skeleton-control, .skeleton-image { border-radius: 6px; background: var(--skeleton-fill); }
+.skeleton-line { height: .8rem; width: min(100%, 40rem); margin-bottom: .8rem; }
+.skeleton-line:first-child { height: 1.6rem; width: min(65%, 26rem); }
+.skeleton-line:last-child { width: min(76%, 30rem); }
+.skeleton-control { min-height: 2.75rem; }
+.skeleton-grid, .skeleton-gallery, .skeleton-columns, .skeleton-fields { display: grid; gap: clamp(.75rem, 2vw, 1.5rem); }
+.skeleton-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 1.25rem; }
+.skeleton-card { min-width: 0; padding: .75rem; border: 1px solid var(--line); border-radius: 8px; }
+.skeleton-image { aspect-ratio: 4 / 3; margin-bottom: .75rem; }
+.skeleton-gallery { grid-template-columns: 2fr 1fr; }
+.skeleton-gallery .skeleton-image { aspect-ratio: auto; margin: 0; }
+.skeleton-gallery .skeleton-image:first-child { grid-row: span 2; aspect-ratio: 3 / 2; }
+.skeleton-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.content-skeleton--stats .skeleton-grid { grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr)); }
+.content-skeleton--stats .skeleton-card { min-height: 6rem; }
+@media (max-width: 680px) {
+  .skeleton-grid, .content-skeleton--stats .skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .skeleton-columns, .skeleton-gallery { grid-template-columns: minmax(0, 1fr); }
+  .skeleton-gallery .skeleton-image:not(:first-child) { display: none; }
+  :is(.content-skeleton--catalogue, .content-skeleton--cards) .skeleton-card:last-child { display: none; }
+}

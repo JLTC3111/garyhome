@@ -38,6 +38,16 @@ async function harness(t, options={}){
  setGlobal('localStorage',{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)});
  setGlobal('FormData',class{constructor(form){this.form=form;}get(key){return this.form.fields?.[key]??null;}});
  setGlobal('fetch',async(input,init)=>{
+  if(String(input)==='/api/admin/property-deletions'){
+   const body=JSON.parse(init.body);backend.listingDeleteCalls??=[];backend.listingDeleteCalls.push(body);
+   if(body.action==='queue')return Response.json({jobs:backend.cleanupJob?.pending?[backend.cleanupJob]:[]});
+   if(body.action==='retry'){
+    backend.cleanupJob={...backend.cleanupJob,pending:0,removed:1};return Response.json(backend.cleanupJob);
+   }
+   backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==body.propertyId);
+   backend.cleanupJob={propertyId:body.propertyId,listingCode:'FIXTURE',pending:1,removed:0,retained:0,review:0};
+   return Response.json(backend.cleanupJob);
+  }
   if(String(input).startsWith('/api/admin/team')){
    const method=String(input).endsWith('/reset-password')?'RESET':String(input).endsWith('/set-password')?'PASSWORD':init?.method??'GET';backend.teamCalls.push({method,input:init?.body?JSON.parse(init.body):null});
    if(method==='RESET')return Response.json({ok:true});
@@ -62,6 +72,7 @@ async function harness(t, options={}){
   return Response.json({configured:true,url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'});
  });
  let session=options.guest?null:authSession(options.customer?'customer':'owner'),callback;
+ let pathname=options.path??(options.customer?'/account':'/admin'),sessionReads=0;
  const backend={exchangeRate:Object.hasOwn(options,'exchangeRate')?options.exchangeRate:currencyTestRate,role:options.role??(options.customer||options.guest?null:'owner'),roleError:false,readErrors:new Map(Object.entries(options.readErrors??{})),pending:new Map(),writes:new Map(),writeErrors:new Map(),upload:null,rows:{editorial_articles:structuredClone(fixture.editorial),enquiries:[],customer_profiles:[],customer_records:[],saved_homes:[],portal_guides:JSON.parse(fs.readFileSync(path.join(base,'data/portal-guides.json'),'utf8')).map(row=>({...row,created_at:'2026-10-28T00:00:00Z',updated_at:'2026-10-28T00:00:00Z'})),portal_guide_files:[]},calls:[],publicCalls:[],publicError:options.publicError??false,publicPending:options.publicPending,publicRows:structuredClone(options.publicContent??fixture),sessionRead:options.authPending,authCalls:[],passwordCalls:[],navigation:[],rpcCalls:[],rpcPending:new Map(),teamCalls:[],teamRows:[{user_id:'owner',display_name:'Project Owner',email:'owner@protonmail.com',role:'owner',active:true,confirmed:true}]};
  const publicClient={from(table){
   const filters={},query={};let range;
@@ -79,7 +90,7 @@ async function harness(t, options={}){
   return query;
  }};
  const client={
-  auth:{getSession:async()=>backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null}),onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};},
+  auth:{getSession:async()=>{sessionReads++;return backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null});},onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async()=>{session=null;callback?.('SIGNED_OUT',null);return {error:null};},
    signUp:async input=>{backend.authCalls.push({method:'signup',input});return {data:{session:null},error:null};},
    signInWithPassword:async input=>{backend.authCalls.push({method:'password',input});if(backend.signInError)return {data:{session:null},error:backend.signInError};session=authSession('customer');callback?.('SIGNED_IN',session);return {data:{session},error:null};},
    verifyOtp:async input=>{backend.authCalls.push({method:'verify',input});if(backend.verifyError)return {data:{session:null,user:null},error:backend.verifyError};session=authSession(options.verifyUser??'invited-staff');callback?.(input.type==='recovery'?'PASSWORD_RECOVERY':'SIGNED_IN',session);const verified=session;if(backend.verifySwitch){session=authSession('other-account');callback?.('SIGNED_IN',session);}return {data:{session:verified,user:verified.user},error:null};},
@@ -155,7 +166,7 @@ async function harness(t, options={}){
   function dependency(id){
    if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
-   if(id==='next/navigation')return {usePathname:()=>options.path??(options.customer?'/account':'/admin'),useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
+   if(id==='next/navigation')return {usePathname:()=>pathname,useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
    if(id==='@supabase/supabase-js')return {createClient:(_url,_key,options)=>({storage:{from:bucket=>({upload:async(path,file,uploadOptions)=>{backend.imageUploads??=[];backend.imageUploads.push({bucket,path,file,options:uploadOptions,clientOptions:options});return backend.upload.promise;},getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}}),uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
    if(id==='@/lib/browser-client'||id==='./browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient,browserBackendConfig:()=>({url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'})};
    if(id.startsWith('.')||id.startsWith('@/')){
@@ -171,6 +182,7 @@ async function harness(t, options={}){
  const {SiteProvider,useSite}=load(path.join(base,'components/site-context.tsx'));
  const Page=options.page==='password'||options.page==='invite'||options.page==='callback'?load(path.join(base,'components/password-reset.tsx')).PasswordReset
   :options.page==='property'?load(path.join(base,'components/property-detail.tsx')).PropertyDetail
+  :options.page==='loading'?load(path.join(base,'components/page-loading.tsx')).PageLoading
   :options.page==='error'?load(path.join(base,'app/error.tsx')).default
   :options.page==='portals'?load(path.join(base,'components/portal-access.tsx')).PortalAccess
   :options.page==='homes'?load(path.join(base,'components/homes-page.tsx')).HomesPage
@@ -200,7 +212,8 @@ async function harness(t, options={}){
  };
  const mountPage=async()=>{await act(async()=>{renderer.update(render(true));await delay(5);});};
  const emitEvent=async(event,next)=>{await act(async()=>{session=next;callback?.(event,next);await delay(5);});};
- return {renderer,backend,network,browser,page,stored,emit,emitEvent,mountPage,editSettings,get site(){return site;}};
+ const navigate=async next=>{await act(async()=>{pathname=next;browser.location=new URL(next,browser.location);renderer.update(render(true));await delay(5);});};
+ return {renderer,backend,network,browser,page,stored,emit,emitEvent,mountPage,editSettings,navigate,get site(){return site;},get sessionReads(){return sessionReads;}};
 }
 
 test('portal chooser identifies both destinations without changing authentication',async t=>{
@@ -997,18 +1010,22 @@ test('opening an enquiry persists read state and preserves a note edited while t
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Close editor'}).props.onClick());
  await act(async()=>row().props.onClick());assert.equal(h.backend.rpcCalls.filter(c=>c.name==='mark_enquiry_read').length,requestCount,'Already-read enquiries need no repeated writes');
 });
-test('listing deletion requires explicit confirmation, removes the listing and is unavailable to editors',async t=>{
+test('listing deletion requires explicit confirmation and displays a retryable pending media cleanup',async t=>{
  const h=await harness(t);
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
- const target=h.site.content.properties[0].id;
+ const {id:target,updated_at:version}=h.site.content.properties[0];
  const deleteButton=h.renderer.root.findAllByType('button').find(n=>n.props.className==='text-danger');assert.ok(deleteButton);
- await act(async()=>deleteButton.props.onClick());assert.equal(h.backend.rpcCalls.filter(c=>c.name==='delete_property').length,0);
+ await act(async()=>deleteButton.props.onClick());assert.equal(h.backend.listingDeleteCalls,undefined);
  const dialog=h.renderer.root.findByType('dialog');assert.equal(dialog.props.role,'alertdialog');
  await act(async()=>{await dialog.findAllByType('button').find(n=>n.props.className==='button button-danger').props.onClick();await delay(5);});
- assert.equal(h.backend.rpcCalls.find(c=>c.name==='delete_property').name,'delete_property');assert.equal(h.backend.rpcCalls.find(c=>c.name==='delete_property').args.target_property,target);
+ assert.deepEqual(h.backend.listingDeleteCalls,[{action:'delete',confirm:true,propertyId:target,version}]);
  assert.ok(!h.site.content.properties.some(p=>p.id===target));
+ assert.ok(h.renderer.root.findAllByType('summary').some(n=>n.children.join('')==='Listing media cleanup (1)'));
+ const retry=h.renderer.root.findAllByType('button').find(n=>n.children.join('')==='Retry cleanup');
+ await act(async()=>{await retry.props.onClick();await delay(5);});
+ assert.deepEqual(h.backend.listingDeleteCalls.at(-1),{action:'retry',propertyId:target});
  await h.emit(null);assert.ok(!h.site.content.properties.some(p=>p.id===target));
- assert.equal(h.backend.rpcCalls.filter(c=>c.name==='delete_property').length,1);
+ assert.equal(h.backend.listingDeleteCalls.filter(c=>c.action==='delete').length,1);
 });
 test('editors can read enquiries but cannot see destructive listing or enquiry actions',async t=>{
  const h=await harness(t,{role:'editor'});
@@ -1595,71 +1612,111 @@ test('Customers Refresh updates a selected conversation history without replacin
  assert.equal(detail().findAllByType('textarea')[0].props.value,'Keep this unsaved note');
 });
 
-test('Lattice Loader marks active session recovery while drafts stay editable, translates, and stops offline or after recovery',async t=>{
+test('quiet session revalidation preserves the Studio shell and editable draft',async t=>{
  const h=await harness(t);await h.editSettings('Draft kept during connection recovery');
+ const sidebar=h.renderer.root.findByProps({className:'admin-sidebar'});
  const draft=h.renderer.root.findAllByType('textarea')[0],pending=deferred();h.backend.sessionRead=pending;
+ const banners=()=>h.renderer.root.findAllByProps({className:'session-banner'});
  let restoring;await act(async()=>{restoring=h.site.reconnect();await delay(5);});
- assert.equal(h.site.sessionPhase,'recovering');assert.equal(h.renderer.root.findAllByType('textarea')[0],draft);
- const banner=()=>h.renderer.root.findByProps({className:'session-banner'});
- assert.equal(banner().findByProps({className:'lattice-loader'}).props['aria-busy'],true);
- assert.equal(draft.props.disabled,undefined);assert.equal(draft.props.value,'Draft kept during connection recovery');
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(banner().toJSON?.()??h.renderer.toJSON()),/Đang khôi phục phiên/);
- await act(async()=>{h.network.onLine=false;h.browser.dispatchEvent(new Event('offline'));});assert.equal(h.site.sessionPhase,'offline');assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);assert.equal(draft.props.value,'Draft kept during connection recovery');
- h.backend.sessionRead=null;pending.resolve({data:{session:authSession('owner')},error:null});await act(async()=>{await restoring;});
- await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(5);});assert.equal(h.site.sessionPhase,'ready');assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);assert.equal(draft.props.value,'Draft kept during connection recovery');
-});
-
-
-test('cold configuration loading shows the Lattice banner and Studio gate before a session identity is known',async t=>{
- const pending=deferred(),h=await harness(t,{guest:true,path:'/admin',url:'https://gary.example/admin',configPending:pending});
- assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.user,null);assert.equal(h.site.ready,false);
- const banner=()=>h.renderer.root.findByProps({className:'session-banner'}),gate=()=>h.renderer.root.findByProps({className:'admin-loading'});
- const bannerLoader=banner().findByProps({className:'lattice-loader'}),gateLoader=gate().findByProps({className:'lattice-loader'});
- assert.equal(bannerLoader.props['aria-busy'],true);assert.equal(gateLoader.props['aria-busy'],true);
- assert.equal(h.renderer.root.findAllByType('form').length,0,'The sign-in form must not flash while the saved session is unknown.');
- const english=banner().findByProps({className:'lattice-loader__label'}).children.join('');
+ assert.equal(h.site.sessionPhase,'ready');assert.equal(h.site.sessionResolved,true);assert.equal(banners().length,0);
  await act(async()=>h.site.setLanguage('vi'));
- assert.equal(banner().findByProps({className:'lattice-loader'}),bannerLoader);assert.equal(gate().findByProps({className:'lattice-loader'}),gateLoader);
- const vietnamese=banner().findByProps({className:'lattice-loader__label'}).children.join('');assert.notEqual(vietnamese,english);assert.match(vietnamese,/Đang/);
- await act(async()=>{pending.resolve();await delay(10);});
- assert.equal(h.site.sessionPhase,'ready');assert.equal(h.site.user,null);assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);assert.equal(h.renderer.root.findAllByProps({className:'admin-loading'}).length,0);
- assert.equal(h.renderer.root.findAllByType('form').length,1);assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);
+ assert.equal(h.renderer.root.findAllByType('textarea')[0],draft);
+ assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
+ assert.equal(draft.props.disabled,undefined);assert.equal(draft.props.value,'Draft kept during connection recovery');
+ await act(async()=>{h.network.onLine=false;h.browser.dispatchEvent(new Event('offline'));});
+ assert.equal(h.site.sessionPhase,'offline');assert.equal(banners().length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/ngoại tuyến|mất kết nối|chưa có kết nối|đang offline/i);
+ h.backend.sessionRead=null;pending.resolve({data:{session:authSession('owner')},error:null});await act(async()=>{await restoring;});
+ await act(async()=>{h.network.onLine=true;h.browser.dispatchEvent(new Event('online'));await delay(5);});
+ assert.equal(h.site.sessionPhase,'ready');assert.equal(banners().length,0);assert.equal(draft.props.value,'Draft kept during connection recovery');
+ assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
 });
 
-test('cold saved-session restoration keeps the Lattice loader visible until the owner workspace is verified',async t=>{
- const pending=deferred(),h=await harness(t,{path:'/admin',url:'https://gary.example/admin',authPending:pending});
- assert.equal(h.site.sessionPhase,'checking');assert.equal(h.site.user,null);assert.equal(h.site.ready,false);
- assert.equal(h.renderer.root.findByProps({className:'session-banner'}).findByProps({className:'lattice-loader'}).props['aria-busy'],true);
- assert.equal(h.renderer.root.findByProps({className:'admin-loading'}).findByProps({className:'lattice-loader'}).props['aria-busy'],true);
+test('cold configuration uses a bilingual neutral gate until the signed-out state is known',async t=>{
+ const pending=deferred(),h=await harness(t,{guest:true,path:'/admin',url:'https://gary.example/admin',configPending:pending});
+ const gate=h.renderer.root.findByProps({className:'session-placeholder'});
+ assert.equal(h.site.sessionResolved,false);assert.equal(h.site.user,null);assert.equal(h.site.ready,false);
+ assert.equal(gate.props['aria-busy'],true);
+ assert.match(gate.findByProps({role:'status'}).children.join(''),/Checking staff access/);
  assert.equal(h.renderer.root.findAllByType('form').length,0);
- h.backend.sessionRead=null;await act(async()=>{pending.resolve({data:{session:authSession('owner')},error:null});await delay(10);});
- assert.equal(h.site.sessionPhase,'ready');assert.equal(h.site.user.id,'owner');assert.equal(h.site.editor,true);assert.equal(h.site.ready,true);
- assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);assert.equal(h.renderer.root.findAllByProps({className:'admin-loading'}).length,0);assert.equal(h.renderer.root.findAllByProps({className:'admin-shell'}).length,1);
+ assert.equal(h.renderer.root.findAllByProps({className:'admin-shell'}).length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(h.renderer.root.findByProps({className:'session-placeholder'}),gate);
+ assert.match(gate.findByProps({role:'status'}).children.join(''),/Đang kiểm tra quyền truy cập/);
+ await act(async()=>{pending.resolve();await delay(10);});
+ assert.equal(h.site.sessionResolved,true);assert.equal(h.site.user,null);
+ assert.equal(h.renderer.root.findAllByProps({className:'session-placeholder'}).length,0);
+ assert.equal(h.renderer.root.findAllByType('form').length,1);
 });
 
-test('admin image uploads retain full original names through cover changes, removal, saving and reopening',async t=>{
+test('cold saved-session restoration verifies access before showing the shell and a data skeleton',async t=>{
+ const auth=deferred(),data=deferred(),h=await harness(t,{path:'/admin',url:'https://gary.example/admin',authPending:auth});
+ h.backend.pending.set('properties',data);
+ assert.equal(h.site.sessionResolved,false);
+ assert.equal(h.renderer.root.findAllByType('form').length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'admin-sidebar'}).length,0);
+ h.backend.sessionRead=null;await act(async()=>{auth.resolve({data:{session:authSession('owner')},error:null});await delay(10);});
+ const sidebar=h.renderer.root.findByProps({className:'admin-sidebar'});
+ assert.equal(h.site.sessionResolved,true);assert.equal(h.site.editor,true);assert.equal(h.site.studioDataReady,false);
+ assert.equal(h.renderer.root.findAllByProps({className:'session-placeholder'}).length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--stats'}).length,1);
+ await act(async()=>{h.backend.pending.delete('properties');data.resolve({data:fixture.properties,error:null});await delay(10);});
+ assert.equal(h.site.studioDataReady,true);
+ assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
+ assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--stats'}).length,0);
+});
+
+test('public navigation uses contextual skeletons without restarting auth',async t=>{
+ const h=await harness(t,{guest:true,page:'loading',path:'/vi/homes',url:'https://gary.example/vi/homes'});
+ assert.equal(h.sessionReads,1);
+ const matches=layout=>h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--'+layout});
+ assert.equal(matches('catalogue').length,1);
+ await h.navigate('/vi/homes/fixture');assert.equal(matches('gallery').length,1);
+ await h.navigate('/en/contact');assert.equal(matches('form').length,1);
+ assert.equal(h.sessionReads,1);
+ assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);
+});
+
+test('admin image uploads retain originals and metadata through cover changes, reordering, saving and reopening',async t=>{
  const h=await harness(t,{role:'admin'});
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
  const form=()=>h.renderer.root.findByProps({className:'editor-form'}),photos=()=>form().findByProps({className:'editor-photo-grid'});
  const picker=()=>form().findAllByType('input').find(node=>node.props.type==='file'&&node.props.multiple);
- const names=['3-bedroom-apartment-tay-ho-1-2-3.JPG','Căn hộ Tây Hồ (Lake View) 02.jpg'];
+ const names=['3-bedroom-apartment-tay-ho-1-2-3.JPG','Căn hộ Tây Hồ (Lake View) 02.jpg','Balcony.JPG'];
  const captions=()=>photos().findAllByType('figcaption').map(node=>node.findAllByType('span').at(-1).children.join(''));
+ const sources=()=>photos().findAllByProps({className:'editor-photo-preview'}).map(node=>node.findByType('img').props.src);
  for(const name of names){
   h.backend.upload=deferred();const target={files:[jpegFile(name)],value:'selected'};let pending;
   await act(async()=>{pending=picker().props.onChange({target});await delay(5);});assert.equal(target.value,'');
   assert.ok(form().findAllByProps({role:'status'}).some(node=>node.children.join('').includes(name)));
   await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});
  }
- assert.deepEqual(captions(),names);assert.equal(h.backend.imageUploads.length,2);
+ assert.deepEqual(captions(),names);assert.equal(h.backend.imageUploads.length,3);
  for(const [index,upload] of h.backend.imageUploads.entries()){assert.equal(upload.bucket,'property-media');assert.match(upload.path,/^properties\/[0-9a-f-]+\/[a-z0-9-]+\.jpg$/);assert.equal(upload.file.type,'image/jpeg');assert.equal(upload.options.metadata.original_filename,names[index]);}
- await act(async()=>photos().findByProps({'aria-label':'Make photo 2 cover'}).props.onClick());assert.deepEqual(captions(),[names[1],names[0]]);
- await act(async()=>photos().findByProps({'aria-label':'Remove photo 2'}).props.onClick());assert.deepEqual(captions(),[names[1]]);
+ const originalSources=sources();
+ await act(async()=>photos().findByProps({'aria-label':'Edit photo 3'}).props.onClick());
+ const captionFields=()=>form().findByProps({className:'editor-photo-panel'}).findAllByType('textarea');
+ await act(async()=>captionFields()[0].props.onChange({target:{value:'Garden from the balcony'}}));
+ await act(async()=>photos().findByProps({'aria-label':'Set photo 2 as cover (move to first position)'}).props.onClick());
+ assert.deepEqual(captions(),[names[1],names[0],names[2]]);
+ await act(async()=>photos().findByProps({'aria-label':'Reorder photo 3'}).props.onKeyDown({key:'ArrowUp',preventDefault(){}}));
+ assert.deepEqual(sources(),[originalSources[1],originalSources[2],originalSources[0]]);
+ await act(async()=>photos().findByProps({'aria-label':'Remove photo 3'}).props.onClick());
+ assert.deepEqual(captions(),[names[1],names[2]]);
+ assert.equal(captionFields()[0].props.value,'Garden from the balcony');
+ assert.equal(h.backend.imageUploads.length,3);
  for(const [label,value] of [['Property title · English','Image filename QA'],['Property title · Vietnamese','Kiểm tra tên ảnh'],['Public location / street','Tây Hồ']])await act(async()=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input').props.onChange({target:{value}}));
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
- const saved=h.backend.calls.find(call=>call.table==='properties').payload;assert.equal(saved.images.length,1);assert.deepEqual(Object.values(saved.image_filenames),[names[1]]);assert.equal(saved.image_filenames[saved.images[0]],names[1]);
+ const saved=h.backend.calls.find(call=>call.table==='properties').payload;
+ assert.deepEqual(saved.images,[originalSources[1],originalSources[2]]);
+ assert.deepEqual(saved.images.map(src=>saved.image_filenames[src]),[names[1],names[2]]);
+ assert.equal(saved.image_metadata[originalSources[2]].description_en,'Garden from the balcony');
  const row=h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(strong=>strong.children.includes('Image filename QA')));
- await act(async()=>row.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());assert.deepEqual(captions(),[names[1]]);
+ await act(async()=>row.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ assert.deepEqual(captions(),[names[1],names[2]]);
+ await act(async()=>photos().findByProps({'aria-label':'Edit photo 2'}).props.onClick());
+ assert.equal(captionFields()[0].props.value,'Garden from the balcony');
 });
 
 test('a timed-out image identifies its full name and can be selected again without losing the draft',async t=>{

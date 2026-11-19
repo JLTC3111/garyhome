@@ -5,8 +5,9 @@ import {PGlite} from '@electric-sql/pglite';
 import {propertyPhotoFilename,propertyPhotoPath,propertyPhotoUrl,replacePropertyPhotoUrl} from '../lib/property-photo-files.ts';
 import {propertyPhotoRenameHistory,renamePropertyPhoto,retirePropertyPhoto} from '../lib/property-photo-rename-server.ts';
 import {syncRenamedListingDraft} from '../lib/property-photo-rename-state.ts';
+import {deleteListingAndMedia,listingDeletionQueue} from '../lib/property-deletion-server.ts';
 
-const origin='https://storage.example.test', bucket='property-media';
+const origin='https://duyiihsmaqfgwezmsnjs.supabase.co', bucket='property-media';
 const first='10101010-1111-4111-8111-111111111111', second='20202020-2222-4222-8222-222222222222';
 const admin='a0000000-0000-4000-8000-000000000001', editor='a0000000-0000-4000-8000-000000000002';
 const manager='a0000000-0000-4000-8000-000000000003', owner='a0000000-0000-4000-8000-000000000004';
@@ -48,17 +49,31 @@ async function setup(t) {
     banned_until timestamptz,deleted_at timestamptz,is_anonymous boolean default false);
   create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
   create function private.staff_role() returns text language sql stable as $$select role from auth.users where id=auth.uid()$$;
+  create function private.is_staff_admin() returns boolean language sql stable as $$select private.staff_role() in ('admin','owner')$$;
   create table public.properties(id uuid primary key,images text[] not null,image_metadata jsonb not null default '{}',
-    image_filenames jsonb not null default '{}', source_url text,updated_at timestamptz not null);
+    image_filenames jsonb not null default '{}', source_url text,updated_at timestamptz not null,
+    status text not null default 'draft',listing_code text not null default 'TEST',address text not null default 'Test address',
+    video_url text,listing_type text default 'rent',availability text default 'available');
   create table public.neighbourhoods(image text);create table public.site_settings(hero_image text);
   create table public.listing_authors(portrait_url text);create table public.site_activities(image_url text,source_url text);
   create table public.editorial_articles(image_url text,sources jsonb not null default '[]');
-  create table storage.objects(bucket_id text,name text,primary key(bucket_id,name));
+  create table public.enquiries(id uuid primary key,property_id uuid references public.properties(id) on delete set null,message text);
+  create table public.enquiry_notes(enquiry_id uuid primary key,notes text,property_code text,property_address text);
+  create table public.feedback_public(message text);create table public.feedback_submissions(message text);
+  create table public.property_assistance(notes text);create table public.assistance_reviews(internal_notes text);
+  create table public.landlord_submissions(id uuid primary key,listing_id uuid references public.properties(id) on delete set null,message text);
+  create table public.landlord_submission_files(submission_id uuid references public.landlord_submissions(id) on delete cascade,storage_path text);
+  create table public.property_display_orders(property_ids uuid[]);
+  create table public.saved_homes(property_id uuid references public.properties(id) on delete cascade);
+  create table storage.buckets(id text primary key,versioning_status text not null default 'DISABLED');
+  insert into storage.buckets(id) values('property-media'),('listing-videos');
+  create table storage.objects(bucket_id text,name text,id uuid not null default gen_random_uuid(),
+    version text default gen_random_uuid()::text,metadata jsonb default '{"size":8}',primary key(bucket_id,name));
   alter table storage.objects enable row level security;
   grant usage on schema storage,private to authenticated;
   grant select,insert,update,delete on storage.objects to authenticated;
   create policy legacy_storage_editor on storage.objects for all to authenticated using(true) with check(true);
-  grant select,update on public.properties to authenticated;
+  grant select,update,insert,delete on public.properties to authenticated;
  `);
  for(const [id,name] of [[admin,'admin'],[editor,'editor'],[manager,'manager'],[owner,'owner']])
   await pg.query('insert into auth.users(id,role) values($1,$2)',[id,name]);
@@ -72,6 +87,10 @@ async function setup(t) {
  await pg.query('insert into storage.objects values($1,$2)',[bucket,oldKey]);
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119054408_property_photo_storage_rename.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119073707_property_photo_rename_completion.sql',import.meta.url),'utf8'));
+ const baseline=await readFile(new URL('../supabase/migrations/20261024173814_staff_gmail_inbox_and_deletion_controls.sql',import.meta.url),'utf8');
+ await pg.exec(baseline.match(/create function private\.preserve_deleted_property\(\)[\s\S]*?create trigger preserve_deleted_property[\s\S]*?;/)[0]);
+ await pg.exec(baseline.match(/create function public\.delete_property\(target_property uuid\)[\s\S]*?end; \$\$;/)[0]);
+ await pg.exec(await readFile(new URL('../supabase/migrations/20261119095000_property_deletion_media_cleanup.sql',import.meta.url),'utf8'));
  const files=new Map([[oldKey,{mime:'image/jpeg',bytes:jpeg}]]), calls=[];
  let onCopy=()=>{}, onRemove=()=>{};
  const original=globalThis.fetch;
@@ -85,9 +104,10 @@ async function setup(t) {
  const listing=async id=>(await pg.query('select to_jsonb(p) listing from public.properties p where id=$1',[id])).rows[0]?.listing||null;
  const client=(as,actor)=>({
   rpc(name,params){return {abortSignal:async()=>{
-   const args=Object.values(params);
-   try {const rows=await role(as,actor,()=>pg.query('select public.'+name+'('+args.map((_,i)=>'$'+(i+1)).join(',')+') value',args));
-    return {data:rows.rows[0]?.value};
+   const args=Object.entries(params).map(([key,value])=>key==='p_manifest'?JSON.stringify(value):value);
+   const returnsRows=name==='home_listing_delete_targets';
+   try {const rows=await role(as,actor,()=>pg.query((returnsRows?'select * from public.':'select public.')+name+'('+args.map((_,i)=>'$'+(i+1)).join(',')+')'+(returnsRows?'':' value'),args));
+    return {data:returnsRows?rows.rows:rows.rows[0]?.value};
    }catch(error){return {error:{code:error.code,message:error.message}};}
   }};},
   from(table){
@@ -95,7 +115,7 @@ async function setup(t) {
    return {select:()=>({eq:(_,id)=>({abortSignal:()=>({maybeSingle:async()=>({data:await listing(id)})})})})};
   },
   storage:{from(name){
-   assert.equal(as,'service_role');assert.equal(name,bucket);
+   assert.equal(as,'service_role');assert.ok([bucket,'listing-videos'].includes(name));
    return {
     async copy(from,to){
      calls.push(['copy',from,to]);
@@ -107,10 +127,10 @@ async function setup(t) {
      return {error:null};
     },
     async remove(paths){
-     assert.equal(paths.length,1);calls.push(['remove',...paths]);
-     await onRemove(paths[0]);
-     for(const key of paths){files.delete(key);await pg.query('delete from storage.objects where bucket_id=$1 and name=$2',[bucket,key]);}
-     return {error:null};
+     calls.push(['remove',...paths]);
+     await onRemove(paths[0],name);
+     for(const key of paths){files.delete(key);await pg.query('delete from storage.objects where bucket_id=$1 and name=$2',[name,key]);}
+     return {data:paths.map(name=>({name})),error:null};
     },
    };
   }},
@@ -178,6 +198,110 @@ test('guarded copy, stale edit retry, atomic references, retained originals and 
  await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('insert into storage.objects values($1,$2)',[bucket,oldKey])),/policy/);
  assert.equal(h.calls.filter(call=>call[0]==='remove').length,1);
  assert.ok((await propertyPhotoRenameHistory(write,first,signal()))[0].removed_at);
+});
+
+test('permanent deletion captures each listing state and leaves shared CRM and gallery files available',async t=>{
+ const h=await setup(t), db=h.client('authenticated',admin), system=h.client('service_role');
+ for(const [i,status] of ['draft','published','archived'].entries()){
+  const id=`30303030-0000-4000-8000-00000000000${i}`;
+  const photo=`properties/listings/${id}/${first}/photo.jpg`, shared=`properties/listings/${id}/${second}/shared.jpg`;
+  const video=`${admin}/${id}/${first}.mp4`, old=`properties/${id}.jpg`, renamed=`properties/renamed/${id}/cover.jpg`;
+  const incoming=propertyPhotoUrl(origin,shared).replace('/object/public/','/render/image/public/')+'?width=600';
+  const enquiry=crypto.randomUUID(), landlord=crypto.randomUUID();
+  const images=[propertyPhotoUrl(origin,renamed),propertyPhotoUrl(origin,photo),propertyPhotoUrl(origin,shared)];
+  const videoUrl=origin+'/storage/v1/object/public/listing-videos/'+video;
+  await h.pg.query('insert into properties(id,images,updated_at,status,video_url) values($1,$2,$3,$4,$5)',[id,images,version,status,videoUrl]);
+  await h.pg.query('insert into public.enquiries values($1,$2,$3)',[enquiry,id,`More photos: ${incoming}.`]);
+  await h.pg.query('insert into public.landlord_submissions values($1,$2,$3)',[landlord,id,`Saved photo ${incoming}`]);
+  await h.pg.query('insert into public.landlord_submission_files values($1,$2)',[landlord,'private-file.pdf']);
+  await h.pg.query('insert into public.saved_homes values ($1)',[id]);
+  for(const key of [photo,shared,old,renamed])await h.pg.query('insert into storage.objects values($1,$2)',[bucket,key]);
+  await h.pg.query('insert into storage.objects values($1,$2)',['listing-videos',video]);
+  await h.pg.query(`insert into private.property_photo_renames(property_id,origin,old_key,new_key,started_by,applied_at)
+    values($1,$2,$3,$4,$5,now())`,[id,origin,old,renamed,admin]);
+  // A second active listing also uses the same transformed object.
+  await h.pg.query('update properties set images=array_append(images,$1) where id=$2',[incoming,second]);
+  if(status==='archived'){
+   await h.pg.query("update properties set status='published' where id=$1",[id]);
+   await h.pg.query("update properties set status='archived' where id=$1",[id]);
+   assert.equal((await h.pg.query('select name from storage.objects where name=$1',[video])).rows.length,1);
+  }
+  await assert.rejects(h.role('authenticated',admin,()=>h.pg.query('delete from properties where id=$1',[id])),/permission denied/);
+  await assert.rejects(h.role('authenticated',admin,()=>h.pg.query('select public.delete_property($1)',[id])),/permission denied/);
+  await assert.rejects(deleteListingAndMedia(h.client('authenticated',editor),system,editor,id,{version},signal()),/forbidden/);
+  await assert.rejects(deleteListingAndMedia(db,system,admin,id,{version:changedVersion},signal()),/stale/);
+  if(status==='draft'){
+   h.onRemove((_key,b)=>{if(b===bucket)throw new Error('Simulated storage failure');});
+  }
+  const result=await deleteListingAndMedia(db,system,admin,id,{version},signal());
+  assert.equal(await h.listing(id),null);
+  assert.equal(result.retained,1);
+  assert.equal(result.pending,status==='draft'?3:0);
+  assert.equal((await h.pg.query('select property_id from enquiries where id=$1',[enquiry])).rows[0].property_id,null);
+  assert.equal((await h.pg.query('select property_code from enquiry_notes where enquiry_id=$1',[enquiry])).rows[0].property_code,'TEST');
+  assert.equal((await h.pg.query('select * from landlord_submission_files where submission_id=$1',[landlord])).rows.length,1);
+  assert.equal((await h.pg.query('select * from saved_homes where property_id=$1',[id])).rows.length,0);
+  assert.equal((await h.pg.query('select name from storage.objects where name=$1',[video])).rows.length,0);
+  assert.equal((await h.pg.query('select name from storage.objects where name=$1',[shared])).rows.length,1);
+  assert.equal((await h.pg.query('select previous_status from private.home_listing_deletions where property_id=$1',[id])).rows[0].previous_status,status);
+  await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('insert into storage.objects values($1,$2)',
+    [bucket,`properties/listings/${id}/${first}/late.jpg`])),/policy/);
+  await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('insert into storage.objects values($1,$2)',
+    ['listing-videos',`${admin}/${id}/${second}.mp4`])),/policy/);
+  await assert.rejects(h.pg.query('insert into feedback_public values($1)',[`Please use ${images[1]}.`]),/retired_reference/);
+  if(status==='draft'){
+   assert.equal((await listingDeletionQueue(db,signal()))[0].propertyId,id);
+   h.onRemove(()=>{});
+   const recovered=await deleteListingAndMedia(db,system,admin,id,{retry:true},signal());
+   assert.equal(recovered.pending,0);assert.equal(recovered.removed,4);
+  }
+  const calls=h.calls.length;
+  const repeat=await deleteListingAndMedia(db,system,admin,id,{version},signal());
+  assert.equal(repeat.removed,4);assert.equal(h.calls.length,calls);
+ }
+ assert.deepEqual(await listingDeletionQueue(db,signal()),[]);
+});
+
+test('a changed object or an undocumented provider removal is held for review',async t=>{
+ const h=await setup(t), db=h.client('authenticated',admin), system=h.client('service_role');
+ const gone=`properties/listings/${first}/${first}/gone.jpg`, changed=`properties/listings/${first}/${second}/changed.jpg`;
+ for(const key of [gone,changed])await h.pg.query('insert into storage.objects values($1,$2)',[bucket,key]);
+ h.onRemove(async()=>{
+  await h.pg.query('delete from storage.objects where name=$1',[gone]);
+  await h.pg.query("update storage.objects set version='new-object' where name=$1",[changed]);
+  throw new Error('Simulated provider failure after one catalogue commit');
+ });
+ const result=await deleteListingAndMedia(db,system,admin,first,{version},signal());
+ assert.equal(result.pending,2);assert.equal(result.removed,0);
+ const calls=h.calls.length;
+ const retry=await deleteListingAndMedia(db,system,admin,first,{retry:true},signal());
+ assert.equal(retry.pending,0);assert.equal(retry.review,2);assert.equal(retry.removed,0);
+ assert.equal(h.calls.length,calls);
+ assert.ok((await h.pg.query('select 1 from storage.objects where name=$1',[changed])).rows.length);
+});
+
+test('an in-flight rename blocks deletion and historical recovery checks the reviewed object identity',async t=>{
+ const h=await setup(t), db=h.client('authenticated',owner), system=h.client('service_role');
+ const find=async key=>(await h.pg.query('select bucket_id as bucket,name,id,version from storage.objects where name=$1',[key])).rows[0];
+ h.onCopy(async()=>{
+  await assert.rejects(deleteListingAndMedia(db,system,owner,first,{version},signal()),/rename_pending/);
+ });
+ await renamePropertyPhoto(db,system,origin,{propertyId:first,source:oldUrl,filename:'room-03',version},signal());
+
+ // Reproduce a deletion that happened before the cleanup migration existed.
+ await h.pg.exec('alter table properties disable trigger guard_home_listing_delete');
+ await h.pg.query('delete from properties where id in ($1,$2)',[first,second]);
+ await h.pg.exec('alter table properties enable trigger guard_home_listing_delete');
+ await h.pg.exec("update site_settings set hero_image=''; update editorial_articles set sources='[]';");
+ const reviewed=await find(newKey);
+ await assert.rejects(deleteListingAndMedia(db,system,owner,first,{manifest:[{...reviewed,version:'stale'}]},signal()),/manifest_changed/);
+ await h.pg.query('insert into feedback_submissions values($1)',[newUrl]);
+ await assert.rejects(deleteListingAndMedia(db,system,owner,first,{manifest:[reviewed]},signal()),/manifest_changed/);
+ await h.pg.exec('delete from feedback_submissions');
+ const result=await deleteListingAndMedia(db,system,owner,first,{manifest:[reviewed]},signal());
+ assert.equal(result.removed,1);assert.equal(await find(newKey),undefined);
+ assert.ok(await find(oldKey),'an object absent from the approved manifest is retained');
+ assert.equal((await deleteListingAndMedia(db,system,owner,first,{manifest:[reviewed]},signal())).removed,1);
 });
 
 test('confirmed cleanup is recoverable after a stale update, failed removal, and lost response',async t=>{

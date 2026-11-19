@@ -27,6 +27,8 @@ const messages:Record<string,[string,string]> = {
   unsupported_source:["This photo is outside the configured Home Storage bucket.", "Ảnh không nằm trong kho lưu trữ đã cấu hình của Gary Home."],
   object_unavailable:["The photo could not be loaded from Storage.", "Không thể tải ảnh từ kho lưu trữ."],
   copy_failed:["Storage did not confirm the copy. Retry the same name.", "Kho lưu trữ chưa xác nhận bản sao. Hãy thử lại cùng tên."],
+  copy_pending:["The earlier copy is still unconfirmed. Retry the same name to check its result.", "Chưa xác nhận bản sao trước đó. Hãy thử lại cùng tên để kiểm tra kết quả."],
+  media_busy:["Listing media is being updated. Try again shortly.", "Tệp của tin đăng đang được cập nhật. Vui lòng thử lại sau."],
   other_origin:["Another Storage address uses this key. Review the references before changing it.", "Có địa chỉ lưu trữ khác dùng khóa này. Kiểm tra các tham chiếu trước khi đổi tên."],
   metadata_conflict:["This photo has conflicting metadata aliases. Review the listing before retrying.", "Ảnh có thông tin không nhất quán giữa các địa chỉ. Kiểm tra tin đăng trước khi thử lại."],
   confirm_listing:["The rename may have saved. Reopen the listing to check the result.", "Có thể đã lưu tên mới. Mở lại tin đăng để kiểm tra kết quả."],

@@ -4,7 +4,6 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { usePathname, useRouter } from "next/navigation";
 import { SwipeToast, type ToastTone } from "./swipe-toast";
-import { LatticeLoader } from "./react-bits/lattice-loader";
 import { emailLinkIssue, emailTokenLink, passwordLinkEvidence, type PasswordLink, type EmailLinkIssue, type EmailTokenLink } from "@/lib/password-actions";
 import type { Content, Enquiry, ExchangeRate, Language, PriceCurrency } from "@/lib/types";
 import { languageValue, persistLanguage } from "@/lib/language";
@@ -41,7 +40,7 @@ type SiteContext = {
   passwordLinkIssue:EmailLinkIssue|null;
   emailVerification:{type:PasswordLink["type"];busy:boolean;failed:boolean}|null;
   verifyEmailLink:()=>Promise<void>;
-  sessionPhase: SessionPhase; reconnect: () => Promise<void>;
+  sessionPhase: SessionPhase; sessionResolved: boolean; reconnect: () => Promise<void>;
   editorTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal) => PromiseLike<T>, timeoutMs?: number | null) => Promise<T>;
   accountTask: <T>(operation: (db: SupabaseClient, signal: AbortSignal, userId: string) => PromiseLike<T>) => Promise<T>;
   studioDataReady: boolean; enquiries: Enquiry[]; setEnquiries: (list: Update<Enquiry[]>) => void; refresh: () => Promise<void>;
@@ -115,6 +114,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const [editor, setEditor] = useState(false);
   const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("checking");
+  const [sessionResolved, setSessionResolved] = useState(!initial.configured);
   const [demo, setDemo] = useState(false);
   const [studioDataReady, setStudioDataReady] = useState(false);
   const [enquiries, updateEnquiries] = useState<Enquiry[]>([]);
@@ -127,7 +127,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   }, []);
   const clientRef = useRef<SupabaseClient | null>(null);
   const sessionRef = useRef<SessionRecovery | null>(null);
-  const snapshotRef = useRef<SessionState>({ user: null, editor: false, role: null, phase: "checking", generation: 0 });
+  const snapshotRef = useRef<SessionState>({ user: null, editor: false, role: null, resolved: false, phase: "checking", generation: 0 });
   const initialRef = useRef(initial.content);
   useEffect(() => { initialRef.current = initial.content; }, [initial.content]);
   const version = useRef(0);
@@ -328,7 +328,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
           if (!response.ok) throw new Error("Configuration unavailable");
           const config = await response.json() as { configured: boolean; url: string; publishableKey: string };
           if (!active) return;
-          if (!config.configured) { setSessionPhase("ready"); return; }
+          if (!config.configured) { setSessionResolved(true); setSessionPhase("ready"); return; }
           const publicDb=publicBrowserClient(config.url,config.publishableKey);publicClientRef.current=publicDb;setPublicClient(publicDb);
           if (publicContentNeeded.current) {
             void recoverPublicContent();
@@ -346,7 +346,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
             onChange: next => {
               if (!active) return;
               const previous = snapshotRef.current; snapshotRef.current = next;
-              setUser(next.user); setEditor(next.editor); setStaffRole(next.role); setSessionPhase(next.phase);
+              setUser(next.user); setEditor(next.editor); setStaffRole(next.role); setSessionPhase(next.phase); setSessionResolved(next.resolved);
               if (previous.user?.id !== next.user?.id) {
                 setStaffProfile(null);savedVersion.current++; setSavedAccount(null); setSavedError(""); setGuestImportError(false); setPendingSaved([]);
                 if (next.user) setSaved([]);
@@ -364,7 +364,8 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
           let latestAuthUser:string|null=null;
           const { data } = db.auth.onAuthStateChange((event, session) => {
             latestAuthUser=session?.user.id||null;
-            recovery.observe(session);
+            // The explicit read handles startup errors as well as a missing session.
+            if (event !== "INITIAL_SESSION") recovery.observe(session, event);
             const fromHash=pendingLink&&pendingLink.userId===latestAuthUser?pendingLink:null;
             if(fromHash)pendingLink=null;
             const link:PasswordLink|null=event==="PASSWORD_RECOVERY"&&session?{type:"recovery",userId:session.user.id}:fromHash;
@@ -505,10 +506,10 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     return()=>{active=false;window.removeEventListener("gary-staff-profile-changed",changed);if(channel)void client.removeChannel(channel);};
   },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
 
-  const sessionLoading = sessionPhase === "checking" || sessionPhase === "recovering";
-  const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : sessionPhase === "error" ? "We couldn’t verify your connection. Your edits are still here." : "Restoring your session…";
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
-    {initial.configured && ["checking", "offline", "error", "recovering"].includes(sessionPhase) && <div className="session-banner" role="status" aria-busy={sessionLoading}>{sessionLoading ? <LatticeLoader label={studioText(sessionMessage, language)} announce={false}/> : studioText(sessionMessage, language)}{!sessionLoading && <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button>}</div>}
+  const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : "We couldn’t verify your connection. Your edits are still here.";
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, reconnect, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
+    {initial.configured && sessionResolved && user && (sessionPhase === "offline" || sessionPhase === "error") &&
+      <div className="session-banner" role="status">{studioText(sessionMessage, language)} <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button></div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
     {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}
     <FormValidationMessages language={language}/>{children}

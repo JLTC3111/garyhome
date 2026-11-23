@@ -1182,7 +1182,7 @@ test('customer edits made during a pending save remain as the next draft',async 
 
 test('staff can add a customer, keep a follow-up and search the directory',async t=>{
  const h=await harness(t);
- await act(async()=>{h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(5);});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Client Database'}).props.onClick();await delay(5);});
  const add=h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add customer'));
  await act(async()=>{add.props.onClick();});
  const detail=()=>h.renderer.root.findByProps({'aria-label':'Customer details'});
@@ -1817,7 +1817,7 @@ test('a late guest import keeps a newer favourite removal and reserves only impo
 
 test('CRM drafts survive same-account reauthentication but clear on explicit sign-out or another account',async t=>{
  const h=await harness(t);
- const openCustomers=async()=>{await act(async()=>{h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(10);});};
+ const openCustomers=async()=>{await act(async()=>{h.renderer.root.findByProps({'aria-label':'Client Database'}).props.onClick();await delay(10);});};
  const detail=()=>h.renderer.root.findByProps({className:'admin-panel customer-detail'});
  const add=async value=>{await act(async()=>h.renderer.root.findAllByType('button').find(b=>b.children.includes('Add customer')).props.onClick());await act(async()=>detail().findAllByType('input')[0].props.onChange({target:{value}}));};
  await openCustomers();await add('Unsaved CRM draft');
@@ -1830,7 +1830,7 @@ test('CRM drafts survive same-account reauthentication but clear on explicit sig
 });
 
 test('Customers Refresh loads newly arrived enquiry-only contacts as well as profiles and CRM records',async t=>{
- const h=await harness(t);await act(async()=>{h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(10);});
+ const h=await harness(t);await act(async()=>{h.renderer.root.findByProps({'aria-label':'Client Database'}).props.onClick();await delay(10);});
  h.backend.rows.enquiries=[{id:'new-enquiry',property_id:null,name:'New Guest Customer',email:'new@example.invalid',phone:'',message:'Please contact me about a rental',preferred_date:null,kind:'contact',consent:true,status:'new',created_at:'2026-11-01T00:00:00Z',user_id:null,appointment_at:null,customer_update:'',cancelled_at:null,enquiry_notes:[]}];
  await act(async()=>{h.renderer.root.findByProps({className:'customer-toolbar'}).findAllByType('button').find(b=>b.children.includes('Refresh')).props.onClick();await delay(15);});
  assert.equal(h.site.enquiries.length,1);assert.ok(h.renderer.root.findAll(n=>n.type==='strong'&&n.children.includes('New Guest Customer')).length);
@@ -1843,7 +1843,7 @@ test('Studio and customer directory load past the API row cap without dropping l
  h.backend.rows.customer_profiles=[0,1,2].map(i=>({user_id:'page-profile-'+i,full_name:'Profile '+i,email:'profile'+i+'@example.invalid',phone:'',updated_at:'2026-11-01T00:00:00Z'}));
  h.backend.rows.customer_records=[0,1,2].map(i=>({customer_key:'manual:'+i,user_id:null,name:'Record '+i,email:'record'+i+'@example.invalid',phone:'',stage:'new',follow_up_on:null,notes:'',updated_at:'2026-11-01T00:00:00Z'}));
  await act(async()=>{await h.site.refresh();await delay(5);});assert.equal(h.site.content.properties.length,3);assert.equal(h.site.enquiries.length,3);
- await act(async()=>{h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(15);});
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Client Database'}).props.onClick();await delay(15);});
  assert.equal(h.renderer.root.findAll(n=>n.type==='button'&&typeof n.props.className==='string'&&n.props.className.startsWith('customer-row ')).length,9);
  for(const table of ['properties','enquiries','customer_profiles','customer_records'])assert.ok(h.backend.privateRanges.some(call=>call.table===table&&call.from===3),table+' reads through the terminating empty page');
 });
@@ -1852,7 +1852,7 @@ test('Studio and customer directory load past the API row cap without dropping l
 test('Customers Refresh updates a selected conversation history without replacing unsaved CRM notes',async t=>{
  const h=await harness(t);
  const first={id:'selected-enquiry-1',property_id:null,name:'Selected Guest',email:'selected@example.invalid',phone:'',message:'First conversation',preferred_date:null,kind:'contact',consent:true,status:'new',created_at:'2026-11-01T00:00:00Z',user_id:null,appointment_at:null,customer_update:'',cancelled_at:null,enquiry_notes:[]};
- h.backend.rows.enquiries=[first];await act(async()=>{await h.site.refresh();h.renderer.root.findByProps({'aria-label':'Customers'}).props.onClick();await delay(10);});
+ h.backend.rows.enquiries=[first];await act(async()=>{await h.site.refresh();h.renderer.root.findByProps({'aria-label':'Client Database'}).props.onClick();await delay(10);});
  await act(async()=>h.renderer.root.findAll(n=>n.type==='button'&&typeof n.props.className==='string'&&n.props.className.startsWith('customer-row '))[0].props.onClick());
  const detail=()=>h.renderer.root.findByProps({className:'admin-panel customer-detail'});
  await act(async()=>detail().findAllByType('textarea')[0].props.onChange({target:{value:'Keep this unsaved note'}}));

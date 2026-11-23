@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { ChevronDown, Heart, House, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { unlocalizedPath } from "@/lib/localized-routes";
 import { request } from "@/lib/requests";
 import { CUSTOMER_ACCOUNT_URL, STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
 import type { StaffRole } from "@/lib/staff";
@@ -9,6 +11,37 @@ import Link from "./localized-link";
 import { useSite } from "./site-context";
 
 const staffDashboard = `${STAFF_PORTAL_ORIGIN}/admin`;
+
+function subscribeAccountLocation(onStoreChange: () => void) {
+  window.addEventListener("popstate", onStoreChange);
+  // Account tabs update the query with replaceState, which does not emit popstate.
+  document.addEventListener("click", onStoreChange);
+  return () => {
+    window.removeEventListener("popstate", onStoreChange);
+    document.removeEventListener("click", onStoreChange);
+  };
+}
+function readAccountSearch() { return window.location.search; }
+function serverAccountSearch() { return null; }
+
+function accountDestinationCurrent(href: string, pathname: string, search: string | null) {
+  let target: URL;
+  try { target = new URL(href, "https://garyhome.local"); } catch { return false; }
+  const currentPath = unlocalizedPath(pathname).replace(/\/+$/, "") || "/";
+  const targetPath = unlocalizedPath(target.pathname).replace(/\/+$/, "") || "/";
+  if (currentPath !== targetPath) return false;
+  if (targetPath === "/account") {
+    if (search === null) return false;
+    const tab = new URLSearchParams(search).get("tab");
+    return target.searchParams.get("tab") === "profile" ? tab === "profile" : !tab || tab === "overview";
+  }
+  if ([...target.searchParams].length > 0) {
+    if (search === null) return false;
+    const current = new URLSearchParams(search);
+    return [...target.searchParams].every(([key, value]) => current.get(key) === value);
+  }
+  return true;
+}
 const roleNames: Record<StaffRole, [string, string]> = {
   owner: ["Owner", "Chủ sở hữu"],
   admin: ["Admin", "Quản trị viên"],
@@ -46,6 +79,9 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
   const trigger = staffActions?.trigger ?? defaultTrigger;
   const verification = useRef<AbortController | null>(null);
   const id = useId();
+  const pathname = usePathname() || "";
+  const accountSearch = useSyncExternalStore(subscribeAccountLocation, readAccountSearch, serverAccountSearch);
+  const currentDestination = (href: string) => accountDestinationCurrent(href, pathname, accountSearch) ? "page" as const : undefined;
 
   if (identity !== disclosure.identity) {
     setDisclosure({ identity, open: false });
@@ -167,11 +203,11 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
         <nav className="header-account-links" aria-label={t("Account destinations", "Điều hướng tài khoản")}>
           {showStaff && (staffActions
             ? <button type="button" onClick={() => { close(); staffActions.dashboard(); trigger.current?.focus({preventScroll:true}); }}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</button>
-            : <a href={staffDashboard} onClick={close}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</a>)}
-          {showProfile && <Link href={staffActions ? CUSTOMER_ACCOUNT_URL : "/account"} onClick={close}><House size={19} aria-hidden="true"/>{t("Customer Dashboard", "Bảng điều khiển khách hàng")}</Link>}
+            : <a href={staffDashboard} aria-current={currentDestination(staffDashboard)} onClick={close}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</a>)}
+          {showProfile && <Link href={staffActions ? CUSTOMER_ACCOUNT_URL : "/account"} aria-current={currentDestination(staffActions ? CUSTOMER_ACCOUNT_URL : "/account")} onClick={close}><House size={19} aria-hidden="true"/>{t("Customer Dashboard", "Bảng điều khiển khách hàng")}</Link>}
           {staffActions ? showStaff && <button type="button" onClick={() => { close(); staffActions.profile(); }}><UserRound size={19} aria-hidden="true"/>{t("My Staff Profile", "Hồ sơ nhân viên của tôi")}</button>
-            : showProfile && <Link href="/account?tab=profile" onClick={close}><UserRound size={19} aria-hidden="true"/>{t("My Profile", "Hồ sơ của tôi")}</Link>}
-          {showSaved && <Link href="/saved" onClick={close}><Heart size={19} aria-hidden="true"/>{t("Saved Homes", "Nhà đã lưu")}</Link>}
+            : showProfile && <Link href="/account?tab=profile" aria-current={currentDestination("/account?tab=profile")} onClick={close}><UserRound size={19} aria-hidden="true"/>{t("My Profile", "Hồ sơ của tôi")}</Link>}
+          {showSaved && <Link href="/saved" aria-current={currentDestination("/saved")} onClick={close}><Heart size={19} aria-hidden="true"/>{t("Saved Homes", "Nhà đã lưu")}</Link>}
         </nav>
         {staffAccessRevoked && <p className="header-account-message" role="status">{t("Your staff access was removed.", "Quyền truy cập nhân viên của bạn đã bị thu hồi.")}</p>}
         {checking ? <p className="header-account-message" role="status">{t("Checking portal access…", "Đang kiểm tra quyền truy cập cổng…")}</p>
@@ -187,8 +223,8 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
       </> : <>
         {sessionExpired && <p className="header-account-message" role="status">{t("Your session expired. Sign in again.", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")}</p>}
         <nav className="header-account-links" aria-label={t("Sign-in portals", "Cổng đăng nhập")}>
-          <Link href="/account" onClick={close}><UserRound size={19} aria-hidden="true"/>{t("Customer Login", "Đăng nhập khách hàng")}</Link>
-          <a href={staffDashboard} onClick={close}><ShieldCheck size={19} aria-hidden="true"/>{t("Staff Login", "Đăng nhập nhân viên")}</a>
+          <Link href="/account" aria-current={currentDestination("/account")} onClick={close}><UserRound size={19} aria-hidden="true"/>{t("Customer Login", "Đăng nhập khách hàng")}</Link>
+          <a href={staffDashboard} aria-current={currentDestination(staffDashboard)} onClick={close}><ShieldCheck size={19} aria-hidden="true"/>{t("Staff Login", "Đăng nhập nhân viên")}</a>
         </nav>
       </>)}
     </div>

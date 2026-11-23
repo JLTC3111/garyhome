@@ -21,6 +21,9 @@ html[data-home-public="true"][data-home-theme="light"]{color-scheme:light}
   --home-action-hover:#d9e3cb;
   --home-danger:#f4b9a8;
   --home-danger-surface:#3a2724;
+  --home-menu-hover:#344b3b;
+  --home-menu-ink:#f4f6ef;
+  --home-menu-active:#405a47;
   --home-header:#121c17f5;
   --home-scrim:#08100be6;
   --home-shadow:0 12px 36px #050b073d;
@@ -53,7 +56,7 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.eyebrow,.text-link,.hero-location,.hero-headline-accent,.rental-search-heading h2,.rental-card-bottom .price strong,.vinhomes-rent,.rental-facilities svg,.service-title>svg,.landlord-steps>section>svg,.commercial-consultancy-grid>article>svg,.home-theme-hint){color:var(--home-accent)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(section,article,aside,fieldset,details,hr,li,table,td,th){border-color:var(--home-border)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(a,button,summary,input,select,textarea):focus-visible{outline-color:var(--home-accent)}
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(a:not(.button):hover,.text-link:hover,.rental-site-header .main-nav>a.header-feedback:hover){color:var(--home-copper)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(a:not(.button):not(.header-account-links a):hover,.text-link:hover,.rental-site-header .main-nav>a.header-feedback:hover){color:var(--home-copper)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-header,.rental-site-header .top-strip,.rental-site-header .header-nav,.rental-site-header .main-nav){background:var(--home-header);border-color:var(--home-border)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-site-header .main-nav>a,.district-navigation>button,.about-navigation>button,.rental-band-contact>.top-strip-phone,.favourites-trigger,.rental-brand .brand-tagline,.rental-site-header .top-strip-actions>.staff-login-link,.rental-site-header .top-strip-actions>.customer-login-link){color:var(--home-text)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-band-contact>.top-strip-phone svg,.hero-location svg,.hero-note>svg,.rental-area-card svg){color:var(--home-copper)}

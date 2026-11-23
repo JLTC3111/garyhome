@@ -7,6 +7,10 @@
   --account-focus: var(--green);
   --account-danger: #a13a32;
   --account-danger-surface: #f9eae7;
+  --account-item-hover: var(--account-hover);
+  --account-item-ink: var(--account-text);
+  --account-item-active: var(--account-hover);
+  --account-item-focus: var(--account-focus);
   position: relative;
   flex: none;
   color: var(--ink);
@@ -21,6 +25,11 @@ html[data-home-theme="dark"] .header-account-menu {
   --account-focus: var(--home-accent);
   --account-danger: var(--home-danger);
   --account-danger-surface: var(--home-danger-surface);
+  --account-danger-pressed: color-mix(in srgb, var(--account-danger) 18%, var(--account-danger-surface));
+  --account-item-hover: var(--home-menu-hover);
+  --account-item-ink: var(--home-menu-ink);
+  --account-item-active: var(--home-menu-active);
+  --account-item-focus: var(--home-accent);
 }
 
 .rental-site-header .top-strip:has(.header-account-trigger[aria-expanded="true"]) {
@@ -106,17 +115,16 @@ html[data-home-theme="dark"] .header-account-menu {
   border-radius: 7px;
   text-align: start;
 }
-.header-account-panel svg { flex-shrink: 0; }
+.header-account-panel svg { flex-shrink: 0; color: inherit; }
 .header-account-footer { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--account-line); }
 .header-account-signout,
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-signout { color: var(--account-danger); }
 .header-account-signout:disabled { opacity: .7; cursor: progress; }
 .header-account-message { padding: 6px 8px; margin: 0; font-size: .8125rem; color: var(--account-secondary); }
 .header-account-retry { min-height: 44px; color: var(--account-text); }
-.header-account-menu :is(button, a):focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.header-account-panel :is(button, a):focus-visible { outline-color: var(--account-focus); }
+.header-account-menu :is(button, a):focus-visible { outline: 2px solid var(--account-item-focus); outline-offset: 2px; }
+.header-account-panel :is(button, a):focus-visible { outline-color: var(--account-item-focus); }
 .header-account-trigger[aria-expanded="true"] { background: var(--account-hover); color: var(--account-text); }
-.header-account-links :is(a, button):active { background: var(--account-hover); }
 
 .admin-sidebar-bottom > .staff-account-menu {
   display: block;
@@ -138,9 +146,47 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
 
 @media (hover: hover) {
   button.header-account-trigger:hover { background: var(--account-hover); color: var(--account-text); }
-  .header-account-links :is(a, button):hover { background: var(--account-hover); }
-  .header-account-signout:hover:not(:disabled) { background: var(--account-danger-surface); }
+  .header-account-links :is(a, button):hover {
+    background: var(--account-item-hover);
+    color: var(--account-item-ink);
+  }
+  .header-account-signout:hover:not(:disabled) {
+    background: var(--account-danger-surface);
+    color: var(--account-danger);
+  }
 }
+.header-account-links :is(a, button):active,
+html[data-home-theme="dark"] .header-account-links :is(a, button)[aria-current="page"] {
+  background: var(--account-item-active);
+  color: var(--account-item-ink);
+}
+html[data-home-theme="dark"] .header-account-signout:active:not(:disabled) { background: var(--account-danger-pressed); }
+
+/* The public dark theme paints links and buttons from the root. Menu states
+   share that scope so hover, current, and focus keep their own tokens. */
+@media (hover: hover) {
+  html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-links :is(a, button):hover {
+    background: var(--account-item-hover);
+    color: var(--account-item-ink);
+  }
+  html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-links :is(a, button):hover svg { color: var(--account-item-ink); }
+  html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-signout:hover:not(:disabled) {
+    background: var(--account-danger-surface);
+    color: var(--account-danger);
+  }
+}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-links :is(a, button):is(:active, [aria-current="page"]) {
+  background: var(--account-item-active);
+  color: var(--account-item-ink);
+}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-links :is(a, button):is(:active, [aria-current="page"]) svg { color: var(--account-item-ink); }
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-panel :is(button, a):focus-visible {
+  outline: 2px solid var(--account-item-focus);
+  outline-offset: 2px;
+}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-signout:is(:hover, :focus-visible),
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-signout:active:not(:disabled) { color: var(--account-danger); }
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-signout:active:not(:disabled) { background: var(--account-danger-pressed); }
 @media (max-width: 680px) {
   .header-account-menu { margin-inline-start: 4px; }
   .header-account-trigger { width: 44px; min-height: 44px; padding: 0; }

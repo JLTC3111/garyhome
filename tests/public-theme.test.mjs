@@ -69,6 +69,11 @@ test('forest surfaces, secondary copy, sage actions and input outlines meet AA c
   assert.ok(contrast(tokens['home-action-ink'], tokens['home-accent']) >= 4.5);
   assert.ok(contrast(tokens['home-field-border'], tokens['home-surface']) >= 3);
   assert.ok(contrast(tokens['home-accent'], tokens['home-elevated']) >= 3, 'visible focus outline');
+  assert.ok(contrast(tokens['home-menu-ink'], tokens['home-menu-hover']) >= 4.5, 'menu hover label');
+  assert.ok(contrast(tokens['home-menu-ink'], tokens['home-menu-active']) >= 4.5, 'menu active label');
+  assert.ok(contrast(tokens['home-accent'], tokens['home-menu-hover']) >= 3, 'focus ring on menu hover');
+  assert.ok(contrast(tokens['home-accent'], tokens['home-menu-active']) >= 3, 'focus ring on menu active');
+  assert.ok(contrast(tokens['home-danger'], tokens['home-danger-surface']) >= 4.5, 'danger label');
 });
 
 test('customer dark surfaces and controls use the shared palette tokens', () => {

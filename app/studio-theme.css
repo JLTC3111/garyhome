@@ -214,10 +214,10 @@ html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .s
   & .site-select-popup { background-color: var(--surface); color: var(--ink); border-color: var(--studio-control-border); box-shadow: var(--home-shadow); }
   & .site-select-list { scrollbar-color: var(--studio-control-border) transparent; }
   & :is(.team-account-modes, .upload-label, .listing-upload-status, .editor-photo-grid > div > span,
-    .editor-photo-grid button, .editor-photo-order, .editor-photo-card, .staff-photo-editor) { background-color: var(--warm); border-color: var(--line); }
+    .editor-photo-grid button:not([data-button-variant]), .editor-photo-order, .editor-photo-card, .staff-photo-editor) { background-color: var(--warm); border-color: var(--line); }
   & :is(.property-video, .rental-cms-row) { border-color: var(--line); }
   & .upload-label { border-color: var(--studio-control-border); }
-  & :is(.upload-label:hover, .editor-photo-grid button:hover) { background-color: var(--paper); }
+  & :is(.upload-label:hover, .editor-photo-grid button:not([data-button-variant]):hover) { background-color: var(--paper); }
   & .team-invite-form label.team-password-choice { color: var(--ink); }
   & .admin-shell .activity-tabs > button:not([aria-pressed="true"]) {
     background-color: var(--surface); border-color: var(--studio-control-border); color: var(--ink);

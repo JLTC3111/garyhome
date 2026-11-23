@@ -191,7 +191,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
         <button type="button" data-button-variant="view" data-button-size="icon" data-photo-control="preview"
           disabled={disabled} aria-haspopup="dialog" aria-label={t(`Preview photo ${index + 1}`, `Xem trước ảnh ${index + 1}`)}
           title={t("Preview photo", "Xem trước ảnh")} onClick={event => showPhoto(index, event.currentTarget)}><Eye size={16} aria-hidden="true"/></button>
-        {index > 0 && <button type="button" data-button-variant="view" data-button-size="icon" disabled={disabled}
+        {index > 0 && <button type="button" data-button-variant="feature" data-button-size="icon" disabled={disabled}
           aria-label={t(`Set photo ${index + 1} as cover (move to first position)`, `Đặt ảnh ${index + 1} làm ảnh bìa (chuyển lên vị trí đầu tiên)`)}
           title={coverHint} onClick={() => {
             focusAfterMove.current = { index: 0, src, control: "preview" };
@@ -199,7 +199,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
             makeCover(index);
             setOrderMessage(t("Cover photo moved to first position.", "Đã chuyển ảnh bìa lên vị trí đầu tiên."));
           }}><Star size={16} aria-hidden="true"/></button>}
-        {reorderable && <button type="button" data-button-variant="view" data-button-size="icon" data-photo-control="reorder"
+        {reorderable && <button type="button" data-button-variant="reorder" data-button-size="icon" data-photo-control="reorder"
           disabled={disabled} draggable={false} aria-label={t(`Reorder photo ${index + 1}`, `Sắp xếp ảnh ${index + 1}`)}
           aria-describedby={`${panelId}-order-help`} aria-keyshortcuts="ArrowUp ArrowDown"
           title={reorderHelp} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
@@ -222,7 +222,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
       <figcaption className="editor-photo-filename" data-filename-source={storageName ? "stored" : source}>
         <span>{storageName ? storageLabel : filenameLabel(source)}</span><span>{storageName || filename || text("Filename unavailable")}</span>
         {storageName && source === "original" && storageName !== filename && <small className="muted">{originalLabel} · {filename}</small>}
-        {rename?.savedImages.includes(src)&&storageName&&<button type="button" className="editor-photo-rename-trigger"
+        {rename?.savedImages.includes(src)&&storageName&&<button type="button" data-button-variant="edit" className="editor-photo-rename-trigger"
           disabled={disabled} aria-controls={panelId} aria-label={t(`Rename photo ${index+1}`,`Đổi tên ảnh ${index+1}`)}
           onClick={()=>{setSelectedSrc(src);setRenameSrc(src);}}>{t("Rename","Đổi tên")}</button>}
       </figcaption>

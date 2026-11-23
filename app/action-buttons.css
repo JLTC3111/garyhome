@@ -20,6 +20,10 @@
   --action-red-hover: #991b1b;
   --action-teal: #0f766e;
   --action-teal-hover: #115e59;
+  --action-feature-hover: var(--action-amber-hover);
+  --action-feature-hover-ink: var(--action-white);
+  --action-reorder-hover: var(--action-blue);
+  --action-reorder-hover-ink: var(--action-white);
 }
 html[data-home-theme="dark"] {
   --action-archive-tint: #392819;
@@ -31,6 +35,10 @@ html[data-home-theme="dark"] {
   --action-danger-tint: #432326;
   --action-danger-ink: #fecaca;
   --action-danger-border: #f87171;
+  --action-feature-hover: #fbbf24;
+  --action-feature-hover-ink: #422006;
+  --action-reorder-hover: #60a5fa;
+  --action-reorder-hover-ink: #0f172a;
 }
 
 :is([data-button-variant="save"], [data-button-variant="publish"], [data-button-variant="confirm"]) {
@@ -47,7 +55,8 @@ html[data-home-theme="dark"] {
   --action-border: var(--action-archive-border);
   --action-hover: var(--action-amber-hover);
 }
-:is([data-button-variant="edit"], [data-button-variant="view"], [data-button-variant="cancel"]) {
+:is([data-button-variant="edit"], [data-button-variant="view"], [data-button-variant="cancel"],
+    [data-button-variant="feature"], [data-button-variant="reorder"]) {
   --action-fill: transparent;
   --action-ink: var(--action-neutral-ink);
   --action-border: var(--action-neutral-border);
@@ -57,6 +66,14 @@ html[data-home-theme="dark"] {
 [data-button-variant="view"] {
   --action-hover: var(--action-neutral-hover);
   --action-hover-ink: var(--action-neutral-ink);
+}
+[data-button-variant="feature"] {
+  --action-hover: var(--action-feature-hover);
+  --action-hover-ink: var(--action-feature-hover-ink);
+}
+[data-button-variant="reorder"] {
+  --action-hover: var(--action-reorder-hover);
+  --action-hover-ink: var(--action-reorder-hover-ink);
 }
 [data-button-variant="danger"] {
   --action-fill: var(--action-danger-tint);
@@ -106,6 +123,8 @@ html[data-home-theme="dark"] {
     inline-size: var(--action-hit-size) !important;
     padding: 0 !important;
   }
+  /* Drag needs the pointer immediately. Do not let the shared tap delay win. */
+  [data-button-variant="reorder"] { touch-action: none; }
   [data-button-variant][hidden] { display: none !important; }
   [data-button-variant] :where(span, svg, .icon) { color: inherit !important; }
   [data-button-variant] svg { flex-shrink: 0; }

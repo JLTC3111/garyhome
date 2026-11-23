@@ -139,6 +139,10 @@ test('drag and keyboard reordering move any photo, including into the cover posi
  const card=index=>h.renderer.root.findByProps({'data-photo-index':index});
  const keyboardEvent=key=>({key,preventDefault(){},stopPropagation(){}});
  assert.equal(handle(1).props.onClick,undefined);
+ assert.equal(handle(1).props['data-button-variant'],'reorder');
+ assert.equal(h.renderer.root.findByProps({'aria-label':'Preview photo 1'}).props['data-button-variant'],'view');
+ assert.equal(h.renderer.root.findByProps({'aria-label':'Set photo 2 as cover (move to first position)'}).props['data-button-variant'],'feature');
+ assert.equal(h.renderer.root.findByProps({'aria-label':'Remove photo 1'}).props['data-button-variant'],'danger');
  assert.equal(handle(1).props['aria-controls'],undefined);
  assert.equal(handle(1).props.draggable,false);
  assert.equal(handle(1).props.style.touchAction,'none');
@@ -277,6 +281,29 @@ test('photo 19 can move earlier, between rows, and to position 1 without changin
  assert.equal(filenames[sources[18]],'Room 19.JPG');
 });
 
+test('photo action variants keep their own hover ink and do not inherit the Studio button fill',()=>{
+ const actions=fs.readFileSync(path.join(root,'app/action-buttons.css'),'utf8');
+ const studio=fs.readFileSync(path.join(root,'app/studio-theme.css'),'utf8');
+ const drawer=fs.readFileSync(path.join(root,'app/editor-drawer.css'),'utf8');
+ const globals=fs.readFileSync(path.join(root,'app/globals.css'),'utf8');
+ assert.match(actions,/\[data-button-variant="feature"\]\s*\{[^}]*--action-hover:\s*var\(--action-feature-hover\)/);
+ assert.match(actions,/\[data-button-variant="feature"\]\s*\{[^}]*--action-hover-ink:\s*var\(--action-feature-hover-ink\)/);
+ assert.match(actions,/\[data-button-variant="reorder"\]\s*\{[^}]*--action-hover:\s*var\(--action-reorder-hover\)/);
+ assert.match(actions,/\[data-button-variant="reorder"\]\s*\{[^}]*--action-hover-ink:\s*var\(--action-reorder-hover-ink\)/);
+ assert.match(actions,/html\[data-home-theme="dark"\]\s*\{[^}]*--action-feature-hover:\s*#fbbf24;/);
+ assert.match(actions,/html\[data-home-theme="dark"\]\s*\{[^}]*--action-feature-hover-ink:\s*#422006;/);
+ assert.match(actions,/html\[data-home-theme="dark"\]\s*\{[^}]*--action-reorder-hover:\s*#60a5fa;/);
+ assert.match(actions,/html\[data-home-theme="dark"\]\s*\{[^}]*--action-reorder-hover-ink:\s*#0f172a;/);
+ assert.match(actions,/\[data-button-variant="reorder"\]\s*\{\s*touch-action:\s*none;/);
+ assert.doesNotMatch(actions,/touch-action:\s*manipulation\s*!important/);
+ assert.match(studio,/\.editor-photo-grid button:not\(\[data-button-variant\]\)/);
+ assert.match(studio,/\.editor-photo-grid button:not\(\[data-button-variant\]\):hover/);
+ assert.match(drawer,/\.editor-photo-grid button:not\(\[data-button-variant\]\):focus-visible/);
+ assert.match(globals,/\.editor-photo-grid button:not\(\[data-button-variant\]\)\{/);
+ assert.doesNotMatch(globals,/\.editor-photo-grid button\{display:flex/);
+ assert.doesNotMatch(drawer,/\.editor-photo-rename-trigger\s*\{[^}]*(?:background|border|padding)\s*:/);
+});
+
 test('reorder handle blocks scrolling and selection while a photo is dragged',()=>{
  const css=fs.readFileSync(path.join(root,'app/rental.css'),'utf8');
  assert.match(css,/\[data-photo-control="reorder"\]\{[^}]*touch-action:none/);
@@ -346,6 +373,7 @@ test('a saved Storage photo exposes an inline rename and a read-only normalized 
   return 'https://media.example/storage/v1/object/public/property-media/properties/renamed/room-03.jpg';
  }};
  const h=await harness(t,{images:[saved,sourceB],onMetadataChange(){},rename:request});
+ assert.equal(h.renderer.root.findByProps({'aria-label':'Rename photo 1'}).props['data-button-variant'],'edit');
  assert.equal(h.renderer.root.findAllByProps({'aria-label':'Rename photo 2'}).length,0);
  assert.equal(h.renderer.root.findAllByProps({className:'editor-photo-rename'}).length,0);
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Rename photo 1'}).props.onClick());

@@ -58,10 +58,6 @@
 .editor-scroll-body .editor-photo-grid .editor-photo-rename-trigger {
   width:fit-content;
   height:auto;
-  min-height:36px;
-  padding:4px 8px;
-  border:1px solid var(--line);
-  border-radius:5px;
 }
 .editor-photo-rename,.editor-photo-rename-tools {
   min-width:0;
@@ -86,7 +82,7 @@
 }
 .editor-photo-panel .editor-photo-filename-option input[type="checkbox"] { width:auto; margin:0.2em 0 0; padding:0; }
 .editor-photo-filename-option span { overflow-wrap:anywhere; }
-.editor-scroll-body .editor-photo-grid button:focus-visible,
+.editor-scroll-body .editor-photo-grid button:not([data-button-variant]):focus-visible,
 .editor-scroll-body .editor-photo-panel :is(textarea,input,button):focus-visible,
 .editor-scroll-body .editor-photo-panel:focus-visible,
 .editor-scroll-body .editor-photo-card:has(.editor-photo-select:focus-visible) {

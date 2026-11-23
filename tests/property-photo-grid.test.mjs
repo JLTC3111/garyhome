@@ -11,7 +11,16 @@ import ts from 'typescript';
 
 const root=path.resolve(import.meta.dirname,'..'),require=createRequire(import.meta.url);
 const sourceA='https://media.example/properties/a.jpg',sourceB='https://media.example/properties/b.jpg';
-function loadGrid(){
+function photoRect(index,columns=3){
+ const width=120,height=180,gap=12,column=index%columns,row=Math.floor(index/columns);
+ const left=16+column*(width+gap),top=20+row*(height+gap);
+ return {left,top,right:left+width,bottom:top+height,width,height};
+}
+function photoCenter(index,columns=3){
+ const rect=photoRect(index,columns);
+ return {x:(rect.left+rect.right)/2,y:(rect.top+rect.bottom)/2};
+}
+function loadGridExports(){
  const cache=new Map();
  function load(file){
   if(cache.has(file))return cache.get(file).exports;
@@ -28,8 +37,9 @@ function loadGrid(){
   vm.runInThisContext('(function(exports,require,module){'+js+'\n})',{filename:file})(loaded.exports,dependency,loaded);
   return loaded.exports;
  }
- return load(path.join(root,'components/property-photo-grid.tsx')).PropertyPhotoGrid;
+ return load(path.join(root,'components/property-photo-grid.tsx'));
 }
+function loadGrid(){return loadGridExports().PropertyPhotoGrid;}
 
 async function harness(t,props){
  const previous=Object.getOwnPropertyDescriptor(globalThis,'IS_REACT_ACT_ENVIRONMENT');globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -38,7 +48,16 @@ async function harness(t,props){
  const allProps={images:[sourceA,sourceB],makeCover:index=>covers.push(index),remove:index=>removals.push(index),...props};
  await act(async()=>{renderer=TestRenderer.create(React.createElement(Grid,allProps),{createNodeMock:node=>{
    if(node.type==='dialog')return dialog;
-   if(node.props.className==='editor-photo-grid')return {querySelector:selector=>({focus:()=>focused.push(selector)})};
+   if(node.props.className==='editor-photo-grid')return {
+    querySelector:selector=>({focus:()=>focused.push(selector)}),
+    querySelectorAll(selector){
+     if(selector!=='[data-photo-index]'||!renderer)return [];
+     return renderer.root.findAllByType('figure').filter(figure=>figure.props['data-photo-index']!==undefined).map(figure=>{
+      const index=figure.props['data-photo-index'];
+      return {dataset:{photoIndex:String(index)},getBoundingClientRect:()=>photoRect(index)};
+     });
+    },
+   };
    return null;
  }});});
  t.after(async()=>{await act(async()=>renderer.unmount());if(previous)Object.defineProperty(globalThis,'IS_REACT_ACT_ENVIRONMENT',previous);else delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
@@ -107,29 +126,165 @@ test('Eye opens the actual clicked image without editing and Escape keeps the dr
  assert.equal(btn('Edit photo 1').props['aria-pressed'],true);
 });
 
-test('drag and keyboard reordering move non-cover photos and return keyboard focus',async t=>{
+function pointerEvent(values={}){
+ const target={setPointerCapture(){},releasePointerCapture(){},hasPointerCapture(){return true;}};
+ return {button:0,pointerId:1,currentTarget:target,preventDefault(){},stopPropagation(){},...values};
+}
+function at(point,extra={}){return pointerEvent({clientX:point.x,clientY:point.y,...extra});}
+
+test('drag and keyboard reordering move any photo, including into the cover position, and return keyboard focus',async t=>{
  const sourceC='https://media.example/properties/c.jpg',moves=[];
  const h=await harness(t,{images:[sourceA,sourceB,sourceC],move:(from,to)=>moves.push([from,to])});
  const handle=position=>h.renderer.root.findByProps({'aria-label':`Reorder photo ${position}`});
  const card=index=>h.renderer.root.findByProps({'data-photo-index':index});
+ const keyboardEvent=key=>({key,preventDefault(){},stopPropagation(){}});
+ assert.equal(handle(1).props.onClick,undefined);
+ assert.equal(handle(1).props['aria-controls'],undefined);
+ assert.equal(handle(1).props.draggable,false);
+ assert.equal(handle(1).props.style.touchAction,'none');
+ assert.equal(handle(1).props.title,'Drag or use the Up and Down arrow keys to reorder. Position 1 is the cover photo.');
  assert.equal(card(0).props.onDrop,undefined);
- const keyboardEvent=key=>({key,preventDefault(){}});
  await act(async()=>handle(2).props.onKeyDown(keyboardEvent('ArrowUp')));
+ assert.deepEqual(moves,[[1,0]]);
+ await h.update({images:[sourceB,sourceA,sourceC]});
+ assert.deepEqual(h.focused,['[data-photo-index="0"] [data-photo-control="reorder"]']);
+ assert.match(h.renderer.root.findByProps({className:'sr-only editor-photo-order-status'}).props.children,/position 1 of 3/);
+ assert.match(h.renderer.root.findByProps({className:'sr-only editor-photo-order-status'}).props.children,/cover photo/);
+ assert.equal(h.renderer.root.findAllByProps({className:'editor-photo-order'})[0].children.join(''),'COVER');
+ assert.equal(h.renderer.root.findAllByProps({className:'editor-photo-preview'})[0].findByType('img').props.src,sourceB);
+ await act(async()=>handle(1).props.onKeyDown(keyboardEvent('ArrowDown')));
+ assert.deepEqual(moves,[[1,0],[0,1]]);
+ assert.match(h.renderer.root.findByProps({className:'sr-only editor-photo-order-status'}).props.children,/Position 1 is now the cover photo/);
+ const origin=photoCenter(2),target=photoCenter(1);
+ await act(async()=>handle(3).props.onPointerDown(at(origin)));
+ await act(async()=>handle(3).props.onPointerMove(at({x:origin.x+8,y:origin.y})));
+ await act(async()=>handle(3).props.onPointerMove(at(target)));
+ assert.equal(card(1).props['data-photo-drop-target'],'true');
+ assert.equal(card(1).findAllByProps({'data-photo-drop-indicator':'true'}).length,1);
+ assert.equal(card(2).props['data-photo-dragging'],'true');
+ await act(async()=>handle(3).props.onPointerUp(at(target)));
+ assert.equal(card(1).props['data-photo-drop-target'],undefined);
+ assert.deepEqual(moves,[[1,0],[0,1],[2,1]]);
+});
+
+test('photo 19 can move earlier, between rows, and to position 1 without changing selection or file identity',async t=>{
+ const {nearestPhotoIndex}=loadGridExports();
+ const cards=columns=>Array.from({length:19},(_,index)=>({index,...photoRect(index,columns)}));
+ const nineteen=cards(3);
+ const center=index=>photoCenter(index);
+ assert.equal(nearestPhotoIndex(center(4),nineteen,18),4);
+ const first=photoRect(0),nextRow=photoRect(3);
+ assert.equal(nearestPhotoIndex({x:(first.left+first.right)/2,y:(first.bottom+nextRow.top)/2},nineteen,18),3);
+ assert.equal(nearestPhotoIndex(center(0),nineteen,18),0);
+ assert.equal(nearestPhotoIndex(center(18),nineteen,18),null);
+ const narrow=cards(2),top=photoRect(0,2),below=photoRect(2,2);
+ assert.equal(nearestPhotoIndex({x:(top.left+top.right)/2,y:(top.bottom+below.top)/2},narrow,18),2);
+
+ const sources=Array.from({length:19},(_,index)=>`https://media.example/storage/v1/object/public/property-media/properties/reorder/room-${String(index+1).padStart(2,'0')}.jpg`);
+ const filenames=Object.fromEntries(sources.map((src,index)=>[src,`Room ${index+1}.JPG`]));
+ let metadata={[sources[18]]:{description_en:'Unsaved balcony caption',alt_vi:'Ban công'}};
+ let images=sources.slice();
+ const moves=[];
+ const h=await harness(t,{images,filenames,metadata,move:(from,to)=>moves.push([from,to]),onMetadataChange(src,patch){metadata={...metadata,[src]:{...metadata[src],...patch}};}});
+ const handle=position=>h.renderer.root.findByProps({'aria-label':`Reorder photo ${position}`});
+ const pressed=position=>h.renderer.root.findByProps({'aria-label':`Edit photo ${position}`}).props['aria-pressed'];
+ const orderOf=src=>h.renderer.root.findAllByType('figure').find(figure=>figure.findByType('img').props.src===src).findByProps({className:'editor-photo-order'}).children.join('');
+ const storedName=src=>h.renderer.root.findAllByType('figure').find(figure=>figure.findByType('img').props.src===src).findByType('figcaption').findAllByType('span')[1].children.join('');
+ async function commit(){
+  const [from,to]=moves.at(-1);
+  const next=images.slice();
+  const [item]=next.splice(from,1);
+  next.splice(to,0,item);
+  images=next;
+  await h.update({images,metadata,filenames});
+ }
+ assert.equal(pressed(1),true);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit photo 19'}).props.onClick());
+ const caption=()=>h.renderer.root.findByProps({className:'editor-photo-panel'}).findAllByType('textarea')[0];
+ await act(async()=>caption().props.onChange({target:{value:'Unsaved balcony caption'}}));
+ await h.update({metadata});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit photo 1'}).props.onClick());
+ assert.equal(pressed(1),true);
+ await act(async()=>handle(5).props.onPointerDown(at(photoCenter(4))));
+ await act(async()=>handle(5).props.onPointerUp(at(photoCenter(4))));
+ assert.equal(pressed(1),true);
  assert.deepEqual(moves,[]);
- await act(async()=>handle(3).props.onKeyDown(keyboardEvent('ArrowUp')));
- assert.deepEqual(moves,[[2,1]]);
- await h.update({images:[sourceA,sourceC,sourceB]});
- assert.deepEqual(h.focused,['[data-photo-index="1"] [data-photo-control="reorder"]']);
- assert.match(h.renderer.root.findByProps({role:'status'}).props.children,/position 2 of 3/);
- const transfer={setData(type,value){assert.equal(type,'text/plain');assert.equal(value,'photo');}};
- const event={dataTransfer:transfer,preventDefault(){}};
- await act(async()=>handle(2).props.onDragStart(event));
- assert.equal(transfer.effectAllowed,'move');
- await act(async()=>card(2).props.onDragOver(event));
- assert.equal(card(2).props['data-photo-drop-target'],true);assert.equal(transfer.dropEffect,'move');
- await act(async()=>card(2).props.onDrop(event));
- assert.equal(card(2).props['data-photo-drop-target'],undefined);
- assert.deepEqual(moves,[[2,1],[1,2]]);
+
+ const listeners=[];
+ const body={style:{userSelect:'text'},dataset:{}};
+ const previousDocument=globalThis.document,previousWindow=globalThis.window;
+ globalThis.document={body};
+ globalThis.window={addEventListener(type,listener,options){listeners.push({type,listener,options});},removeEventListener(){}};
+ try{
+  const start=photoCenter(18);
+  await act(async()=>handle(19).props.onPointerDown(at(start)));
+  await act(async()=>handle(19).props.onPointerMove(at({x:start.x+8,y:start.y})));
+  assert.equal(body.style.userSelect,'none');
+  assert.equal(body.dataset.photoReordering,'true');
+  assert.ok(listeners.some(item=>item.type==='wheel'&&item.options.passive===false&&item.options.capture===true));
+  assert.ok(listeners.some(item=>item.type==='touchmove'&&item.options.passive===false&&item.options.capture===true));
+  assert.equal(h.renderer.root.findByProps({className:'editor-photo-grid'}).props['data-photo-reordering'],'true');
+  assert.equal(pressed(1),true);
+  const earlier=photoCenter(4);
+  await act(async()=>handle(19).props.onPointerMove(at(earlier)));
+  assert.equal(h.renderer.root.findByProps({'data-photo-index':4}).props['data-photo-drop-target'],'true');
+  await act(async()=>handle(19).props.onPointerUp(at(earlier)));
+  assert.deepEqual(moves.at(-1),[18,4]);
+  await commit();
+  assert.equal(orderOf(sources[18]),'5');
+  assert.equal(storedName(sources[18]),'room-19.jpg');
+  assert.equal(pressed(1),true);
+
+  const upper=photoRect(0),lower=photoRect(3);
+  const gap={x:(upper.left+upper.right)/2,y:(upper.bottom+lower.top)/2};
+  const reorderFifth=()=>h.renderer.root.findByProps({'aria-label':'Reorder photo 5'});
+  await act(async()=>reorderFifth().props.onPointerDown(at(photoCenter(4))));
+  await act(async()=>reorderFifth().props.onPointerMove(at({x:gap.x+8,y:gap.y})));
+  await act(async()=>reorderFifth().props.onPointerMove(at(gap)));
+  assert.equal(h.renderer.root.findByProps({'data-photo-index':3}).props['data-photo-drop-target'],'true');
+  await act(async()=>reorderFifth().props.onPointerUp(at(gap)));
+  assert.deepEqual(moves.at(-1),[4,3]);
+  await commit();
+  assert.equal(orderOf(sources[18]),'4');
+  assert.equal(orderOf(sources[0]),'COVER');
+  assert.equal(pressed(1),true);
+
+  const cover=photoCenter(0);
+  const reorderFourth=()=>h.renderer.root.findByProps({'aria-label':'Reorder photo 4'});
+  await act(async()=>reorderFourth().props.onPointerDown(at(photoCenter(3))));
+  await act(async()=>reorderFourth().props.onPointerMove(at({x:cover.x,y:cover.y+8})));
+  await act(async()=>reorderFourth().props.onPointerMove(at(cover)));
+  assert.equal(h.renderer.root.findByProps({'data-photo-index':0}).props['data-photo-drop-target'],'true');
+  assert.match(h.renderer.root.findByProps({className:'sr-only editor-photo-order-status'}).props.children,/position 1 of 19/);
+  await act(async()=>reorderFourth().props.onPointerUp(at(cover)));
+  assert.deepEqual(moves.at(-1),[3,0]);
+  await commit();
+ }finally{
+  if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;
+  if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;
+ }
+ assert.equal(orderOf(sources[18]),'COVER');
+ assert.equal(orderOf(sources[0]),'2');
+ assert.equal(storedName(sources[18]),'room-19.jpg');
+ assert.equal(storedName(sources[0]),'room-01.jpg');
+ assert.match(h.renderer.root.findAllByType('figure').find(figure=>figure.findByType('img').props.src===sources[18]).findByType('small').children.join(''),/Room 19\.JPG/);
+ assert.equal(pressed(2),true);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Edit photo 1'}).props.onClick());
+ assert.equal(h.renderer.root.findByProps({className:'editor-photo-panel'}).findAllByType('textarea')[0].props.value,'Unsaved balcony caption');
+ assert.equal(h.renderer.root.findByProps({className:'editor-photo-panel'}).findAllByType('textarea')[3].props.value,'Ban công');
+ assert.equal(h.renderer.root.findByProps({className:'editor-photo-panel'}).findByType('img').props.src,sources[18]);
+ assert.deepEqual(Object.keys(filenames),sources);
+ assert.equal(filenames[sources[18]],'Room 19.JPG');
+});
+
+test('reorder handle blocks scrolling and selection while a photo is dragged',()=>{
+ const css=fs.readFileSync(path.join(root,'app/rental.css'),'utf8');
+ assert.match(css,/\[data-photo-control="reorder"\]\{[^}]*touch-action:none/);
+ assert.match(css,/\[data-photo-control="reorder"\]\{[^}]*user-select:none/);
+ assert.match(css,/\[data-photo-reordering="true"\]\{[^}]*touch-action:none/);
+ assert.match(css,/\[data-photo-reordering="true"\]\{[^}]*user-select:none/);
+ assert.match(css,/\.editor-photo-drop-indicator\{[^}]*width:4px/);
+ assert.match(css,/data-photo-drop-target="true"\]\{[^}]*outline:3px/);
 });
 
 test('existing UUID uploads show the complete stored basename and extension without inventing an original name',async t=>{

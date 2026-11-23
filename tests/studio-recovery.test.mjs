@@ -389,6 +389,9 @@ test('header account shows dual access and removes the staff badge, portrait and
 });
 
 test('staff account dropdown shows verified portrait, dashboard and profile actions, with conditional customer access',async t=>{
+ const sidebarStyles=fs.readFileSync(path.join(base,'app/globals.css'),'utf8');
+ assert.match(sidebarStyles,/\.admin-sidebar > nav button\{font-size:0;/);
+ assert.doesNotMatch(sidebarStyles,/\.admin-sidebar nav button/);
  const h=await harness(t,{page:'staff',role:'admin',path:'/admin',url:'https://staff.garyhome.vn/admin'});
  const account=staffAccount(h);
  h.backend.profilePaths=new Map([['owner','owner/staff-portrait.png']]);
@@ -409,6 +412,7 @@ test('staff account dropdown shows verified portrait, dashboard and profile acti
  await act(async()=>h.site.setLanguage('vi'));
  assert.equal(account.trigger().props['aria-label'],'Tài khoản nhân viên');
  assert.ok(action('Hồ sơ nhân viên của tôi'));
+ assert.ok(action('Bảng điều khiển nhân viên'));
  h.backend.role=null;
  await act(async()=>h.site.revalidateSession());
  assert.equal(h.renderer.root.findAllByProps({className:'header-account-menu staff-account-menu'}).length,0);
@@ -1964,6 +1968,55 @@ test('admin image uploads retain originals and metadata through cover changes, r
  assert.deepEqual(captions(),[names[1],names[2]]);
  await act(async()=>photos().findByProps({'aria-label':'Edit photo 2'}).props.onClick());
  assert.equal(captionFields()[0].props.value,'Garden from the balcony');
+});
+
+test('moving photo 19 to the cover persists through save, refresh and reopening',async t=>{
+ const h=await harness(t,{role:'admin'});
+ const images=Array.from({length:19},(_,index)=>`https://media.example/storage/v1/object/public/property-media/properties/reorder/room-${String(index+1).padStart(2,'0')}.jpg`);
+ const filenames=Object.fromEntries(images.map((src,index)=>[src,`Room ${index+1}.JPG`]));
+ const metadata={[images[18]]:{description_en:'Draft caption for photo 19'}};
+ const listing={...fixture.properties[0],id:'photo-reorder-19',listing_code:'GH-900019',slug:'photo-reorder-listing',title_en:'Photo reorder listing',title_vi:'Tin sắp xếp ảnh',status:'draft',published_at:null,images,image_filenames:filenames,image_metadata:metadata};
+ await act(async()=>h.site.setContent(previous=>({...previous,properties:[...previous.properties,listing]})));
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ const row=()=>h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(strong=>strong.children.includes(listing.title_en)||strong.findAllByType('a').some(link=>link.children.includes(listing.title_en))));
+ await act(async()=>row().findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ const form=()=>h.renderer.root.findByProps({className:'editor-form'}),photos=()=>form().findByProps({className:'editor-photo-grid'});
+ const sources=()=>photos().findAllByProps({className:'editor-photo-preview'}).map(node=>node.findByType('img').props.src);
+ const orders=()=>photos().findAllByProps({className:'editor-photo-order'}).map(node=>node.children.join(''));
+ const caption=()=>form().findByProps({className:'editor-photo-panel'}).findAllByType('textarea')[0];
+ assert.deepEqual(sources(),images);
+ assert.equal(orders()[0],'COVER');
+ await act(async()=>photos().findByProps({'aria-label':'Edit photo 19'}).props.onClick());
+ await act(async()=>caption().props.onChange({target:{value:'Unsaved caption stays with this file'}}));
+ for(let position=19;position>16;position-=1)await act(async()=>photos().findByProps({'aria-label':`Reorder photo ${position}`}).props.onKeyDown({key:'ArrowUp',preventDefault(){}}));
+ assert.equal(sources()[15],images[18]);
+ assert.equal(orders()[15],'16');
+ assert.equal(caption().props.value,'Unsaved caption stays with this file');
+ for(let position=16;position>1;position-=1)await act(async()=>photos().findByProps({'aria-label':`Reorder photo ${position}`}).props.onKeyDown({key:'ArrowUp',preventDefault(){}}));
+ const expected=[images[18],...images.slice(0,18)];
+ assert.deepEqual(sources(),expected);
+ assert.equal(orders()[0],'COVER');
+ assert.equal(orders()[1],'2');
+ assert.equal(caption().props.value,'Unsaved caption stays with this file');
+ assert.equal(photos().findAllByType('figcaption')[0].findAllByType('span')[1].children.join(''),'room-19.jpg');
+ await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(20);});
+ const saved=h.backend.calls.filter(call=>call.table==='properties').at(-1);
+ assert.equal(saved.method,'update');
+ assert.deepEqual(saved.payload.images,expected);
+ assert.deepEqual(saved.payload.image_filenames,filenames);
+ assert.equal(saved.payload.image_metadata[images[18]].description_en,'Unsaved caption stays with this file');
+ await act(async()=>row().findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ assert.deepEqual(sources(),expected);
+ assert.equal(caption().props.value,'Unsaved caption stays with this file');
+ const close=h.renderer.root.findAllByProps({'aria-label':'Close editor'});
+ if(close.length)await act(async()=>close[0].props.onClick());
+ h.backend.rows.properties=[...structuredClone(fixture.properties),saved.payload];
+ await act(async()=>{await h.site.refresh();await delay(20);});
+ await act(async()=>row().findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ assert.deepEqual(sources(),expected);
+ assert.equal(orders()[0],'COVER');
+ assert.equal(caption().props.value,'Unsaved caption stays with this file');
+ assert.equal(photos().findAllByType('figcaption')[0].findAllByType('span')[1].children.join(''),'room-19.jpg');
 });
 
 test('a timed-out image identifies its full name and can be selected again without losing the draft',async t=>{

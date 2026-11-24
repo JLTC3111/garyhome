@@ -311,7 +311,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     if (!active) return;
     try {
       setSaved(readBrowserFavourites(localStorage));
-      if (!initial.configured) {
+      if (!initial.configured && !initial.error) {
         updateEnquiries(JSON.parse(localStorage.getItem("gary-preview-enquiries") || "[]"));
         if (localStorage.getItem("gary-preview-enabled") === "true") {
           const stored = localStorage.getItem("gary-preview-content"); if (stored) updateContent(JSON.parse(stored));

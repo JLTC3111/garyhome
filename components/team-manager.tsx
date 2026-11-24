@@ -4,8 +4,6 @@ import { useCallback,useEffect,useRef,useState,type FormEvent } from "react";
 import { Check,KeyRound,LoaderCircle,RefreshCw,ShieldCheck,Trash2,UserPlus,UserRound } from "lucide-react";
 import { SelectField } from "./select-field";
 import { DeleteConfirmation } from "./delete-confirmation";
-import { PasswordInput } from "./password-input";
-import { StaffTemporaryPassword } from "./staff-temporary-password";
 import { useSite } from "./site-context";
 import { useStudioText } from "./use-studio-text";
 import { fetchWithDeadline,request } from "@/lib/requests";
@@ -19,9 +17,8 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
  const {client,user,staffRole,sessionPhase,editorTask,notice}=useSite(),text=useStudioText();
  const [members,setMembers]=useState<StaffAccount[]>([]),[next,setNext]=useState<string|null>(null),[domains,setDomains]=useState<string[]>([]),[enabled,setEnabled]=useState(false);
  const [loading,setLoading]=useState(false),[busy,setBusy]=useState(""),[error,setError]=useState("");
- const [password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[replacePassword,setReplacePassword]=useState(false);
  const [loadError,setLoadError]=useState(""),[errorCode,setErrorCode]=useState("");
- const [removing,setRemoving]=useState<StaffAccount|null>(null),[passwordTarget,setPasswordTarget]=useState<StaffAccount|null>(null);
+ const [removing,setRemoving]=useState<StaffAccount|null>(null);
  const active=useRef(true),identity=useRef(user?.id),sequence=useRef(0),version=useRef(0);
  const roles=assignableRoles(staffRole),mode=draft.mode||"create";
  useEffect(()=>{identity.current=user?.id;},[user?.id]);
@@ -32,7 +29,7 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
   const {data,error}=await client.auth.getSession();
   if(error||data.session?.user.id!==user.id||identity.current!==user.id)throw new Error("Your account changed. Sign in again before continuing.");
   signal.throwIfAborted();
-  const response=await fetchWithDeadline((method==="RESET"?"/api/admin/team/reset-password":method==="PASSWORD"?"/api/admin/team/set-password":"/api/admin/team")+(cursor?"?after="+encodeURIComponent(cursor):""),{method:method==="RESET"||method==="PASSWORD"?"POST":method,cache:"no-store",signal,headers:{Authorization:"Bearer "+data.session.access_token,...(input?{"Content-Type":"application/json"}:{})},...(input?{body:JSON.stringify(input)}:{})});
+  const response=await fetchWithDeadline((method==="RESET"?"/api/admin/team/reset-password":"/api/admin/team")+(cursor?"?after="+encodeURIComponent(cursor):""),{method:method==="RESET"?"POST":method,cache:"no-store",signal,headers:{Authorization:"Bearer "+data.session.access_token,...(input?{"Content-Type":"application/json"}:{})},...(input?{body:JSON.stringify(input)}:{})});
   const body=await response.json() as {error?:string;code?:string};if(!response.ok)throw new TeamActionError(body.error||"Couldn’t load the team. Reconnect and try again.",body.code);return body;
  },[client,user]);
  const load=useCallback(async(cursor?:string|null)=>{
@@ -46,18 +43,23 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
  useEffect(()=>{let cancelled=false;if(sessionPhase==="ready")queueMicrotask(()=>{if(!cancelled)void load();});return()=>{cancelled=true;};},[sessionPhase,load]);
  useEffect(()=>{const refresh=()=>{if(sessionPhase==="ready"&&!busy)void load();};window.addEventListener("gary-staff-directory-changed",refresh);return()=>window.removeEventListener("gary-staff-directory-changed",refresh);},[load,sessionPhase,busy]);
  const changed=()=>window.dispatchEvent(new Event("gary-team-access-changed"));
- function reuseExisting(withPassword:boolean){setDraft({...draft,mode:"assign"});setReplacePassword(withPassword);setError("");setErrorCode("");if(!withPassword){setPassword("");setConfirm("");}}
+ function selectMode(value: "create"|"assign"){setDraft({...draft,mode:value});setError("");setErrorCode("");}
  async function create(event:FormEvent<HTMLFormElement>){
   event.preventDefault();if(busy)return;setErrorCode("");
   if(!domains.includes(draft.email.trim().toLowerCase().split("@")[1])){setError("Use an allowed company or Gmail address.");return;}
-  if((mode==="create"||replacePassword)&&(password.length<12||password!==confirm)){setError("Use matching passwords of at least 12 characters.");return;}
   setBusy("create");setError("");version.current++;
-  try{const data=await editorTask((_db,signal)=>call("POST",signal,{...draft,mode,replace_password:mode==="assign"&&replacePassword,...(mode==="create"||replacePassword?{password,confirm_password:confirm}:{})})) as {created:boolean;password_set?:boolean};
-   if(!active.current)return;setDraft(emptyTeamDraft());setPassword("");setConfirm("");setReplacePassword(false);
-   const message=data.created?"Staff account created and confirmed. Share the temporary password securely; a change-password reminder appears after login.":data.password_set?"Staff access assigned and temporary password saved. Use the regular Staff portal to sign in.":"Staff access assigned. The verified login password is unchanged.";
-   notice(text(message));changed();await load();
-  }catch(error){if(active.current){setError(error instanceof Error?error.message:"Couldn’t create the staff account. Refresh before trying again.");setErrorCode(error instanceof TeamActionError?error.code:"");if(error instanceof TeamActionError&&["staff_access_assigned_reminder_unconfirmed","staff_password_saved_access_unconfirmed"].includes(error.code))await load();}}
-  finally{if(active.current)setBusy("");}
+  try{
+   const result=await editorTask((_db,signal)=>call("POST",signal,{...draft,mode})) as {invited?:boolean};
+   if(!active.current)return;
+   if(result.invited){
+    setDraft({...draft,mode:"assign"});
+    notice(text("Invitation sent. Assign Home access after the staff member verifies their email."));
+    return;
+   }
+   setDraft(emptyTeamDraft());notice(text("Home staff access assigned."));changed();await load();
+  }catch(error){
+   if(active.current){setError(error instanceof Error?error.message:"Couldn’t complete the staff request.");setErrorCode(error instanceof TeamActionError?error.code:"");}
+  }finally{if(active.current)setBusy("");}
  }
  async function update(member:StaffAccount,role:"admin"|"manager"|"editor",activeValue:boolean){
   if(busy)return;setErrorCode("");setBusy(member.user_id);setError("");version.current++;
@@ -68,15 +70,6 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
   if(!removing||busy)return;const target=removing,actor=user?.id;setErrorCode("");setBusy("delete:"+target.user_id);setError("");version.current++;
   try{await editorTask((_db,signal)=>call("DELETE",signal,{user_id:target.user_id}));if(!active.current||identity.current!==actor)return;setMembers(rows=>rows.filter(m=>m.user_id!==target.user_id));setRemoving(null);notice(text("Staff access deleted. The customer account and history are preserved."));changed();await load();}
   catch(error){if(active.current&&identity.current===actor)setError(error instanceof Error?error.message:"Couldn’t confirm deletion. Refresh before trying again.");}finally{if(active.current&&identity.current===actor)setBusy("");}
- }
- async function setTemporaryPassword(password:string,confirmation:string){
-  if(!passwordTarget||busy)return;const actor=user?.id,target=passwordTarget;setErrorCode("");setBusy("password:"+target.user_id);setError("");version.current++;
-  try{const result=await editorTask((_db,signal)=>call("PASSWORD",signal,{user_id:target.user_id,password,confirm_password:confirmation})) as {password_set?:boolean};
-   if(!active.current||identity.current!==actor)return;
-   if(!result.password_set)throw new Error("Couldn’t confirm the temporary password. Check the account before trying again.");
-   setPasswordTarget(null);notice(text("Temporary password saved. Use the regular Staff portal to sign in; a password-change reminder appears after login."));changed();await load();
-  }catch(error){if(active.current&&identity.current===actor)setError(error instanceof Error?error.message:"Couldn’t confirm the temporary password. Check the account before trying again.");}
-  finally{if(active.current&&identity.current===actor)setBusy("");}
  }
  async function resetPassword(member:StaffAccount){
   if(busy)return;const actor=user?.id;setErrorCode("");setBusy("reset:"+member.user_id);setError("");
@@ -89,29 +82,26 @@ export function TeamManager({draft,setDraft}:{draft:TeamDraft;setDraft:(draft:Te
  return <div className="team-manager">
 
   {error&&<div className={errorCode==="existing_login"?"form-info":"form-error"} role="alert">{text(error)}</div>}
-  {errorCode==="existing_login"&&<div className="team-existing-login-callout"><p>{text("Removing staff access keeps the login account and customer history. Choose how to reuse this email.")}</p><div><button type="button" className="button button-outline button-small" disabled={!!busy} onClick={()=>reuseExisting(false)}>{text("Assign and keep existing password")}</button><button type="button" className="button button-small" disabled={!!busy} onClick={()=>reuseExisting(true)}>{text("Assign and set temporary password")}</button></div></div>}
-  {errorCode==="unverified_login"&&<div className="team-existing-login-callout"><button type="button" className="button button-small" disabled={!!busy} onClick={()=>reuseExisting(true)}>{text("Assign and set temporary password")}</button></div>}
+  {errorCode==="existing_login"&&<button type="button" className="button button-small" disabled={!!busy} onClick={()=>selectMode("assign")}>{text("Assign existing login")}</button>}
   {loadError&&<div className="form-error" role="alert">{text(loadError)}</div>}
   {managing&&<div className="team-creation-grid"><form className="admin-panel enquiry-form team-invite-form" onSubmit={create}>
-   <div className="eyebrow">{text("DIRECT ACCOUNT SETUP")}</div><h2>{text("Add a team member")}</h2>
-   <div className="team-account-modes" role="group" aria-label={text("Account setup mode")}><button type="button" aria-pressed={mode==="create"} disabled={!!busy} onClick={()=>{setDraft({...draft,mode:"create"});setReplacePassword(false);setErrorCode("");setError("");setPassword("");setConfirm("");}}>{text("Create new account")}</button><button type="button" aria-pressed={mode==="assign"} disabled={!!busy} onClick={()=>reuseExisting(false)}>{text("Assign existing login")}</button></div>
+   <div className="eyebrow">{text("HOME TEAM ACCESS")}</div><h2>{text("Add a team member")}</h2>
+   <div className="team-account-modes" role="group" aria-label={text("Account setup mode")}><button type="button" aria-pressed={mode==="create"} disabled={!!busy} onClick={()=>selectMode("create")}>{text("Invite by email")}</button><button type="button" aria-pressed={mode==="assign"} disabled={!!busy} onClick={()=>selectMode("assign")}>{text("Assign existing login")}</button></div>
    <label>{text("Full name")}<input name="full_name" value={draft.full_name} onChange={event=>setDraft({...draft,full_name:event.target.value})} autoComplete="off" required minLength={2} maxLength={120} disabled={!!busy}/></label>
    <label>{text("Staff email")}<input name="email" type="email" value={draft.email} onChange={event=>setDraft({...draft,email:event.target.value})} autoComplete="off" required maxLength={254} disabled={!!busy}/></label>
    <label>{text("Assigned role")}<SelectField value={roles.includes(draft.role)?draft.role:roles[0]} disabled={!!busy} onValueChange={role=>setDraft({...draft,role:role as TeamDraft["role"]})}>{roles.map(role=><option key={role} value={role}>{roleLabel(role)}</option>)}</SelectField></label>
-   {mode==="assign"&&<label className="team-password-choice"><input type="checkbox" checked={replacePassword} disabled={!!busy} onChange={event=>{setReplacePassword(event.target.checked);setError("");setErrorCode("");if(!event.target.checked){setPassword("");setConfirm("");}}}/><span>{text("Set a new temporary password for this existing login")}</span></label>}
-   {mode==="create"||replacePassword?<><label>{text("Temporary password")}<PasswordInput key={mode} inputProps={{"name":"password","autoComplete":"new-password","minLength":12,"maxLength":128,"value":password,"required":true,"disabled":!!busy,"onChange":event=>setPassword(event.target.value)}}/></label><label>{text("Confirm password")}<input name="confirm_password" type="password" autoComplete="new-password" minLength={12} maxLength={128} value={confirm} required disabled={!!busy} onChange={event=>setConfirm(event.target.value)}/></label><small>{text("Use at least 12 characters. Share the temporary password securely with the staff member.")}</small>{mode==="assign"&&<p className="form-info">{text("This explicitly replaces the existing login password. Customer history is preserved.")}</p>}</>:<p className="form-info">{text("Only verified logins can keep their existing password. Customer history is preserved.")}</p>}
-   {!enabled&&domains.length>0&&<p className="form-error">{text("Direct staff creation needs the server-only Supabase secret key. Ask the owner to configure it in Vercel.")}</p>}
-   <button data-button-variant="confirm" className="button" aria-busy={busy==="create"||undefined} disabled={!!busy||!enabled||!domains.length||sessionPhase!=="ready"}>{busy==="create"?<LoaderCircle className="spin" size={17}/>:<UserPlus size={17}/>} {text(busy==="create"?"Creating account…":mode==="create"?"Create confirmed staff account":replacePassword?"Assign and set temporary password":"Assign staff access")}</button>
-  </form><aside className="admin-panel team-permissions-guide"><ShieldCheck size={25}/><h2>{text("Who can create which roles?")}</h2><p>{text("Every role can create or assign roles at least one level below itself. Peer and higher roles are protected.")}</p><table><thead><tr><th>{text("Signed-in role")}</th><th>{text("Can create / assign")}</th></tr></thead><tbody><tr><th>{text("Owner")}</th><td>{text("Administrator, Manager, Staff")}</td></tr><tr><th>{text("Administrator")}</th><td>{text("Manager, Staff")}</td></tr><tr><th>{text("Manager")}</th><td>{text("Staff")}</td></tr><tr><th>{text("Staff")}</th><td>{text("No team access management")}</td></tr></tbody></table><h3>{text("Ready to sign in")}</h3><p>{text("New accounts are confirmed immediately and use the password you enter. Staff are reminded to change it after signing in.")}</p><h3>{text("Existing accounts")}</h3><p>{text("Choose Assign existing login for a verified login, or explicitly set a temporary password before assigning an unverified login.")}</p><p>{text("A replacement password is saved before staff access is assigned. For an existing staff member, use Set temporary password in the directory if needed.")}</p><h3>{text("Protected access")}</h3><p>{text("You cannot edit your own role or a peer or higher role. Only owners and administrators can delete lower-level staff access.")}</p><h3>{text("Who can you see?")}</h3><p>{text("Your directory includes accounts at your own role level and below. Higher roles are hidden. Peer accounts are view-only.")}</p></aside></div>}
+   <p className="form-info">{text(mode==="create"?"The staff member verifies their email and chooses their password. Assign their Home role afterward.":"A verified login is required before you can assign Home access.")}</p>
+   {mode==="create"&&!enabled&&domains.length>0&&<p className="form-error">{text("Staff invitations require the server-only Supabase key.")}</p>}
+   <button data-button-variant="confirm" className="button" aria-busy={busy==="create"||undefined} disabled={!!busy||(mode==="create"&&!enabled)||!domains.length||sessionPhase!=="ready"}>{busy==="create"?<LoaderCircle className="spin" size={17}/>:<UserPlus size={17}/>} {text(busy==="create"?"Updating…":mode==="create"?"Send staff invitation":"Assign staff access")}</button>
+  </form><aside className="admin-panel team-permissions-guide"><ShieldCheck size={25}/><h2>{text("Which roles can you assign?")}</h2><p>{text("Peer and higher roles are protected.")}</p><table><thead><tr><th>{text("Signed-in role")}</th><th>{text("Assigned role")}</th></tr></thead><tbody><tr><th>{text("Owner")}</th><td>{text("Administrator, Manager, Staff")}</td></tr><tr><th>{text("Administrator")}</th><td>{text("Manager, Staff")}</td></tr><tr><th>{text("Manager")}</th><td>{text("Staff")}</td></tr><tr><th>{text("Staff")}</th><td>{text("No team access management")}</td></tr></tbody></table><h3>{text("Protected access")}</h3><p>{text("You cannot edit your own role or a peer or higher role. Only owners and administrators can delete lower-level staff access.")}</p><h3>{text("Who can you see?")}</h3><p>{text("Your directory includes accounts at your own role level and below. Higher roles are hidden. Peer accounts are view-only.")}</p></aside></div>}
   {!managing&&<p className="form-info">{text("You can view other staff members. Team access changes require a higher role.")}</p>}
   <section className="admin-panel team-directory" aria-label={text("Team directory")}><header><div><h2>{text("Your team")}</h2><p>{text("View accounts at your level or below. Manage lower-level accounts and preserve customer history.")}</p></div><div className="team-directory-tools">{loading&&<LoaderCircle className="spin" size={18}/>}<button type="button" className="button button-outline button-small" disabled={loading||!!busy} onClick={()=>void load()}><RefreshCw size={15}/>{text("Refresh")}</button></div></header>
    {members.filter(member=>canViewRole(staffRole,member.role)).map(member=>{const manageable=member.user_id!==user?.id&&canManageRole(staffRole,member.role);const photo=member.avatar_path&&client?client.storage.from("staff-avatars").getPublicUrl(member.avatar_path).data.publicUrl:"";
-    return <article className="team-member" key={member.user_id}><span className="team-avatar">{photo?<img src={photo} alt=""/>:<UserRound size={21}/>}</span><div className="team-member-details"><strong>{member.display_name||member.email}</strong><span>{member.email}</span><div><span className={member.active?"team-state active":"team-state"}>{text(!member.active?"Access disabled":member.confirmed?"Active":"Email confirmation pending")}</span><small>{roleLabel(member.role)}</small></div>{manageable&&<button className="text-link team-password-action" type="button" disabled={!!busy||!enabled||!member.active} onClick={()=>{setError("");setErrorCode("");setPasswordTarget(member);}}><KeyRound size={13}/>{text("Set temporary password")}</button>}{managing&&(manageable||member.user_id===user?.id)&&<button className="text-link team-reset-action" type="button" disabled={!!busy||!member.active} onClick={()=>void resetPassword(member)}><KeyRound size={13}/>{text(busy==="reset:"+member.user_id?"Requesting reset…":"Send password link")}</button>}</div>
+    return <article className="team-member" key={member.user_id}><span className="team-avatar">{photo?<img src={photo} alt=""/>:<UserRound size={21}/>}</span><div className="team-member-details"><strong>{member.display_name||member.email}</strong><span>{member.email}</span><div><span className={member.active?"team-state active":"team-state"}>{text(!member.active?"Access disabled":member.confirmed?"Active":"Email confirmation pending")}</span><small>{roleLabel(member.role)}</small></div>{managing&&(manageable||member.user_id===user?.id)&&<button className="text-link team-reset-action" type="button" disabled={!!busy||!member.active} onClick={()=>void resetPassword(member)}><KeyRound size={13}/>{text(busy==="reset:"+member.user_id?"Requesting reset…":"Send password link")}</button>}</div>
     {!manageable?<span className="team-protected"><Check size={13}/>{text(member.user_id===user?.id?"Your account":"View only")}</span>:<div className="team-member-actions"><SelectField aria-label={text("Assigned role")+" · "+member.email} value={member.role} disabled={!!busy} onValueChange={role=>void update(member,role as TeamDraft["role"],member.active)}>{roles.map(role=><option key={role} value={role}>{roleLabel(role)}</option>)}</SelectField><button data-button-variant={member.active?undefined:"restore"} type="button" className="text-link" disabled={!!busy} onClick={()=>void update(member,member.role as TeamDraft["role"],!member.active)}>{text(member.active?"Disable access":"Restore access")}</button>{canDeleteContent(staffRole)&&<button data-button-variant="danger" type="button" className="text-link text-danger" disabled={!!busy} onClick={()=>{setError("");setErrorCode("");setRemoving(member);}}><Trash2 size={14}/>{text("Delete access")}</button>}</div>}</article>;
    })}
    {!members.length&&!loading&&<p>{text("No team members loaded. Refresh the directory to try again.")}</p>}{next&&<button type="button" className="button button-outline" disabled={loading||!!busy} onClick={()=>void load(next)}>{text("Load more")}</button>}
   </section>
-  <AnimatePresence initial={false}>{passwordTarget&&<StaffTemporaryPassword key={passwordTarget.user_id} member={passwordTarget} busy={!!busy} error={error} close={()=>{if(!busy){setPasswordTarget(null);setError("");}}} save={setTemporaryPassword}/>}</AnimatePresence>
   <AnimatePresence initial={false}>{removing&&<DeleteConfirmation title={text("Delete staff access?")} target={removing.display_name+" · "+removing.email} description={text("This removes the staff assignment. The person’s customer account and customer history are preserved.")} busy={!!busy} error={error?text(error):""} onCancel={()=>{setRemoving(null);setError("");}} onConfirm={()=>void remove()} confirmLabel={text("Delete access")}/>}</AnimatePresence>
  </div>;
 }

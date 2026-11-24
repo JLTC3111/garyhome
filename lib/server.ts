@@ -12,6 +12,13 @@ export function backendConfig() {
     key: runtime.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "",
   };
 }
+export function mayShowSeedContent() {
+  return process.env.NODE_ENV !== "production" && runtimeEnv.VERCEL_ENV !== "production";
+}
+
+function unavailableContent(): Content {
+  return {settings:seed.settings,properties:[],neighbourhoods:[],authors:[],activities:[],editorial:[]};
+}
 export function publicSupabase(accessToken?: string) {
   const { url, key } = backendConfig();
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}), fetch: (input, init) => fetchWithDeadline(input, init, 10000) } }) : null;
@@ -31,7 +38,7 @@ export function staffAdminClient() {
 }
 export async function loadContent(): Promise<{ content: Content; configured: boolean; error: boolean }> {
   const db = publicSupabase();
-  if (!db) return { content: seed, configured: false, error: false };
+  if (!db) return { content: mayShowSeedContent() ? seed : unavailableContent(), configured: false, error: !mayShowSeedContent() };
   try {
     return { content: await readPublishedContent(db), configured: true, error: false };
   } catch (error) {
@@ -39,6 +46,6 @@ export async function loadContent(): Promise<{ content: Content; configured: boo
     console.warn("[Gary Home] Public content unavailable", error instanceof ContentReadError
       ? { resource: error.resource, status: error.status, code: error.code }
       : { type: error instanceof Error ? error.name : "UnknownError" });
-    return { content: seed, configured: true, error: true };
+    return { content: mayShowSeedContent() ? seed : unavailableContent(), configured: true, error: true };
   }
 }

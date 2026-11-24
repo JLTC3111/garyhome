@@ -2,7 +2,7 @@ import { requireAvailableContent } from "./content-unavailable";
 import type { Metadata } from "next";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
-import { loadContent } from "./server";
+import { backendConfig, loadContent, mayShowSeedContent } from "./server";
 import { languageValue } from "./language";
 import { documentTitle } from "./document-titles";
 import { isPublicRental, listingCode, propertyTitle } from "./rentals";
@@ -46,7 +46,8 @@ export async function pageMetadata(path: string, privatePage = false): Promise<M
     alternates: privatePage ? { canonical: privateOrigin + path, languages: {} } : localizedAlternates(path, origin, language),
     openGraph: { title, description, siteName: "Gary Home", type: "website", locale: language === "vi" ? "vi_VN" : "en_US", alternateLocale: language === "vi" ? "en_US" : "vi_VN", url: (privatePage ? privateOrigin : origin) + (privatePage ? path : localizedPath(path, language)) },
     twitter: { card: "summary", title, description },
-    robots: privatePage ? { index: false, follow: false } : undefined,
+    robots: privatePage || !mayShowSeedContent() && !backendConfig().url || !mayShowSeedContent() && !backendConfig().key
+      ? { index: false, follow: false } : undefined,
   };
 }
 export async function propertyMetadata(slug: string): Promise<Metadata> {

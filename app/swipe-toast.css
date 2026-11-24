@@ -89,6 +89,19 @@ html[data-home-theme="dark"] .action-toast {
 .action-toast[data-tone="error"] { --toast-accent: var(--toast-error-icon); }
 .action-toast[data-tone="info"] { --toast-accent: var(--toast-info-icon); }
 .action-toast-mark { flex: none; width: 1em; color: var(--toast-accent); font-weight: 750; text-align: center; }
+.action-toast[data-tone="success"] .action-toast-mark { position: relative; }
+.action-toast[data-tone="success"] .action-toast-mark::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  box-sizing: border-box;
+  width: 1.4em;
+  height: 1.4em;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
 .action-toast-content { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .action-toast [data-success-heading],
 .action-toast [data-success-title] { display: block; font-weight: 650; }

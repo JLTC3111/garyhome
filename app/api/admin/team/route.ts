@@ -6,7 +6,12 @@ import { StaffRequestError, staffDataError, staffRequest } from "@/lib/staff-ser
 import { canManageRole,canManageStaff,canViewRole,type StaffAccount } from "@/lib/staff";
 
 const headers = { "Cache-Control": "private, no-store" };
-const createAccount = z.object({ email:z.string().trim().toLowerCase().email().max(254),full_name:z.string().trim().min(2).max(120),role:z.enum(["admin","manager","editor"]),mode:z.enum(["create","assign"]).default("create"),replace_password:z.boolean().default(false),password:z.string().max(128).optional(),confirm_password:z.string().max(128).optional() }).superRefine((value,ctx)=>{if((value.mode==="create"||value.replace_password)&&(!value.password||value.password.length<12||value.password!==value.confirm_password))ctx.addIssue({code:"custom",message:"Use matching passwords of at least 12 characters."});});
+const onboardAccount = z.object({
+  email:z.string().trim().toLowerCase().email().max(254),
+  full_name:z.string().trim().min(2).max(120),
+  role:z.enum(["admin","manager","editor"]),
+  mode:z.enum(["create","assign"]).default("create")
+}).strict();
 const editAccount = z.object({ user_id: z.string().uuid(), role: z.enum(["admin", "manager", "editor"]), active: z.boolean() });
 const removeAccount = z.object({ user_id:z.string().uuid() });
 async function body(request: Request) {
@@ -39,64 +44,40 @@ export async function GET(request: Request) {
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
-  let created=false,accessAssigned=false,passwordPrepared=false;
   try {
     const result = await boundedRequest(async signal => {
       const { db, role } = await staffRequest(request, signal);
-      const parsed = createAccount.safeParse(await body(request));
-      if (!parsed.success) throw new StaffRequestError("Check the staff details and matching passwords of at least 12 characters.");
+      const parsed = onboardAccount.safeParse(await body(request));
+      if (!parsed.success) throw new StaffRequestError("Check the staff details. Staff choose their own passwords.",400,"invalid_onboarding");
       const input = parsed.data;
-      const replacingPassword=input.mode==="assign"&&input.replace_password;
-      if(input.mode==="assign"&&!input.replace_password&&(input.password||input.confirm_password))throw new StaffRequestError("Choose Set a temporary password to replace the existing password, or leave both password fields blank.",400,"password_choice_required");
       if(!canManageRole(role,input.role))throw new StaffRequestError("You can assign roles below your own level only.",403);
-      // The RPC validates the allowed email domain, protected accounts, and the
-      // actor's fresh membership before any Auth account or email is created.
       const found = await db.rpc("find_staff_account", { target_email: input.email, assigned_role: input.role }).abortSignal(signal);
       staffDataError(found.error);
-      const admin=staffAdminClient();
-      if(!admin)throw new StaffRequestError("Direct staff creation needs the server-only Supabase secret key. Ask the owner to configure it in Vercel.",503);
       if(input.mode==="create"){
-        if(found.data)throw new StaffRequestError("A login already exists for this email. Assign or restore staff access instead of creating another login.",409,"existing_login");
-        const account=await admin.auth.admin.createUser({email:input.email,password:input.password!,email_confirm:true,user_metadata:{full_name:input.full_name}});
-        if(account.error||!account.data.user){
-          if(["email_exists","user_already_exists","email_already_exists"].includes(account.error?.code||""))throw new StaffRequestError("A login already exists for this email. Assign or restore staff access instead of creating another login.",409,"existing_login");
-          if(account.error?.code==="weak_password")throw new StaffRequestError("Supabase rejected this password. Choose a stronger password and try again.",400,"weak_password");
-          throw new StaffRequestError("Couldn’t create the account. Check the email, password requirements and server configuration, then refresh before retrying.",503);
-        }
-        created=true;
-      }else{
-        if(!found.data)throw new StaffRequestError("No account exists for this email. Choose Create new account.",404);
-        const existing=await admin.auth.admin.getUserById(found.data);
-        if(existing.error||existing.data.user?.id!==found.data||existing.data.user.email?.toLowerCase()!==input.email)throw new StaffRequestError("Couldn’t verify the existing login. Refresh the team before trying again.",503);
-        if(replacingPassword){
-          // Establish trusted credentials before confirming a pending signup or
-          // granting access. Never activate a password supplied by a stranger.
-          signal.throwIfAborted();
-          const updated=await admin.auth.admin.updateUserById(found.data,{password:input.password!,email_confirm:true});
-          if(updated.error||updated.data.user?.id!==found.data||updated.data.user.email?.toLowerCase()!==input.email||!updated.data.user.email_confirmed_at)throw new StaffRequestError("Couldn’t confirm the temporary password. Staff access was not assigned. Check the account before trying again.",503,"staff_password_unconfirmed");
-          passwordPrepared=true;
-        }else if(!existing.data.user.email_confirmed_at){
-          throw new StaffRequestError("This login has not verified its email. Ask the staff member to confirm their email, or explicitly set a temporary password before assigning access.",409,"unverified_login");
-        }
+        const existingLogin=()=>new StaffRequestError("A login already exists for this email. Assign the verified login.",409,"existing_login");
+        if(found.data)throw existingLogin();
+        const admin=staffAdminClient();
+        if(!admin)throw new StaffRequestError("Staff invitations require the server-only Supabase key.",503);
+        signal.throwIfAborted();
+        const {data,error}=await admin.auth.admin.inviteUserByEmail(input.email,{
+          data:{full_name:input.full_name},redirectTo:new URL("/auth/invite",request.url).href
+        });
+        if(["email_exists","user_already_exists","email_already_exists"].includes(error?.code||""))throw existingLogin();
+        if(error||!data.user)throw new StaffRequestError("Couldn’t confirm delivery of the invitation. Check whether the login exists before retrying.",503);
+        // Mailbox verification and the Home access grant are separate operations.
+        return {invited:true};
       }
-      // This second RPC checks permissions again after the Auth account write.
-      // A revoked admin cannot use a delayed Auth response to grant access.
+      if(!found.data)throw new StaffRequestError("No account exists for this email. Send a staff invitation first.",404,"login_missing");
       const assigned = await db.rpc("assign_staff_account", { target_email: input.email, full_name: input.full_name, assigned_role: input.role }).abortSignal(signal);
+      if(assigned.error?.code==="23514"&&/must confirm its email/.test(assigned.error.message)){
+        throw new StaffRequestError("Ask the staff member to verify their email before assigning Home access.",409,"unverified_login");
+      }
       staffDataError(assigned.error);
       if(typeof assigned.data!=="string"||!assigned.data)throw new StaffRequestError("Staff access was not confirmed. Refresh the team before trying again.",409);
-      accessAssigned=true;
-      if(replacingPassword){
-        const reminder=await db.rpc("staff_temporary_password_request",{target_user_id:assigned.data,failed:false}).abortSignal(signal);
-        staffDataError(reminder.error);
-      }
-      return {user_id:assigned.data,created,confirmed:true,...(replacingPassword?{password_set:true}:{})};
+      return {user_id:assigned.data,confirmed:true};
     });
-    return Response.json(result, { status:result.created?201:200,headers });
-  } catch (error) {
-    if(accessAssigned&&passwordPrepared)return failure(new StaffRequestError("Staff access and the temporary password were saved, but the password-change reminder was not confirmed. Refresh the team before continuing.",409,"staff_access_assigned_reminder_unconfirmed"));
-    if(passwordPrepared)return failure(new StaffRequestError("The temporary password was saved, but staff access was not confirmed. Refresh and assign the existing login to finish.",409,"staff_password_saved_access_unconfirmed"));
-    return failure(created?new StaffRequestError("The account was created, but staff access was not confirmed. Refresh and use Assign existing login to finish assigning its role.",409):error);
-  }
+    return Response.json(result, { status:result.invited?202:200,headers });
+  } catch (error) { return failure(error); }
 }
 export async function PATCH(request: Request) {
   try {

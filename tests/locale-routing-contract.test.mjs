@@ -133,7 +133,7 @@ test('property and news metadata have distinct translations, self canonicals and
  const editorial=JSON.parse(fs.readFileSync(path.join(root,'data/editorial.json'),'utf8'));
  const neighbourhoods=[];
  const requestHeaders=new Headers();
- const load=loader({'next/headers':{headers:async()=>requestHeaders,cookies:async()=>({get:()=>({value:requestHeaders.get('x-gary-language')==='vi'?'en':'vi'})})},'./runtime-env':{runtimeEnv:{SITE_URL:'https://garyhome.vn'}},'./server':{loadContent:async()=>({content:{properties,editorial,neighbourhoods},configured:false,error:false})}});
+ const load=loader({'next/headers':{headers:async()=>requestHeaders,cookies:async()=>({get:()=>({value:requestHeaders.get('x-gary-language')==='vi'?'en':'vi'})})},'./runtime-env':{runtimeEnv:{SITE_URL:'https://garyhome.vn'}},'./server':{backendConfig:()=>({url:'https://fixture.invalid',key:'fixture-key'}),mayShowSeedContent:()=>false,loadContent:async()=>({content:{properties,editorial,neighbourhoods},configured:false,error:false})}});
  const seo=load('lib/seo.ts'),property=properties.find(row=>row.status==='published'),article=editorial.find(row=>row.status==='published');
  assert.ok(property&&article,'Use actual published fixtures');
  const paired=[];
@@ -181,4 +181,12 @@ test('sitemap pairs every published record across locales and excludes drafts, p
   assert.ok(urls.has(origin+'/'+language+'/homes/'+property.slug));
   assert.ok(urls.has(origin+'/'+language+'/tips-and-news/'+article.slug));
  }
+});
+
+test('a misconfigured production shell is noindex and publishes an empty sitemap',async()=>{
+ const override={loadContent:async()=>({configured:false,error:true,content:{properties:[],editorial:[]}}),backendConfig:()=>({url:'',key:''}),mayShowSeedContent:()=>false};
+ const load=loader({'next/headers':{headers:async()=>new Headers(),cookies:async()=>({get:()=>undefined})},'./server':override,
+  '@/lib/server':override,'@/lib/seo':{siteUrl:()=>origin}});
+ assert.deepEqual((await load('lib/seo.ts').pageMetadata('/homes')).robots,{index:false,follow:false});
+ assert.deepEqual(await load('app/sitemap.ts').default(),[]);
 });

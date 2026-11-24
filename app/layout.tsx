@@ -43,6 +43,8 @@ import { Header, Footer } from "@/components/site-shell";
 import { DocumentTitle } from "@/components/document-title";
 import { PublicThemeProvider } from "@/components/public-theme-provider";
 import { PUBLIC_THEME_SCOPE_BOOTSTRAP } from "@/lib/public-theme";
+import { publicContentPath } from "@/lib/public-content";
+import { mayShowSeedContent } from "@/lib/server";
 import "./public-theme.css";
 import "./gary-network-cards.css";
 import "./studio-theme.css";
@@ -64,8 +66,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [content, exchangeRate] = await Promise.all([loadPageContent(), getExchangeRate()]);
-  const initial = { ...content, exchangeRate, publicOrigin: siteUrl(), publicPath: (await headers()).get("x-gary-public-path") || undefined };
+  const requestHeaders = await headers();
+  const contentPath = publicContentPath(requestHeaders.get("x-gary-content-path") || "/shell");
+  const [content, exchangeRate] = await Promise.all([loadPageContent(contentPath), getExchangeRate()]);
+  const initial = { ...content, contentPath, exchangeRate, seedPreview: mayShowSeedContent(), publicOrigin: siteUrl(), publicPath: requestHeaders.get("x-gary-public-path") || undefined };
   const preferences = await cookies();
   const initialLanguage=await requestLanguage();
   const initialCurrency=currencyValue(preferences.get(CURRENCY_COOKIE)?.value);

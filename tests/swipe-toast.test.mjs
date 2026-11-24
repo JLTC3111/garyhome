@@ -77,13 +77,11 @@ test('default expiry pauses for hover, focus and hidden pages and survives langu
   assert.equal(h.dismissed(),1);
 });
 
-test('the curved fuse and single timeout share the longer reading duration',async t=>{
+test('the fuse bar and single timeout share the longer reading duration',async t=>{
   const h=await harness(t,{},'A'.repeat(220));
   const fuse=()=>h.card().findByProps({className:'action-toast-fuse'});
-  assert.equal(fuse().type,'svg');
-  assert.deepEqual(fuse().findAllByType('stop').map(stop=>stop.props.offset),['0%','50%','100%']);
-  assert.match(fuse().findByType('path').props.d,/Q.*H.*Q/);
-  assert.equal(fuse().findByType('path').props.pathLength,1);
+  assert.equal(fuse().type,'span');
+  assert.equal(fuse().props['aria-hidden'],'true');
   assert.equal(fuse().props.style['--toast-duration'],'6700ms');
   assert.equal(h.timers.size,1);
   await h.advance(4500);
@@ -96,18 +94,32 @@ test('the curved fuse and single timeout share the longer reading duration',asyn
   assert.equal(h.dismissed(),1);
 });
 
-test('both resolved themes bind the curved fuse to the sunset palette',()=>{
+test('success toasts mark with the Lucide circle check',async t=>{
+  const h=await harness(t);
+  const icon=h.card().findByProps({className:'action-toast-mark'}).findByType('svg');
+  assert.match(icon.props.className,/\blucide-circle-check\b/);
+});
+
+test('both resolved themes bind the surface, fuse edge and colors, title, icon and buttons',()=>{
   const css=postcss.parse(readFileSync(new URL('../app/swipe-toast.css',import.meta.url),'utf8'));
   const declarations=selector=>Object.fromEntries(css.nodes.find(rule=>rule.selector===selector).nodes
     .filter(node=>node.type==='decl').map(({prop,value})=>[prop,value]));
-  const stops=['first-child','nth-child(2)','last-child'];
-  const tokens=stops.map(stop=>declarations(`.action-toast-fuse stop:${stop}`)['stop-color'].match(/^var\((--[^)]+)\)$/)[1]);
+  const token=(selector,prop)=>declarations(selector)[prop].match(/^var\((--[^)]+)\)$/)[1];
+  const title=token('.action-toast-content','color'), inset=token('.action-toast-fuse','inset');
   const light=declarations('.action-toast');
   const dark={...light,...declarations('html[data-home-theme="dark"] .action-toast')};
-  assert.deepEqual(tokens.map(token=>light[token]),['#B45309','rgb(187, 74, 10.5)','#C2410C']);
-  assert.deepEqual(tokens.map(token=>dark[token]),['#8E5030','#E88932','#F5A524']);
-  assert.equal(declarations('.action-toast-fuse path').animation,'action-toast-burn var(--toast-duration) linear forwards');
-  assert.equal(declarations('.action-toast-fuse[data-paused] path')['animation-play-state'],'paused');
+  assert.deepEqual([light['--toast-surface'],dark['--toast-surface']],['#fff','#27272a']);
+  assert.deepEqual([light['--toast-fuse'],dark['--toast-fuse']],['#10b981','#ffffff']);
+  assert.deepEqual([light[inset],dark[inset]],['auto 0 0','auto 0 0']);
+  assert.deepEqual([light[title],dark[title]],['var(--toast-ink)','#f5f5f5']);
+  assert.deepEqual([light['--toast-success-icon'],dark['--toast-success-icon']],['#171717','#ffffff']);
+  const fuse=declarations('.action-toast-fuse'), button=declarations('.action-toast button');
+  assert.match(fuse.background,/^linear-gradient\(\s*90deg,\s*transparent 0%,[\s\S]*var\(--toast-fuse\) 38%,\s*var\(--toast-fuse\) 62%,[\s\S]*transparent 100%\s*\)$/);
+  assert.equal(fuse.animation,'action-toast-burn var(--toast-duration) linear forwards');
+  assert.equal(declarations('.action-toast-fuse[data-paused]')['animation-play-state'],'paused');
+  const burn=css.nodes.find(node=>node.type==='atrule'&&node.name==='keyframes'&&node.params==='action-toast-burn');
+  assert.deepEqual(burn.nodes.map(frame=>[frame.selector,frame.nodes[0].value]),[['from','scaleX(1)'],['to','scaleX(0)']]);
+  assert.deepEqual([button.background,button.color,button.height,button['border-radius']],['var(--toast-title)','var(--toast-surface)','24px','5px']);
 });
 
 test('downward swipe dismisses, while an upward drag and pointer cancellation keep the toast',async t=>{
@@ -130,6 +142,7 @@ test('downward swipe dismisses, while an upward drag and pointer cancellation ke
 test('optional close, Escape, assertive errors and timer cleanup work without swiping',async t=>{
   const h=await harness(t,{closeButton:false,tone:'error'});
   assert.equal(h.card().props.tabIndex,0);
+  assert.equal(h.card().findByProps({className:'action-toast-mark'}).children.join(''),'×');
   assert.equal(h.card().findByProps({role:'alert'}).props['aria-atomic'],'true');
   await act(async()=>h.card().props.onKeyDown({key:'Escape',preventDefault(){},stopPropagation(){}}));
   assert.equal(h.dismissed(),1);
@@ -140,9 +153,9 @@ test('optional close, Escape, assertive errors and timer cleanup work without sw
 test('Undo runs the supplied reversal once and Close can dismiss directly',async t=>{
   let undone=0;
   const h=await harness(t,{action:{label:'Undo',run:()=>undone++}});
-  await act(async()=>h.card().findByProps({className:'action-toast-undo'}).props.onClick());
+  await act(async()=>h.card().findByProps({className:'action-toast-undo'}).props.onClick({detail:1}));
   assert.equal(undone,1);
   assert.equal(h.dismissed(),1);
-  await act(async()=>h.close().props.onClick());
+  await act(async()=>h.close().props.onClick({detail:0}));
   assert.equal(h.dismissed(),2);
 });

@@ -2,7 +2,9 @@
 .admin-table--listings .listing-thumbnail-link { display:block; flex:none; border-radius:4px; }
 .admin-table--listings .listing-thumbnail-link img { display:block; }
 .admin-table--listings .listing-title-link { text-decoration:underline; text-underline-offset:.16em; }
-.listing-deletion-queue{padding:14px 21px}
+.listing-deletion-queue{padding:14px 21px;font-size:12px;line-height:1.5}
+.listing-deletion-queue summary{font-size:12px}
+.listing-deletion-queue :is(p,li,.text-link){font-size:11px;line-height:1.5}
 .listing-search-tools>label{max-width:520px;flex:1 1 440px}
 .listing-search-tools input{min-height:42px;padding:10px 14px;font-size:13px;border-radius:6px}
 @media(max-width:680px){.listing-search-tools>label{max-width:none;flex-basis:100%}.listing-search-tools input{font-size:16px}}
@@ -10,3 +12,28 @@
   outline:2px solid var(--studio-focus,var(--olive));
   outline-offset:3px;
 }
+.admin-table--listings .listing-column-label{display:inline-flex;align-items:center;gap:4px;max-width:100%;vertical-align:middle}
+.admin-table--listings .listing-column-filter{position:relative;display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;margin:0;padding:0;border-radius:3px;color:inherit;line-height:1;flex:none}
+.admin-table--listings .listing-column-filter::after{content:"";position:absolute;inset:-8px -6px}
+.admin-table--listings .listing-column-filter:focus-visible{outline:2px solid var(--studio-focus,var(--olive));outline-offset:1px}
+.admin-table--listings .listing-column-filter:hover,.admin-table--listings .listing-column-filter[data-state="open"]{background:color-mix(in srgb,currentColor 14%,transparent)}
+.admin-table--listings .listing-column-filter[data-active="true"]{color:var(--green);background:color-mix(in srgb,var(--green) 16%,transparent)}
+.listing-column-popover[data-slot="popover-content"]{z-index:80;width:min(268px,calc(100vw - 24px));max-height:min(var(--radix-popover-content-available-height,70dvh),calc(100dvh - 24px));overflow:auto;overscroll-behavior:contain;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);box-shadow:0 12px 32px color-mix(in srgb,var(--ink) 16%,transparent);font:400 12px/1.4 var(--sans);letter-spacing:0;text-transform:none}
+.listing-column-popover fieldset{margin:0;padding:0;border:0;min-width:0}
+.listing-column-popover legend{padding:4px 8px 2px;font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.listing-column-popover label{display:flex;align-items:center;gap:8px;min-height:32px;padding:4px 8px;border-radius:6px;cursor:pointer}
+.listing-column-popover label:hover{background:var(--warm)}
+.listing-column-popover input[type="radio"]{width:14px;height:14px;margin:0;accent-color:var(--green);flex:none}
+.listing-column-popover p{margin:0 8px 6px;font-size:10px;line-height:1.4;color:var(--muted)}
+.listing-price-range{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:2px 8px 6px}
+.listing-price-range label{display:grid;align-items:stretch;gap:4px;min-height:0;padding:0;font-size:10px;color:var(--muted)}
+.listing-price-range label:hover{background:transparent}
+.listing-price-range input{width:100%;min-height:34px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font-size:12px}
+.listing-column-popover .listing-filter-reset{display:flex;align-items:center;justify-content:center;width:100%;min-height:34px;margin-top:4px;padding:8px;border-top:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px}
+.listing-column-popover .listing-filter-reset:hover{color:var(--ink);background:var(--warm)}
+.listing-column-popover :is(button,input,label):focus-visible{outline:2px solid var(--studio-focus,var(--olive));outline-offset:2px}
+@media(max-width:680px){
+  .listing-column-popover label,.listing-column-popover .listing-filter-reset{min-height:44px}
+  .listing-price-range input{min-height:44px;font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){.listing-column-popover[data-slot="popover-content"]{animation:none;transition:none}}

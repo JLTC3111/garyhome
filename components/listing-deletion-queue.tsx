@@ -60,6 +60,7 @@ export function ListingDeletionQueue({latest}: {latest: ListingDeletion | null})
     <button type="button" className="text-link" disabled={busy} onClick={()=>void load()}>{t("Refresh status","Làm mới trạng thái")}</button>
     {!!pending?.length&&<ul>{pending.map(job=><li key={job.propertyId}>
       <strong>{job.listingCode||job.propertyId}</strong> {t(`${job.pending} pending · ${job.review} for review`,`${job.pending} đang chờ · ${job.review} cần kiểm tra`)}{" "}
+      {Date.parse(job.requestedAt)<Date.now()-86400000&&<small>{t("Needs attention after 24 hours.","Cần xử lý sau 24 giờ.")}{" "}</small>}
       {job.pending>0&&<button className="text-link" type="button" disabled={busy} onClick={()=>void retry(job.propertyId)}>{t("Retry cleanup","Thử dọn tệp lại")}</button>}
     </li>)}</ul>}
     {pending?.length===0&&<p>{t("No listing media needs cleanup.","Không có tệp tin đăng nào cần xử lý.")}</p>}

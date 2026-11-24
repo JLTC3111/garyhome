@@ -29,6 +29,39 @@ export function listingDeletionQueue(db: SupabaseClient, signal: AbortSignal) {
   return rpc<ListingDeletion[]>(db,"status",{},signal);
 }
 
+async function cleanListingMedia(system: SupabaseClient, propertyId: string, actor: string | null, signal: AbortSignal) {
+  const args = {p_property:propertyId};
+  const lease = await rpc<string|null>(system,"claim",{...args,p_background:actor===null},signal);
+  if (!lease) return false;
+  try {
+    const targets=await rpc<Pick<ReviewedListingObject,"bucket"|"name">[]>(system,"targets",{...args,p_actor:actor},signal);
+    for (const bucket of ["property-media","listing-videos"] as const) {
+      const paths=targets.filter(target=>target.bucket===bucket).map(target=>target.name);
+      if (!paths.length) continue;
+      signal.throwIfAborted();
+      // Require the per-object Storage acknowledgement and catalogue
+      // confirmation before marking an item removed.
+      const result=await system.storage.from(bucket).remove(paths).catch(()=>null);
+      const acknowledged=result?.error===null ? result.data.map(item=>item.name).filter(name=>paths.includes(name)) : [];
+      if (acknowledged.length) await rpc<null>(system,"confirm",{...args,p_bucket:bucket,p_names:acknowledged},signal);
+    }
+    return true;
+  } finally {
+    await rpc<null>(system,"release",{...args,p_lease:lease},AbortSignal.timeout(2500)).catch(()=>null);
+  }
+}
+
+export async function retryDueListingCleanup(system: SupabaseClient, signal: AbortSignal) {
+  const due=await rpc<{jobs:string[];overdue:number}>(system,"due",{},signal);
+  let attempted=0;
+  for (const propertyId of due.jobs) {
+    signal.throwIfAborted();
+    if (await cleanListingMedia(system,propertyId,null,signal)) attempted++;
+  }
+  const {overdue}=attempted ? await rpc<{overdue:number}>(system,"due",{},signal) : due;
+  return {attempted,overdue};
+}
+
 export async function deleteListingAndMedia(
   db: SupabaseClient, system: SupabaseClient, actor: string, propertyId: string,
   action: { version: string } | { manifest: ReviewedListingObject[] } | { retry: true }, signal: AbortSignal,
@@ -45,17 +78,7 @@ export async function deleteListingAndMedia(
   // leaves the durable manifest available for retry instead of hiding the result.
   return request(async deadline=>{
     const cleanupSignal=AbortSignal.any([signal,deadline]);
-    const targets=await rpc<Pick<ReviewedListingObject,"bucket"|"name">[]>(system,"targets",{...args,p_actor:actor},cleanupSignal);
-    for (const bucket of ["property-media","listing-videos"] as const) {
-      const paths=targets.filter(target=>target.bucket===bucket).map(target=>target.name);
-      if (!paths.length) continue;
-      cleanupSignal.throwIfAborted();
-      // Storage can commit its catalogue before removing the bytes. Require
-      // its per-object acknowledgement as well as catalogue confirmation.
-      const result=await system.storage.from(bucket).remove(paths).catch(()=>null);
-      const acknowledged=result?.error===null ? result.data.map(item=>item.name).filter(name=>paths.includes(name)) : [];
-      if(acknowledged.length)await rpc<null>(system,"confirm",{...args,p_bucket:bucket,p_names:acknowledged},cleanupSignal);
-    }
+    await cleanListingMedia(system,propertyId,actor,cleanupSignal);
     return rpc<ListingDeletion>(db,"status",args,cleanupSignal);
   },24000).catch(()=>job);
 }

@@ -1,0 +1,35 @@
+name: Retry Gary Home listing cleanup
+on:
+  schedule:
+    - cron: '25 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: listing-cleanup-runner
+  cancel-in-progress: false
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Retry due media cleanup
+        env:
+          LISTING_CLEANUP_CRON_SECRET: ${{ secrets.LISTING_CLEANUP_CRON_SECRET }}
+        shell: python
+        run: |
+          import json, os, urllib.request
+          secret = os.environ.get("LISTING_CLEANUP_CRON_SECRET", "")
+          if not secret:
+              print("Listing cleanup schedule is waiting for configuration.")
+              raise SystemExit(0)
+          request = urllib.request.Request(
+              "https://www.garyhome.vn/api/cron/listing-cleanup",
+              method="POST", headers={"Authorization": "Bearer " + secret})
+          try:
+              with urllib.request.urlopen(request, timeout=55) as response:
+                  result = json.load(response)
+          except Exception:
+              raise SystemExit("Listing cleanup could not be reached. Check the Home deployment.")
+          print(f"Attempted {result['attempted']} due jobs. {result['overdue']} need attention after 24 hours.")
+          if result["overdue"]:
+              raise SystemExit("Review the listing media cleanup queue in Gary Home Studio.")

@@ -37,6 +37,8 @@ export const publicPageDescriptions: Record<string, readonly [string, string]> =
 };
 export async function pageMetadata(path: string, privatePage = false): Promise<Metadata> {
   const language = await requestLanguage(), origin = siteUrl();
+  const {url,key} = backendConfig();
+  const noIndex = privatePage || !mayShowSeedContent() && (!url || !key);
   const privateOrigin = path === "/admin" ? STAFF_PORTAL_ORIGIN : origin;
   const title = documentTitle(path, language, []) || "Gary Home";
   const description = publicPageDescriptions[path]?.[language === "vi" ? 1 : 0] || siteDescription(language);
@@ -46,12 +48,11 @@ export async function pageMetadata(path: string, privatePage = false): Promise<M
     alternates: privatePage ? { canonical: privateOrigin + path, languages: {} } : localizedAlternates(path, origin, language),
     openGraph: { title, description, siteName: "Gary Home", type: "website", locale: language === "vi" ? "vi_VN" : "en_US", alternateLocale: language === "vi" ? "en_US" : "vi_VN", url: (privatePage ? privateOrigin : origin) + (privatePage ? path : localizedPath(path, language)) },
     twitter: { card: "summary", title, description },
-    robots: privatePage || !mayShowSeedContent() && !backendConfig().url || !mayShowSeedContent() && !backendConfig().key
-      ? { index: false, follow: false } : undefined,
+    robots: noIndex ? { index: false, follow: false } : undefined,
   };
 }
 export async function propertyMetadata(slug: string): Promise<Metadata> {
-  const language = await requestLanguage(), { content } = requireAvailableContent(await loadPageContent());
+  const language = await requestLanguage(), { content } = requireAvailableContent(await loadPageContent("/homes/"+slug));
   const p = content.properties.find(p => p.slug === slug && isPublicRental(p));
   if (!p) return { title: { absolute: language === "vi" ? "Không tìm thấy căn nhà | Gary Home" : "Home not found | Gary Home" }, robots: { index: false, follow: false }, alternates: { canonical: null, languages: {} } };
   const area = content.neighbourhoods.find(n => n.slug === p.district_slug)?.name, { title, description } = propertySeoText(p, language, area);
@@ -63,7 +64,7 @@ export function propertyStructuredData(p: Property, language: Language, area?: s
   return { "@context": "https://schema.org", "@type": "RealEstateListing", name: propertyTitle(p, language, area), identifier: listingCode(p), url, inLanguage: language, image: p.images, datePosted: p.published_at || p.created_at, description: language === "vi" ? p.overview_vi || p.description_vi : p.overview_en || p.description_en, mainEntity: { "@type": p.property_type === "Office & Restaurant" ? "Place" : p.property_type === "Villa/Duplex" || p.property_type === "House & Villa" ? "House" : p.property_type === "Vinhomes" ? "Residence" : "Apartment", name: propertyTitle(p, language, area, false), address: { "@type": "PostalAddress", addressLocality: "Hanoi", addressRegion: area || p.address, addressCountry: "VN" }, ...(p.area_sqm ? { floorSize: { "@type": "QuantitativeValue", value: p.area_sqm, unitCode: "MTK" } } : {}), ...(p.property_type !== "Office & Restaurant" ? { numberOfBedrooms: p.bedrooms, ...(p.bathrooms !== null ? { numberOfBathroomsTotal: p.bathrooms } : {}) } : {}) }, ...propertyPriceOffers(p, url) };
 }
 export async function guideMetadata(slug: string): Promise<Metadata> {
-  const { publicArticles, editorialView } = await import("./editorial"), { content } = requireAvailableContent(await loadPageContent());
+  const { publicArticles, editorialView } = await import("./editorial"), { content } = requireAvailableContent(await loadPageContent("/tips-and-news/"+slug));
   const record = publicArticles(content.editorial).find(item => item.slug === slug), language = await requestLanguage();
   if (!record) return { robots: { index: false, follow: false }, alternates: { canonical: null, languages: {} } };
   const guide = editorialView(record), base = await pageMetadata("/tips-and-news/" + slug), index = language === "vi" ? 1 : 0;

@@ -9,13 +9,13 @@ import { fetchWithDeadline } from '../lib/requests.ts';
 
 const content={editorial:[],properties:[{id:'published-home',status:'published',images:[]}],neighbourhoods:[{slug:'tay-ho',image:''}],settings:{id:'main',hero_title_en:'Live data',hero_image:''},authors:[],activities:[],propertyOrders:{}};
 function database(fetch){return createClient('https://public-content-test.invalid','sb_publishable_test',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch}});}
-function responseFor(input){const url=new URL(input),table=url.pathname.split('/').at(-1),data=table==='site_settings'?content.settings:table==='listing_authors'?content.authors:table==='site_activities'?content.activities:table==='property_display_orders'?[]:table==='editorial_articles'?content.editorial:content[table];return Response.json(Array.isArray(data)?data.slice(Number(url.searchParams.get('offset')||0),Number(url.searchParams.get('offset')||0)+Number(url.searchParams.get('limit')||500)):data);}
+function responseFor(input){const url=new URL(input),table=url.pathname.split('/').at(-1),data=table==='site_settings'?content.settings:table==='listing_authors'?content.authors:table==='site_activities'?content.activities:table==='home_public_properties'?content.properties:table==='property_display_orders'?[]:table==='editorial_articles'?content.editorial:content[table];return Response.json(Array.isArray(data)?data.slice(Number(url.searchParams.get('offset')||0),Number(url.searchParams.get('offset')||0)+Number(url.searchParams.get('limit')||500)):data);}
 
 test('the real SDK loads only published homes and the main public settings',async()=>{
  const calls=[];
  const result=await readPublishedContent(database(async(input,init)=>{calls.push({url:new URL(input),method:init.method});return responseFor(input);}));
  assert.deepEqual(result,content);assert.equal(calls.length,9);assert.ok(calls.every(call=>call.method==='GET'));
- assert.equal(calls.find(call=>call.url.pathname.endsWith('/properties')).url.searchParams.get('status'),'eq.published');
+ assert.equal(calls.find(call=>call.url.pathname.endsWith('/home_public_properties')).url.searchParams.get('status'),'eq.published');
  assert.equal(calls.find(call=>call.url.pathname.endsWith('/site_settings')).url.searchParams.get('id'),'eq.main');
 });
 
@@ -35,7 +35,7 @@ test('a missing settings row never turns a fallback into a successful live respo
 });
 
 test('empty published results are valid and do not restore reference homes',async()=>{
- const db=database(async input=>new URL(input).pathname.endsWith('/properties')?Response.json([]):responseFor(input));
+ const db=database(async input=>new URL(input).pathname.endsWith('/home_public_properties')?Response.json([]):responseFor(input));
  assert.deepEqual((await readPublishedContent(db)).properties,[]);
 });
 
@@ -75,7 +75,7 @@ test('published catalogue exhausts the real SDK ranges and propagates later-page
  const offsets=[];
  const capped=database(async input=>{
   const url=new URL(input);
-  if(!url.pathname.endsWith('/properties'))return responseFor(input);
+  if(!url.pathname.endsWith('/home_public_properties'))return responseFor(input);
   const from=Number(url.searchParams.get('offset')||0);offsets.push(from);
   assert.equal(url.searchParams.get('order'),'sort_order.asc,id.asc');
   return Response.json(homes.slice(from,from+200));
@@ -84,8 +84,54 @@ test('published catalogue exhausts the real SDK ranges and propagates later-page
  assert.deepEqual(offsets,[0,200,400,600,800,1000,1001]);
  const failing=database(async input=>{
   const url=new URL(input);
-  return url.pathname.endsWith('/properties')&&Number(url.searchParams.get('offset'))>0
+  return url.pathname.endsWith('/home_public_properties')&&Number(url.searchParams.get('offset'))>0
    ?Response.json({code:'42501',message:'Private failure'},{status:403}):responseFor(input);
  });
  await assert.rejects(readPublishedContent(failing),error=>error instanceof ContentReadError&&error.resource==='properties'&&error.code==='42501');
+});
+
+test('contact and staff shell reads skip the catalogue, and listing details fetch only their listing and three neighbours',async()=>{
+ const queries=[];
+ const property={...content.properties[0],slug:'sample-home',district_slug:'tay-ho'};
+ const db=database(async input=>{
+  const url=new URL(input);
+  queries.push(url);
+  if(url.pathname.endsWith('/home_public_properties')) {
+   return Response.json(url.searchParams.has('slug')?[property]:[]);
+  }
+  return responseFor(input);
+ });
+ for(const path of ['/vi/contact','/admin']){
+  queries.length=0;
+  const result=await readPublishedContent(db,undefined,path);
+  assert.equal(result.properties.length,0);
+  assert.deepEqual([...new Set(queries.map(url=>url.pathname.split('/').at(-1)))].sort(),['neighbourhoods','site_settings']);
+ }
+ queries.length=0;
+ const detail=await readPublishedContent(db,undefined,'/vi/homes/sample-home');
+ assert.deepEqual(detail.properties,[property]);
+ const listings=queries.filter(url=>url.pathname.endsWith('/home_public_properties'));
+ assert.equal(listings.length,2);
+ assert.equal(listings[0].searchParams.get('slug'),'eq.sample-home');
+ assert.equal(listings[1].searchParams.get('district_slug'),'eq.tay-ho');
+ assert.equal(listings[1].searchParams.get('limit'),'3');
+ assert.equal(queries.some(url=>url.pathname.endsWith('/editorial_articles')),false);
+});
+
+test('a missing production backend leaves sample listings out of the published response',async()=>{
+ const source=fs.readFileSync(new URL('../lib/server.ts',import.meta.url),'utf8');
+ const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+ const result={exports:{}},process={env:{NODE_ENV:'production'}},seed={...content,editorial:[{id:'example'}]};
+ vm.runInNewContext('(function(exports,require,process){'+code+'\n})')(
+  result.exports,name=>({'./runtime-env':{runtimeEnv:{}},'./seed':{seed}}[name]||{}),process
+ );
+ const live=await result.exports.loadContent();
+ assert.equal(live.error,true);
+ assert.equal(live.configured,false);
+ assert.equal(live.content.properties.length,0);
+ assert.equal(live.content.editorial.length,0);
+ process.env.NODE_ENV='development';
+ const preview=await result.exports.loadContent();
+ assert.equal(preview.error,false);
+ assert.equal(preview.content,seed);
 });

@@ -40,9 +40,19 @@ The app automatically switches from preview to live mode when both configuration
 
 Customers register and sign in with a personal email and password at `/account`. Email signup requires mailbox confirmation. Staff sign in at `/admin` using company accounts explicitly assigned by an owner or administrator. A company address alone grants no staff permissions. The allowed staff domains are `@garyhome.com` and `@icue.vn`. The existing owner account is preserved.
 
-Staff access is managed in **Studio → Team access**. Owners can create Admin, Manager or Staff accounts; Admins can create Manager or Staff accounts; Managers can create Staff accounts. New accounts use a temporary password and automatic confirmation, with a reminder to change the password after login. Already verified logins can be assigned while preserving their password and customer history. Unconfirmed logins must verify their mailbox or receive trusted replacement credentials before assignment. Staff account management and public enquiry/review/assistance submission require the server-only `SUPABASE_SECRET_KEY`. See [the current staff guide](docs/direct-staff-accounts.md) for migrations, photos and persistent notifications. Customer registration still uses email confirmation.
+Staff access is managed in **Studio → Team access**. Staff verify their email and choose their own password. An authorized team member then assigns the verified login a role below their own. Active Home membership controls Studio access.
 
 See **[the authentication setup guide](docs/auth-setup.md)** for the exact project, company domains, email confirmation and recovery redirects, staff invitations, secret handling, and live verification steps. Rebuild fresh-project SQL with `node scripts/build-setup.mjs` after adding a migration.
+
+### Home audit rollout
+
+For an existing Home database, review the pending credential, public projection, and cleanup worker migrations alongside the application change.
+
+1. Install the [public listing projection](supabase/migrations/20261124064334_home_public_listing_projection.sql) and [cleanup retry functions](supabase/migrations/20261124102511_home_listing_cleanup_retry.sql) before deploying the new Home readers. Apply the [credential cleanup](supabase/migrations/20261124063907_home_staff_credential_boundary.sql) with the staff portal release.
+2. Deploy Gary Home and verify the public homepage, both listing languages, saved homes, and Studio. Once the deployment uses the new projection, apply the [internal listing read restriction](supabase/migrations/20261124064349_home_restrict_internal_listing_reads.sql).
+3. Set the same `LISTING_CLEANUP_CRON_SECRET` in the Home runtime and Home repository secrets to enable scheduled cleanup. The worker retries prepared jobs and leaves ambiguous files in the Studio review queue.
+
+The read restriction hides the catalogue of Storage object keys. Direct links to existing files still follow the public bucket settings. Moving draft and archived files behind private access needs a coordinated rollout for listing galleries and the other pages sharing these buckets.
 
 ## Customer portal and staff CRM
 
@@ -120,7 +130,7 @@ Media folder changes, messaging icons and manager-controlled card ordering are d
 
 Staff invitation/password pages and branded email-template activation are documented in [docs/staff-password-email-setup.md](docs/staff-password-email-setup.md).
 
-The current direct staff-account workflow, strict role hierarchy, profile photos and persistent activity log are documented in [docs/direct-staff-accounts.md](docs/direct-staff-accounts.md). This replaces invitation-first staff onboarding.
+The current invitation and assignment workflow is documented in [docs/auth-setup.md](docs/auth-setup.md). This replaces invitation-first staff onboarding.
 
 Landlord introductions support private photos/PDF plans and a Studio review queue under **Customer care → Introduced properties**, with status, assignment, internal notes and draft-listing conversion. See [landlord-introductions.md](docs/landlord-introductions.md) for the migration, permissions and upload maintenance. About Us links Services, Tips & News, Contact and Landlords; [about-pages.md](docs/about-pages.md) covers the bilingual editorial pages and their sources.
 

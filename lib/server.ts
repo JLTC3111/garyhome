@@ -36,16 +36,17 @@ export function staffAdminClient() {
     global: { fetch: (input, init) => fetchWithDeadline(input, init, 10000) },
   }) : null;
 }
-export async function loadContent(): Promise<{ content: Content; configured: boolean; error: boolean }> {
+export async function loadContent(scope?: string): Promise<{ content: Content; configured: boolean; error: boolean }> {
   const db = publicSupabase();
-  if (!db) return { content: mayShowSeedContent() ? seed : unavailableContent(), configured: false, error: !mayShowSeedContent() };
+  const allowSeed = mayShowSeedContent();
+  if (!db) return { content: allowSeed ? seed : unavailableContent(), configured: false, error: !allowSeed };
   try {
-    return { content: await readPublishedContent(db), configured: true, error: false };
+    return { content: await readPublishedContent(db, undefined, scope), configured: true, error: false };
   } catch (error) {
     // Log identifiers only: SDK error details can contain URLs and credentials.
     console.warn("[Gary Home] Public content unavailable", error instanceof ContentReadError
       ? { resource: error.resource, status: error.status, code: error.code }
       : { type: error instanceof Error ? error.name : "UnknownError" });
-    return { content: mayShowSeedContent() ? seed : unavailableContent(), configured: true, error: true };
+    return { content: allowSeed ? seed : unavailableContent(), configured: true, error: true };
   }
 }

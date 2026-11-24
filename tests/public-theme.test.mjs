@@ -187,6 +187,53 @@ test('Studio action, focus and field colors meet contrast targets in both themes
   }
 });
 
+test('search fields share light input tokens and keep readable text', () => {
+  const theme = postcss.parse(css);
+  const tokenRule = theme.nodes.find(node => node.type === 'rule' && node.selector === ':root');
+  const value = name => tokenRule.nodes.find(node => node.prop === `--home-input-${name}`)?.value;
+  const light = {
+    fill: '#f0f3ea',
+    border: '#a9b9a5',
+    'fill-hover': '#ffffff',
+    'border-hover': '#78957e',
+    'fill-focus': '#ffffff',
+    'border-focus': '#3f6a4c',
+    ink: '#243c31',
+    placeholder: '#526658',
+    icon: '#3f6a4c',
+    'focus-ring': '#3f6a4c'
+  };
+  for (const [name, hex] of Object.entries(light)) assert.equal(value(name), hex, name);
+  assert.equal(value('focus-shadow'), 'inset 0 0 0 1px var(--home-input-border-focus)');
+  assert.equal(value('ring-focus'), '0 0 0 2px var(--home-input-border-focus)');
+  const dark = theme.nodes.find(node => node.selector === 'html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"]');
+  assert.equal(dark.nodes.find(node => node.prop === '--home-input-fill').value, 'var(--home-surface)');
+  assert.equal(dark.nodes.find(node => node.prop === '--home-input-focus-shadow').value, 'none');
+  const uses = selector => theme.nodes.some(node => node.type === 'rule' && node.selector.includes(selector)
+    && node.nodes.some(child => String(child.value).includes('var(--home-input-')));
+  assert.equal(uses('.rental-search :is(.rental-id-field,.rental-keyword-field) input'), true);
+  assert.equal(uses('.admin-table-tools input'), true);
+  assert.equal(uses('.help-search:focus-within'), true);
+  const focus = theme.nodes.find(node => node.selector?.includes('.help-search input:focus-visible'));
+  assert.equal(focus.nodes.find(node => node.prop === 'outline').value, '2px solid var(--home-input-focus-ring)');
+  assert.ok(contrast(light.ink, light.fill) >= 4.5);
+  assert.ok(contrast(light.ink, light['fill-hover']) >= 4.5);
+  assert.ok(contrast(light.placeholder, light.fill) >= 4.5);
+  assert.ok(contrast(light.placeholder, light['fill-focus']) >= 4.5);
+  assert.ok(contrast(light.icon, '#ffffff') >= 4.5);
+  assert.ok(contrast(light['border-hover'], '#ffffff') >= 3);
+  assert.ok(contrast(light['border-focus'], '#ffffff') >= 3);
+  assert.ok(contrast(light['focus-ring'], light.fill) >= 3);
+  const rental = fs.readFileSync(new URL('app/rental-id-search.css', root), 'utf8');
+  assert.match(rental, /min-height:44px;padding:11px 12px/);
+  assert.match(rental, /\.rental-keyword-field input\{font-size:16px;min-height:48px\}/);
+  const studio = postcss.parse(fs.readFileSync(new URL('app/studio-theme.css', root), 'utf8'));
+  const studioDark = studio.nodes.find(node => node.selector === 'html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .session-gate)');
+  assert.equal(studioDark.nodes.find(node => node.prop === '--home-input-fill').value, 'var(--paper)');
+  assert.equal(studioDark.nodes.find(node => node.prop === '--home-input-focus-shadow').value, 'none');
+  assert.equal(studioDark.nodes.find(node => node.prop === '--home-input-ring').value, '0 0 0 1px var(--home-field-border)');
+});
+
 test('dark styles preserve image color and the supplied evening asset is an unmodified copy', () => {
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
   for (const [, selector, body] of rules) {

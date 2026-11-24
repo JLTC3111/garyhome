@@ -5,7 +5,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {propertyPhotoFilename,propertyPhotoPath,propertyPhotoUrl,replacePropertyPhotoUrl} from '../lib/property-photo-files.ts';
 import {propertyPhotoRenameHistory,renamePropertyPhoto,retirePropertyPhoto} from '../lib/property-photo-rename-server.ts';
 import {syncRenamedListingDraft} from '../lib/property-photo-rename-state.ts';
-import {deleteListingAndMedia,listingDeletionQueue} from '../lib/property-deletion-server.ts';
+import {deleteListingAndMedia,listingDeletionQueue,retryDueListingCleanup} from '../lib/property-deletion-server.ts';
 
 const origin='https://duyiihsmaqfgwezmsnjs.supabase.co', bucket='property-media';
 const first='10101010-1111-4111-8111-111111111111', second='20202020-2222-4222-8222-222222222222';
@@ -19,6 +19,26 @@ const transformedNew=newUrl.replace('/object/public/','/render/image/public/')+'
 const another=origin+'/storage/v1/object/public/property-media/properties/another.jpg';
 const jpeg=new Uint8Array([255,216,255,224,0,0,0,1]), png=new Uint8Array([137,80,78,71,13,10,26,10]);
 const signal=()=>new AbortController().signal;
+
+test('scheduled cleanup retries only committed pending files and respects the manual cleanup lease',async t=>{
+ const h=await setup(t),job=crypto.randomUUID(),name='properties/scheduled-unreferenced.jpg';
+ await h.pg.query(`insert into private.home_listing_deletions(property_id,listing_code,requested_by,requested_at)
+   values($1,'TEST',$2,now()-interval '25 hours')`,[job,admin]);
+ await h.pg.query('insert into storage.objects(bucket_id,name) values($1,$2)',[bucket,name]);
+ await h.pg.query(`insert into private.home_listing_deletion_media(property_id,bucket,name,object_id,object_version,evidence,state)
+   select $1,bucket_id,name,id,version,'fixture','pending' from storage.objects where bucket_id=$2 and name=$3`,[job,bucket,name]);
+ const asService=(sql,args=[])=>h.role('service_role',null,()=>h.pg.query(sql,args));
+ await assert.rejects(h.role('authenticated',admin,()=>h.pg.query('select public.home_listing_delete_due()')),error=>error.code==='42501');
+ const lease=(await asService('select public.home_listing_delete_claim($1,false) token',[job])).rows[0].token;
+ const system=h.client('service_role');
+ assert.deepEqual(await retryDueListingCleanup(system,signal()),{attempted:0,overdue:1});
+ assert.deepEqual(h.calls,[]);
+ await asService('select public.home_listing_delete_release($1,$2)',[job,lease]);
+ await h.pg.query(`update private.home_listing_deletions set cleanup_retry_after=now() where property_id=$1`,[job]);
+ assert.deepEqual(await retryDueListingCleanup(system,signal()),{attempted:1,overdue:0});
+ assert.deepEqual(h.calls,[['remove',name]]);
+ assert.equal((await h.pg.query('select state from private.home_listing_deletion_media where property_id=$1',[job])).rows[0].state,'removed');
+});
 
 test('filename normalization fixes duplicate and copy suffixes with the actual extension',()=>{
  for(const [input,want] of [
@@ -92,6 +112,7 @@ async function setup(t) {
  await pg.exec(baseline.match(/create function public\.delete_property\(target_property uuid\)[\s\S]*?end; \$\$;/)[0]);
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119095000_property_deletion_media_cleanup.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119183631_property_photo_rename_owner_only.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../supabase/migrations/20261124102511_home_listing_cleanup_retry.sql',import.meta.url),'utf8'));
  const files=new Map([[oldKey,{mime:'image/jpeg',bytes:jpeg}]]), calls=[];
  let onCopy=()=>{}, onRemove=()=>{};
  const original=globalThis.fetch;

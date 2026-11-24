@@ -266,7 +266,7 @@ test.describe("homepage favourite pulse", { concurrency: 1 }, () => {
     assert.equal(heart.queue.length, 0);
   });
 
-  test("homepage cards reuse favourite persistence without opening the listing or moving the photo", async t => {
+  test("homepage and filtered cards share thumbnails and keep the favourite action separate", async t => {
     const browser = installBrowser(t);
     const saves = [];
     const site = { current: { t: (en, vi) => en, language: "en", currency: "USD", exchangeRate: null, saved: [], pendingSaved: [], toggleSaved(id) { saves.push(id); }, content: { neighbourhoods: [{ slug: "tay-ho", name: "Tây Hồ" }] } } };
@@ -275,6 +275,19 @@ test.describe("homepage favourite pulse", { concurrency: 1 }, () => {
       "next/link": { __esModule: true, default: ({ href, children, ...props }) => React.createElement("a", { href, ...props }, children) },
       "next/navigation": { usePathname: () => "/" },
       "./site-context": { useSite: () => site.current },
+      "embla-carousel-react": () => {
+        const [api] = React.useState(() => {
+          const listeners = new Map();
+          let index = 0;
+          return {
+            on(event, handler) { listeners.set(event, handler); return this; },
+            off(event) { listeners.delete(event); return this; },
+            selectedScrollSnap: () => index,
+            scrollTo(next) { index = next; listeners.get("select")?.(); },
+          };
+        });
+        return [() => {}, api];
+      },
     });
     const property = {
       id: "home-1", slug: "lake-house", listing_code: "GH-1", title_en: "Lake house", title_vi: "Nhà hồ",
@@ -288,11 +301,14 @@ test.describe("homepage favourite pulse", { concurrency: 1 }, () => {
     const position = () => renderer.root.findByProps({ className: "rental-photo-position" }).children.join("");
     await act(async () => { renderer = TestRenderer.create(React.createElement(PropertyCard, { property, pulseFavourite: true }), { createNodeMock: browser.createNodeMock }); });
     const favourite = () => renderer.root.findByProps({ "data-button-variant": "save" });
+    const thumbnails = () => renderer.root.findByProps({ className: "embla-listing-thumbnails" }).findAllByType("button");
+    assert.equal(thumbnails().length, 2);
     assert.equal(favourite().props.href, undefined);
     assert.equal(favourite().props.className.includes("pulse-heart"), true);
     assert.equal(favourite().props.className.includes("save-button"), true);
     await act(async () => renderer.root.findByProps({ "aria-label": "Next property photo" }).props.onClick());
     assert.equal(position(), "2 / 2");
+    assert.equal(thumbnails()[1].props["aria-pressed"], true);
     const click = pointer(1);
     await act(async () => { favourite().props.onPointerDown(click); favourite().props.onPointerUp(pointer(1)); favourite().props.onClick(click); });
     assert.equal(click.stopped, true);
@@ -307,11 +323,22 @@ test.describe("homepage favourite pulse", { concurrency: 1 }, () => {
     assert.equal(renderer.root.findAllByProps({ className: "spin" }).length, 0);
     assert.equal(favourite().props["aria-pressed"], true);
 
-    await act(async () => renderer.update(React.createElement(PropertyCard, { property })));
+    await act(async () => renderer.update(React.createElement(PropertyCard, { property, keywordTerms: ["lake"] })));
     const plain = renderer.root.findByProps({ "data-button-variant": "save" });
     assert.equal(plain.props.className.includes("pulse-heart"), false);
     assert.equal(plain.props.className.includes("is-saved"), true);
     assert.equal(renderer.root.findAllByProps({ className: "spin" }).length, 1);
+    assert.equal(renderer.root.findByType("mark").children.join(""), "Lake");
+    await act(async () => thumbnails()[0].props.onClick());
+    assert.equal(position(), "1 / 2");
+    assert.equal(thumbnails()[0].props["aria-pressed"], true);
+
+    await act(async () => renderer.update(React.createElement(PropertyCard, { property: { ...property, images: property.images.slice(0, 1) } })));
+    assert.equal(renderer.root.findAllByProps({ className: "embla-listing-thumbnails" }).length, 0);
+    assert.equal(renderer.root.findAllByProps({ className: "rental-card-photo-nav" }).length, 0);
+    assert.equal(renderer.root.findAllByProps({ className: "rental-photo-position" }).length, 0);
+    assert.equal(renderer.root.findByType("img").props.loading, "lazy");
+    assert.equal(renderer.root.findByProps({ "data-button-variant": "save" }).props["aria-pressed"], true);
   });
 });
 

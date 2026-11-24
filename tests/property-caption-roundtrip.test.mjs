@@ -30,7 +30,7 @@ test('Studio photo metadata survives a database save and public gallery reload',
     global: {fetch: async (input, init) => {
       const url = new URL(input), table = url.pathname.split('/').at(-1);
       if (table === 'site_settings') return Response.json({id: 'main', hero_image: ''});
-      if (table !== 'properties') return Response.json([]);
+      if (!['properties','home_public_properties'].includes(table)) return Response.json([]);
       if (init.method === 'PATCH') {
         assert.equal(url.searchParams.get('id'), 'eq.gallery-fixture');
         const {image_metadata} = JSON.parse(init.body);
@@ -68,4 +68,69 @@ test('Studio photo metadata survives a database save and public gallery reload',
     {caption: 'Photo 4 of 4', alt: '', filename: ''},
   ]);
   assert.equal(galleryPhotoMetadata(canonical, listing.image_metadata, 'vi', 'Ảnh 1 trên 4').caption, 'Ghế bên cửa sổ trong nắng sớm');
+});
+
+test('public listing reads exclude private original filenames, drafts and Storage catalogue entries', async t => {
+  const db = new PGlite();
+  t.after(() => db.close());
+  await db.exec(`
+    create role anon;
+    create role authenticated;
+    create schema private;
+    create schema storage;
+    create schema auth;
+    grant usage on schema private, storage, auth to authenticated, anon;
+    create function auth.uid() returns text language sql stable as $$ select current_setting('fixture.user_id',true) $$;
+    create function private.is_editor() returns boolean language sql stable
+      as $$ select current_setting('fixture.is_editor',true) is not distinct from 'yes' $$;
+    create table public.properties (
+      id text primary key,slug text,title_en text,title_vi text,listing_code text,author_id uuid,price_period text,rental_term text,
+      overview_en text,overview_vi text,location_en text,location_vi text,furnishings_en text,furnishings_vi text,seo_features text[],
+      description_en text,description_vi text,district_slug text,address text,map_address text,price numeric,price_max numeric,currency text,
+      price_vnd numeric,price_vnd_max numeric,listing_type text,property_type text,bedrooms integer,bathrooms integer,area_sqm numeric,
+      amenities text[],images text[],image_metadata jsonb,video_url text,featured boolean,status text,availability text,published_at timestamptz,
+      source_url text,sort_order integer,created_at timestamptz,updated_at timestamptz,image_filenames jsonb
+    );
+    alter table public.properties enable row level security;
+    grant select on public.properties to anon,authenticated;
+    create policy properties_public_read on public.properties for select to anon,authenticated using(status='published');
+    create policy properties_editor_read on public.properties for select to authenticated using(private.is_editor());
+    insert into public.properties(id,status,listing_type,availability,image_filenames,image_metadata)
+      values ('public','published','rent','available','{"a":"name-only-for-staff.jpg"}','{"a":{"public_filename":"Approved name.jpg"}}'),
+             ('draft','draft','rent','available','{}','{}'),
+             ('archived','archived','rent','available','{}','{}'),
+             ('rented','published','rent','rented','{}','{}');
+    create table public.saved_homes(user_id text,property_id text references public.properties(id));
+    alter table public.saved_homes enable row level security;
+    grant insert on public.saved_homes to authenticated;
+    create policy saved_insert_self on public.saved_homes for insert to authenticated
+      with check(user_id=(select auth.uid()));
+    create policy saved_rental_only on public.saved_homes as restrictive for insert to authenticated
+      with check(exists(select 1 from public.properties p where p.id=property_id and p.status='published'));
+    create table storage.objects(bucket_id text,name text);
+    alter table storage.objects enable row level security;
+    grant select on storage.objects to anon,authenticated;
+    create policy legacy_public_catalogue on storage.objects for select to anon,authenticated using(true);
+    insert into storage.objects values ('property-media','old.jpg'),('listing-videos','old.mp4'),('other','public.svg');
+  `);
+  for (const name of ['20261124064334_home_public_listing_projection.sql','20261124064349_home_restrict_internal_listing_reads.sql']) {
+    await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+  }
+  await db.exec('set role anon');
+  const published = (await db.query('select * from public.home_public_properties')).rows;
+  assert.deepEqual(published.map(row => row.id), ['public']);
+  assert.equal(Object.hasOwn(published[0],'image_filenames'), false);
+  assert.equal(published[0].image_metadata.a.public_filename,'Approved name.jpg');
+  await assert.rejects(db.query('select * from public.properties'), error => error.code === '42501');
+  assert.deepEqual((await db.query('select name from storage.objects')).rows,[{name:'public.svg'}]);
+  await db.exec('set role authenticated');
+  assert.deepEqual((await db.query('select id from public.properties')).rows,[]);
+  await db.exec("set fixture.user_id='self'");
+  await db.query("insert into public.saved_homes values('self','public')");
+  for (const [user,property] of [['self','draft'],['self','rented'],['someone-else','public']]) {
+    await assert.rejects(db.query('insert into public.saved_homes values($1,$2)',[user,property]), error => error.code === '42501');
+  }
+  await db.exec("set fixture.is_editor='yes'");
+  assert.equal((await db.query("select image_filenames from public.properties where id='public'")).rows[0].image_filenames.a,'name-only-for-staff.jpg');
+  assert.equal((await db.query('select name from storage.objects')).rows.length,3);
 });

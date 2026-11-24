@@ -38,10 +38,37 @@ html[data-home-public="true"]{
   --home-shadow:0 12px 36px #050b073d;
   --home-shine-soft:#c7d6b626;
   --home-shine-peak:#c9a58870;
+  /* Search fields. Light values; dark remaps below so both sites share one set. */
+  --home-input-fill:#f0f3ea;
+  --home-input-border:#a9b9a5;
+  --home-input-fill-hover:#ffffff;
+  --home-input-border-hover:#78957e;
+  --home-input-fill-focus:#ffffff;
+  --home-input-border-focus:#3f6a4c;
+  --home-input-ink:#243c31;
+  --home-input-placeholder:#526658;
+  --home-input-icon:#3f6a4c;
+  --home-input-focus-shadow:inset 0 0 0 1px var(--home-input-border-focus);
+  --home-input-focus-ring:#3f6a4c;
+  --home-input-ring:0 0 0 1px var(--home-input-border);
+  --home-input-ring-focus:0 0 0 2px var(--home-input-border-focus);
 }
 
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"]{
   color-scheme:dark;
+  --home-input-fill:var(--home-surface);
+  --home-input-border:var(--home-field-border);
+  --home-input-fill-hover:var(--home-surface);
+  --home-input-border-hover:var(--home-field-border);
+  --home-input-fill-focus:var(--home-surface);
+  --home-input-border-focus:var(--home-field-border);
+  --home-input-ink:var(--home-text);
+  --home-input-placeholder:var(--home-quiet);
+  --home-input-icon:var(--home-secondary);
+  --home-input-focus-shadow:none;
+  --home-input-focus-ring:var(--home-accent);
+  --home-input-ring:0 0 0 1px var(--home-field-border);
+  --home-input-ring-focus:0 0 0 1px var(--home-field-border);
   --ink:var(--home-text);
   --green:var(--home-accent);
   --olive:var(--home-accent);
@@ -229,4 +256,51 @@ html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-ca
 }
 @media(forced-colors:active){
   .home-theme-options .rubber-segment__item{forced-color-adjust:auto}
+}
+
+/* Keyword, ID, Staff Studio, and guide search fields share these tokens.
+   Border width stays 1px; focus adds an inner 1px so the outer size does not move.
+   Studio directory fields use a ring because they have no layout border. */
+.rental-search :is(.rental-id-field,.rental-keyword-field) input{
+  background-color:var(--home-input-fill);
+  border:1px solid var(--home-input-border);
+  color:var(--home-input-ink);
+}
+.rental-search :is(.rental-keyword-field,.rental-id-field)>span{color:var(--home-input-icon)}
+.admin-table-tools input{
+  border:0;
+  background-color:var(--home-input-fill);
+  box-shadow:var(--home-input-ring);
+  color:var(--home-input-ink);
+}
+.admin-table-tools>label{color:var(--home-input-icon)}
+.rental-search :is(.rental-id-field,.rental-keyword-field) input::placeholder,
+.admin-table-tools input::placeholder,
+.help-search input::placeholder{color:var(--home-input-placeholder);opacity:1}
+@media (hover:hover) and (pointer:fine){
+  .rental-search :is(.rental-id-field,.rental-keyword-field) input:hover:not(:focus),
+  .help-search:hover:not(:focus-within){
+    background-color:var(--home-input-fill-hover);
+    border-color:var(--home-input-border-hover);
+  }
+  .admin-table-tools input:hover:not(:focus){
+    background-color:var(--home-input-fill-hover);
+    box-shadow:0 0 0 1px var(--home-input-border-hover);
+  }
+}
+.rental-search :is(.rental-id-field,.rental-keyword-field) input:focus,
+.help-search:focus-within{
+  background-color:var(--home-input-fill-focus);
+  border-color:var(--home-input-border-focus);
+  box-shadow:var(--home-input-focus-shadow);
+}
+.admin-table-tools input:focus{
+  background-color:var(--home-input-fill-focus);
+  box-shadow:var(--home-input-ring-focus);
+}
+.rental-search :is(.rental-id-field,.rental-keyword-field) input:focus-visible,
+.admin-table-tools input:focus-visible,
+.help-search input:focus-visible{
+  outline:2px solid var(--home-input-focus-ring);
+  outline-offset:2px;
 }

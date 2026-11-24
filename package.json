@@ -8,8 +8,8 @@
   "scripts": {
     "build:gary-apps": "node scripts/build-gary-apps.mjs",
     "predev": "npm run build:gary-apps",
-    "prebuild": "npm run build:gary-apps",
-    "prebuild:vercel": "npm run build:gary-apps",
+    "prebuild": "node scripts/build-setup.mjs --check && npm run build:gary-apps",
+    "prebuild:vercel": "node scripts/build-setup.mjs --check && npm run build:gary-apps",
     "install:ci": "node scripts/install-ci.mjs",
     "dev": "node scripts/run-framework.mjs dev",
     "build": "node scripts/run-framework.mjs build",

@@ -57,7 +57,7 @@ async function harness(t, options={}){
     if(backend.teamPending)await backend.teamPending.promise;
     return Response.json({members:backend.teamRows,next:null,domains:['garyhome.com','icue.vn','gmail.com'],directCreationEnabled:true});
    }
-   if(method==='POST'){if(backend.teamPostError)return Response.json(backend.teamPostError,{status:409});const data=JSON.parse(init.body),existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});if(existing)backend.teamRows=backend.teamRows.map(m=>m.email.toLowerCase()===data.email.toLowerCase()?{...m,confirmed:true}:m);return Response.json(backend.teamResult??{created:data.mode!=='assign',confirmed:true,...(data.replace_password?{password_set:true}:{})});}
+   if(method==='POST'){if(backend.teamPostError)return Response.json(backend.teamPostError,{status:409});const data=JSON.parse(init.body);if(data.mode==='create')return Response.json({invited:true},{status:202});const existing=backend.teamRows.some(m=>m.email.toLowerCase()===data.email.trim().toLowerCase());if(!existing)backend.teamRows.push({user_id:'new-staff',display_name:data.full_name,email:data.email,role:data.role,active:true,confirmed:false});if(existing)backend.teamRows=backend.teamRows.map(m=>m.email.toLowerCase()===data.email.toLowerCase()?{...m,confirmed:true}:m);return Response.json(backend.teamResult??{created:data.mode!=='assign',confirmed:true,...(data.replace_password?{password_set:true}:{})});}
    return Response.json({user_id:'changed-staff'});
   }
   if(String(input)==='/api/landlords'){
@@ -82,8 +82,8 @@ async function harness(t, options={}){
   query.then=(resolve,reject)=>(async()=>{
    backend.publicCalls.push({table,filters});
    if(backend.publicPending)await backend.publicPending.promise;
-   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:table==='property_display_orders'?[]:table==='editorial_articles'?backend.publicRows.editorial||[]:backend.publicRows[table]);
-   if(table==='properties')data=data.filter(row=>row.status===filters.status);
+   let data=structuredClone(table==='site_settings'?backend.publicRows.settings:table==='listing_authors'?backend.publicRows.authors||[]:table==='site_activities'?backend.publicRows.activities||[]:table==='property_display_orders'?[]:table==='editorial_articles'?backend.publicRows.editorial||[]:backend.publicRows[table==='home_public_properties'?'properties':table]);
+   if(table==='home_public_properties')data=data.filter(row=>row.status===filters.status);
    if(range&&Array.isArray(data))data=data.slice(range[0],Math.min(range[1]+1,range[0]+(options.rowCap??Infinity)));
    return backend.publicError?{data:null,error:{code:'',message:'Temporary network failure'},status:0}:{data,error:null,status:200};
   })().then(resolve,reject);
@@ -664,19 +664,20 @@ test('opening staff password setup without an invitation cannot change an existi
  assert.match(JSON.stringify(h.renderer.toJSON()),/Open the staff invitation link/);
 });
 
-test('owner team drafts survive language changes and same-user recovery while temporary passwords clear after sign-out',async t=>{
+test('owner team drafts survive language changes and same-user recovery, and invitations do not grant access',async t=>{
  const h=await harness(t);
  await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
  const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
  await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'New Colleague'}});});
  await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'new@garyhome.com'}});h.site.setLanguage('vi');});
- await h.emit(authSession('owner'));
  await h.emit(null);await h.emit(authSession('owner'));
- assert.equal(form().findByProps({name:'full_name'}).props.value,'New Colleague');assert.equal(form().findByProps({name:'email'}).props.value,'new@garyhome.com');
- assert.equal(form().findByProps({name:'password'}).props.value,'');
- await act(async()=>{form().findByProps({name:'password'}).props.onChange({target:{value:'A temporary colleague password'}});form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A temporary colleague password'}});});
+ assert.equal(form().findByProps({name:'full_name'}).props.value,'New Colleague');
+ assert.equal(form().findByProps({name:'email'}).props.value,'new@garyhome.com');
+ assert.equal(form().findAllByProps({name:'password'}).length,0);
  await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
- const create=h.backend.teamCalls.find(call=>call.method==='POST');assert.equal(create.input.email,'new@garyhome.com');assert.equal(create.input.role,'editor');
+ const posts=h.backend.teamCalls.filter(call=>call.method==='POST');
+ assert.deepEqual(posts.map(call=>call.input),[{full_name:'New Colleague',email:'new@garyhome.com',role:'editor',mode:'create'}]);
+ assert.equal(h.backend.teamRows.some(row=>row.email==='new@garyhome.com'),false);
  assert.match(JSON.stringify(h.renderer.toJSON()),/New Colleague/);
  assert.ok(h.backend.teamCalls.length<10,'Directory reads must not loop through session recovery');
 });
@@ -708,7 +709,7 @@ test('a failed server reload automatically recovers public listings and clears t
  assert.equal(h.site.content.settings.hero_title_en,live.settings.hero_title_en);
  assert.equal(h.renderer.root.findAllByProps({className:'service-banner'}).length,0);
  assert.equal(h.backend.publicCalls.length,10);
- assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='properties').filters,{status:'published',listing_type:'rent',availability:['available','on_request']});
+ assert.deepEqual(h.backend.publicCalls.find(call=>call.table==='home_public_properties').filters,{status:'published',listing_type:'rent',availability:['available','on_request']});
  assert.equal(h.site.user,null);
 });
 
@@ -1365,7 +1366,7 @@ test('existing staff assignments preserve their login and recovery email remains
  await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Pending Staff'}});});
  await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'pending@gmail.com'}});});
  await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
- assert.match(JSON.stringify(h.renderer.toJSON()),/verified login password is unchanged/);assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET').length,0);
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Home staff access assigned/);assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET').length,0);
  assert.equal(h.backend.teamRows.length,2);assert.equal(h.backend.teamCalls.filter(c=>c.method==='POST').length,1);
  const pending=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('pending@gmail.com')));
  const resend=pending.findAllByType('button').find(n=>n.props.className==='text-link team-reset-action');assert.equal(resend.props.disabled,false);assert.ok(resend.children.includes('Send password link'));
@@ -1379,9 +1380,9 @@ test('managers receive Staff-only creation choices and a translated role guide',
  await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
  const form=h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
  const roles=form.findAllByType(require('@base-ui/react/select').Select.Root)[0].props.items.map(item=>item.value);assert.deepEqual(roles,['editor']);
- assert.equal(form.findByProps({name:'password'}).props.autoComplete,'new-password');assert.equal(form.findByProps({name:'confirm_password'}).props.minLength,12);
+ assert.equal(form.findAllByProps({name:'password'}).length,0);
  const guide=h.renderer.root.findByProps({className:'admin-panel team-permissions-guide'});assert.equal(guide.findAllByType('tbody')[0].findAllByType('tr').length,4);
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Ai có thể tạo vai trò nào/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Bạn có thể cấp vai trò nào/);
 });
 test('staff can change their own password from the sidebar and clear the first-login reminder without email',async t=>{
  const h=await harness(t);h.backend.passwordReminder=true;
@@ -1425,37 +1426,39 @@ test('notifications load once per refresh, show persisted activity and keep read
 });
 
 
-test('existing staff passwords can be replaced explicitly without assigning a role, sending an email or switching the owner session',async t=>{
- const h=await harness(t);h.backend.teamRows.push({user_id:'existing-staff',display_name:'Existing colleague',email:'colleague@gmail.com',role:'manager',active:true,confirmed:true});
+test('the directory offers mailbox recovery and removes shared credential controls',async t=>{
+ const h=await harness(t);
+ h.backend.teamRows.push({user_id:'existing-staff',display_name:'Existing colleague',email:'colleague@gmail.com',role:'manager',active:true,confirmed:true});
  await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
  const row=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('colleague@gmail.com')));
- await act(async()=>row.findByProps({className:'text-link team-password-action'}).props.onClick());
- let dialog=h.renderer.root.findByType('dialog');assert.match(JSON.stringify(dialog.toJSON?.()??h.renderer.toJSON()),/current password/);
- const form=()=>h.renderer.root.findByType('dialog').findByType('form');
- await act(async()=>{form().findByProps({name:'temporary_password'}).props.onChange({target:{value:'A replacement temporary password'}});form().findByProps({name:'confirm_temporary_password'}).props.onChange({target:{value:'Does not match'}});});
- await act(async()=>{await form().props.onSubmit({preventDefault(){}});});assert.equal(h.backend.teamCalls.filter(c=>c.method==='PASSWORD').length,0);
- await act(async()=>{form().findByProps({name:'confirm_temporary_password'}).props.onChange({target:{value:'A replacement temporary password'}});});
+ assert.equal(row.findAllByProps({className:'text-link team-password-action'}).length,0);
+ await act(async()=>{await row.findByProps({className:'text-link team-reset-action'}).props.onClick();await delay(5);});
+ assert.deepEqual(h.backend.teamCalls.filter(call=>['PASSWORD','RESET','POST'].includes(call.method)),[{method:'RESET',input:{user_id:'existing-staff'}}]);
+ assert.equal(h.site.user.id,'owner');
+ assert.equal(h.backend.authCalls.length,0);
+});
+
+test('an unverified assignment leaves the invitation draft intact without providing a credential override',async t=>{
+ const h=await harness(t);
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+ const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
+ await act(async()=>h.renderer.root.findAllByType('button').find(button=>button.children.includes('Assign existing login')).props.onClick());
+ await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Unverified colleague'}});});
+ await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'pending@gmail.com'}});});
+ h.backend.teamPostError={code:'unverified_login',error:'Ask the staff member to verify their email before assigning Home access.'};
  await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
- assert.deepEqual(h.backend.teamCalls.filter(c=>c.method==='PASSWORD'),[{method:'PASSWORD',input:{user_id:'existing-staff',password:'A replacement temporary password',confirm_password:'A replacement temporary password'}}]);
- assert.equal(h.backend.teamCalls.filter(c=>c.method==='RESET'||c.method==='POST'||c.method==='PATCH').length,0);assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.equal(h.site.user.id,'owner');assert.equal(h.backend.authCalls.length,0);assert.equal(h.backend.teamRows.find(m=>m.user_id==='existing-staff').role,'manager');
+ assert.equal(form().findByProps({name:'email'}).props.value,'pending@gmail.com');
+ assert.equal(form().findAllByProps({name:'password'}).length,0);
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.match(JSON.stringify(h.renderer.toJSON()),/xác minh email trước khi cấp quyền/);
 });
-test('temporary-password failures keep the form open and private passwords clear on role change',async t=>{
- const h=await harness(t);h.backend.teamRows.push({user_id:'existing-staff',display_name:'Existing colleague',email:'colleague@gmail.com',role:'editor',active:true,confirmed:true});
- await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
- const row=h.renderer.root.findAllByProps({className:'team-member'}).find(n=>n.findAllByType('span').some(s=>s.children.includes('colleague@gmail.com')));
- await act(async()=>row.findByProps({className:'text-link team-password-action'}).props.onClick());
- const form=()=>h.renderer.root.findByType('dialog').findByType('form');
- await act(async()=>{form().findByProps({name:'temporary_password'}).props.onChange({target:{value:'Private unsaved temporary password'}});form().findByProps({name:'confirm_temporary_password'}).props.onChange({target:{value:'Private unsaved temporary password'}});});
- h.backend.teamPasswordError='Couldn’t confirm the temporary password. Check the account before trying again.';
- await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.backend.teamCalls.filter(c=>c.method==='PASSWORD').length,1);assert.match(JSON.stringify(h.renderer.toJSON()),/Couldn’t confirm the temporary password/);
- h.backend.role='manager';await h.emit(authSession('owner'));assert.equal(h.renderer.root.findAllByType('dialog').length,0);assert.equal(h.renderer.root.findAllByProps({name:'temporary_password'}).length,0);
-});
+
 test('the staff portal normalizes email, preserves exact password characters and explains existing-account credentials in both languages',async t=>{
  const h=await harness(t,{guest:true,page:'staff'});h.backend.signInError=Object.assign(new Error('Invalid login credentials'),{code:'invalid_credentials'});
  const fields={email:'  COLLEAGUE@GMAIL.COM  ',password:'  An exact temporary password  '};
  await act(async()=>{await h.renderer.root.findByProps({'aria-label':'Staff account access'}).props.onSubmit({preventDefault(){},currentTarget:{fields}});});
- assert.deepEqual(h.backend.authCalls,[{method:'password',input:{email:'colleague@gmail.com',password:fields.password}}]);assert.equal(h.site.user,null);assert.match(JSON.stringify(h.renderer.toJSON()),/Reassigned accounts keep their existing password/);assert.match(JSON.stringify(h.renderer.toJSON()),/no separate first-time login page/);
- await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Tài khoản được cấp lại quyền/);assert.match(JSON.stringify(h.renderer.toJSON()),/Không có trang đăng nhập lần đầu riêng/);
+ assert.deepEqual(h.backend.authCalls,[{method:'password',input:{email:'colleague@gmail.com',password:fields.password}}]);assert.equal(h.site.user,null);assert.match(JSON.stringify(h.renderer.toJSON()),/Use the password you chose or request a reset link/);assert.match(JSON.stringify(h.renderer.toJSON()),/Your Home role is granted separately/);
+ await act(async()=>h.site.setLanguage('vi'));assert.match(JSON.stringify(h.renderer.toJSON()),/Hãy dùng mật khẩu bạn đã chọn/);assert.match(JSON.stringify(h.renderer.toJSON()),/Quyền Gary Home được cấp riêng/);
 });
 
 
@@ -1502,24 +1505,36 @@ test('an unconfirmed photo write cannot be acknowledged by Save changes',async t
 });
 
 
-test('duplicate staff conflicts survive a background refresh and offer explicit password replacement when restoring access',async t=>{
- const h=await harness(t);await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
+test('an invitation conflict survives a directory refresh and offers verified assignment',async t=>{
+ const h=await harness(t);
+ await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});
  const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
- await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Returning colleague'}});form().findByProps({name:'email'}).props.onChange({target:{value:'returning@gmail.com'}});form().findByProps({name:'password'}).props.onChange({target:{value:'A new temporary colleague password'}});form().findByProps({name:'confirm_password'}).props.onChange({target:{value:'A new temporary colleague password'}});});
- h.backend.teamPostError={code:'existing_login',error:'A login already exists for this email. Assign or restore staff access instead of creating another login.'};
- await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});assert.equal(h.renderer.root.findAllByProps({className:'team-existing-login-callout'}).length,1);
- await act(async()=>{h.browser.dispatchEvent(new Event('gary-staff-directory-changed'));await delay(5);});assert.match(JSON.stringify(h.renderer.toJSON()),/A login already exists/);
- await act(async()=>h.renderer.root.findAllByType('button').find(n=>n.children.includes('Assign and set temporary password')).props.onClick());assert.equal(form().findByProps({name:'password'}).props.value,'A new temporary colleague password');
- h.backend.teamPostError=null;await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
- const posts=h.backend.teamCalls.filter(x=>x.method==='POST');assert.equal(posts.length,2);assert.equal(posts[1].input.mode,'assign');assert.equal(posts[1].input.replace_password,true);assert.equal(posts[1].input.password,'A new temporary colleague password');assert.match(JSON.stringify(h.renderer.toJSON()),/temporary password saved/);
+ await act(async()=>{form().findByProps({name:'full_name'}).props.onChange({target:{value:'Returning colleague'}});});
+ await act(async()=>{form().findByProps({name:'email'}).props.onChange({target:{value:'returning@gmail.com'}});});
+ h.backend.teamPostError={code:'existing_login',error:'A login already exists for this email. Assign the verified login.'};
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
+ await act(async()=>{h.browser.dispatchEvent(new Event('gary-staff-directory-changed'));await delay(5);});
+ assert.match(JSON.stringify(h.renderer.toJSON()),/A login already exists/);
+ await act(async()=>form().findAllByType('button').find(button=>button.children.includes('Assign existing login')).props.onClick());
+ h.backend.teamPostError=null;
+ await act(async()=>{await form().props.onSubmit({preventDefault(){}});await delay(5);});
+ const posts=h.backend.teamCalls.filter(call=>call.method==='POST');
+ assert.deepEqual(posts.map(call=>call.input.mode),['create','assign']);
+ assert.equal(Object.hasOwn(posts[1].input,'password'),false);
 });
-test('password visibility controls reveal only the primary field and mask it again after clearing',async t=>{
- const h=await harness(t);await act(async()=>{h.renderer.root.findByProps({'aria-label':'Team access'}).props.onClick();await delay(5);});const form=()=>h.renderer.root.findByProps({className:'admin-panel enquiry-form team-invite-form'});
- await act(async()=>form().findByProps({name:'password'}).props.onChange({target:{value:'A private password to reveal'}}));
- await act(async()=>form().findByProps({'aria-label':'Show password'}).props.onClick({preventDefault(){}}));assert.equal(form().findByProps({name:'password'}).props.type,'text');assert.equal(form().findByProps({name:'confirm_password'}).props.type,'password');assert.equal(form().findByProps({'aria-label':'Hide password'}).props['aria-pressed'],true);
- await act(async()=>h.site.setLanguage('vi'));assert.ok(form().findByProps({'aria-label':'Ẩn mật khẩu'}));assert.equal(form().findByProps({name:'password'}).props.value,'A private password to reveal');
- await act(async()=>form().findByProps({name:'password'}).props.onChange({target:{value:''}}));assert.equal(form().findByProps({name:'password'}).props.type,'password');
+
+test('staff can reveal their own sign-in password and clear it to restore masking',async t=>{
+ const h=await harness(t,{guest:true,page:'staff'});
+ const form=()=>h.renderer.root.findByProps({'aria-label':'Staff account access'});
+ await act(async()=>form().findByProps({'aria-label':'Show password'}).props.onClick({preventDefault(){}}));
+ assert.equal(form().findByProps({name:'password'}).props.type,'text');
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.ok(h.renderer.root.findByProps({'aria-label':'Ẩn mật khẩu'}));
+ const input=h.renderer.root.findByProps({name:'password'});
+ await act(async()=>input.props.onChange({target:{value:''}}));
+ assert.equal(h.renderer.root.findByProps({name:'password'}).props.type,'password');
 });
+
 test('the public header About Us menu excludes agent and testimonial links',async t=>{
  const h=await harness(t,{page:'header',path:'/'});
  const trigger=()=>h.renderer.root.findByProps({'aria-controls':'about-navigation-links'});await act(async()=>trigger().props.onClick());assert.equal(trigger().props['aria-expanded'],true);

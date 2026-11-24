@@ -47,7 +47,7 @@ test('retired About redirects before rendering, preserving locale instead of inh
 });
 test('server metadata has unique localized canonicals and reciprocal EN/VI alternates with explicit language taking precedence over cookies',async()=>{
  const requestHeaders=new Headers({'x-gary-language':'vi'});
- const load=loader({'next/headers':{headers:async()=>requestHeaders,cookies:async()=>({get:()=>({value:'en'})})},'./runtime-env':{runtimeEnv:{SITE_URL:'https://www.garyhome.vn'}},'./server':{loadContent:async()=>({content:{properties:[],editorial:[]},configured:false,error:false})}});
+ const load=loader({'next/headers':{headers:async()=>requestHeaders,cookies:async()=>({get:()=>({value:'en'})})},'./runtime-env':{runtimeEnv:{SITE_URL:'https://www.garyhome.vn'}},'./server':{backendConfig:()=>({url:'https://fixture.invalid',key:'fixture-key'}),mayShowSeedContent:()=>false,loadContent:async()=>({content:{properties:[],editorial:[]},configured:false,error:false})}});
  const {pageMetadata,publicPageDescriptions}=load('lib/seo.ts');
  const {PUBLIC_LANDING_PATHS}=load('lib/public-routes.ts');
  const seen=new Set();
@@ -66,10 +66,11 @@ test('sitemap lists actual localized indexable pages with alternates and exclude
  assert.equal(entries.length,24);assert.ok(entries.every(entry=>/^https:\/\/www\.garyhome\.vn\/(en|vi)(?:\/|$)/.test(entry.url)));assert.ok(entries.every(entry=>!entry.url.endsWith('/about')));assert.equal(new Set(entries.map(entry=>entry.url)).size,entries.length);
  assert.ok(entries.every(entry=>entry.alternates.languages.en&&entry.alternates.languages.vi));
 });
-test('browser bootstrap respects explicit language URL over stale browser preference',()=>{
+test('browser bootstrap preserves the explicit page language and the saved preference',()=>{
  const {LANGUAGE_BOOTSTRAP}=loader()('lib/language.ts');const values=new Map([['gary-language','en']]),document={documentElement:{lang:'vi',dataset:{}},cookie:''};
  vm.runInNewContext(LANGUAGE_BOOTSTRAP,{localStorage:{getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)},location:{pathname:'/vi/homes'},document,window:{location:{protocol:'https:',pathname:'/vi/homes'}}});
- assert.equal(values.get('gary-language'),'vi');assert.match(document.cookie,/gary-language=vi/);assert.equal(document.documentElement.dataset.languagePending,undefined);
+ assert.equal(document.documentElement.lang,'vi');assert.equal(values.get('gary-language'),'en');
+ assert.match(document.cookie,/gary-language=en/);assert.equal(document.documentElement.dataset.languagePending,undefined);
 });
 test('localized links are real server-rendered anchors and localize public navigation and preserve private routes',()=>{
  let pathname='/vi/homes';

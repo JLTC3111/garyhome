@@ -7,7 +7,9 @@ import { publicArticles } from "@/lib/editorial";
 import { requireAvailableContent } from "@/lib/content-unavailable";
 export const dynamic="force-dynamic";
 export default async function sitemap(){
- const {content}=requireAvailableContent(await loadContent()),base=siteUrl();
+ const result=await loadContent("/sitemap.xml"),base=siteUrl();
+ if(!result.configured && result.error)return [];
+ const {content}=requireAvailableContent(result);
  const paths=[...PUBLIC_LANDING_PATHS,...publicArticles(content.editorial).map(guide=>"/tips-and-news/"+guide.slug),...content.properties.filter(isPublicRental).map(p=>"/homes/"+p.slug)];
  return paths.flatMap(path=>(["en","vi"] as const).map(language=>({url:new URL(localizedPath(path,language),base).href,alternates:{languages:localizedAlternates(path,base,language).languages}})));
 }

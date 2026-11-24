@@ -21,6 +21,7 @@ export function proxy(request: NextRequest) {
   // Never trust client-supplied routing evidence.
   headers.delete("x-gary-language"); headers.delete("x-gary-public-path");
   const incoming = new URL(request.url), host = incoming.hostname, pathname = request.nextUrl.pathname, search = incoming.search, path = barePath(pathname);
+  headers.set("x-gary-content-path", path);
   // customers.garyhome.vn is an entry to the existing account page. Recovery
   // and every other path keep their path on the public site.
   if (host === CUSTOMERS_HOST) {

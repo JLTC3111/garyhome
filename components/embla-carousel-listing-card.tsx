@@ -55,7 +55,7 @@ export function EmblaCarouselListingCard({ photos, href, title, renderPhoto, chi
   const index = Math.min(selected, photos.length - 1);
   const select = (slide: number) => main?.scrollTo(slide, reduced());
 
-  return <>
+  return (
     <div className="property-image">
       <Link href={href} tabIndex={-1} aria-hidden="true" aria-label={title} draggable={false}>
         <div className="embla-listing-viewport" ref={mainRef}>
@@ -69,15 +69,17 @@ export function EmblaCarouselListingCard({ photos, href, title, renderPhoto, chi
         <button type="button" onClick={()=>select((index-1+photos.length)%photos.length)} aria-label={t("Previous property photo","Ảnh bất động sản trước")}><ChevronLeft size={17}/></button>
         <button type="button" onClick={()=>select((index+1)%photos.length)} aria-label={t("Next property photo","Ảnh bất động sản tiếp theo")}><ChevronRight size={17}/></button>
       </div>
-      <span className="rental-photo-position" aria-hidden="true">{index+1} / {photos.length}</span>
-    </div>
-    <div className="embla-listing-thumbnails" ref={thumbsRef} role="group" aria-label={t("Property photos","Ảnh bất động sản")}>
-      <div className="embla-listing-track">
-        {photos.map((src,i)=><button key={src+i} type="button" aria-pressed={index===i}
-          aria-label={t(`Photo ${i+1} of ${photos.length}`, `Ảnh ${i+1} trên ${photos.length}`)} onClick={()=>select(i)}>
-          <ContentImage src={src} alt="" width={96} height={64} sizes="56px" loading="lazy" draggable={false}/>
-        </button>)}
+      <div className="embla-listing-footer">
+        <div className="embla-listing-thumbnails" ref={thumbsRef} role="group" aria-label={t("Property photos","Ảnh bất động sản")}>
+          <div className="embla-listing-track">
+            {photos.map((src,i)=><button key={src+i} type="button" aria-pressed={index===i}
+              aria-label={t(`Photo ${i+1} of ${photos.length}`, `Ảnh ${i+1} trên ${photos.length}`)} onClick={()=>select(i)}>
+              <ContentImage src={src} alt="" width={96} height={64} sizes="56px" loading="lazy" draggable={false}/>
+            </button>)}
+          </div>
+        </div>
+        <span className="rental-photo-position" aria-hidden="true">{index+1} / {photos.length}</span>
       </div>
     </div>
-  </>;
+  );
 }

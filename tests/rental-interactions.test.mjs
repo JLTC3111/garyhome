@@ -166,7 +166,7 @@ test('fullscreen metadata changes with arrows, keyboard, Embla snapping and thum
  assert.equal(caption().findByType('p').props.children,'Nhìn ra vườn');
 });
 
-test('homepage carousel snaps thumbnail drags and keeps selection separate from listing links',async t=>{
+test('listing carousel snaps thumbnails inside the image area and outside the listing link',async t=>{
  const p=await platform(t),site={current:{t:en=>en,language:'en'}};
  const carousels={};
  const {EmblaCarouselListingCard}=loadComponents(site,options=>{
@@ -191,6 +191,9 @@ test('homepage carousel snaps thumbnail drags and keeps selection separate from 
  const renderer=await p.mount(React.createElement(EmblaCarouselListingCard,{photos,href:'/homes/a-home',title:'A home',renderPhoto:src=>React.createElement('img',{src,loading:'lazy'})}));
  const strip=()=>renderer.root.findByProps({className:'embla-listing-thumbnails'});
  const buttons=()=>strip().findAllByType('button');
+ const image=renderer.root.findByProps({className:'property-image'});
+ assert.equal(image.findByProps({className:'embla-listing-footer'}).findByProps({className:'embla-listing-thumbnails'}),strip());
+ assert.equal(image.findByType('a').findAllByProps({className:'embla-listing-thumbnails'}).length,0);
  assert.equal(buttons().length,4);
  assert.equal(carousels.thumbs.options.containScroll,false);
  assert.notEqual(carousels.thumbs.options.dragFree,true);

@@ -1,6 +1,6 @@
 # Current staff account workflow
 
-Staff are now created directly with a temporary password and confirmation, with automatic email confirmation and a first-login password reminder. See [direct-staff-accounts.md](direct-staff-accounts.md) for the current hierarchy, existing-account assignment, profile photos and notifications. The invitation-first staff instructions below are historical; customer email confirmation and optional password recovery still apply.
+Use **Studio → Team access → Invite by email** for a new login. The recipient verifies the mailbox and chooses their password. Once verified, use **Assign existing login** to grant a Home role. An invitation on its own grants no Studio access.
 
 # Customer email sign-in and staff accounts
 
@@ -58,21 +58,21 @@ Auth sessions stay in the browser and use the SDK's automatic refresh. Email-lin
 
 Allowed staff email domains are **`@garyhome.com`, `@icue.vn` and `@gmail.com`**. The existing bootstrap owner is preserved. If allowed domains change, update `public.staff_settings.email_domains` as the database owner and verify staff access afterwards.
 
-An owner or administrator opens **Studio → Team access** and enters the staff member's full name, exact company or Gmail email and role.
+A staff manager, administrator, or owner opens **Studio → Team access** and enters the staff member's full name, exact company or Gmail email and role.
 
 | Role | Access |
 | --- | --- |
 | Owner | Studio, customers and staff management; can appoint administrators and delete listings, enquiries and eligible staff assignments. |
 | Administrator | Studio, customers, staff invitations and assignments; can delete listings, enquiries and ordinary staff assignments; cannot edit owners, other administrators or their own access. |
-| Manager | Properties, customers and site content, plus public card ordering. No staff access management. |
+| Manager | Properties, customers and site content, plus public card ordering. May manage the lower Staff role. |
 | Staff | Properties, media, site content, neighbourhoods and customers. No staff management or public card ordering. |
 | Customer | Their own details, saved homes, enquiries and viewings. No Studio access. |
 
-For a new email, the server sends an Auth invitation. The recipient confirms their assigned mailbox and chooses a password at `/auth/invite`. The administrator never chooses or sees that password. Confirmation is required before the assignment can access Studio.
+For a new email, the server sends an Auth invitation. The recipient confirms their assigned mailbox and chooses a password at `/auth/invite`. After email verification, a higher-level team member assigns the Home role in a separate action.
 
-For an existing eligible Auth account, the role is assigned and a fresh password-setup email is requested through Auth recovery. The person can keep their existing password or follow the newest link to choose one. This also covers a previous invitation whose password setup was never completed. Assigning an existing account does not require the server invitation secret.
+For an existing eligible Auth account, **Assign existing login** grants the selected Home role using the current verified identity. The staff member can request password recovery independently. Assignment works without the invitation secret.
 
-Use **Send password link** on an active team member to request an email link; the server resolves the actual assigned email and enforces the target role. Owners can request resets for ordinary staff and administrators, administrators for ordinary staff, and both for their own account. Protected owner accounts cannot be reset by someone else. Pending invitations can use **Send setup email** to request a fresh setup link. Staff access remains blocked until the email is verified. Customers and staff can also use **Forgot password?** in their respective login portals.
+Use **Send password link** on an active team member to request an email link; the server resolves the actual assigned email and enforces the target role. Owners can request resets for ordinary staff and administrators, administrators for ordinary staff, and both for their own account. Protected owner accounts cannot be reset by someone else. Staff with an unverified existing login must finish mailbox verification before assignment. Customers and staff can also use **Forgot password?** in their respective login portals.
 
 The provider captures invite/recovery identity before Supabase consumes the URL. A `PASSWORD_RECOVERY` redirect reaching the homepage is routed to `/auth/reset` without reloading the recovered session. The password form and authenticated write must still match the link account. A successful request means Auth accepted it, not that the recipient inbox has received it; verify SMTP and the production redirect allow list with a real mailbox.
 

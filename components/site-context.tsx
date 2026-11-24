@@ -12,7 +12,7 @@ import { CURRENCY_COOKIE, currencyValue, persistCurrency, usableExchangeRate } f
 import { studioText } from "@/lib/studio-i18n";
 import { browserClient, publicBrowserClient } from "@/lib/browser-client";
 import { watchHomeSessionStorage } from "@/lib/home-session-bridge";
-import { readPublishedContent } from "@/lib/public-content";
+import { publicContentPath, readPublishedContent } from "@/lib/public-content";
 import { installRecoveryEvents } from "@/lib/recovery-events";
 import { fetchWithDeadline, request } from "@/lib/requests";
 import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/session-recovery";
@@ -34,7 +34,7 @@ type SiteContext = {
   savedReady: boolean; savedError: string; pendingSaved: string[];
   importSaved: () => Promise<number>;
   compare: string[]; toggleCompare: (id: string) => void;
-  configured: boolean; backendError: boolean; client: SupabaseClient | null; publicClient:SupabaseClient|null; ready: boolean;
+  configured: boolean; seedPreview: boolean; backendError: boolean; client: SupabaseClient | null; publicClient:SupabaseClient|null; ready: boolean;
   user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
   staffProfile:StaffProfile|null;refreshStaffProfile:()=>Promise<void>;
   passwordLink:PasswordLink|null;
@@ -50,7 +50,7 @@ type SiteContext = {
   notice: (message: string, tone?: ToastTone) => void;
 };
 const Context = createContext<SiteContext | null>(null);
-export function SiteProvider({ children, initial, initialLanguage = "en", initialCurrency = "USD" }: { children: ReactNode; initialLanguage?: Language; initialCurrency?: PriceCurrency; initial: { content: Content; configured: boolean; error: boolean; exchangeRate?: ExchangeRate | null; publicOrigin?: string; publicPath?: string } }) {
+export function SiteProvider({ children, initial, initialLanguage = "en", initialCurrency = "USD" }: { children: ReactNode; initialLanguage?: Language; initialCurrency?: PriceCurrency; initial: { content: Content; configured: boolean; error: boolean; exchangeRate?: ExchangeRate | null; publicOrigin?: string; publicPath?: string; contentPath?: string; seedPreview?: boolean } }) {
   const pathname=usePathname(),router=useRouter(),routerRef=useRef(router);
   useEffect(()=>{routerRef.current=router;},[router]);
   const [passwordLink,setPasswordLink]=useState<PasswordLink|null>(null);
@@ -137,6 +137,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const connectRef = useRef<() => Promise<void>>(async () => {});
   const refreshFlight = useRef<{ generation: number; promise: Promise<void> } | null>(null);
   const publicClientRef = useRef<SupabaseClient | null>(null);
+  const publicPathRef = useRef(initial.contentPath);
   const publicContentNeeded = useRef(initial.error);
   const publicContentEpoch = useRef(0);
   const publicContentFlight = useRef<{ promise: Promise<void>; controller: AbortController } | null>(null);
@@ -186,7 +187,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     setContentRecovering(true);
     const promise = (async () => {
       try {
-        const live = await readPublishedContent(db, controller.signal);
+        const live = await readPublishedContent(db, controller.signal, publicPathRef.current);
         if (epoch !== publicContentEpoch.current || controller.signal.aborted || !publicContentNeeded.current || startedVersion !== version.current) return;
         initialRef.current = live;
         publicContentNeeded.current = false;
@@ -196,6 +197,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
         if (!snapshotRef.current.editor) updateContent(live);
       } catch {
         // Keep the warning truthful and let Retry/online/focus recover it later.
+        if (epoch === publicContentEpoch.current && !controller.signal.aborted) setBackendError(true);
       }
     })();
     publicContentFlight.current = { promise, controller };
@@ -206,6 +208,18 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!pathname || !initial.configured || !initial.contentPath) return;
+    const path = publicContentPath(pathname);
+    if (path === publicPathRef.current) return;
+    publicPathRef.current = path;
+    publicContentEpoch.current++;
+    publicContentFlight.current?.controller.abort();
+    publicContentFlight.current = null;
+    publicContentNeeded.current = true;
+    void recoverPublicContent();
+  }, [pathname, initial.configured, initial.contentPath, recoverPublicContent]);
 
   const refresh = useCallback(async () => {
     const db = clientRef.current, state = sessionRef.current?.state;
@@ -311,7 +325,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     if (!active) return;
     try {
       setSaved(readBrowserFavourites(localStorage));
-      if (!initial.configured && !initial.error) {
+      if (!initial.configured && !initial.error && initial.seedPreview !== false) {
         updateEnquiries(JSON.parse(localStorage.getItem("gary-preview-enquiries") || "[]"));
         if (localStorage.getItem("gary-preview-enabled") === "true") {
           const stored = localStorage.getItem("gary-preview-content"); if (stored) updateContent(JSON.parse(stored));
@@ -416,7 +430,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
       publicContentEpoch.current = contentEpoch + 1; publicContentFlight.current?.controller.abort(); publicContentFlight.current = null; publicClientRef.current = null;
       removeRecoveryEvents();
     };
-  }, [initial.configured, reconnect, recoverPublicContent]);
+  }, [initial.configured, initial.error, initial.seedPreview, reconnect, recoverPublicContent]);
 
   useEffect(() => {
     if (!client || !user || sessionPhase !== "ready") return;
@@ -523,7 +537,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.id,savedAccount,sessionPhase]);
   function toggleCompare(id: string) { setCompare(previous => previous.includes(id) ? previous.filter(x => x !== id) : previous.length < 3 ? [...previous, id] : (notice(language === "en" ? "Compare up to 3 homes at a time." : "So sánh tối đa 3 căn hộ.", "warning"), previous)); }
-  function enterDemo() { setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
+  function enterDemo() { if (initial.seedPreview === false) return; setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   useEffect(()=>{
     if(!client)return;
@@ -561,11 +575,11 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     }
   }
 
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, seedPreview: initial.seedPreview !== false, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
     {initial.configured && sessionResolved && user && (sessionPhase === "offline" || sessionPhase === "error") &&
       <div className="session-banner" role="status">{studioText(sessionMessage, language)} <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button></div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}
-    {backendError && <div className="service-banner" role="status">{studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}
+    {backendError && <div className="service-banner" role="status">{initial.seedPreview === false ? studioText("Some site content is temporarily unavailable.", language) : studioText("We couldn’t refresh listings. Showing reference listings; please confirm prices and availability with the team.", language)} <button type="button" disabled={contentRecovering} onClick={() => void reconnect()}>{studioText(contentRecovering ? "Refreshing listings…" : "Retry", language)}</button></div>}
     <FormValidationMessages language={language}/>{children}
     <div className="action-toast-host" data-action-toast-host>
       {toasts.map(toast => <SwipeToast key={toast.id} tone={toast.tone} language={language}

@@ -8,6 +8,7 @@ import { propertyPhotoPath } from "@/lib/property-photo-files";
 import { PropertyGallery } from "./property-gallery";
 import { PropertyPhotoRenameForm, PropertyPhotoRenameTools, type PhotoRenameControls } from "./property-photo-rename";
 import { useSite } from "./site-context";
+import { ContentImage } from "./content-image";
 import { useStudioText } from "./use-studio-text";
 
 export type PhotoCardBox = { index: number; left: number; top: number; right: number; bottom: number };
@@ -175,7 +176,8 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
   return <PropertyGallery images={images} metadata={metadata} title={title || t("Listing photos", "Ảnh tin đăng")} renderOpeners={showPhoto => <>
   <div ref={grid} className="editor-photo-grid" data-photo-reordering={draggingKey ? "true" : undefined}>{namedPhotos.map(({ key, src, filename, source, storageName }, index) => {
     const reorderable = canReorder;
-    const photo = <img src={src} alt={onMetadataChange ? "" : text("Property photo {number}", { number: index + 1 })}/>;
+    const photo = <ContentImage src={src} alt={onMetadataChange ? "" : text("Property photo {number}", { number: index + 1 })} width={320} height={210}
+      sizes="(max-width: 650px) 50vw, 220px" loading="lazy"/>;
     return <figure className="editor-photo-card" key={key} data-photo-index={index}
       data-photo-selected={onMetadataChange && selectedIndex === index ? "true" : undefined}
       data-photo-dragging={draggingKey === key ? "true" : undefined}

@@ -42,18 +42,22 @@ function installBrowser(t) {
   const previous = new Map();
   const listeners = new Set();
   const queue = [];
+  const timers = new Map(), body = {};
+  const portals = [];
   const media = {
     matches: false,
     addEventListener(_type, callback) { listeners.add(callback); },
     removeEventListener(_type, callback) { listeners.delete(callback); },
   };
-  let frame = 0;
-  const clock = 10000;
-  const now = performance.now.bind(performance);
+  let frame = 0, timer = 0;
   const values = {
     IS_REACT_ACT_ENVIRONMENT: true,
-    window: { matchMedia: () => media },
-    document: { documentElement: { lang: "en" } },
+    window: {
+      matchMedia: () => media,
+      setTimeout(callback, delay) { timers.set(++timer, { callback, delay }); return timer; },
+      clearTimeout(id) { timers.delete(id); },
+    },
+    document: { body, documentElement: { lang: "en" } },
     requestAnimationFrame(callback) { queue.push({ id: ++frame, callback }); return frame; },
     cancelAnimationFrame(id) { const index = queue.findIndex(item => item.id === id); if (index >= 0) queue.splice(index, 1); },
   };
@@ -61,25 +65,26 @@ function installBrowser(t) {
     previous.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
     Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
   }
-  performance.now = () => clock;
   const nodes = {};
   const cleanup = { unmount: async () => {} };
   t.after(async () => {
     await cleanup.unmount();
     assert.equal(listeners.size, 0);
-    performance.now = now;
+    assert.equal(queue.length, 0);
+    assert.equal(timers.size, 0);
     for (const [name, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else delete globalThis[name];
     }
   });
   return { cleanup,
-    media, listeners, queue, nodes,
+    media, listeners, queue, nodes, timers, body, portals,
+    createPortal(children, target) { portals.push(target); return children; },
     createNodeMock(element) {
       const node = motionNode();
       const className = String(element.props.className || "");
       if (element.type === "button") nodes.button = node;
-      if (className.includes("pulse-heart__heart")) nodes.heart = node;
+      if (className === "pulse-heart__fanfare") nodes.fanfare = node;
       return node;
     },
     async preferReduced(value) {
@@ -117,7 +122,9 @@ function load(file, mocks) {
 
 async function mountHeart(t) {
   const browser = installBrowser(t);
-  const PulseHeart = load(path.join(root, "components/react-bits/pulse-heart.tsx"), {}).default;
+  const PulseHeart = load(path.join(root, "components/react-bits/pulse-heart.tsx"), {
+    "react-dom": { createPortal: browser.createPortal },
+  }).default;
   const calls = [];
   const mode = { current: "commit" };
   const api = {};
@@ -125,7 +132,6 @@ async function mountHeart(t) {
     const [liked, setLiked] = React.useState(false);
     const [pending, setPending] = React.useState(false);
     const [disabled, setDisabled] = React.useState(false);
-    const [, setTick] = React.useState(0);
     api.setLiked = setLiked;
     api.setPending = setPending;
     api.setDisabled = setDisabled;
@@ -135,9 +141,19 @@ async function mountHeart(t) {
       icon: filled => React.createElement("svg", { "data-heart": "true", fill: filled ? "currentColor" : "none" }),
       onChange(next) {
         calls.push(next);
-        if (mode.current === "commit") setLiked(next);
-        else if (mode.current === "hold") setPending(true);
-        else setTick(value => value + 1);
+        if (mode.current === "hold") {
+          setPending(true);
+          return new Promise(resolve => {
+            api.finish = result => {
+              if (typeof result === "boolean") setLiked(result);
+              setPending(false);
+              resolve(result);
+            };
+          });
+        }
+        if (mode.current === "reject") return Promise.reject(new Error("Save failed"));
+        setLiked(next);
+        return next;
       },
     });
   }
@@ -145,22 +161,31 @@ async function mountHeart(t) {
   browser.cleanup.unmount = async () => { if (renderer) await act(async () => renderer.unmount()); renderer = null; };
   await act(async () => { renderer = TestRenderer.create(React.createElement(Harness), { createNodeMock: browser.createNodeMock }); });
   const button = () => renderer.root.findByType("button");
-  const icon = () => renderer.root.findByType("svg");
-  async function at(ms) {
-    const frame = browser.queue.shift();
-    assert.ok(frame, "animation frame");
-    await act(async () => frame.callback(10000 + ms));
+  const icon = () => renderer.root.findByProps({ "data-heart": "true" });
+  const fanfare = () => renderer.root.findAllByProps({ className: "pulse-heart__fanfare" });
+  const particles = () => renderer.root.findAllByProps({ className: "pulse-heart__particle" });
+  async function finishTimer(delay) {
+    const [entry] = browser.timers;
+    assert.ok(entry, "animation cleanup timer");
+    assert.equal(entry[1].delay, delay);
+    await act(async () => {
+      browser.timers.delete(entry[0]);
+      entry[1].callback();
+    });
   }
-  return { ...browser, ...api, calls, mode, button, icon, at };
+  return { ...browser, ...api, calls, mode, button, icon, fanfare, particles, finishTimer,
+    finish: result => api.finish(result),
+  };
 }
 
 test.describe("homepage favourite pulse", { concurrency: 1 }, () => {
-  test("uses the controlled favourite and the existing heart, without a count or React Bits colours", async t => {
-    assert.doesNotMatch(source, /hugeicons|pulse-heart__count|ff4d6d|232326|8b8b93|f5f5f5/);
-    assert.doesNotMatch(css, /#ff4d6d|#232326|#8b8b93|#f5f5f5|border-radius|width:\s*\d+px|height:\s*\d+px/);
-    assert.match(fs.readFileSync(path.join(root, "app/rental.css"), "utf8"), /\.rental-property-card \.save-button\{[^}]*background:#fff;color:var\(--navy\)/);
-    assert.match(fs.readFileSync(path.join(root, "app/rental.css"), "utf8"), /\.rental-property-card \.save-button\.is-saved\{color:#a7583d;background:#f4e6dc/);
-    assert.match(fs.readFileSync(path.join(root, "app/public-theme.css"), "utf8"), /\.rental-property-card \.save-button\.is-saved/);
+  test("keeps the existing save button chrome and shows passive favourites without fanfare", async t => {
+    assert.doesNotMatch(source, /hugeicons|pulse-heart__count/);
+    assert.doesNotMatch(css, /\.pulse-heart\s*\{/);
+    const buttons = fs.readFileSync(path.join(root, "app/action-buttons.css"), "utf8");
+    assert.match(buttons, /--action-green:\s*#168642/);
+    assert.match(buttons, /--action-white:\s*#fff/);
+    assert.match(buttons, /--action-fill: var\(--action-green\)/);
     assert.match(fs.readFileSync(path.join(root, "components/home-page.tsx"), "utf8"), /<PropertyCard key=\{p\.id\} property=\{p\} pulseFavourite\b[^>]*\/>/);
     assert.doesNotMatch(fs.readFileSync(path.join(root, "components/homes-page.tsx"), "utf8"), /pulseFavourite/);
 
@@ -171,99 +196,109 @@ test.describe("homepage favourite pulse", { concurrency: 1 }, () => {
     assert.equal(heart.button().props["aria-pressed"], false);
     assert.equal(heart.icon().props.fill, "none");
     assert.equal(rendererText(heart.button()), "");
+    assert.equal(heart.fanfare().length, 0);
     await act(async () => heart.setLiked(true));
-    assert.equal(heart.queue.length, 0);
     assert.equal(heart.button().props["aria-pressed"], true);
     assert.equal(heart.button().props.className.includes("is-saved"), true);
     assert.equal(heart.icon().props.fill, "currentColor");
+    assert.equal(heart.button().props["data-pulse"], undefined);
+    assert.equal(heart.fanfare().length, 0);
+    assert.equal(heart.timers.size, 0);
     assert.equal(heart.button().props.style, undefined);
   });
 
-  test("pointer clicks shrink, flip, rebound and beat, then keyboard and reduced motion settle with the saved state", async t => {
+  test("only a confirmed addition emits one anchored, staggered fanfare and removal uses a reverse pulse", async t => {
     const heart = await mountHeart(t);
-    const down = pointer(1);
-    await act(async () => heart.button().props.onPointerDown(down));
-    assert.equal(down.stopped, true);
-    assert.equal(scale(heart.nodes.button), 0.97);
-    const up = pointer(1);
-    await act(async () => heart.button().props.onPointerUp(up));
-    assert.equal(up.stopped, true);
-    assert.equal(scale(heart.nodes.button), null);
+    heart.mode.current = "hold";
     const click = pointer(1);
-    await act(async () => heart.button().props.onClick(click));
+    await act(async () => {
+      heart.button().props.onPointerDown(click);
+      assert.equal(scale(heart.nodes.button), 0.97);
+      heart.button().props.onPointerUp(pointer(1));
+      void heart.button().props.onClick(click);
+      void heart.button().props.onClick(pointer(1));
+    });
     assert.equal(click.stopped, true);
     assert.deepEqual(heart.calls, [true]);
-    assert.equal(heart.button().props["aria-pressed"], true);
+    assert.equal(heart.button().props["aria-busy"], true);
+    assert.equal(heart.icon().props.fill, "none");
+    assert.equal(heart.fanfare().length, 0);
+    assert.equal(heart.queue.length, 0);
+
+    await act(async () => heart.finish(true));
+    assert.equal(heart.button().props["aria-busy"], false);
+    assert.equal(heart.button().props["data-pulse"], "add");
+    assert.equal(heart.icon().props.fill, "currentColor");
+    assert.equal(heart.fanfare()[0].props["aria-hidden"], "true");
+    assert.equal(heart.portals.at(-1), heart.body);
+    assert.equal(heart.particles().length, 8);
+    assert.equal(new Set(heart.particles().map(node => node.props.style["--pulse-heart-angle"])).size, 8);
+    assert.equal(heart.particles().filter(node => node.props["data-shape"] === "strip").length, 4);
+    assert.deepEqual(
+      new Set(heart.particles().map(node => node.props.style.color)),
+      new Set(["red", "cyan", "pink", "yellow", "blue", "green"].map(color => "var(--pulse-heart-" + color + ")"))
+    );
+    assert.ok(heart.particles().some(node => parseFloat(node.props.style["--pulse-heart-delay"]) > 0));
+    assert.equal(heart.nodes.fanfare.style.transform, "translate3d(19.5px,19.5px,0)");
+    assert.equal(heart.nodes.fanfare.style.getPropertyValue("--pulse-heart-radius"), "24.5px");
+    heart.nodes.button.getBoundingClientRect = () => ({ left: 25, top: 40, width: 39, height: 39 });
+    await act(async () => heart.queue.shift().callback());
+    assert.equal(heart.nodes.fanfare.style.transform, "translate3d(44.5px,59.5px,0)");
     await act(async () => heart.button().props.onClick(pointer(1)));
     assert.deepEqual(heart.calls, [true]);
-    await heart.at(224);
-    assert.ok(Math.abs(scale(heart.nodes.heart) - 0.3) < 0.02);
-    assert.ok(Math.abs(scale(heart.nodes.button) - 0.97) < 0.02);
-    assert.equal(heart.button().props.className.includes("is-saved"), true);
-    assert.equal(heart.icon().props.fill, "currentColor");
-    await heart.at(420);
-    assert.ok(scale(heart.nodes.heart) > 1);
-    await heart.at(560);
-    assert.equal(scale(heart.nodes.heart), null);
-    assert.equal(scale(heart.nodes.button), null);
+    await heart.finishTimer(560);
+    assert.equal(heart.fanfare().length, 0);
     assert.equal(heart.queue.length, 0);
-    assert.equal(heart.button().props["data-liked"], "true");
 
+    heart.mode.current = "commit";
     const key = { key: " ", stopPropagation() { key.stopped = true; } };
-    await act(async () => { heart.button().props.onKeyDown(key); heart.button().props.onClick(pointer(0)); });
+    await act(async () => { heart.button().props.onKeyDown(key); await heart.button().props.onClick(pointer(0)); });
     assert.equal(key.stopped, true);
     assert.deepEqual(heart.calls, [true, false]);
-    assert.equal(heart.queue.length, 0);
-    assert.equal(heart.button().props["aria-pressed"], false);
-    assert.equal(heart.button().props.className.includes("is-saved"), false);
+    assert.equal(heart.button().props["data-pulse"], "remove");
     assert.equal(heart.icon().props.fill, "none");
-
-    await heart.preferReduced(true);
-    await act(async () => { heart.button().props.onPointerDown(pointer(1)); heart.button().props.onPointerUp(pointer(1)); heart.button().props.onClick(pointer(1)); });
-    assert.deepEqual(heart.calls, [true, false, true]);
-    assert.equal(heart.queue.length, 0);
-    assert.equal(scale(heart.nodes.button), null);
-    assert.equal(heart.button().props["aria-pressed"], true);
-    assert.equal(heart.icon().props.fill, "currentColor");
+    assert.equal(heart.fanfare().length, 0);
+    await heart.finishTimer(210);
   });
 
-  test("a failed save returns to the confirmed favourite and a successful save keeps it", async t => {
+  test("failed saves and reduced motion keep the controlled heart readable and skip fanfare", async t => {
     const heart = await mountHeart(t);
     heart.mode.current = "hold";
-    await act(async () => { heart.button().props.onPointerDown(pointer(1)); heart.button().props.onPointerUp(pointer(1)); heart.button().props.onClick(pointer(1)); });
-    assert.equal(heart.button().props.disabled, true);
-    assert.equal(heart.button().props["aria-pressed"], false);
-    assert.equal(heart.button().props["aria-busy"], true);
-    await heart.at(224);
-    assert.equal(heart.icon().props.fill, "currentColor");
-    await heart.at(560);
-    assert.equal(heart.button().props.className.includes("is-saved"), true);
-    assert.equal(heart.button().props["aria-pressed"], false);
-    await act(async () => heart.button().props.onClick(pointer(1)));
-    assert.deepEqual(heart.calls, [true]);
-    await act(async () => heart.setPending(false));
-    assert.equal(heart.button().props.className.includes("is-saved"), false);
-    assert.equal(heart.icon().props.fill, "none");
-    assert.equal(heart.button().props["aria-pressed"], false);
+    await act(async () => { void heart.button().props.onClick(pointer(1)); });
+    await act(async () => heart.finish(null));
     assert.equal(heart.button().props.disabled, false);
+    assert.equal(heart.button().props["aria-pressed"], false);
+    assert.equal(heart.icon().props.fill, "none");
+    assert.equal(heart.fanfare().length, 0);
 
     heart.mode.current = "reject";
-    const rejected = pointer(1);
-    await act(async () => { heart.button().props.onPointerDown(rejected); heart.button().props.onClick(rejected); });
-    assert.equal(rejected.stopped, true);
+    await act(async () => heart.button().props.onClick(pointer(0)));
     assert.deepEqual(heart.calls, [true, true]);
-    assert.equal(heart.queue.length, 0);
-    assert.equal(heart.button().props["aria-pressed"], false);
-    assert.equal(heart.icon().props.fill, "none");
+    assert.equal(heart.button().props["data-pulse"], undefined);
+    assert.equal(heart.timers.size, 0);
 
-    heart.mode.current = "hold";
-    await act(async () => { heart.button().props.onPointerDown(pointer(1)); heart.button().props.onPointerUp(pointer(1)); heart.button().props.onClick(pointer(1)); });
-    await heart.at(560);
-    await act(async () => { heart.setLiked(true); heart.setPending(false); });
-    assert.equal(heart.button().props["aria-pressed"], true);
-    assert.equal(heart.button().props.className.includes("is-saved"), true);
+    heart.mode.current = "commit";
+    await heart.preferReduced(true);
+    await act(async () => heart.button().props.onClick(pointer(0)));
     assert.equal(heart.icon().props.fill, "currentColor");
+    assert.equal(heart.fanfare().length, 0);
+    assert.equal(heart.timers.size, 0);
+    await heart.preferReduced(false);
+    assert.equal(heart.fanfare().length, 0, "a preference change does not replay a save");
+
+    await act(async () => heart.button().props.onClick(pointer(0)));
+    await heart.finishTimer(210);
+    await act(async () => heart.button().props.onClick(pointer(0)));
+    assert.equal(heart.fanfare().length, 1);
+    await heart.preferReduced(true);
+    assert.equal(heart.fanfare().length, 0);
+    assert.equal(heart.timers.size, 0);
     assert.equal(heart.queue.length, 0);
+
+    assert.match(css, /html\[data-home-theme="dark"\] \.pulse-heart__fanfare/);
+    assert.match(css, /\.pulse-heart__fanfare\s*\{[^}]*position: fixed;[^}]*pointer-events: none;/);
+    assert.match(css, /pulse-heart-scatter 470ms[^;]+var\(--pulse-heart-delay\)/);
+    assert.match(css, /prefers-reduced-motion: reduce/);
   });
 
   test("homepage and filtered cards share thumbnails and keep the favourite action separate", async t => {

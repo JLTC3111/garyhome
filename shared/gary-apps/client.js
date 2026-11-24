@@ -1,7 +1,7 @@
 /** Stable browser protocol adapter. The component and catalogue live in Gary Home. */
 const DEFAULT_MANIFEST = 'https://garyhome.vn/shared/gary-apps/v1/manifest.json';
 const channels = new Map();
-const POLL_MS = 60_000;
+const POLL_MS = 300_000;
 const TIMEOUT_MS = 10_000;
 
 function report(subscriber, name, value) {
@@ -124,8 +124,9 @@ function retryPending(channel) {
 }
 
 async function refresh(channel) {
-  if (channel.disposed || channel.refreshing) return;
+  if (channel.disposed || channel.refreshing || Date.now() < (channel.refreshAfter || 0)) return;
   channel.refreshing = true;
+  channel.refreshAfter = Date.now() + POLL_MS;
   const controller = new AbortController();
   channel.controller = controller;
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -144,6 +145,7 @@ async function refresh(channel) {
     retryPending(channel);
     collectResources(channel);
   } catch (error) {
+    channel.refreshAfter = Date.now() + 60_000;
     if (!channel.disposed) for (const subscriber of channel.subscribers) report(subscriber, 'onError', error);
   } finally {
     clearTimeout(timer);

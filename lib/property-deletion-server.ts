@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { request } from "./requests.ts";
+import { isConflictResponse } from "./conflict-response.ts";
 
 export type ListingDeletion = {
   propertyId: string; listingCode: string; requestedAt: string;
@@ -13,13 +14,14 @@ export class ListingDeletionError extends Error {
 }
 
 async function rpc<T>(db: SupabaseClient, action: string, args: Record<string, unknown>, signal: AbortSignal): Promise<T> {
-  const {data,error} = await db.rpc(`home_listing_delete_${action}`,args).abortSignal(signal);
+  const {data,error,status} = await db.rpc(`home_listing_delete_${action}`,args).abortSignal(signal);
   if (error) {
     const code = /^listing_cleanup\.([a-z_]+)$/.exec(error.message)?.[1];
     if (error.code === "55P03") throw new ListingDeletionError("media_busy",409);
     if (error.code === "42501") throw new ListingDeletionError("forbidden",403);
     if (["PGRST202","42883","42P01"].includes(error.code)) throw new ListingDeletionError("migration_required",503);
     if (code) throw new ListingDeletionError(code,error.code === "P0002" ? 404 : 409);
+    if (isConflictResponse({code:error.code,status})) throw new ListingDeletionError("conflict",409);
     throw new ListingDeletionError("unavailable",503);
   }
   return data as T;

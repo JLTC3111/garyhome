@@ -22,7 +22,8 @@ export function listingDeletionMessage(error: unknown,t: ReturnType<typeof useSi
   switch (error instanceof Error ? error.message : "") {
     case "media_busy": return t("A listing or upload is being updated. Try again shortly.","Tin đăng hoặc tệp đang được cập nhật. Vui lòng thử lại sau.");
     case "rename_pending": return t("Finish the pending photo rename before deleting this listing.","Hãy hoàn tất việc đổi tên ảnh đang chờ trước khi xóa tin đăng.");
-    case "stale": return t("This listing changed. Refresh it and review the changes before deleting.","Tin đăng đã thay đổi. Làm mới và kiểm tra các thay đổi trước khi xóa.");
+    case "stale": case "conflict": case "manifest_changed":
+      return t("This listing or its media changed. Refresh and review the current information before deleting.","Tin đăng hoặc tệp đã thay đổi. Làm mới và kiểm tra thông tin hiện tại trước khi xóa.");
     case "migration_required": return t("The listing cleanup database update is required.","Cần cập nhật cơ sở dữ liệu để dọn tệp của tin đăng.");
     case "forbidden": return t("An active Home Admin or Owner can permanently delete listings.","Cần quyền Quản trị viên hoặc Chủ sở hữu Gary Home đang hoạt động để xóa vĩnh viễn.");
     case "session_expired": return t("Sign in again to continue.","Đăng nhập lại để tiếp tục.");

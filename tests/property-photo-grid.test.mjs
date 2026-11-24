@@ -29,7 +29,8 @@ function loadGridExports(){
   function dependency(id){
    if(id==='./use-studio-text')return {useStudioText:()=>((message,values={})=>message.replace(/\{(\w+)\}/g,(_,key)=>String(values[key])))};
    if(id==='./site-context')return {useSite:()=>({t:en=>en,language:'en'})};
-   if(id==='./property-photo-rename'||id==='./property-gallery')return load(path.resolve(path.dirname(file),id+'.tsx'));
+   if(['./property-photo-rename','./property-gallery','./content-image','./embla-carousel-detail-gallery'].includes(id))return load(path.resolve(path.dirname(file),id+'.tsx'));
+   if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
    if(id.startsWith('@/'))return load(path.join(root,id.slice(2))+'.ts');
    if(id.startsWith('.')&&id.endsWith('.ts'))return load(path.resolve(path.dirname(file),id));
    return require(id);

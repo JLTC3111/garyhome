@@ -4,6 +4,7 @@ import {ArrowDown,ArrowUp,GripVertical,Save,Settings2,X} from "lucide-react";
 import {useSite} from "./site-context";
 import {canReorderProperties} from "@/lib/staff";
 import {applyPropertyOrder} from "@/lib/property-order";
+import {isConflictResponse} from "@/lib/conflict-response";
 import {listingCode,propertyTitle} from "@/lib/rentals";
 import type {Property,PropertyOrderScope} from "@/lib/types";
 
@@ -22,7 +23,7 @@ function OrderEditor({scope,properties}:{scope:PropertyOrderScope;properties:Pro
  async function save(reset=false){if(!draft)return;setBusy(true);setError("");const ids=reset?[]:draft.ids.filter(id=>properties.some(p=>p.id===id));
   try{const {error}=await editorTask((db,signal)=>db.rpc("save_property_order",{order_scope:scope,ordered_property_ids:ids,expected_property_ids:draft.expected}).abortSignal(signal));if(error)throw error;
    setContent(previous=>({...previous,propertyOrders:{...previous.propertyOrders,[scope]:ids}}));setDraft(null);setSaved(true);
-  }catch(error){setError(error&&typeof error==="object"&&"code" in error&&error.code==="40001"?"conflict":"save");}finally{setBusy(false);}}
+  }catch(error){setError(isConflictResponse(error)||error&&typeof error==="object"&&"message" in error&&error.message==="This order changed. Refresh the page before saving."?"conflict":"save");}finally{setBusy(false);}}
  return <section className="property-order-tools" aria-label={t("Card order","Thứ tự tin đăng")}>
   <div className="property-order-toolbar"><span>{current.length?t("Custom card order","Thứ tự đã sắp xếp"):t("Newest posts first","Tin mới nhất trước")}</span><button className="text-link" type="button" onClick={()=>draft?setDraft(null):open()} disabled={busy}>{draft?<X size={16}/>:<Settings2 size={16}/>} {draft?t("Close ordering","Đóng sắp xếp"):t("Arrange cards","Sắp xếp tin")}</button></div>
   {saved&&!draft&&<p role="status">{t("Card order saved.","Đã lưu thứ tự tin đăng.")}</p>}

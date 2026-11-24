@@ -19,7 +19,8 @@ import { SessionRecovery, type SessionPhase, type SessionState } from "@/lib/ses
 import { customerError, ENQUIRY_FIELDS } from "@/lib/customer-data";
 import { contentAssets } from "@/lib/content-assets";
 import { propertyOrders } from "@/lib/property-order";
-import { readAllRows } from "@/lib/pagination";
+import { firstPageCount, readAllRows } from "@/lib/pagination";
+import { STUDIO_PROPERTY_FIELDS, STUDIO_REFRESH_AGE_MS } from "@/lib/studio-catalogue";
 import { readBrowserFavourites,claimBrowserFavourites,acknowledgeBrowserFavourites,releaseBrowserFavouriteClaim } from "@/lib/favourites";
 import { isPublicRental } from "@/lib/rentals";
 import type { StaffRole,StaffProfile } from "@/lib/staff";
@@ -30,7 +31,7 @@ type SiteContext = {
   content: Content; setContent: (content: Update<Content>) => void;
   language: Language; setLanguage: (l: Language) => void; t: (en: string, vi: string) => string;
   currency: PriceCurrency; setCurrency: (currency: PriceCurrency) => void; exchangeRate: ExchangeRate | null;
-  saved: string[]; toggleSaved: (id: string) => void;
+  saved: string[]; toggleSaved: (id: string) => Promise<boolean | null>;
   savedReady: boolean; savedError: string; pendingSaved: string[];
   importSaved: () => Promise<number>; retrySavedHomes: () => void;
   compare: string[]; toggleCompare: (id: string) => void;
@@ -52,13 +53,15 @@ type SiteContext = {
 const Context = createContext<SiteContext | null>(null);
 export function SiteProvider({ children, initial, initialLanguage = "en", initialCurrency = "USD" }: { children: ReactNode; initialLanguage?: Language; initialCurrency?: PriceCurrency; initial: { content: Content; configured: boolean; error: boolean; exchangeRate?: ExchangeRate | null; publicOrigin?: string; publicPath?: string; contentPath?: string; seedPreview?: boolean } }) {
   const pathname=usePathname(),router=useRouter(),routerRef=useRef(router);
+  const studioRoute = pathname?.replace(/\/+$/, "") === "/admin";
   useEffect(()=>{routerRef.current=router;},[router]);
   const [passwordLink,setPasswordLink]=useState<PasswordLink|null>(null);
   const [staffProfile,setStaffProfile]=useState<StaffProfile|null>(null);
   const [passwordLinkIssue,setPasswordLinkIssue]=useState<EmailLinkIssue|null>(null);
   const [emailVerification,setEmailVerification]=useState<{type:PasswordLink["type"];busy:boolean;failed:boolean}|null>(null);
   const pendingEmail=useRef<EmailTokenLink|null>(null),verificationFlight=useRef(false);
-  const [content, updateContent] = useState(initial.content);
+  const [publicContent, updateContent] = useState(initial.content);
+  const [studioContent, updateStudioContent] = useState<Content | null>(null);
   const [backendError, setBackendError] = useState(initial.error);
   const [contentRecovering, setContentRecovering] = useState(false);
   const [language, updateLanguage] = useState<Language>(initialLanguage);
@@ -121,6 +124,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const [sessionExpired, setSessionExpired] = useState(false);
   const [staffAccessRevoked, setStaffAccessRevoked] = useState(false);
   const [demo, setDemo] = useState(false);
+  const content = studioRoute && editor && !demo && studioContent ? studioContent : publicContent;
   const [studioDataReady, setStudioDataReady] = useState(false);
   const [enquiries, updateEnquiries] = useState<Enquiry[]>([]);
   const [toasts, setToasts] = useState<{ id: number; message: string; tone: ToastTone }[]>([]);
@@ -136,8 +140,25 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const initialRef = useRef(initial.content);
   useEffect(() => { initialRef.current = initial.content; }, [initial.content]);
   const version = useRef(0);
+  const publicVersion = useRef(0);
   const connectRef = useRef<() => Promise<void>>(async () => {});
-  const refreshFlight = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+  const studioRouteRef = useRef(studioRoute);
+  const refreshedAt = useRef<number | null>(null);
+  const refreshFlight = useRef<{ generation: number; promise: Promise<void>; controller: AbortController } | null>(null);
+  const profileFlight = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+  const clearStudio = useCallback(() => {
+    refreshFlight.current?.controller.abort();
+    refreshFlight.current = null;
+    refreshedAt.current = null;
+    updateStudioContent(null);
+    updateEnquiries([]);
+    setStudioDataReady(false);
+  }, []);
+  useLayoutEffect(() => {
+    if (studioRouteRef.current === studioRoute) return;
+    studioRouteRef.current = studioRoute;
+    if (!studioRoute) { clearStudio(); setStaffProfile(null); }
+  }, [studioRoute, clearStudio]);
   const publicClientRef = useRef<SupabaseClient | null>(null);
   const publicPathRef = useRef(initial.contentPath);
   const publicContentNeeded = useRef(initial.error);
@@ -147,13 +168,17 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
 
   const refreshStaffProfile=useCallback(async()=>{
     const db=clientRef.current,state=sessionRef.current?.state;
-    if(!db||!state?.editor||!state.user){setStaffProfile(null);return;}
+    if(!db||!state?.editor||!state.user||!studioRouteRef.current){setStaffProfile(null);return;}
     const id=state.user.id,generation=state.generation;
-    const {data,error}=await request(signal=>db.rpc("get_staff_profile").abortSignal(signal));
-    if(error)throw error;
-    const current=sessionRef.current?.state;
-    if(current?.user?.id!==id||current.generation!==generation||!current.editor)return;
-    if(data&&data.user_id===id)setStaffProfile(data as StaffProfile);
+    if(profileFlight.current?.generation===generation)return profileFlight.current.promise;
+    const promise=(async()=>{
+      const {data,error}=await request(signal=>db.rpc("get_staff_profile").abortSignal(signal));
+      if(error)throw error;
+      const current=sessionRef.current?.state;
+      if(studioRouteRef.current&&current?.user?.id===id&&current.generation===generation&&current.editor&&data?.user_id===id)setStaffProfile(data as StaffProfile);
+    })();
+    profileFlight.current={generation,promise};
+    try{await promise;}finally{if(profileFlight.current?.promise===promise)profileFlight.current=null;}
   },[]);
 
   const verifyEmailLink=useCallback(async()=>{
@@ -184,19 +209,17 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     const db = publicClientRef.current;
     if (!publicContentNeeded.current || !db || !navigator.onLine) return;
     if (publicContentFlight.current) return publicContentFlight.current.promise;
-    const epoch = publicContentEpoch.current, startedVersion = version.current;
+    const epoch = publicContentEpoch.current, startedVersion = publicVersion.current;
     const controller = new AbortController();
     setContentRecovering(true);
     const promise = (async () => {
       try {
         const live = await readPublishedContent(db, controller.signal, publicPathRef.current);
-        if (epoch !== publicContentEpoch.current || controller.signal.aborted || !publicContentNeeded.current || startedVersion !== version.current) return;
+        if (epoch !== publicContentEpoch.current || controller.signal.aborted || !publicContentNeeded.current || startedVersion !== publicVersion.current) return;
         initialRef.current = live;
         publicContentNeeded.current = false;
         setBackendError(false);
-        // Public recovery must not replace the Studio's full listing set or a
-        // local save that completed while the anonymous read was pending.
-        if (!snapshotRef.current.editor) updateContent(live);
+        updateContent(live);
       } catch {
         // Keep the warning truthful and let Retry/online/focus recover it later.
         if (epoch === publicContentEpoch.current && !controller.signal.aborted) setBackendError(true);
@@ -223,30 +246,33 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     void recoverPublicContent();
   }, [pathname, initial.configured, initial.contentPath, recoverPublicContent]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (background = false) => {
     const db = clientRef.current, state = sessionRef.current?.state;
-    if (!db || !state?.user || !state.editor) throw new Error("Sign in with an editor account to continue.");
+    if (!studioRouteRef.current || !db || !state?.user || !state.editor) return;
     const generation = state.generation, startedVersion = version.current;
     if (refreshFlight.current?.generation === generation) return refreshFlight.current.promise;
+    if (background && refreshedAt.current !== null && Date.now() - refreshedAt.current < STUDIO_REFRESH_AGE_MS) return;
+    const controller = new AbortController();
     const promise = (async () => {
-      const [p, n, s, a, act, e, orders, articles] = await request(signal => Promise.all([
-        readAllRows((from,to)=>db.from("properties").select("*").order("sort_order").order("id").range(from,to).abortSignal(signal)),
-        readAllRows((from,to)=>db.from("neighbourhoods").select("*").order("sort_order").order("slug").range(from,to).abortSignal(signal)),
+      const [p, n, s, a, act, e, orders, articles] = await request(deadline => {
+        const signal = AbortSignal.any([deadline, controller.signal]);
+        return Promise.all([
+        readAllRows((from,to)=>db.from("properties").select(STUDIO_PROPERTY_FIELDS,firstPageCount(from)).order("sort_order").order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("neighbourhoods").select("*",firstPageCount(from)).order("sort_order").order("slug").range(from,to).abortSignal(signal)),
         db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
-        readAllRows((from,to)=>db.from("listing_authors").select("*").order("sort_order").order("id").range(from,to).abortSignal(signal)),
-        readAllRows((from,to)=>db.from("site_activities").select("*").order("sort_order").order("id").range(from,to).abortSignal(signal)),
-        readAllRows((from,to)=>db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes,read_at,read_by,property_code,property_address)`).order("created_at", { ascending: false }).order("id").range(from,to).abortSignal(signal)),
-        readAllRows((from,to)=>db.from("property_display_orders").select("scope,property_ids").order("scope").range(from,to).abortSignal(signal)),
-        readAllRows((from,to)=>db.from("editorial_articles").select("*").order("updated_at",{ascending:false}).order("id").range(from,to).abortSignal(signal)),
-      ]));
+        readAllRows((from,to)=>db.from("listing_authors").select("*",firstPageCount(from)).order("sort_order").order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("site_activities").select("*",firstPageCount(from)).order("sort_order").order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("enquiries").select(`${ENQUIRY_FIELDS},enquiry_notes(notes,read_at,read_by,property_code,property_address)`,firstPageCount(from)).order("created_at", { ascending: false }).order("id").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("property_display_orders").select("scope,property_ids",firstPageCount(from)).order("scope").range(from,to).abortSignal(signal)),
+        readAllRows((from,to)=>db.from("editorial_articles").select("*",firstPageCount(from)).order("updated_at",{ascending:false}).order("id").range(from,to).abortSignal(signal)),
+        ]);
+      });
       const current = sessionRef.current?.state;
-      if (current?.generation !== generation || !current.editor || current.user?.id !== state.user?.id) return;
+      if (controller.signal.aborted || !studioRouteRef.current || current?.generation !== generation || !current.editor || current.user?.id !== state.user?.id) return;
       if (s.error) throw new Error("Couldn’t load CMS data. Check your connection and editor permissions.");
       // A slow background read must not overwrite a save that completed meanwhile.
       if (startedVersion !== version.current) return;
-      updateContent(contentAssets({ editorial:articles, properties: p, neighbourhoods: n, settings: s.data, authors:a,activities:act,propertyOrders:propertyOrders(orders) } as Content));
-      initialRef.current = contentAssets({ editorial:articles.filter(row=>row.status==="published"), properties: p.filter(isPublicRental), neighbourhoods: n, settings: s.data,authors:a.filter(row=>row.published),activities:act.filter(row=>row.published),propertyOrders:propertyOrders(orders) } as Content);
-      publicContentNeeded.current = false;
+      updateStudioContent(contentAssets({ editorial:articles, properties: p, neighbourhoods: n, settings: s.data, authors:a,activities:act,propertyOrders:propertyOrders(orders) } as Content));
       setBackendError(false);
       updateEnquiries(e.map(row => {
         const { enquiry_notes, ...enquiry } = row;
@@ -256,16 +282,19 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
         return { ...enquiry, notes:note?.notes??"",read_at:note?.read_at??null,read_by:note?.read_by??null,property_code:note?.property_code||"",property_address:note?.property_address||"" } as Enquiry;
       }));
       setStudioDataReady(true);
+      refreshedAt.current = Date.now();
     })();
-    refreshFlight.current = { generation, promise };
+    refreshFlight.current = { generation, promise, controller };
     try { await promise; } finally { if (refreshFlight.current?.promise === promise) refreshFlight.current = null; }
   }, []);
 
-  const reconnect = useCallback(async () => {
+  const reconnect = useCallback(async (background = false) => {
     if (!sessionRef.current) { await connectRef.current(); await recoverPublicContent(); return; }
     const publicRecovery = recoverPublicContent();
-    if (await sessionRef.current.recover()) {
-      try { await refresh(); } catch (error) { notice(error instanceof Error ? error.message : "Couldn’t load CMS data. Check your connection and editor permissions.", "error"); }
+    if (await sessionRef.current.recover() && studioRouteRef.current) {
+      try { await refresh(background); } catch (error) {
+        if(studioRouteRef.current)notice(error instanceof Error ? error.message : "Couldn’t load CMS data. Check your connection and editor permissions.", "error");
+      }
     }
     await publicRecovery;
   }, [refresh, recoverPublicContent]);
@@ -391,7 +420,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
               }
               if (next.phase !== "checking" && next.phase !== "recovering") setReady(true);
               if (previous.user && (next.user?.id !== previous.user.id || previous.editor && !next.editor && next.phase === "ready")) {
-                if(!next.editor)setStaffProfile(null);version.current++; setStudioDataReady(false); updateEnquiries([]); updateContent(initialRef.current);
+                if(!next.editor)setStaffProfile(null);version.current++; clearStudio();
                 if(next.user?.id!==previous.user.id)setPasswordLink(null);
               }
             },
@@ -425,20 +454,20 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     };
     connectRef.current = connect;
     const offline = () => { if (sessionRef.current) sessionRef.current.offline(); else setSessionPhase("offline"); };
-    const removeRecoveryEvents = installRecoveryEvents(reconnect, offline);
+    const removeRecoveryEvents = installRecoveryEvents(() => reconnect(true), offline);
     void connect();
     return () => {
       active = false; unsubscribe?.(); sessionRef.current?.stop(); sessionRef.current = null; clientRef.current = null;
       publicContentEpoch.current = contentEpoch + 1; publicContentFlight.current?.controller.abort(); publicContentFlight.current = null; publicClientRef.current = null;
       removeRecoveryEvents();
     };
-  }, [initial.configured, initial.error, initial.seedPreview, reconnect, recoverPublicContent]);
+  }, [initial.configured, initial.error, initial.seedPreview, reconnect, recoverPublicContent, clearStudio]);
 
   useEffect(() => {
-    if (!client || !user || sessionPhase !== "ready") return;
+    if (!client || !activeUserId || sessionPhase !== "ready") return;
     let active = true;
-    const identity = user.id, generation = snapshotRef.current.generation, startedVersion = savedVersion.current;
-    void request(signal => readAllRows<{property_id:string}>((from,to)=>client.from("saved_homes").select("property_id").eq("user_id", identity).order("property_id").range(from,to).abortSignal(signal)))
+    const identity = activeUserId, generation = snapshotRef.current.generation, startedVersion = savedVersion.current;
+    void request(signal => readAllRows<{property_id:string}>((from,to)=>client.from("saved_homes").select("property_id",firstPageCount(from)).eq("user_id", identity).order("property_id").range(from,to).abortSignal(signal)))
       .then(data => {
         if (!active || snapshotRef.current.generation !== generation || startedVersion !== savedVersion.current) return;
         setSaved((data ?? []).map(row => row.property_id as string)); setSavedAccount(identity); setSavedError("");
@@ -446,7 +475,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     return () => { active = false; };
     // Language changes must not refetch private data or overwrite pending saves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, user?.id, sessionPhase, savedRetry]);
+  }, [client, activeUserId, sessionPhase, savedRetry]);
 
   useEffect(() => {
     const syncLanguage = () => {
@@ -472,7 +501,12 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   }, []);
   useLayoutEffect(() => { document.documentElement.lang = language; }, [language]);
   const setContent = useCallback((next: Update<Content>) => {
-    version.current++;
+    if (studioRouteRef.current && !demo && snapshotRef.current.editor) {
+      version.current++;
+      updateStudioContent(previous => typeof next === "function" ? next(previous ?? initialRef.current) : next);
+      return;
+    }
+    publicVersion.current++;
     updateContent(previous => {
       const value = typeof next === "function" ? next(previous) : next;
       if (demo) { try { localStorage.setItem("gary-preview-content", JSON.stringify(value)); } catch { notice("Browser storage is full. Changes are only kept for this session.", "warning"); } }
@@ -488,19 +522,41 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
       return value;
     });
   }
-  function toggleSaved(id: string) {
-    if (!user) { setSaved(previous => { const next = previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id]; try { localStorage.setItem("gary-saved", JSON.stringify(next));if(!next.includes(id))releaseBrowserFavouriteClaim(localStorage,id); } catch { notice("Saved for this visit. Browser storage is unavailable.", "warning"); } return next; }); return; }
+  async function toggleSaved(id: string): Promise<boolean | null> {
+    if (!user) {
+      return new Promise(resolve => {
+        setSaved(previous => {
+          const removing = previous.includes(id);
+          const next = removing ? previous.filter(value => value !== id) : [...previous, id];
+          try {
+            localStorage.setItem("gary-saved", JSON.stringify(next));
+            if (removing) releaseBrowserFavouriteClaim(localStorage, id);
+            resolve(!removing);
+          } catch {
+            notice("Saved for this visit. Browser storage is unavailable.", "warning");
+            resolve(null);
+          }
+          return next;
+        });
+      });
+    }
     const identity = user.id, key = identity + ":" + id, remove = saved.includes(id);
-    if (savedFlight.current.has(key)) return;
-    if (savedAccount !== identity) { notice(language === "vi" ? "Đang kết nối danh sách nhà đã lưu. Hãy kết nối lại và thử lại." : "Your saved homes are still connecting. Reconnect and try again.", "warning"); return; }
+    if (savedFlight.current.has(key)) return null;
+    if (savedAccount !== identity) { notice(language === "vi" ? "Đang kết nối danh sách nhà đã lưu. Hãy kết nối lại và thử lại." : "Your saved homes are still connecting. Reconnect and try again.", "warning"); return null; }
     savedFlight.current.add(key); savedVersion.current++; setPendingSaved(previous => [...previous, id]);
-    void accountTask((db, signal, userId) => remove
+    return accountTask((db, signal, userId) => remove
       ? db.from("saved_homes").delete().eq("user_id", userId).eq("property_id", id).select("property_id").abortSignal(signal)
       : db.from("saved_homes").upsert({ user_id: userId, property_id: id }, { onConflict: "user_id,property_id", ignoreDuplicates: true }).select("property_id").abortSignal(signal))
-      .then(({ error }) => {
+      .then(({ data, error }) => {
         if (error) throw error;
-        if (snapshotRef.current.user?.id === identity) { savedVersion.current++; setSaved(previous => remove ? previous.filter(value => value !== id) : previous.includes(id) ? previous : [...previous, id]); }
-      }).catch(error => { if (snapshotRef.current.user?.id === identity) notice(customerError(error, language), "error"); })
+        if (snapshotRef.current.user?.id !== identity) return null;
+        savedVersion.current++;
+        setSaved(previous => remove ? previous.filter(value => value !== id) : previous.includes(id) ? previous : [...previous, id]);
+        return data?.some(row => row.property_id === id) ? !remove : null;
+      }).catch(error => {
+        if (snapshotRef.current.user?.id === identity) notice(customerError(error, language), "error");
+        return null;
+      })
       .finally(() => { savedFlight.current.delete(key); if (snapshotRef.current.user?.id === identity) setPendingSaved(previous => previous.filter(value => value !== id)); });
   }
   async function importSaved():Promise<number> {
@@ -542,25 +598,28 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   function enterDemo() { if (initial.seedPreview === false) return; setDemo(true); try { localStorage.setItem("gary-preview-enabled", "true"); } catch { /* optional */ } }
   function exitDemo() { setDemo(false); updateContent(initialRef.current); try { localStorage.removeItem("gary-preview-enabled"); } catch { /* optional */ } }
   useEffect(()=>{
-    if(!client)return;
+    if(!client||!studioRoute||!editor||!activeUserId)return;
     let active=true;
-    if(editor&&sessionPhase==="ready")void refreshStaffProfile().catch(()=>{});
+    void refreshStaffProfile().catch(()=>{});
     const changed=()=>{
-      if(editor)void refreshStaffProfile().catch(()=>{});
+      void refreshStaffProfile().catch(()=>{});
       const state=snapshotRef.current,actor=state.user?.id,generation=state.generation;
       void request(async signal=>{
-        return await readAllRows((from,to)=>{let query=client.from("listing_authors").select("*");if(!editor)query=query.eq("published",true);
-          return query.order("sort_order").order("id").range(from,to).abortSignal(signal);});
+        return await readAllRows((from,to)=>client.from("listing_authors").select("*",firstPageCount(from))
+          .order("sort_order").order("id").range(from,to).abortSignal(signal));
       }).then(data=>{
-        if(!active||snapshotRef.current.user?.id!==actor||snapshotRef.current.generation!==generation||!Array.isArray(data))return;
-        version.current++;updateContent(previous=>({...previous,authors:data}));initialRef.current={...initialRef.current,authors:data.filter(a=>a.published)};
+        if(!active||!studioRouteRef.current||!snapshotRef.current.editor||snapshotRef.current.user?.id!==actor||snapshotRef.current.generation!==generation)return;
+        updateStudioContent(previous=>previous&&({...previous,authors:data}));
       }).catch(()=>{});
       window.dispatchEvent(new Event("gary-staff-directory-changed"));
     };
     window.addEventListener("gary-staff-profile-changed",changed);
-    const channel=typeof client.channel==="function"?client.channel("gary-staff-portraits").on("postgres_changes",{event:"*",schema:"public",table:"staff_profiles"},changed).subscribe():null;
+    const profile = {schema:"public",table:"staff_profiles",filter:`user_id=eq.${activeUserId}`};
+    const channel=typeof client.channel==="function"?client.channel(`gary-staff-portraits:${activeUserId}`)
+      .on("postgres_changes",{event:"INSERT",...profile},changed)
+      .on("postgres_changes",{event:"UPDATE",...profile},changed).subscribe():null;
     return()=>{active=false;window.removeEventListener("gary-staff-profile-changed",changed);if(channel)void client.removeChannel(channel);};
-  },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
+  },[client,editor,activeUserId,refreshStaffProfile,studioRoute]);
 
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : "We couldn’t verify your connection. Your edits are still here.";
   function setLanguage(next: Language) {
@@ -577,7 +636,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     }
   }
 
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, retrySavedHomes, compare, toggleCompare, configured: initial.configured, seedPreview: initial.seedPreview !== false, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, retrySavedHomes, compare, toggleCompare, configured: initial.configured, seedPreview: initial.seedPreview !== false, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile:studioRoute?staffProfile:null,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady:studioRoute&&studioDataReady, enquiries:studioRoute?enquiries:[], setEnquiries, refresh, notice }}>
     {initial.configured && sessionResolved && user && (sessionPhase === "offline" || sessionPhase === "error") &&
       <div className="session-banner" role="status">{studioText(sessionMessage, language)} <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button></div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}

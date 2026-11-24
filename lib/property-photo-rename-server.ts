@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Property } from "./types";
 import { request } from "./requests.ts";
+import { isConflictResponse } from "./conflict-response.ts";
 import {
   PROPERTY_IMAGE_BUCKET, PROPERTY_IMAGE_MAX_BYTES, propertyImageFormat,
   propertyPhotoExtension, propertyPhotoFilename, propertyPhotoPath, propertyPhotoUrl, replacePropertyPhotoUrl,
@@ -21,13 +22,14 @@ export class PhotoRenameError extends Error {
 }
 
 async function rpc<T>(db:SupabaseClient,name:string,args:Record<string,unknown>,signal:AbortSignal):Promise<T> {
-  const {data,error} = await db.rpc("home_photo_rename_"+name,args).abortSignal(signal);
+  const {data,error,status} = await db.rpc("home_photo_rename_"+name,args).abortSignal(signal);
   if (error) {
     if (error.code==="55P03") throw new PhotoRenameError("media_busy");
     if (["PGRST202","42883","42P01"].includes(error.code)) throw new PhotoRenameError("migration_required",503);
     const code = /^photo_rename\.([a-z_]+)$/.exec(error.message)?.[1];
     if (code) throw new PhotoRenameError(code,error.code==="42501"?403:409);
     if (error.code==="42501") throw new PhotoRenameError("forbidden",403);
+    if (isConflictResponse({code:error.code,status})) throw new PhotoRenameError("conflict");
     throw new PhotoRenameError("unavailable",503);
   }
   return data as T;

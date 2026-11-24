@@ -8,6 +8,7 @@ import { SelectField } from "./select-field";
 import { DeleteConfirmation } from "./delete-confirmation";
 import { HELP_BUCKET, HELP_FIELDS, HELP_FILE_TYPES, HELP_MAX_FILES, helpFileSize, helpFileType, helpUploadPath, type HelpFile, type HelpGuide } from "@/lib/portal-help";
 import { uploadHelpFile } from "@/lib/portal-help-upload";
+import { isConflictResponse } from "@/lib/conflict-response";
 
 const fields = ["title_en", "title_vi", "summary_en", "summary_vi", "body_en", "body_vi", "audience", "minimum_role", "sort_order", "published"] as const;
 type Draft = Pick<HelpGuide, typeof fields[number]>;
@@ -80,7 +81,11 @@ export function PortalGuideEditor({ guide, close, saved, changed }: { guide: Hel
           if (!check.error && !check.data) await editorTask(db => db.storage.from(HELP_BUCKET).remove([pendingPath!]));
         } catch { /* Keep an uncertain object private for the owner to inspect. */ }
       }
-      if (active.current) setError(error instanceof DOMException && error.name === "AbortError" ? t("Upload cancelled. Completed files are kept; select remaining files to continue.", "Đã hủy tải. Tệp hoàn tất được giữ lại; chọn các tệp còn lại để tiếp tục.") : t("An upload could not be confirmed. Refresh before reselecting any files; completed files are kept.", "Chưa xác nhận được lần tải. Làm mới trước khi chọn lại; tệp đã hoàn tất được giữ lại."));
+      if (active.current && (isConflictResponse(error) || (error as {message?:string})?.message === "The guide changed during upload; review its audience before attaching this file")) {
+        setConflict(true);
+      } else if (active.current) {
+        setError(error instanceof DOMException && error.name === "AbortError" ? t("Upload cancelled. Completed files are kept; select remaining files to continue.", "Đã hủy tải. Tệp hoàn tất được giữ lại; chọn các tệp còn lại để tiếp tục.") : t("An upload could not be confirmed. Refresh before reselecting any files; completed files are kept.", "Chưa xác nhận được lần tải. Làm mới trước khi chọn lại; tệp đã hoàn tất được giữ lại."));
+      }
     } finally { if (active.current) { setBusy(""); setProgress(null); } uploadAbort.current = null; }
   }
   async function removeFile() {

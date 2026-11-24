@@ -5,7 +5,7 @@ import { ArrowUpRight, CalendarDays, Check, LoaderCircle, Mail, MessageSquare, P
 import { useSite } from "./site-context";
 import { CUSTOMER_STAGES, customerError, customerSummaries, enquiryLabel, hanoiDay, type CustomerSummary } from "@/lib/customer-data";
 import { request } from "@/lib/requests";
-import { readAllRows } from "@/lib/pagination";
+import { firstPageCount, readAllRows } from "@/lib/pagination";
 import { normalize } from "@/lib/property-search";
 import type { CustomerProfile, CustomerRecord, Enquiry } from "@/lib/types";
 
@@ -30,8 +30,8 @@ export function CustomerManager({ openEnquiry, draft: editing, setDraft: setEdit
     setLoading(true);
     try {
       const [p, r] = await request(signal => Promise.all([
-        readAllRows<CustomerProfile>((from,to)=>client.from("customer_profiles").select("*").order("updated_at", { ascending: false }).order("user_id").range(from,to).abortSignal(signal)),
-        readAllRows<CustomerRecord>((from,to)=>client.from("customer_records").select("*").order("updated_at", { ascending: false }).order("customer_key").range(from,to).abortSignal(signal)),
+        readAllRows<CustomerProfile>((from,to)=>client.from("customer_profiles").select("*",firstPageCount(from)).order("updated_at", { ascending: false }).order("user_id").range(from,to).abortSignal(signal)),
+        readAllRows<CustomerRecord>((from,to)=>client.from("customer_records").select("*",firstPageCount(from)).order("updated_at", { ascending: false }).order("customer_key").range(from,to).abortSignal(signal)),
         refreshEnquiries ? refresh() : Promise.resolve(),
       ]));
       if (!active.current || read !== sequence.current || identity.current !== id || version.current !== startedVersion) return;

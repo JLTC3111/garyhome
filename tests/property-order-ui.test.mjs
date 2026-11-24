@@ -22,5 +22,5 @@ test('a manager can rearrange with arrows, retain the draft through translation 
  assert.equal(h.calls[0].name,'save_property_order');assert.equal(h.calls[0].input.order_scope,'home');assert.deepEqual(h.calls[0].input.expected_property_ids,[]);assert.deepEqual(h.site.content.propertyOrders.home,h.calls[0].input.ordered_property_ids);assert.equal(h.renderer.root.findAllByType('li').length,0);
 });
 test('a conflicting order leaves the draft visible instead of claiming a save succeeded',async t=>{
- const h=await harness(t);await act(async()=>button(h.renderer,'Arrange cards').props.onClick());h.error({code:'40001'});await act(async()=>button(h.renderer,'Save order').props.onClick());assert.equal(h.renderer.root.findAllByType('li').length,3);assert.match(h.renderer.root.findByProps({role:'alert'}).children.join(''),/order changed/);assert.equal(h.site.content.propertyOrders.home,undefined);
+ const h=await harness(t);await act(async()=>button(h.renderer,'Arrange cards').props.onClick());h.error({code:'PT409'});await act(async()=>button(h.renderer,'Save order').props.onClick());assert.equal(h.renderer.root.findAllByType('li').length,3);assert.match(h.renderer.root.findByProps({role:'alert'}).children.join(''),/order changed/);assert.equal(h.site.content.propertyOrders.home,undefined);
 });

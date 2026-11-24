@@ -113,6 +113,7 @@ async function setup(t) {
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119095000_property_deletion_media_cleanup.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119183631_property_photo_rename_owner_only.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261124102511_home_listing_cleanup_retry.sql',import.meta.url),'utf8'));
+ await pg.exec(await readFile(new URL('../supabase/migrations/20261124202612_home_postgrest_conflict_sqlstates.sql',import.meta.url),'utf8'));
  const files=new Map([[oldKey,{mime:'image/jpeg',bytes:jpeg}]]), calls=[];
  let onCopy=()=>{}, onRemove=()=>{};
  const original=globalThis.fetch;
@@ -203,7 +204,8 @@ test('Owner-only copy, stale edit retry, atomic references, retained originals a
  assert.deepEqual((await h.pg.query('select sources from public.editorial_articles')).rows[0].sources,[{title:'Photo',url:newUrl}]);
  assert.deepEqual(h.files.get(newKey)?.bytes,jpeg);
  assert.equal(h.files.has(oldKey),true,'the old URL remains available by default');
- await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('update public.properties set images=$1 where id=$2',[[transformed],first])),/stale_reference/);
+ await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('update public.properties set images=$1 where id=$2',[[transformed],first])),
+  error=>error.code==='PT409'&&error.message==='photo_rename.stale_reference');
  assert.equal((await rename()).id,result.id,'a lost success response can be retried');
  assert.deepEqual((await rename(write,{cleanupConfirmed:true})).cleanup,{status:'pending',reason:'review_required'},
   'retrying an older operation cannot upgrade it to automatic removal');
@@ -280,7 +282,8 @@ test('permanent deletion captures each listing state and leaves shared CRM and g
     [bucket,`properties/listings/${id}/${first}/late.jpg`])),/policy/);
   await assert.rejects(h.role('authenticated',editor,()=>h.pg.query('insert into storage.objects values($1,$2)',
     ['listing-videos',`${admin}/${id}/${second}.mp4`])),/policy/);
-  await assert.rejects(h.pg.query('insert into feedback_public values($1)',[`Please use ${images[1]}.`]),/retired_reference/);
+ await assert.rejects(h.pg.query('insert into feedback_public values($1)',[`Please use ${images[1]}.`]),
+  error=>error.code==='PT409'&&error.message==='listing_cleanup.retired_reference');
   if(status==='draft'){
    assert.equal((await listingDeletionQueue(db,signal()))[0].propertyId,id);
    h.onRemove(()=>{});

@@ -90,6 +90,14 @@ async function harness(t, options={}){
   return query;
  }};
  const client={
+  ...(options.trackProfiles?{
+   channel(topic){
+    const subscriptions=backend.subscriptions??=[],binding={topic,events:[],removed:false};
+    const channel={on(_type,filter){binding.events.push(filter);return channel;},subscribe(){subscriptions.push(binding);return channel;},binding};
+    return channel;
+   },
+   async removeChannel(channel){channel.binding.removed=true;},
+  }:{}),
   auth:{getSession:async()=>{sessionReads++;return backend.sessionRead?await backend.sessionRead.promise:({data:{session},error:null});},onAuthStateChange:handler=>{callback=handler;return {data:{subscription:{unsubscribe:()=>{callback=undefined;}}}};},signOut:async options=>{
     backend.signOutCalls??=[];backend.signOutCalls.push(options);
     if(backend.signOutPending)await backend.signOutPending.promise;
@@ -104,22 +112,34 @@ async function harness(t, options={}){
   rpc(name,args){const q={abortSignal:()=>q,then(resolve,reject){backend.rpcCalls.push({name,args});if(['get_studio_notifications','mark_studio_notifications_read'].includes(name)&&backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='get_staff_profile')return Promise.resolve({data:{user_id:session?.user.id,display_name:'Test staff',avatar_path:backend.profilePaths?.get(session?.user.id)||'',password_change_reminder:backend.passwordReminder||false},error:null}).then(resolve,reject);if(name==='acknowledge_staff_password_reminder')backend.passwordReminder=false;if(name==='mark_studio_notifications_read')backend.notifications=backend.notifications?.map(n=>({...n,unread:false}));if(name==='get_studio_notifications')return Promise.resolve({data:{items:backend.notifications??[],unread_count:backend.notifications?.filter(n=>n.unread).length||0},error:null}).then(resolve,reject);if(name==='staff_photo_directory')return Promise.resolve({data:[],error:null}).then(resolve,reject);if(backend.rpcPending.has(name))return backend.rpcPending.get(name).promise.then(resolve,reject);if(name==='delete_property')backend.rows.properties=(backend.rows.properties??fixture.properties).filter(p=>p.id!==args.target_property);if(name==='delete_enquiry')backend.rows.enquiries=backend.rows.enquiries.filter(e=>e.id!==args.target_enquiry);return Promise.resolve({data:name==='mark_enquiry_read'?{read_at:'2026-10-25T01:02:03Z',read_by:session?.user.id}:true,error:null}).then(resolve,reject);}};return q;},
   storage:{from:bucket=>({upload:()=>backend.upload.promise,getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}}),remove:async paths=>{backend.helpRemoved??=[];backend.helpRemoved.push(...paths);return {data:[],error:null};},createSignedUrl:async(path,expires,options)=>{backend.helpSigned??=[];backend.helpSigned.push({bucket,path,expires,options});if(backend.helpSignedPending)await backend.helpSignedPending.promise;return {data:{signedUrl:'https://private.example.invalid/'+path+'?view='+String(!options?.download)},error:null};}})},
   from(table){
-   let writing=false,payload,single=false,writeMethod,range;const filters={};const query={};
+   let writing=false,payload,single=false,writeMethod,range,columns="*",count=false;const filters={};const query={};
    query.range=(from,to)=>{range=[from,to];return query;};
-   const applyRange=result=>!writing&&range&&Array.isArray(result.data)?{...result,data:result.data.slice(range[0],Math.min(range[1]+1,range[0]+(options.rowCap??Infinity)))}:result;
+   const applyRange=result=>{
+    if(writing||!range||!Array.isArray(result.data))return result;
+    let rows=result.data.slice(range[0],Math.min(range[1]+1,range[0]+(options.rowCap??Infinity)));
+    if(table==='properties'&&columns!=='*')rows=rows.map(row=>Object.fromEntries(columns.split(',').map(key=>[key,row[key]])));
+    return {...result,data:rows,count:count?result.data.length:null};
+   };
    for(const method of ['upsert','update','insert','delete'])query[method]=value=>{writing=true;writeMethod=method;payload=value;return query;};
    query.eq=(key,value)=>{filters[key]=value;return query;};query.in=(key,value)=>{filters[key]=value;return query;};
    for(const method of ['single','maybeSingle'])query[method]=()=>{single=true;return query;};
-   for(const method of ['select','order','abortSignal','is','limit','or'])query[method]=()=>query;
+   query.select=(fields,options)=>{columns=fields??"*";count=options?.count==='exact';return query;};
+   for(const method of ['order','abortSignal','is','limit','or'])query[method]=()=>query;
    query.then=(resolve,reject)=>{
     if(writing)backend.calls.push({table,payload,method:writeMethod,filters});
-    if(!writing){backend.privateReads??=[];backend.privateReads.push(table);if(range){backend.privateRanges??=[];backend.privateRanges.push({table,from:range[0],to:range[1]});}}
+    if(!writing){backend.privateReads??=[];backend.privateReads.push(table);(backend.selects??=[]).push({table,columns,range,filters,count});if(range){backend.privateRanges??=[];backend.privateRanges.push({table,from:range[0],to:range[1]});}}
     if(writing&&table==='staff_profiles'){backend.profilePaths??=new Map();backend.profilePaths.set(payload.user_id,payload.avatar_path);}
     if(writing&&backend.writeErrors.has(table)){
      const failure=backend.writeErrors.get(table),error=Array.isArray(failure)?failure.shift():failure;
      if(error)return Promise.resolve({data:null,error}).then(resolve,reject);
     }
     if(writing&&backend.writes.has(table))return backend.writes.get(table).promise.then(resolve,reject);
+    if(writing&&table==='properties'&&['insert','update'].includes(writeMethod)){
+     const saved=structuredClone(writeMethod==='insert'?{...payload,listing_code:payload.listing_code||'GH-900001'}:payload);
+     const properties=backend.rows.properties??fixture.properties;
+     backend.rows.properties=properties.some(row=>row.id===saved.id)?properties.map(row=>row.id===saved.id?saved:row):[...properties,saved];
+     return Promise.resolve({data:saved,error:null}).then(resolve,reject);
+    }
     if(writing&&table==='portal_guides'){
      if(backend.role!=='owner')return Promise.resolve({data:null,error:{code:'42501'}}).then(resolve,reject);
      const old=backend.rows.portal_guides.find(row=>row.id===filters.id);
@@ -770,6 +790,47 @@ test('healthy public reloads and session recovery do not make redundant content 
  const h=await harness(t,{guest:true,publicOnly:true});
  await act(async()=>{await h.site.reconnect();});
  assert.equal(h.backend.publicCalls.length,0);assert.equal(h.site.backendError,false);
+});
+
+test('a signed-in staff member on public routes reads no Studio data or staff portraits',async t=>{
+ const h=await harness(t,{path:'/homes',publicOnly:true,trackProfiles:true});
+ await act(async()=>{await h.site.reconnect();});
+ assert.equal(h.site.editor,true);
+ assert.equal(h.site.studioDataReady,false);
+ assert.deepEqual(h.site.enquiries,[]);
+ assert.deepEqual(h.backend.privateReads.filter(table=>['properties','enquiries','editorial_articles'].includes(table)),[]);
+ assert.equal(h.backend.rpcCalls.filter(call=>call.name==='get_staff_profile').length,0);
+ assert.equal(h.backend.subscriptions?.length??0,0);
+});
+
+test('Studio reads each dataset once and keeps one filtered profile subscription through foreground recovery',async t=>{
+ let now=Date.now();t.mock.method(Date,'now',()=>now);
+ const h=await harness(t,{trackProfiles:true});
+ const tables=['properties','neighbourhoods','site_settings','listing_authors','site_activities','enquiries','property_display_orders','editorial_articles'];
+ const reads=()=>h.backend.privateReads.filter(table=>tables.includes(table)).length;
+ const roles=()=>h.backend.privateReads.filter(table=>table==='team_members').length;
+ assert.equal(reads(),8);
+ const roleReads=roles();
+ await act(async()=>{
+  h.browser.dispatchEvent(new Event('focus'));h.page.dispatchEvent(new Event('visibilitychange'));h.browser.dispatchEvent(new Event('pageshow'));
+  await delay(10);
+ });
+ assert.equal(roles(),roleReads+1);
+ assert.equal(reads(),8);
+ const subscriptions=h.backend.subscriptions.filter(entry=>entry.topic==='gary-staff-portraits:owner');
+ assert.equal(subscriptions.length,1);
+ assert.deepEqual(subscriptions[0].events.map(event=>[event.event,event.filter]),[['INSERT','user_id=eq.owner'],['UPDATE','user_id=eq.owner']]);
+ assert.equal(h.backend.rpcCalls.filter(call=>call.name==='get_staff_profile').length,1);
+ for(const elapsed of [379,181,81]){
+  now+=elapsed*1000;
+  await act(async()=>{h.browser.dispatchEvent(new Event('focus'));await delay(10);});
+ }
+ assert.equal(reads(),16,'four wake times from the capture yield only two full snapshots');
+ h.backend.role=null;
+ await act(async()=>{h.browser.dispatchEvent(new Event('focus'));await delay(10);});
+ assert.equal(h.site.editor,false);
+ assert.equal(h.site.studioDataReady,false);
+ assert.equal(subscriptions[0].removed,true);
 });
 
 test('public listing recovery does not wait for a stalled login session',async t=>{
@@ -2072,10 +2133,13 @@ test('moving photo 19 to the cover persists through save, refresh and reopening'
  const filenames=Object.fromEntries(images.map((src,index)=>[src,`Room ${index+1}.JPG`]));
  const metadata={[images[18]]:{description_en:'Draft caption for photo 19'}};
  const listing={...fixture.properties[0],id:'photo-reorder-19',listing_code:'GH-900019',slug:'photo-reorder-listing',title_en:'Photo reorder listing',title_vi:'Tin sắp xếp ảnh',status:'draft',published_at:null,images,image_filenames:filenames,image_metadata:metadata};
- await act(async()=>h.site.setContent(previous=>({...previous,properties:[...previous.properties,listing]})));
+ h.backend.rows.properties=[...structuredClone(fixture.properties),listing];
+ await act(async()=>h.site.refresh());
+ assert.equal(h.site.content.properties.find(row=>row.id===listing.id).image_filenames,undefined);
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  const row=()=>h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('strong').some(strong=>strong.children.includes(listing.title_en)||strong.findAllByType('a').some(link=>link.children.includes(listing.title_en))));
  await act(async()=>row().findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ assert.ok(h.backend.selects.some(read=>read.table==='properties'&&read.columns==='*'&&read.filters.id===listing.id));
  const form=()=>h.renderer.root.findByProps({className:'editor-form'}),photos=()=>form().findByProps({className:'editor-photo-grid'});
  const sources=()=>photos().findAllByProps({className:'editor-photo-preview'}).map(node=>node.findByType('img').props.src);
  const orders=()=>photos().findAllByProps({className:'editor-photo-order'}).map(node=>node.children.join(''));
@@ -2141,7 +2205,8 @@ test('listing thumbnails and titles use the same canonical localized URL and lea
  const published={...fixture.properties[0],slug:'original-public-slug',title_en:'Renamed listing',title_vi:'Tin đã đổi tên',listing_type:'rent',status:'published',availability:'available'};
  const draft={...published,id:'draft-listing',slug:'saved-draft-slug',title_en:'Unpublished draft',title_vi:'Tin nháp',status:'draft'};
  const unavailable={...published,id:'unavailable-listing',slug:'unavailable-listing',title_en:'Unavailable rental',title_vi:'Tin đã đóng',availability:'unavailable'};
- await act(async()=>h.site.setContent(previous=>({...previous,properties:[published,draft,unavailable]})));
+ h.backend.rows.properties=[published,draft,unavailable];
+ await act(async()=>h.site.refresh());
  await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  const table=()=>h.renderer.root.findByProps({className:'admin-table admin-table--listings'});
  const cell=title=>table().findAllByProps({className:'admin-property-cell'}).find(node=>{

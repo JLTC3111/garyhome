@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 import movedAssets from "./data/asset-paths.json";
+import { propertyImageRemotePattern } from "./lib/optimized-property-images";
 
 const nextConfig: NextConfig = {
+  images: { remotePatterns: [propertyImageRemotePattern] },
   // Return the final localized Metadata API result in the initial HTML head
   // for browsers and crawlers alike, rather than streaming it after the body.
   htmlLimitedBots: /.*/,

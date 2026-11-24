@@ -12,6 +12,18 @@ test('pagination exhausts results even when the server cap is below the requeste
   assert.deepEqual(ranges.map(([from]) => from), [0,200,400,600,800,1000,1001]);
 });
 
+test('an exact response total removes empty follow-ups on short or server-capped pages', async () => {
+  for (const [total, cap, expected] of [[76,500,[0]],[401,200,[0,200,400]],[500,500,[0]]]) {
+    const source = Array.from({length: total}, (_, id) => ({id})), offsets = [];
+    const rows = await readAllRows(async (from, to) => {
+      offsets.push(from);
+      return {data: source.slice(from, Math.min(to + 1, from + cap)), error: null, count: from === 0 ? total : null};
+    });
+    assert.deepEqual(rows,source);
+    assert.deepEqual(offsets,expected);
+  }
+});
+
 test('a later-page failure rejects the entire read instead of returning a partial catalogue', async () => {
   const denied = {code: '42501'};
   await assert.rejects(readAllRows(async from => from === 0

@@ -57,10 +57,13 @@ export function EmblaCarouselListingCard({ photos, href, title, renderPhoto, chi
 
   return (
     <div className="property-image">
-      <Link href={href} tabIndex={-1} aria-hidden="true" aria-label={title} draggable={false}>
+      <Link href={href} prefetch={false} tabIndex={-1} aria-hidden="true" aria-label={title} draggable={false}>
         <div className="embla-listing-viewport" ref={mainRef}>
           <div className="embla-listing-track">
-            {photos.map((src, i) => <div className="embla-listing-slide" key={src+i}>{renderPhoto(src)}</div>)}
+            {photos.map((src, i) => {
+              const distance = Math.abs(i - index);
+              return <div className="embla-listing-slide" key={src+i}>{distance < 2 || distance === photos.length - 1 ? renderPhoto(src) : null}</div>;
+            })}
           </div>
         </div>
       </Link>

@@ -54,6 +54,9 @@ export class SessionRecovery {
     this.accessToken = session.access_token;
     this.publish({ user: session.user, ...(changed ? { editor: false, role: null, resolved: false, phase: "recovering", generation: this.state.generation + 1, expired: false, staffRevoked: false } : {}) });
     clearTimeout(this.scheduled);
+    // The active session read checks the current identity's role after the SDK
+    // emits a token refresh. A genuinely new identity still gets its own check.
+    if (this.recovery && !changed) return;
     this.scheduled = setTimeout(() => { void this.checkRole(); }, 0);
   }
 

@@ -1,208 +1,168 @@
 "use client";
 
 // Adapted from React Bits Pulse Heart. See THIRD_PARTY_NOTICES.md.
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type Ref } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { useMotionPreference } from "../use-motion-preference";
 
-const FLIP = 0.4;
-
-const back = (progress: number, overshoot: number) => {
-  const offset = progress - 1;
-  return 1 + (overshoot + 1) * offset ** 3 + overshoot * offset ** 2;
-};
-const swellOf = (progress: number, overshoot: number) =>
-  progress <= 0 ? 0 : progress < FLIP ? 1 - (1 - progress / FLIP) ** 3 : 1 - back((progress - FLIP) / (1 - FLIP), overshoot);
-
-type MotionNode = {
-  dataset: Record<string, string | undefined>;
-  style: CSSStyleDeclaration;
-  getBoundingClientRect: () => DOMRect;
-};
+const ADD_MS = 560;
+const REMOVE_MS = 210;
+const PARTICLES = [
+  { angle: -88, travel: 21, delay: 0, spin: 96, color: "red", shape: "square" },
+  { angle: -44, travel: 17, delay: 35, spin: -118, color: "cyan", shape: "strip" },
+  { angle: -4, travel: 22, delay: 16, spin: 138, color: "pink", shape: "square" },
+  { angle: 41, travel: 16, delay: 62, spin: -84, color: "yellow", shape: "strip" },
+  { angle: 89, travel: 20, delay: 22, spin: 112, color: "blue", shape: "square" },
+  { angle: 139, travel: 16, delay: 52, spin: -124, color: "green", shape: "strip" },
+  { angle: 181, travel: 22, delay: 8, spin: 132, color: "cyan", shape: "square" },
+  { angle: 227, travel: 18, delay: 44, spin: -98, color: "yellow", shape: "strip" },
+] as const;
 
 type PulseHeartProps = {
   liked: boolean;
   pending?: boolean;
-  onChange?: (liked: boolean) => void;
+  onChange?: (liked: boolean) => boolean | null | Promise<boolean | null>;
   showCount?: boolean;
   icon: (filled: boolean) => ReactNode;
   disabled?: boolean;
   label: string;
   className?: string;
-  duration?: number;
-  dotSize?: number;
-  overshoot?: number;
-  beat?: number;
 };
 
-function writeScale(node: MotionNode | null, value: string | null) {
-  if (!node) return;
-  if (value === null) node.style.removeProperty("transform");
-  else node.style.setProperty("transform", value, "important");
+function Fanfare({ anchor }: { anchor: RefObject<HTMLButtonElement | null> }) {
+  const layer = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const button = anchor.current, host = layer.current;
+    if (!button || !host) return;
+    let frame = 0, lastPosition = "", lastRadius = "";
+    const follow = () => {
+      const { left, top, width, height } = button.getBoundingClientRect();
+      const position = "translate3d(" + (left + width / 2) + "px," + (top + height / 2) + "px,0)";
+      const radius = (Math.max(width, height) / 2 + 5) + "px";
+      if (position !== lastPosition) {
+        host.style.transform = position;
+        lastPosition = position;
+      }
+      if (radius !== lastRadius) {
+        host.style.setProperty("--pulse-heart-radius", radius);
+        lastRadius = radius;
+      }
+      frame = requestAnimationFrame(follow);
+    };
+    follow();
+    return () => cancelAnimationFrame(frame);
+  }, [anchor]);
+
+  // Property images and cards clip their contents, so draw the effect at the
+  // button's viewport position for the duration of the burst.
+  return createPortal(
+    <span ref={layer} className="pulse-heart__fanfare" aria-hidden="true">
+      {PARTICLES.map(({ angle, travel, delay, spin, color, shape }) =>
+        <span key={angle} className="pulse-heart__particle" data-shape={shape} style={{
+          color: "var(--pulse-heart-" + color + ")",
+          "--pulse-heart-angle": angle + "deg",
+          "--pulse-heart-travel": travel + "px",
+          "--pulse-heart-delay": delay + "ms",
+          "--pulse-heart-spin": spin + "deg",
+        } as CSSProperties} />
+      )}
+    </span>,
+    document.body
+  );
 }
 
 export default function PulseHeart({
   liked, pending = false, onChange, showCount = false, icon, disabled = false, label, className = "",
-  duration = 560, dotSize = 0.3, overshoot = 1.7, beat = 3,
 }: PulseHeartProps) {
   const reduced = useMotionPreference();
-  const [shown, setShown] = useState(liked);
-  const [attempt, setAttempt] = useState(0);
-  const rootRef = useRef<MotionNode | null>(null);
-  const heartRef = useRef<MotionNode | null>(null);
-  const raf = useRef(0);
-  const viaPointer = useRef(false);
-  const anticipated = useRef<boolean | null>(null);
-  const shownRef = useRef(shown);
-  const likedRef = useRef(liked);
-  const pendingRef = useRef(pending);
+  const [pulse, setPulse] = useState<"add" | "remove" | null>(null);
+  const root = useRef<HTMLButtonElement>(null);
+  const mounted = useRef(false);
+  const inFlight = useRef(false);
+  const timer = useRef<number | null>(null);
   const reducedRef = useRef(reduced);
-  const motion = useRef({ duration, dotSize, overshoot, beat });
-  likedRef.current = liked;
-  pendingRef.current = pending;
   reducedRef.current = reduced;
-  motion.current = { duration, dotSize, overshoot, beat };
-
-  const syncShown = (next: boolean, instant: boolean) => {
-    if (shownRef.current === next) return;
-    shownRef.current = next;
-    if (instant && rootRef.current) rootRef.current.dataset.instant = "";
-    setShown(next);
-  };
-
-  const clearMotion = () => {
-    if (raf.current) cancelAnimationFrame(raf.current);
-    raf.current = 0;
-    writeScale(rootRef.current, null);
-    if (heartRef.current) heartRef.current.style.transform = "";
-    if (rootRef.current) delete rootRef.current.dataset.running;
-  };
-
-  const finish = () => {
-    raf.current = 0;
-    writeScale(rootRef.current, null);
-    if (heartRef.current) heartRef.current.style.transform = "";
-    if (rootRef.current) delete rootRef.current.dataset.running;
-    const confirmed = likedRef.current;
-    const target = anticipated.current;
-    if (target !== null && pendingRef.current && confirmed !== target) return;
-    if (shownRef.current !== confirmed) syncShown(confirmed, true);
-    if (target !== null && (confirmed === target || !pendingRef.current)) anticipated.current = null;
-  };
-
-  const run = (nextLiked: boolean) => {
-    const root = rootRef.current;
-    const heart = heartRef.current;
-    if (!root || !heart) return;
-    root.dataset.running = "";
-    let swapped = false;
-    let previous = 0;
-    const started = performance.now();
-    const tick = (now: number) => {
-      if (reducedRef.current) { clearMotion(); syncShown(likedRef.current, true); return; }
-      const { duration: length, dotSize: dot, overshoot: rebound, beat: dip } = motion.current;
-      const progress = Math.min(1, (now - started) / length);
-      const step = previous ? now - previous : 1000 / 60;
-      previous = now;
-      const swell = swellOf(progress, rebound);
-      heart.style.transform = `scale(${1 - (1 - dot) * swell})`;
-      const pressed = root.dataset.pressed !== undefined ? 0.97 : 1;
-      writeScale(root, `scale(${(1 - (dip / 100) * swell) * pressed})`);
-      if (!swapped && progress + step / 2 / length >= FLIP) {
-        swapped = true;
-        root.dataset.liked = String(nextLiked);
-        shownRef.current = nextLiked;
-        setShown(nextLiked);
-      }
-      if (progress < 1) { raf.current = requestAnimationFrame(tick); return; }
-      finish();
-    };
-    raf.current = requestAnimationFrame(tick);
-  };
 
   useEffect(() => {
-    if (reduced) {
-      clearMotion();
-      anticipated.current = null;
-      syncShown(liked, true);
-      return;
-    }
-    const target = anticipated.current;
-    if (target !== null && liked !== target && !pending) {
-      anticipated.current = null;
-      clearMotion();
-      syncShown(liked, true);
-      return;
-    }
-    if (raf.current) return;
-    if (target !== null && pending && liked !== target) return;
-    if (target !== null && liked === target) anticipated.current = null;
-    if (shownRef.current !== liked) syncShown(liked, true);
-    // attempt changes on every press so a rejected toggle is reconciled even when
-    // the confirmed favourite and pending flag stay the same.
-  }, [liked, pending, reduced, attempt]);
-
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (!root || root.dataset.instant === undefined) return;
-    root.getBoundingClientRect();
-    delete root.dataset.instant;
-  }, [shown]);
-
-  useEffect(() => () => {
-    if (raf.current) cancelAnimationFrame(raf.current);
-    raf.current = 0;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    };
   }, []);
 
-  const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
-  const release = () => {
-    const root = rootRef.current;
-    if (root) delete root.dataset.pressed;
-    if (!raf.current) writeScale(root, null);
-  };
-  const press = (event: PointerEvent<HTMLButtonElement>) => {
-    stop(event);
-    if (event.button !== 0 || disabled) return;
-    viaPointer.current = true;
-    if (!reducedRef.current && rootRef.current) {
-      rootRef.current.dataset.pressed = "";
-      writeScale(rootRef.current, "scale(0.97)");
+  useEffect(() => {
+    if (!reduced) return;
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+      setPulse(null);
     }
-  };
-  const activate = (event: { detail?: number; stopPropagation: () => void }) => {
-    stop(event);
-    const pointer = viaPointer.current && event.detail !== 0;
-    viaPointer.current = false;
-    if (disabled || raf.current || anticipated.current !== null) return;
-    const next = !liked;
-    anticipated.current = next;
-    onChange?.(next);
-    setAttempt(value => value + 1);
-    if (pointer && !reducedRef.current) run(next);
-    else release();
-  };
+    root.current?.style.removeProperty("transform");
+  }, [reduced]);
 
+  function release(event?: PointerEvent<HTMLButtonElement>) {
+    event?.stopPropagation();
+    root.current?.style.removeProperty("transform");
+  }
+
+  function press(event: PointerEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (event.button === 0 && !disabled && !pending && !inFlight.current && !reduced) {
+      root.current?.style.setProperty("transform", "scale(0.97)", "important");
+    }
+  }
+
+  async function activate(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    release();
+    if (disabled || pending || inFlight.current || timer.current !== null || !onChange) return;
+    const next = !liked;
+    inFlight.current = true;
+    try {
+      const confirmed = await onChange(next);
+      if (!mounted.current || confirmed !== next || reducedRef.current) return;
+
+      setPulse(next ? "add" : "remove");
+      timer.current = window.setTimeout(() => {
+        timer.current = null;
+        setPulse(null);
+      }, next ? ADD_MS : REMOVE_MS);
+    } catch {
+      // The saved state stays controlled by the caller on a rejected write.
+    } finally {
+      inFlight.current = false;
+    }
+  }
+
+  const activePulse = reduced || (pulse === "add" && !liked) || (pulse === "remove" && liked) ? null : pulse;
   return (
-    <button
-      ref={rootRef as Ref<HTMLButtonElement>}
-      type="button"
-      className={["save-button", "pulse-heart", shown ? "is-saved" : "", className].filter(Boolean).join(" ")}
-      data-button-variant="save"
-      data-liked={String(shown)}
-      data-no-count={showCount ? undefined : ""}
-      aria-pressed={liked}
-      aria-busy={pending}
-      aria-label={label}
-      disabled={disabled}
-      onPointerDown={press}
-      onPointerUp={event => { stop(event); release(); }}
-      onPointerLeave={event => { stop(event); release(); }}
-      onPointerCancel={event => { stop(event); viaPointer.current = false; release(); }}
-      onKeyDown={event => { viaPointer.current = false; stop(event); }}
-      onClick={activate}
-    >
-      <span className="pulse-heart__pill">
-        <span ref={heartRef as Ref<HTMLSpanElement>} className="pulse-heart__heart" aria-hidden="true">{icon(shown)}</span>
-      </span>
-    </button>
+    <>
+      <button
+        ref={root}
+        type="button"
+        className={["save-button", "pulse-heart", liked ? "is-saved" : "", className].filter(Boolean).join(" ")}
+        data-button-variant="save"
+        data-liked={String(liked)}
+        data-pulse={activePulse ?? undefined}
+        data-no-count={showCount ? undefined : ""}
+        aria-pressed={liked}
+        aria-busy={pending}
+        aria-label={label}
+        disabled={disabled || pending}
+        onPointerDown={press}
+        onPointerUp={release}
+        onPointerLeave={release}
+        onPointerCancel={release}
+        onKeyDown={event => event.stopPropagation()}
+        onClick={activate}
+      >
+        <span className="pulse-heart__pill">
+          <span className="pulse-heart__heart" aria-hidden="true">{icon(liked)}</span>
+        </span>
+      </button>
+      {activePulse === "add" && <Fanfare anchor={root} />}
+    </>
   );
 }

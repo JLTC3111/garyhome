@@ -3,7 +3,7 @@ import type { Content, Property } from "./types";
 import { contentAssets } from "./content-assets.ts";
 import { propertyOrders } from "./property-order.ts";
 import { request } from "./requests.ts";
-import { readAllRows } from "./pagination.ts";
+import { firstPageCount, readAllRows } from "./pagination.ts";
 import { unlocalizedPath } from "./localized-routes.ts";
 
 const cataloguePaths = new Set(["/","/homes","/vinhomes","/neighbourhoods","/saved","/cart","/account","/sitemap.xml"]);
@@ -14,8 +14,8 @@ export function publicContentPath(pathname: string) {
     || /^\/(homes|tips-and-news)\/[a-z0-9-]+$/.test(path) ? path : "/shell";
 }
 
-function publicProperties(db: SupabaseClient, columns = "*") {
-  return db.from("home_public_properties").select(columns).eq("status","published")
+function publicProperties(db: SupabaseClient, columns = "*", from = -1) {
+  return db.from("home_public_properties").select(columns,firstPageCount(from)).eq("status","published")
     .eq("listing_type","rent").in("availability",["available","on_request"]).order("sort_order").order("id");
 }
 
@@ -25,9 +25,9 @@ export async function readSavedPublicProperties(db: SupabaseClient, ids: string[
   for (let index = 0; index < ids.length; index += 50) {
     const batch = ids.slice(index,index+50);
     properties.push(...await readAllRows(async (from,to)=>{
-      const result = await publicProperties(db).in("id",batch).range(from,to).abortSignal(signal);
+      const result = await publicProperties(db,"*",from).in("id",batch).range(from,to).abortSignal(signal);
       if (result.error) throw new ContentReadError("properties",result.status,result.error.code);
-      return {data:result.data as unknown as Property[],error:null};
+      return {data:result.data as unknown as Property[],error:null,count:result.count};
     },50));
   }
   return properties;
@@ -59,7 +59,7 @@ export async function readPublishedContent(db: SupabaseClient, upstream?: AbortS
     const activitiesNeeded = !path || path === "/" || path === "/activities";
     const articlesNeeded = !path || sitemap || path === "/tips-and-news" || !!articleSlug;
     const empty = {data:[],error:null};
-    async function list<T>(resource: string, query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { code: string } | null; status: number }>) {
+    async function list<T>(resource: string, query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { code: string } | null; status: number; count?: number | null }>) {
       const data = await readAllRows(async (from, to) => {
         const result = await query(from, to);
         if (result.error) throw new ContentReadError(resource, result.status, result.error.code);
@@ -78,14 +78,14 @@ export async function readPublishedContent(db: SupabaseClient, upstream?: AbortS
     }
     const [properties, neighbourhoods, settings, authors, activities, orders, articles] = await Promise.all([
       propertySlug ? detailProperties() : catalogue
-        ? list("properties", (from,to) => publicProperties(db,sitemap?"id,slug,status,listing_type,availability,images,sort_order":"*").range(from,to).abortSignal(signal)) : empty,
-      list("neighbourhoods", (from,to) => db.from("neighbourhoods").select("*").order("sort_order").order("slug").range(from,to).abortSignal(signal)),
+        ? list("properties", (from,to) => publicProperties(db,sitemap?"id,slug,status,listing_type,availability,images,sort_order":"*",from).range(from,to).abortSignal(signal)) : empty,
+      list("neighbourhoods", (from,to) => db.from("neighbourhoods").select("*",firstPageCount(from)).order("sort_order").order("slug").range(from,to).abortSignal(signal)),
       db.from("site_settings").select("*").eq("id", "main").abortSignal(signal).single(),
-      (!path || catalogue && !sitemap || propertySlug) ? list("listing_authors", (from,to) => db.from("listing_authors").select("*").eq("published",true).order("sort_order").order("id").range(from,to).abortSignal(signal)) : empty,
-      activitiesNeeded ? list("site_activities", (from,to) => db.from("site_activities").select("*").eq("published",true).order("sort_order").order("id").range(from,to).abortSignal(signal)) : empty,
-      (!path || ["/","/homes","/saved","/cart"].includes(path)) ? list("property_display_orders", (from,to) => db.from("property_display_orders").select("scope,property_ids").order("scope").range(from,to).abortSignal(signal)) : empty,
+      (!path || catalogue && !sitemap || propertySlug) ? list("listing_authors", (from,to) => db.from("listing_authors").select("*",firstPageCount(from)).eq("published",true).order("sort_order").order("id").range(from,to).abortSignal(signal)) : empty,
+      activitiesNeeded ? list("site_activities", (from,to) => db.from("site_activities").select("*",firstPageCount(from)).eq("published",true).order("sort_order").order("id").range(from,to).abortSignal(signal)) : empty,
+      (!path || ["/","/homes","/saved","/cart"].includes(path)) ? list("property_display_orders", (from,to) => db.from("property_display_orders").select("scope,property_ids",firstPageCount(from)).order("scope").range(from,to).abortSignal(signal)) : empty,
       articlesNeeded ? list("editorial_articles", (from,to) => {
-        let query = db.from("editorial_articles").select(sitemap?"id,slug,status,published_on,created_at":"*").eq("status","published");
+        let query = db.from("editorial_articles").select(sitemap?"id,slug,status,published_on,created_at":"*",firstPageCount(from)).eq("status","published");
         if (articleSlug) query = query.eq("slug",articleSlug);
         return query.order("published_on",{ascending:false,nullsFirst:false}).order("id").range(from,to).abortSignal(signal);
       }) : empty,

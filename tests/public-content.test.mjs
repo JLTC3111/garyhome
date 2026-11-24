@@ -6,6 +6,7 @@ import ts from 'typescript';
 import { createClient } from '@supabase/supabase-js';
 import { ContentReadError, readPublishedContent } from '../lib/public-content.ts';
 import { fetchWithDeadline } from '../lib/requests.ts';
+import { isOptimizablePropertyImage } from '../lib/optimized-property-images.ts';
 
 const content={editorial:[],properties:[{id:'published-home',status:'published',images:[]}],neighbourhoods:[{slug:'tay-ho',image:''}],settings:{id:'main',hero_title_en:'Live data',hero_image:''},authors:[],activities:[],propertyOrders:{}};
 function database(fetch){return createClient('https://public-content-test.invalid','sb_publishable_test',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch}});}
@@ -13,8 +14,16 @@ function responseFor(input){const url=new URL(input),table=url.pathname.split('/
 
 test('the real SDK loads only published homes and the main public settings',async()=>{
  const calls=[];
- const result=await readPublishedContent(database(async(input,init)=>{calls.push({url:new URL(input),method:init.method});return responseFor(input);}));
- assert.deepEqual(result,content);assert.equal(calls.length,9);assert.ok(calls.every(call=>call.method==='GET'));
+ const result=await readPublishedContent(database(async(input,init)=>{
+  calls.push({url:new URL(input),method:init.method});
+  const response=responseFor(input);
+  if(new Headers(init.headers).get('prefer')?.includes('count=exact')){
+   const rows=await response.clone().json();
+   response.headers.set('content-range',rows.length?`0-${rows.length-1}/${rows.length}`:'*/0');
+  }
+  return response;
+ }));
+ assert.deepEqual(result,content);assert.equal(calls.length,7);assert.ok(calls.every(call=>call.method==='GET'));
  assert.equal(calls.find(call=>call.url.pathname.endsWith('/home_public_properties')).url.searchParams.get('status'),'eq.published');
  assert.equal(calls.find(call=>call.url.pathname.endsWith('/site_settings')).url.searchParams.get('id'),'eq.main');
 });
@@ -134,4 +143,16 @@ test('a missing production backend leaves sample listings out of the published r
  const preview=await result.exports.loadContent();
  assert.equal(preview.error,false);
  assert.equal(preview.content,seed);
+});
+test('listing optimization accepts public property rasters on the configured origin only',()=>{
+ const origin='https://duyiihsmaqfgwezmsnjs.supabase.co';
+ assert.equal(isOptimizablePropertyImage(origin+'/storage/v1/object/public/property-media/properties/front.JPG'),true);
+ for(const src of [
+  origin+'/storage/v1/object/sign/property-media/private.jpg?token=fixture',
+  origin+'/storage/v1/object/public/another-bucket/front.jpg',
+  origin+'/storage/v1/object/public/property-media/plan.pdf',
+  'https://external.example.test/storage/v1/object/public/property-media/front.jpg',
+ ]){
+  assert.equal(isOptimizablePropertyImage(src),false,src);
+ }
 });

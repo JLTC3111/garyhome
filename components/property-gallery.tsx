@@ -5,6 +5,7 @@ import { Camera, ChevronLeft, ChevronRight, ImageOff, X } from "lucide-react";
 import { galleryPhotoMetadata, type ImageMetadata } from "@/lib/image-metadata";
 import { useSite } from "./site-context";
 import { EmblaCarouselDetailGallery } from "./embla-carousel-detail-gallery";
+import { ContentImage } from "./content-image";
 
 function revealActiveThumbnail(strip: HTMLDivElement, behavior: ScrollBehavior) {
   if (strip.scrollWidth <= strip.clientWidth) return false;
@@ -102,26 +103,34 @@ export function PropertyGallery({images,title,metadata,variant="property",render
     // Cancel a pending smooth scroll if the selection changes before it ends.
     if (moved && !reducedMotion) return () => strip.scrollTo({ left: strip.scrollLeft, behavior: "auto" });
   }, [open, feedback, index, source, images.length]);
-  function picture(src:string,alt:string,priority=false){return failed.includes(src)?<div className="photo-unavailable"><ImageOff size={28}/><span>{t("This photo is unavailable.","Ảnh này hiện chưa xem được.")}</span></div>:<img src={src} alt={alt} width={feedback?900:1200} height={feedback?1600:800} loading={priority?"eager":"lazy"} fetchPriority={priority?"high":"auto"} onError={()=>setFailed(previous=>[...new Set([...previous,src])])}/>;}
+  function picture(src:string,alt:string,priority=false,variant:"display"|"thumbnail"|"original"="display"){
+    const key=variant+":"+src;
+    if(failed.includes(key))return <div className="photo-unavailable"><ImageOff size={28}/><span>{t("This photo is unavailable.","Ảnh này hiện chưa xem được.")}</span></div>;
+    const attributes={src,alt,width:feedback?900:1200,height:feedback?1600:800,
+      loading:priority?"eager" as const:"lazy" as const,fetchPriority:priority?"high" as const:"auto" as const,
+      onError:()=>setFailed(previous=>[...new Set([...previous,key])])};
+    return variant==="original" ? <img {...attributes}/> :
+      <ContentImage {...attributes} sizes={variant==="thumbnail"?"72px":"(max-width: 860px) 100vw, 70vw"}/>;
+  }
   if(!hasImages)return renderOpeners ? renderOpeners(show) : <div className="rental-gallery-empty"><ImageOff size={35}/>{t("Ask the team for property photographs.","Liên hệ đội ngũ để nhận ảnh bất động sản.")}</div>;
   const lightbox = <dialog ref={dialog} className="rental-lightbox" data-photo-caption={info ? "" : undefined} aria-label={insideEditor?t("Photo preview","Xem trước ảnh"):feedback?t("Feedback photo gallery","Thư viện ảnh phản hồi"):t("Property photo gallery","Thư viện ảnh bất động sản")} aria-modal="true" onCancel={event=>{event.preventDefault();if(insideEditor)event.stopPropagation();close();}} onClose={()=>setOpen(false)} onClick={event=>{if(event.target===event.currentTarget)close();}} onKeyDown={event=>{
       if(insideEditor)event.stopPropagation();
       if(event.key==="ArrowRight"){event.preventDefault();move(1);}if(event.key==="ArrowLeft"){event.preventDefault();move(-1);}if(event.key==="Escape"){event.preventDefault();close();}
       if(event.key==="Tab"){const nodes=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex="0"]'));const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
     }}>
-      {(!insideEditor || open) && <><div className="rental-lightbox-top"><span>{index+1} / {images.length}</span><p>{title}</p><button autoFocus type="button" className="icon-button" onClick={close} aria-label={insideEditor?t("Close preview","Đóng xem trước"):t("Close gallery","Đóng thư viện ảnh")}><X/></button></div>
+      {open && <><div className="rental-lightbox-top"><span>{index+1} / {images.length}</span><p>{title}</p><button autoFocus type="button" className="icon-button" onClick={close} aria-label={insideEditor?t("Close preview","Đóng xem trước"):t("Close gallery","Đóng thư viện ảnh")}><X/></button></div>
       <div className="rental-lightbox-stage" onTouchStart={insideEditor?touchStart:undefined} onTouchEnd={insideEditor?touchEnd:undefined} onTouchCancel={()=>{touch.current=null;}}>
         <button className="icon-button" type="button" aria-label={t("Previous photo","Ảnh trước")} onClick={()=>move(-1)} disabled={images.length<2}><ChevronLeft/></button>
         {carousel ? open&&<EmblaCarouselDetailGallery photos={images} selected={index} onSelect={setPhoto}
-          renderPhoto={(src,i)=>picture(src,photoInfo(src,i)?.alt||`${title} · ${i+1}`,i===index)}/>
-          : source&&picture(source,info?.alt||`${title} · ${index+1}`,true)}
+          renderPhoto={(src,i)=>picture(src,photoInfo(src,i)?.alt||`${title} · ${i+1}`,i===index,i===index?"original":"display")}/>
+          : source&&picture(source,info?.alt||`${title} · ${index+1}`,true,"original")}
         <button className="icon-button" type="button" aria-label={t("Next photo","Ảnh tiếp theo")} onClick={()=>move(1)} disabled={images.length<2}><ChevronRight/></button>
       </div>
       {info&&<div className="rental-lightbox-caption" role="status" aria-live="polite" aria-atomic="true" tabIndex={0}>
         <p>{info.caption}</p>
         {info.filename&&<small>{t("Original filename", "Tên tệp gốc")} · {info.filename}</small>}
       </div>}
-      <div ref={feedback?undefined:thumbnails} className="rental-lightbox-thumbs">{images.map((src,i)=><button key={src+i} type="button" aria-pressed={index===i} aria-label={t(`Photo ${i+1}`,`Ảnh ${i+1}`)} onClick={()=>setPhoto(i)}>{picture(src,"")}</button>)}</div></>}
+      <div ref={feedback?undefined:thumbnails} className="rental-lightbox-thumbs">{images.map((src,i)=><button key={src+i} type="button" aria-pressed={index===i} aria-label={t(`Photo ${i+1}`,`Ảnh ${i+1}`)} onClick={()=>setPhoto(i)}>{picture(src,"",false,"thumbnail")}</button>)}</div></>}
     </dialog>;
   if(renderOpeners)return <>{renderOpeners(show)}{lightbox}</>;
   return <div className={feedback?"rental-gallery rental-gallery-feedback":"rental-gallery"}>
@@ -154,7 +163,7 @@ export function PropertyGallery({images,title,metadata,variant="property",render
       <div className="rental-gallery-side">{images.slice(1,3).map((src,i)=><button key={src+i} type="button" onClick={()=>show(i+1)} aria-label={t(`View photo ${i+2}`,`Xem ảnh ${i+2}`)}>{picture(src,photoInfo(src,i+1)?.alt||`${title} · ${i+2}`)}</button>)}</div>
       <button className="button rental-gallery-count" type="button" onClick={()=>show(coverIndex)}><Camera size={17}/>{t("View all photos","Xem tất cả ảnh")} · {images.length}</button>
     </div>
-    <div className="rental-inline-thumbs" aria-label={feedback?t("Feedback photos","Ảnh phản hồi"):t("Property photos","Ảnh bất động sản")}>{images.map((src,i)=><button key={src+i} type="button" onClick={()=>show(i)} aria-current={carousel&&coverIndex===i?"true":undefined} aria-label={t(`Open photo ${i+1}`,`Mở ảnh ${i+1}`)}>{picture(src,"")}</button>)}</div>
+    <div className="rental-inline-thumbs" aria-label={feedback?t("Feedback photos","Ảnh phản hồi"):t("Property photos","Ảnh bất động sản")}>{images.map((src,i)=><button key={src+i} type="button" onClick={()=>show(i)} aria-current={carousel&&coverIndex===i?"true":undefined} aria-label={t(`Open photo ${i+1}`,`Mở ảnh ${i+1}`)}>{picture(src,"",false,"thumbnail")}</button>)}</div>
     {lightbox}
   </div>;
 }

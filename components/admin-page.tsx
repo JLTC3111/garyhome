@@ -2,6 +2,7 @@
 import { AnimatePresence } from "motion/react";
 import { PortalHelp, PortalHelpStart } from "./portal-help";
 import { DelayedLattice, SessionGate } from "./page-loading";
+import { ContentImage } from "./content-image";
 import { ServiceAppsMenu } from "./service-apps";
 import { PasswordInput } from "./password-input";
 import { useListingProvenance } from "./use-listing-provenance";
@@ -34,6 +35,9 @@ import { generateListingSlug, isListingUrlAutomatic, publishedListingUrl } from 
 import { PropertyVideoField } from "./property-video-field";
 import { PropertyPhotoGrid } from "./property-photo-grid";
 import { addImageFilename, imageFilename, imageFilenameKey, imageOriginalFilename, pruneImageFilenames } from "@/lib/image-filenames";
+import { contentAssets } from "@/lib/content-assets";
+import { isConflictResponse } from "@/lib/conflict-response";
+import { firstPageCount, readAllRows } from "@/lib/pagination";
 import { photoMetadata, pruneImageMetadata, type PhotoMetadata } from "@/lib/image-metadata";
 import type { ListingUploadProgress } from "@/lib/listing-file-upload";
 import { ListingUploadStatus } from "./listing-upload-status";
@@ -97,6 +101,40 @@ export function AdminPage() {
   const lastAccount=useRef<string|null>(null);const currentAccount=useRef(user?.id);useLayoutEffect(()=>{currentAccount.current=user?.id;},[user?.id]);
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [authBusy,setAuthBusy]=useState(false);const [resetMode,setResetMode]=useState(false);
   const accountId=user?.id;
+  const detailFlight=useRef<AbortController|null>(null);
+  const [openingProperty,setOpeningProperty]=useState<string|null>(null);
+  const [mediaFilenames,setMediaFilenames]=useState<Record<string,Property["image_filenames"]>>({});
+  useEffect(()=>()=>{detailFlight.current?.abort();detailFlight.current=null;},[accountId]);
+  useEffect(()=>{
+    if(tab!=="media"||demo||!accountId||!editor||!workspaceReady)return;
+    let active=true;
+    void editorTask((db,signal)=>readAllRows((from,to)=>db.from("properties")
+      .select("id,image_filenames",firstPageCount(from)).order("id").range(from,to).abortSignal(signal)))
+      .then(rows=>{if(active)setMediaFilenames(Object.fromEntries(rows.map(row=>[row.id,row.image_filenames])));})
+      .catch(()=>{if(active)setMediaFilenames({});});
+    return()=>{active=false;};
+  },[tab,demo,accountId,editor,workspaceReady,editorTask]);
+  function openLoadedProperty(property:Property){
+    setNewPropertyId(null);setEditing({...property,images:[...property.images],amenities:[...property.amenities]});setError("");
+  }
+  async function openProperty(property:Property){
+    if(demo){openLoadedProperty(property);return;}
+    if(detailFlight.current||busy)return;
+    const controller=new AbortController(),actor=accountId;
+    detailFlight.current=controller;setOpeningProperty(property.id);setError("");
+    try{
+      const {data,error}=await editorTask((db,signal)=>db.from("properties").select("*").eq("id",property.id)
+        .abortSignal(AbortSignal.any([signal,controller.signal])).single());
+      if(error||!data)throw error??new Error("Listing detail unavailable");
+      if(!controller.signal.aborted&&actor===currentAccount.current){
+        openLoadedProperty(contentAssets({...content,properties:[data]}).properties[0]);
+      }
+    }catch{
+      if(!controller.signal.aborted&&actor===currentAccount.current)setError(site.t("Couldn’t open this listing. Refresh the workspace and try again.","Không thể mở tin đăng này. Làm mới không gian làm việc rồi thử lại."));
+    }finally{
+      if(detailFlight.current===controller){detailFlight.current=null;setOpeningProperty(null);}
+    }
+  }
   useEffect(()=>{
     if(!editor || !client)return;
     let cancelled=false;
@@ -112,7 +150,7 @@ export function AdminPage() {
   useLayoutEffect(()=>{
     // Clear private workspace state before a different account can paint it.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPendingDelete(null);setDeleteError("");setBusy(false);setError("");reading.current.clear();if(accountId){if(lastAccount.current && lastAccount.current!==accountId){setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);setError("");}lastAccount.current=accountId;}},[accountId]);
+    setPendingDelete(null);setDeleteError("");setBusy(false);setOpeningProperty(null);setMediaFilenames({});setError("");reading.current.clear();if(accountId){if(lastAccount.current && lastAccount.current!==accountId){setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);setError("");}lastAccount.current=accountId;}},[accountId]);
   function discardStaffDrafts(){
     setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);
   }
@@ -166,7 +204,7 @@ export function AdminPage() {
           return {...saved,submitted};
         }
         throw new Error("Couldn’t assign a unique listing link. Save again. Your draft is still open.");
-      });if(error?.code==="PGRST116"){
+      });if(error?.code==="PGRST116"||isConflictResponse(error)){
         try{const latest=await editorTask((db,signal)=>db.from("properties").select("*").eq("id",p.id).abortSignal(signal).maybeSingle());if(!latest.error)setContent(content=>({...content,properties:latest.data?content.properties.map(row=>row.id===p.id&&Date.parse(row.updated_at)<=Date.parse(latest.data.updated_at)?latest.data:row):content.properties.filter(row=>row.id!==p.id)}));}catch{/* Keep the draft open even if refreshing the saved version fails. */}
         throw new Error("This listing no longer exists or was changed by another editor. Your draft is still open. Copy any edits you want to keep, then close and reopen the listing to review the saved version.");
       }
@@ -347,19 +385,19 @@ export function AdminPage() {
     const title=language==="vi"?p.title_vi||p.title_en:p.title_en;
     const href=demo?undefined:publishedListingUrl(p,language);
     const viewLabel=text("View {title}",{title});
-    const thumbnail=<img src={p.images[0]||"/images/apartments/hero.jpg"} alt=""/>;
+    const thumbnail=<ContentImage src={p.images[0]||"/images/apartments/hero.jpg"} alt="" width={120} height={80} sizes="64px" loading="lazy"/>;
     return <tr key={p.id}><td><div className="admin-property-cell">
       {href?<a className="listing-thumbnail-link" href={href} target="_blank" rel="noopener noreferrer" aria-label={viewLabel}>{thumbnail}</a>:thumbnail}
-      <div><strong>{href?<a className="listing-title-link" href={href} target="_blank" rel="noopener noreferrer">{title}</a>:title}</strong><small>{listingCode(p)} · {typeLabel(p.property_type,language)} · {p.bedrooms} {text("beds")} {p.featured?text("· Featured"):""}</small></div></div></td><td>{content.neighbourhoods.find(n=>n.slug===p.district_slug)?.name||p.district_slug}</td><td>{formatPropertyPrice(p,language)??text("On request")}{p.price!==null&&p.price_vnd!=null&&<small>{formatPropertyPrice(p,language,"VND")}</small>}{p.listing_type==="rent"&&(p.price!==null||p.price_vnd!=null)&&<small>{p.price_period==="night"?text("/ night"):p.price_period==="week"?text("/ week"):text("/ month")}</small>}</td><td><span className={`status-badge status-${p.status}`}>{text(p.status)}</span></td><td className="listing-created">{created?<time dateTime={created.iso}><span>{created.date}</span><small>{created.time} GMT+7</small></time>:text("Not recorded")}</td><td className="listing-poster">{posting.records[p.id]?posting.records[p.id].actor_name||text("Recorded staff member"):text("Not recorded")}</td><td><div className="row-actions"><button type="button" data-button-variant="edit" onClick={()=>{setNewPropertyId(null);setEditing({...p,images:[...p.images],amenities:[...p.amenities]});setError("");}}>{text("Edit")}</button>{canDeleteContent(site.staffRole)&&<button data-button-variant="danger" type="button" className="text-danger" aria-label={text("Delete listing")+" · "+listingCode(p)} onClick={()=>{setDeleteError("");setPendingDelete({kind:"property",id:p.id,version:p.updated_at,label:listingCode(p)+" · "+(language==="vi"?p.title_vi:p.title_en)});}}><Trash2 size={14}/>{text("Delete")}</button>}{href&&<a href={href} target="_blank" rel="noopener" aria-label={viewLabel} data-button-variant="view" data-button-size="icon"><ArrowUpRight size={17} aria-hidden="true"/></a>}</div></td></tr>;})}</tbody></table></div>{posting.error&&<p className="form-info" role="status">{posting.error}</p>}{!filtered.length&&<div className="admin-empty"><p>{text("No properties match this search.")}</p></div>}<div className="table-footer">{text("{count} properties",{count:filtered.length})} · {text("Creation times use Hanoi time (GMT+7). Earlier poster identities may not be recorded.")}</div></section>}
+      <div><strong>{href?<a className="listing-title-link" href={href} target="_blank" rel="noopener noreferrer">{title}</a>:title}</strong><small>{listingCode(p)} · {typeLabel(p.property_type,language)} · {p.bedrooms} {text("beds")} {p.featured?text("· Featured"):""}</small></div></div></td><td>{content.neighbourhoods.find(n=>n.slug===p.district_slug)?.name||p.district_slug}</td><td>{formatPropertyPrice(p,language)??text("On request")}{p.price!==null&&p.price_vnd!=null&&<small>{formatPropertyPrice(p,language,"VND")}</small>}{p.listing_type==="rent"&&(p.price!==null||p.price_vnd!=null)&&<small>{p.price_period==="night"?text("/ night"):p.price_period==="week"?text("/ week"):text("/ month")}</small>}</td><td><span className={`status-badge status-${p.status}`}>{text(p.status)}</span></td><td className="listing-created">{created?<time dateTime={created.iso}><span>{created.date}</span><small>{created.time} GMT+7</small></time>:text("Not recorded")}</td><td className="listing-poster">{posting.records[p.id]?posting.records[p.id].actor_name||text("Recorded staff member"):text("Not recorded")}</td><td><div className="row-actions"><button type="button" data-button-variant="edit" disabled={openingProperty!==null} aria-busy={openingProperty===p.id} onClick={()=>void openProperty(p)}>{text("Edit")}</button>{canDeleteContent(site.staffRole)&&<button data-button-variant="danger" type="button" className="text-danger" aria-label={text("Delete listing")+" · "+listingCode(p)} onClick={()=>{setDeleteError("");setPendingDelete({kind:"property",id:p.id,version:p.updated_at,label:listingCode(p)+" · "+(language==="vi"?p.title_vi:p.title_en)});}}><Trash2 size={14}/>{text("Delete")}</button>}{href&&<a href={href} target="_blank" rel="noopener" aria-label={viewLabel} data-button-variant="view" data-button-size="icon"><ArrowUpRight size={17} aria-hidden="true"/></a>}</div></td></tr>;})}</tbody></table></div>{posting.error&&<p className="form-info" role="status">{posting.error}</p>}{!filtered.length&&<div className="admin-empty"><p>{text("No properties match this search.")}</p></div>}<div className="table-footer">{text("{count} properties",{count:filtered.length})} · {text("Creation times use Hanoi time (GMT+7). Earlier poster identities may not be recorded.")}</div></section>}
   {tab==="enquiries"&&<section className="admin-panel"><div className="panel-heading"><h2>{text("{count} conversations",{count:enquiries.length})}</h2>{!demo&&<button className="text-link" onClick={refreshWorkspace} disabled={refreshing} aria-busy={refreshing}><RefreshCw size={15} className={refreshing?"spin":""}/>{text("Refresh")}</button>}</div>{enquiries.length?enquiries.map(e=><button className="enquiry-row" data-unread={!e.read_at} key={e.id} onClick={()=>openLead(e)}><span className="avatar">{e.name[0]}</span><span><strong>{e.name}<small>{e.email} · {text(e.kind)}</small></strong><small>{e.message.slice(0,120)}</small><small className="enquiry-read-state">{text(e.read_at?"Read":"Unread")}</small></span><time>{new Date(e.created_at).toLocaleDateString(language==="vi"?"vi-VN":"en-US")}</time><span className={`status-badge status-${e.status}`}>{text(e.status==="new"?"Awaiting response":e.status)}</span><ChevronRight size={17}/></button>):<div className="admin-empty"><MessageSquare size={31}/><h3>{text("Your next conversation will appear here.")}</h3><p>{demo?text("Try sending a request from the website’s contact form."):text("You’ll find contact and viewing requests here.")}</p></div>}</section>}
-  {tab==="landlords"&&<LandlordManager openListing={property=>{setNewPropertyId(null);setEditing({...property,images:[...property.images],amenities:[...property.amenities]});setError("");}}/>}
+  {tab==="landlords"&&<LandlordManager openListing={openLoadedProperty}/>}
   {(tab==="news"||tab==="tips")&&<EditorialManager key={user?.id||"preview"} kind={tab==="news"?"news":"tip"} upload={upload}/>}
   {tab==="rental-content"&&<RentalContentManager key={user?.id||"preview"} upload={upload}/>}
   {(tab==="feedback"||tab==="assistance")&&<SubmissionManager kind={tab}/>}
   {tab==="team"&&canViewTeam(site.staffRole)&&<TeamManager key={(user?.id||"preview")+"-"+site.staffRole} draft={teamDraft} setDraft={setTeamDraft}/>}
   {tab==="customers"&&<CustomerManager key={user?.id||"preview"} openEnquiry={openLead} draft={customerDraft} setDraft={setCustomerDraft}/>}
   {tab==="neighbourhoods"&&<div className="admin-area-grid">{content.neighbourhoods.map(n=><article className="admin-panel" key={n.slug}><img src={n.image} alt={n.name}/><div><h2>{n.name}</h2><p>{language==="vi"?n.tagline_vi||n.tagline_en:n.tagline_en}</p><button className="button button-outline button-small" onClick={()=>{setNewArea(false);setArea({...n});setError("");}}>{text("Edit neighbourhood")}<ArrowRight size={16}/></button></div></article>)}</div>}
-  {tab==="media"&&<><div className="form-info">{text("Upload and reorder photos in a property’s editor. The first photo is its cover. JPG, PNG, WebP, and AVIF are supported, up to 8 MB (")}{demo?text("2 MB in this browser preview"):text("private editor uploads")}).</div><div className="admin-media-grid">{content.properties.flatMap(p=>p.images.map((src,i)=>({src,p,i}))).map(({src,p,i})=><button key={p.id+"-"+i} onClick={()=>{setNewPropertyId(null);setEditing({...p,images:[...p.images]});setError("");}}><img src={src} alt={language==="vi"?p.title_vi||p.title_en:p.title_en} loading="lazy"/><span><strong>{language==="vi"?p.title_vi||p.title_en:p.title_en}</strong><small>{i===0?text("Cover photo"):text("Photo {number}",{number:i+1})}</small><small className="media-filename">{imageFilename(src,p.image_filenames)||text("Filename unavailable")}</small></span></button>)}</div></>}
+  {tab==="media"&&<><div className="form-info">{text("Upload and reorder photos in a property’s editor. The first photo is its cover. JPG, PNG, WebP, and AVIF are supported, up to 8 MB (")}{demo?text("2 MB in this browser preview"):text("private editor uploads")}).</div><div className="admin-media-grid">{content.properties.flatMap(p=>p.images.map((src,i)=>({src,p,i}))).map(({src,p,i})=><button key={p.id+"-"+i} disabled={openingProperty!==null} aria-busy={openingProperty===p.id} onClick={()=>void openProperty(p)}><ContentImage src={src} alt={language==="vi"?p.title_vi||p.title_en:p.title_en} width={320} height={210} sizes="(max-width: 650px) 50vw, 240px" loading="lazy"/><span><strong>{language==="vi"?p.title_vi||p.title_en:p.title_en}</strong><small>{i===0?text("Cover photo"):text("Photo {number}",{number:i+1})}</small><small className="media-filename">{imageFilename(src,p.image_filenames??mediaFilenames[p.id])||text("Filename unavailable")}</small></span></button>)}</div></>}
   {tab==="seo"&&<SeoAuditDashboard key={user?.id || "demo"}/>}
   {tab==="settings"&&<SettingsForm settings={settingsDraft||content.settings} onChange={next=>setSettingsDraft(previous=>typeof next==="function"?next(previous||content.settings):next)} onSave={saveSettings} upload={upload} busy={busy}/>}
   </>}

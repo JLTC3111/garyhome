@@ -15,7 +15,7 @@ import { AMENITIES, RENTAL_TYPES, isPublicRental, typeLabel, listingCode } from 
 import { SelectField } from "./select-field";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ArrowUpRight, Building2, Check, ChevronRight, Eye, FileText, Image as ImageIcon, LayoutDashboard, LogOut, Mail, MapPin, Trash2, MessageSquare, MessageSquareQuote, BadgePercent, Plus, Search, Settings2, Upload, X, RefreshCw, Save, Phone, Users, ShieldCheck, Newspaper, BookOpen, NotebookPen, Images } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Building2, Check, ChevronRight, ContactRound, Eye, FileText, House, Image as ImageIcon, KeyRound, LayoutDashboard, LogOut, Mail, MapPin, Trash2, MessageSquare, MessageSquareQuote, BadgePercent, Plus, Search, Settings2, Upload, X, RefreshCw, Save, Phone, Users, ShieldCheck, Newspaper, BookOpen, NotebookPen, Images } from "lucide-react";
 import { StudioShell } from "./studio-sidebar";
 import { useSite } from "./site-context";
 import { BranchedMenu,type BranchedMenuItem } from "./react-bits/branched-menu";
@@ -65,7 +65,7 @@ import { hanoiInput, type CustomerSummary } from "@/lib/customer-data";
 import type { Enquiry, Neighbourhood, Property, Settings } from "@/lib/types";
 
 type Tab="landlords"|"overview"|"properties"|"enquiries"|"customers"|"media"|"neighbourhoods"|"settings"|"team"|"rental-content"|"feedback"|"assistance"|"news"|"tips"|"help"|"seo";
-const tabs:[Tab,string,typeof Building2][]=[["overview","Overview",LayoutDashboard],["seo","SEO Audit",Search],["properties","Listings",Building2],["enquiries","Enquiries",MessageSquare],["landlords","Introduced properties",FileText],["customers","Client Database",Users],["feedback","Customer feedback",MessageSquareQuote],["assistance","Assistance attribution",BadgePercent],["media","Media library",ImageIcon],["neighbourhoods","Neighbourhoods",MapPin],["settings","Site settings",Settings2],["team","Team access",ShieldCheck],["rental-content","People & galleries",Images],["news","News articles",Newspaper],["tips","Rental tips",BookOpen],["help","Help & onboarding",BookOpen]];
+const tabs:[Tab,string,typeof Building2][]=[["overview","Overview",LayoutDashboard],["seo","SEO Audit",Search],["properties","Listings",House],["enquiries","Enquiries",MessageSquare],["landlords","Introduced properties",FileText],["customers","Client Database",ContactRound],["feedback","Customer feedback",MessageSquareQuote],["assistance","Assistance attribution",BadgePercent],["media","Media library",ImageIcon],["neighbourhoods","Neighbourhoods",MapPin],["settings","Site settings",Settings2],["team","Team access",KeyRound],["rental-content","People & galleries",Images],["news","News articles",Newspaper],["tips","Rental tips",BookOpen],["help","Help & onboarding",BookOpen]];
 const amenityOptions=Object.keys(AMENITIES);
 const emptyProperty=():Property=>({id:crypto.randomUUID(),slug:"",title_en:"",title_vi:"",description_en:"",description_vi:"",district_slug:"tay-ho",address:"",price:null,price_max:null,price_vnd:null,price_vnd_max:null,currency:"USD",listing_type:"rent",property_type:"Apartment",bedrooms:1,bathrooms:null,area_sqm:null,amenities:[],images:[],featured:false,status:"draft",availability:"on_request",source_url:null,sort_order:100,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
 

@@ -32,7 +32,7 @@ type SiteContext = {
   currency: PriceCurrency; setCurrency: (currency: PriceCurrency) => void; exchangeRate: ExchangeRate | null;
   saved: string[]; toggleSaved: (id: string) => void;
   savedReady: boolean; savedError: string; pendingSaved: string[];
-  importSaved: () => Promise<number>;
+  importSaved: () => Promise<number>; retrySavedHomes: () => void;
   compare: string[]; toggleCompare: (id: string) => void;
   configured: boolean; seedPreview: boolean; backendError: boolean; client: SupabaseClient | null; publicClient:SupabaseClient|null; ready: boolean;
   user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
@@ -102,6 +102,8 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const [saved, setSaved] = useState<string[]>([]);
   const [savedAccount, setSavedAccount] = useState<string | null>(null);
   const [savedError, setSavedError] = useState("");
+  const [savedRetry, setSavedRetry] = useState(0);
+  const retrySavedHomes = useCallback(() => { setSavedError(""); setSavedRetry(attempt => attempt + 1); }, []);
   const [pendingSaved, setPendingSaved] = useState<string[]>([]);
   const savedFlight = useRef(new Set<string>());
   const savedVersion = useRef(0);
@@ -444,7 +446,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     return () => { active = false; };
     // Language changes must not refetch private data or overwrite pending saves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, user?.id, sessionPhase]);
+  }, [client, user?.id, sessionPhase, savedRetry]);
 
   useEffect(() => {
     const syncLanguage = () => {
@@ -575,7 +577,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     }
   }
 
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, seedPreview: initial.seedPreview !== false, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, retrySavedHomes, compare, toggleCompare, configured: initial.configured, seedPreview: initial.seedPreview !== false, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
     {initial.configured && sessionResolved && user && (sessionPhase === "offline" || sessionPhase === "error") &&
       <div className="session-banner" role="status">{studioText(sessionMessage, language)} <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button></div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}

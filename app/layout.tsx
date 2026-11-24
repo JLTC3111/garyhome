@@ -26,6 +26,7 @@ import "./area-gallery.css";
 import "./shiny-button.css";
 import "./swipe-row.css";
 import "./loading-states.css";
+import "./lattice-loader.css";
 import "./counter.css";
 import "./swipe-toast.css";
 import "../shared/editor-workspace/styles.css";

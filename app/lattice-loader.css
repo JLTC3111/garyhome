@@ -3,11 +3,11 @@
   --ll-cell: 6px;
   --ll-gap: 2px;
   --ll-font: 14px;
-  --ll-color: currentColor;
-  --ll-mark: #22c55e;
+  --ll-color: #111111;
+  --ll-mark: #111111;
   --ll-idle: 0.15;
-  --ll-glow: currentColor;
-  --ll-mark-glow: #22c55e;
+  --ll-glow: transparent;
+  --ll-mark-glow: transparent;
   --ll-peak: 1;
   --ll-cycle: 864ms;
   --ll-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -221,6 +221,42 @@
     opacity: var(--ll-idle);
   }
 }
+
+html:is([data-home-theme="dark"], [data-visa-theme="dark"], [data-jobs-theme="dark"]) .lattice-loader {
+  --ll-color: #ffffff;
+  --ll-mark: #ffffff;
+}
+.lattice-surface { background: #ffffff; color: #111111; }
+html:is([data-home-theme="dark"], [data-visa-theme="dark"], [data-jobs-theme="dark"]) .lattice-surface {
+  background: #111111;
+  color: #ffffff;
+}
+.lattice-slot { display: flex; align-items: center; }
+.lattice-slot[data-reserve] { min-height: 2.75rem; }
+.lattice-navigation {
+  position: fixed;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  bottom: 1.25rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.lattice-navigation[hidden] { display: none !important; }
+.lattice-navigation .lattice-loader {
+  padding: .75rem 1rem;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+}
+html:is([data-home-theme="dark"], [data-visa-theme="dark"], [data-jobs-theme="dark"]) .lattice-navigation .lattice-loader {
+  background: #111111;
+  color: #ffffff;
+}
+
+html .page-loading { background: #ffffff; }
+html[data-home-theme="dark"] .page-loading { background: #111111; }
 
 /* Session banners wrap longer bilingual labels on narrow screens. */
 .lattice-loader{line-height:1.6}

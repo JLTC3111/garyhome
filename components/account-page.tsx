@@ -1,6 +1,6 @@
 "use client";
 import { PortalHelp, PortalHelpStart } from "./portal-help";
-import { ContentSkeleton, SessionGate } from "./page-loading";
+import { DelayedLattice, SessionGate } from "./page-loading";
 import { PasswordInput } from "./password-input";
 import { SelectField } from "./select-field";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -28,7 +28,8 @@ export function AccountPage() {
   // Memory only. A same-account reauthentication can recover the draft, while
   // another identity never receives it. Explicit sign-out clears it below.
   const [draft, setDraft] = useState<Draft>(null);
-  if (configured && !sessionResolved) return <SessionGate label={t("Checking your session…", "Đang kiểm tra phiên đăng nhập…")}/>;
+  if (configured && !sessionResolved) return <SessionGate label={t("Checking your session…", "Đang kiểm tra phiên đăng nhập…")}
+    connectionLabel={t("Connecting securely…", "Đang kết nối an toàn…")}/>;
   return user
     ? <CustomerWorkspace key={user.id} user={user} draft={draft?.userId === user.id ? draft.value : null}
         setDraft={next => setDraft(previous => {
@@ -99,7 +100,7 @@ function CustomerAuth() {
           {message && <div className="form-info" role="status"><Check size={17}/>{message}</div>}
           {error && <div className="form-error" role="alert">{error}</div>}
           <button className="button" disabled={busy || !ready || !client}>{busy ? <LoaderCircle className="spin" size={17}/> : <ArrowRight size={17}/>} {mode === "signup" ? t("Create account", "Tạo tài khoản") : mode === "reset" ? t("Send reset link", "Gửi liên kết") : t("Sign in", "Đăng nhập")}</button>
-          {!ready ? <p role="status">{t("Connecting securely…", "Đang kết nối an toàn…")}</p> : !client && <button className="text-link" type="button" onClick={() => void reconnect()}>{t("Reconnect", "Kết nối lại")}</button>}
+          {!ready ? <DelayedLattice operation="authentication" label={t("Connecting securely…", "Đang kết nối an toàn…")}/> : !client && <div className="form-error" role="alert">{t("Sign-in could not connect.", "Không thể kết nối để đăng nhập.")} <button className="text-link" type="button" onClick={() => void reconnect()}>{t("Reconnect", "Kết nối lại")}</button></div>}
           <div className="account-auth-options">{mode === "signin" ? <><button type="button" onClick={() => changeMode("signup")}>{t("Create an account", "Tạo tài khoản")}</button><button type="button" onClick={() => changeMode("reset")}>{t("Forgot password?", "Quên mật khẩu?")}</button></> : <button type="button" onClick={() => changeMode("signin")}>{t("Back to sign in", "Quay lại đăng nhập")}</button>}</div>
         </form>}
       <div className="account-help"><ShieldCheck size={16}/><p>{t("Your account is personal. Your details are shared only with the Gary Home team.", "Tài khoản dành riêng cho bạn. Thông tin chỉ được chia sẻ với đội ngũ Gary Home.")}</p></div>
@@ -114,7 +115,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   setDraft: (next: CustomerProfile | null | ((previous: CustomerProfile | null) => CustomerProfile | null)) => void;
   clearDraft: () => void;
 }) {
-  const { t, content, language, client, user: currentUser, editor, sessionPhase, accountTask, reconnect, saved, savedReady, savedError, importSaved, notice } = useSite();
+  const { t, content, language, client, user: currentUser, editor, sessionPhase, accountTask, reconnect, saved, savedReady, savedError, importSaved, retrySavedHomes, notice } = useSite();
   const tabParam = useSearchParams().get("tab");
   const requestedTab = accountTabs.find(value => value === tabParam) ?? "overview";
   const [selection, setSelection] = useState({ requested: requestedTab, active: requestedTab });
@@ -184,6 +185,7 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
   };
   const details = draft ?? profile ?? defaultProfile;
   const initialLoad = !loaded && loading && sessionPhase === "ready";
+  const savedLoading = tab === "saved" && !savedReady && !savedError && sessionPhase === "ready";
   function patch(field: keyof CustomerProfile, value: string | number | null) { setDraft({ ...details, [field]: value }); }
   async function saveProfile(event: FormEvent) {
     event.preventDefault(); if (busy) return;
@@ -237,24 +239,30 @@ function CustomerWorkspace({ user, draft, setDraft, clearDraft }: {
       <nav aria-label={t("Customer account", "Tài khoản khách hàng")}><AnimatedBackground activeValue={tab}>{tabs.map(([id, label, Icon]) => <button key={id} data-id={id} className={tab === id ? "selected" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}><Icon size={18}/>{label}{id === "saved" && savedReady && <span>{saved.length}</span>}</button>)}</AnimatedBackground></nav>
       <div className="account-sidebar-bottom">{editor && <Link href={`${STAFF_PORTAL_ORIGIN}/admin`}><ShieldCheck size={16}/>{t("Open staff Studio", "Mở Studio nhân viên")}<ArrowUpRight size={14}/></Link>}<button onClick={() => void signOut()} disabled={!!busy}><LogOut size={16}/>{t("Sign out", "Đăng xuất")}</button></div>
     </aside><div className="account-main">
-      <div className="account-section-heading"><div><div className="eyebrow">{t("A SPACE OF YOUR OWN", "KHÔNG GIAN RIÊNG CỦA BẠN")}</div><h2>{tabs.find(([id]) => id === tab)?.[1]}</h2></div><button className="text-link" disabled={loading || !!busy} aria-busy={loading} onClick={() => void refreshAccount()}><RefreshCw size={15} className={loading ? "spin" : ""}/>{t("Refresh", "Làm mới")}</button></div>
+      <div className="account-section-heading"><div><div className="eyebrow">{t("A SPACE OF YOUR OWN", "KHÔNG GIAN RIÊNG CỦA BẠN")}</div><h2>{tabs.find(([id]) => id === tab)?.[1]}</h2></div><button className="text-link" disabled={loading || !!busy} aria-busy={loading} onClick={() => void refreshAccount()}><RefreshCw size={15}/>{loaded && loading && !savedLoading ? t("Refreshing…", "Đang làm mới…") : t("Refresh", "Làm mới")}</button></div>
       {error && <div className="form-error" role="alert">{error}</div>}
-      {savedError && tab === "saved" && <div className="form-error" role="alert">{savedError}</div>}
+      {savedError && tab === "saved" && <div className="form-error">
+        <div role="alert">{savedError}</div>
+        {!savedReady && sessionPhase === "ready" && <button type="button" className="text-link" onClick={retrySavedHomes}>{t("Retry loading saved homes", "Thử tải lại nhà đã lưu")}</button>}
+      </div>}
       {tab === "submissions" && <SubmissionHistory/>}
       {tab === "help" && <PortalHelp key={user.id} portal="customer"/>}
       {tab === "saved" && <div className="account-import"><p>{t("Browser favourites sync automatically after login. You can retry here if a connection was interrupted.", "Nhà yêu thích trên trình duyệt được tự động đồng bộ sau khi đăng nhập. Bạn có thể thử lại tại đây nếu kết nối bị gián đoạn.")}</p><button type="button" className="text-link" disabled={!!busy || !savedReady} onClick={() => void importShortlist()}>{busy === "import" ? t("Syncing…", "Đang đồng bộ…") : t("Sync browser favourites", "Đồng bộ nhà yêu thích trên trình duyệt")}<ArrowRight size={15}/></button></div>}
       {tab === "overview" && <PortalHelpStart open={() => setTab("help")}/>}
       {tab === "overview" && initialLoad
-        ? <ContentSkeleton layout="stats" count={3} label={t("Loading your plans…", "Đang tải kế hoạch của bạn…")}/>
+        ? <DelayedLattice operation="workspace" skeleton="stats" label={t("Loading your plans…", "Đang tải kế hoạch của bạn…")}/>
         : <div className="account-stats" hidden={tab !== "overview"}>{[[Heart, savedReady ? saved.length : "—", t("Homes you love", "Nhà bạn yêu thích"), "saved"], [CalendarDays, loaded ? upcoming.length : "—", t("Viewing plans", "Kế hoạch xem nhà"), "viewings"], [MessageSquare, loaded ? enquiries.length : "—", t("Conversations", "Cuộc trao đổi"), "enquiries"]].map(([Icon, count, label, target]) => { const Symbol = Icon as typeof Heart; return <button key={String(target)} onClick={() => setTab(target as AccountTab)}><Symbol size={21}/><strong>{typeof count === "number" ? <Counter value={count} fontSize="inherit" motionBlur={false} announce/> : String(count)}</strong><span>{String(label)}<ArrowUpRight size={15}/></span></button>; })}</div>}
       {tab === "overview" && <>
         <div className="account-plan-card"><div><div className="eyebrow">{t("YOUR NEXT MOVE", "BƯỚC TIẾP THEO")}</div><h3>{t("A viewing is a good beginning.", "Một buổi xem nhà, một khởi đầu tốt.")}</h3><p>{t("Find a place that feels right, request a date, and we’ll arrange the details with you.", "Chọn ngôi nhà phù hợp, gửi ngày bạn muốn xem và chúng tôi sẽ cùng bạn sắp xếp chi tiết.")}</p><Link className="text-link" href="/homes">{t("Find a home to visit", "Tìm nhà để ghé thăm")}<ArrowRight size={16}/></Link></div><CalendarDays size={66} strokeWidth={1}/></div>
         {upcoming.length > 0 && <div className="account-preview"><h3>{t("On your horizon", "Kế hoạch sắp tới")}</h3><EnquiryCards rows={upcoming.slice(0, 2)} busy={busy} cancel={cancelViewing}/></div>}
         {!profile && loaded && <div className="account-profile-nudge"><UserRound size={22}/><div><strong>{t("Tell us a little about your plans.", "Chia sẻ thêm về kế hoạch của bạn.")}</strong><p>{t("A budget, a neighbourhood, a move-in date. We’ll help you find the right fit.", "Ngân sách, khu vực, ngày chuyển vào. Chúng tôi sẽ giúp bạn tìm ngôi nhà phù hợp.")}</p></div><button className="text-link" onClick={() => setTab("profile")}>{t("Add my details", "Thêm thông tin")}<ArrowRight size={15}/></button></div>}
       </>}
-      {tab === "saved" && <>{!savedReady && !savedError ? (["offline","error"].includes(sessionPhase)?<p>{t("Reconnect to sync your saved homes.", "Kết nối lại để đồng bộ danh sách nhà đã lưu.")}</p>:<ContentSkeleton layout="cards" label={t("Loading your saved homes…", "Đang tải danh sách nhà đã lưu…")}/>) : savedHomes.length ? <div className="property-grid account-property-grid">{savedHomes.map(p => <PropertyCard key={p.id} property={p}/>)}</div> : savedReady && <EmptyAccount icon={Heart} title={t("Keep a little shortlist.", "Lưu lại những ngôi nhà ưng ý.")} text={t("Tap the heart on any home to save it to your account, on every device.", "Nhấn biểu tượng trái tim để lưu nhà vào tài khoản trên mọi thiết bị.")}/>}<p className="account-fineprint">{t("Only currently published homes appear here. Availability is confirmed by the team.", "Chỉ những nhà đang được đăng mới hiển thị. Vui lòng xác nhận tình trạng với đội ngũ.")}</p></>}
-      {(tab === "enquiries" || tab === "viewings") && <><div className="account-list-intro"><p>{tab === "viewings" ? t("Requested dates are confirmed once the team agrees a time with you. All confirmed times are shown in Hanoi time (GMT+7).", "Ngày yêu cầu được xác nhận sau khi đội ngũ thống nhất với bạn. Mọi lịch đã xác nhận đều theo giờ Hà Nội (GMT+7).") : t("Follow your requests and the team’s updates here. Earlier requests sent while signed out stay private and are not linked automatically.", "Theo dõi yêu cầu và cập nhật từ đội ngũ tại đây. Yêu cầu trước khi đăng nhập được giữ riêng và không tự động liên kết.")}</p><Link className="text-link" href={tab === "viewings" ? "/homes" : "/contact"}>{tab === "viewings" ? t("Request a viewing", "Đặt lịch xem nhà") : t("Send a message", "Gửi lời nhắn")}<ArrowUpRight size={15}/></Link></div>{initialLoad ? <ContentSkeleton layout="rows" label={t("Loading your requests…", "Đang tải yêu cầu của bạn…")}/> : loaded && (tab === "viewings" ? viewings : enquiries).length === 0 ? <EmptyAccount icon={tab === "viewings" ? CalendarDays : MessageSquare} title={t("Your next conversation starts here.", "Cuộc trao đổi tiếp theo bắt đầu tại đây.")} text={t("Send a request while signed in and you’ll find it here.", "Gửi yêu cầu khi đã đăng nhập và bạn sẽ thấy tại đây.")}/> : <EnquiryCards rows={tab === "viewings" ? viewings : enquiries} busy={busy} cancel={cancelViewing}/>}</>}
-      {tab === "profile" && (initialLoad ? <ContentSkeleton layout="rows" label={t("Loading your details…", "Đang tải thông tin của bạn…")}/> : <form className="enquiry-form account-details-form" onSubmit={saveProfile}>
+      {tab === "saved" && <>{savedLoading ? <DelayedLattice operation="workspace" skeleton="cards" label={t("Loading your saved homes…", "Đang tải danh sách nhà đã lưu…")}/>
+        : !savedReady && !savedError ? <p role="status">{sessionPhase === "offline" || sessionPhase === "error"
+          ? t("Reconnect to sync your saved homes.", "Kết nối lại để đồng bộ danh sách nhà đã lưu.")
+          : t("Checking your session…", "Đang kiểm tra phiên đăng nhập…")}</p> : savedHomes.length ? <div className="property-grid account-property-grid">{savedHomes.map(p => <PropertyCard key={p.id} property={p}/>)}</div> : savedReady && <EmptyAccount icon={Heart} title={t("Keep a little shortlist.", "Lưu lại những ngôi nhà ưng ý.")} text={t("Tap the heart on any home to save it to your account, on every device.", "Nhấn biểu tượng trái tim để lưu nhà vào tài khoản trên mọi thiết bị.")}/>}<p className="account-fineprint">{t("Only currently published homes appear here. Availability is confirmed by the team.", "Chỉ những nhà đang được đăng mới hiển thị. Vui lòng xác nhận tình trạng với đội ngũ.")}</p></>}
+      {(tab === "enquiries" || tab === "viewings") && <><div className="account-list-intro"><p>{tab === "viewings" ? t("Requested dates are confirmed once the team agrees a time with you. All confirmed times are shown in Hanoi time (GMT+7).", "Ngày yêu cầu được xác nhận sau khi đội ngũ thống nhất với bạn. Mọi lịch đã xác nhận đều theo giờ Hà Nội (GMT+7).") : t("Follow your requests and the team’s updates here. Earlier requests sent while signed out stay private and are not linked automatically.", "Theo dõi yêu cầu và cập nhật từ đội ngũ tại đây. Yêu cầu trước khi đăng nhập được giữ riêng và không tự động liên kết.")}</p><Link className="text-link" href={tab === "viewings" ? "/homes" : "/contact"}>{tab === "viewings" ? t("Request a viewing", "Đặt lịch xem nhà") : t("Send a message", "Gửi lời nhắn")}<ArrowUpRight size={15}/></Link></div>{initialLoad ? <DelayedLattice operation="workspace" skeleton="rows" label={t("Loading your requests…", "Đang tải yêu cầu của bạn…")}/> : loaded && (tab === "viewings" ? viewings : enquiries).length === 0 ? <EmptyAccount icon={tab === "viewings" ? CalendarDays : MessageSquare} title={t("Your next conversation starts here.", "Cuộc trao đổi tiếp theo bắt đầu tại đây.")} text={t("Send a request while signed in and you’ll find it here.", "Gửi yêu cầu khi đã đăng nhập và bạn sẽ thấy tại đây.")}/> : <EnquiryCards rows={tab === "viewings" ? viewings : enquiries} busy={busy} cancel={cancelViewing}/>}</>}
+      {tab === "profile" && (initialLoad ? <DelayedLattice operation="workspace" skeleton="rows" label={t("Loading your details…", "Đang tải thông tin của bạn…")}/> : <form className="enquiry-form account-details-form" onSubmit={saveProfile}>
         <p>{t("A few details help the team find a home that feels like you.", "Một vài thông tin giúp đội ngũ tìm ngôi nhà phù hợp với bạn.")}</p>
         <div className="form-row"><label>{t("Full name", "Họ và tên")}<input value={details.full_name} required minLength={2} maxLength={120} autoComplete="name" onChange={e => patch("full_name", e.target.value)}/></label><label>{t("Phone number", "Số điện thoại")}<input type="tel" value={details.phone} maxLength={40} autoComplete="tel" onChange={e => patch("phone", e.target.value)}/></label></div>
         <label>{t("Account email", "Email tài khoản")}<input type="email" value={user.email ?? ""} readOnly/><small>{t("Contact the team if you need help changing your account email.", "Liên hệ đội ngũ nếu bạn cần hỗ trợ đổi email tài khoản.")}</small></label>

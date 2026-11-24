@@ -1889,6 +1889,7 @@ test('quiet session revalidation preserves the Studio shell and editable draft',
  const banners=()=>h.renderer.root.findAllByProps({className:'session-banner'});
  let restoring;await act(async()=>{restoring=h.site.reconnect();await delay(5);});
  assert.equal(h.site.sessionPhase,'ready');assert.equal(h.site.sessionResolved,true);assert.equal(banners().length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'lattice-pending'}).length,0);
  await act(async()=>h.site.setLanguage('vi'));
  assert.equal(h.renderer.root.findAllByType('textarea')[0],draft);
  assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
@@ -1901,25 +1902,39 @@ test('quiet session revalidation preserves the Studio shell and editable draft',
  assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
 });
 
-test('cold configuration uses a bilingual neutral gate until the signed-out state is known',async t=>{
- const pending=deferred(),h=await harness(t,{guest:true,path:'/admin',url:'https://gary.example/admin',configPending:pending});
- const gate=h.renderer.root.findByProps({className:'session-placeholder'});
+test('authentication uses delayed bilingual Dots before the text-only session check and retry',async t=>{
+ const pending=deferred(),auth=deferred();
+ const h=await harness(t,{guest:true,path:'/admin',url:'https://gary.example/admin',configPending:pending,authPending:auth});
+ const connection=h.renderer.root.findByProps({className:'lattice-pending'});
  assert.equal(h.site.sessionResolved,false);assert.equal(h.site.user,null);assert.equal(h.site.ready,false);
- assert.equal(gate.props['aria-busy'],true);
- assert.match(gate.findByProps({role:'status'}).children.join(''),/Checking staff access/);
+ assert.equal(connection.findAllByProps({className:'lattice-loader'}).length,0);
+ assert.equal(connection.findByProps({role:'status'}).children.join(''),'Connecting to sign-in…');
  assert.equal(h.renderer.root.findAllByType('form').length,0);
  assert.equal(h.renderer.root.findAllByProps({className:'admin-shell'}).length,0);
  assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);
  await act(async()=>h.site.setLanguage('vi'));
- assert.equal(h.renderer.root.findByProps({className:'session-placeholder'}),gate);
- assert.match(gate.findByProps({role:'status'}).children.join(''),/Đang kiểm tra quyền truy cập/);
+ assert.equal(h.renderer.root.findByProps({className:'lattice-pending'}),connection);
+ await act(async()=>{await delay(220);});
+ const dots=connection.findByProps({className:'lattice-loader'});
+ assert.equal(dots.props.style['--ll-n'],3);
+ assert.equal(dots.findByProps({className:'lattice-loader__layer lattice-loader__run'}).children[1].props.style.animationDelay,'216ms');
+ assert.equal(dots.findByProps({className:'lattice-loader__label'}).children.join(''),'Đang kết nối để đăng nhập…');
  await act(async()=>{pending.resolve();await delay(10);});
+ const gate=h.renderer.root.findByProps({className:'session-placeholder'});
+ assert.match(gate.findByProps({role:'status'}).children.join(''),/Đang kiểm tra quyền truy cập/);
+ assert.equal(h.renderer.root.findAllByProps({className:'lattice-pending'}).length,0);
+ await act(async()=>{auth.resolve({data:{session:null},error:new Error('Connection unavailable')});await delay(10);});
+ assert.equal(gate.props['aria-busy'],false);
+ const reconnect=gate.findByType('button');
+ assert.equal(reconnect.children.join(''),'Kết nối lại');
+ h.backend.sessionRead=null;
+ await act(async()=>{reconnect.props.onClick();await delay(10);});
  assert.equal(h.site.sessionResolved,true);assert.equal(h.site.user,null);
  assert.equal(h.renderer.root.findAllByProps({className:'session-placeholder'}).length,0);
  assert.equal(h.renderer.root.findAllByType('form').length,1);
 });
 
-test('cold saved-session restoration verifies access before showing the shell and a data skeleton',async t=>{
+test('Studio starts delayed Ripple after session restoration and stops it on a failed initial load',async t=>{
  const auth=deferred(),data=deferred(),h=await harness(t,{path:'/admin',url:'https://gary.example/admin',authPending:auth});
  h.backend.pending.set('properties',data);
  assert.equal(h.site.sessionResolved,false);
@@ -1927,24 +1942,78 @@ test('cold saved-session restoration verifies access before showing the shell an
  assert.equal(h.renderer.root.findAllByProps({className:'admin-sidebar'}).length,0);
  h.backend.sessionRead=null;await act(async()=>{auth.resolve({data:{session:authSession('owner')},error:null});await delay(10);});
  const sidebar=h.renderer.root.findByProps({className:'admin-sidebar'});
+ const workspace=()=>h.renderer.root.findAllByProps({className:'lattice-pending'});
  assert.equal(h.site.sessionResolved,true);assert.equal(h.site.editor,true);assert.equal(h.site.studioDataReady,false);
  assert.equal(h.renderer.root.findAllByProps({className:'session-placeholder'}).length,0);
- assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--rows'}).length,1);
- await act(async()=>{h.backend.pending.delete('properties');data.resolve({data:fixture.properties,error:null});await delay(10);});
+ assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);
+ assert.match(workspace()[0].findByProps({className:'sr-only'}).children.join(''),/Loading staff workspace/);
+ await act(async()=>{await delay(220);});
+ assert.equal(workspace().length,1);
+ const ripple=workspace()[0].findByProps({className:'lattice-loader'});
+ assert.equal(ripple.props.style['--ll-n'],4);
+ assert.equal(ripple.findByProps({className:'lattice-loader__layer lattice-loader__run'}).children[5].props.style.animationDelay,'0ms');
+ assert.equal(workspace()[0].findByProps({className:'lattice-loader__label'}).children.join(''),'Loading staff workspace…');
+ assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
+ await act(async()=>{data.resolve({data:null,error:new Error('Read failed')});await delay(10);});
+ assert.equal(workspace().length,0);
+ assert.match(h.renderer.root.findByProps({role:'alert'}).children.join(''),/Couldn’t load the staff workspace/);
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Overview'}).props.onClick());
+ assert.equal(workspace().length,0);
+ h.backend.pending.delete('properties');
+ const retry=h.renderer.root.findAllByType('button').find(node=>node.children.includes('Retry loading workspace'));
+ await act(async()=>{retry.props.onClick();await delay(10);});
  assert.equal(h.site.studioDataReady,true);
  assert.equal(h.renderer.root.findByProps({className:'admin-sidebar'}),sidebar);
- assert.equal(h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--rows'}).length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'lattice-pending'}).length,0);
 });
 
-test('public navigation uses contextual skeletons without restarting auth',async t=>{
+test('Customer Portal uses one Ripple with its saved card skeleton and retries a failed read',async t=>{
+ const auth=deferred(),saved=deferred(),profile=deferred();
+ const h=await harness(t,{customer:true,path:'/account',url:'https://gary.example/account?tab=saved',authPending:auth});
+ h.backend.pending.set('saved_homes',saved);
+ h.backend.pending.set('customer_profiles',profile);
+ await act(async()=>{auth.resolve({data:{session:authSession('customer')},error:null});await delay(10);});
+ const loading=()=>h.renderer.root.findAllByProps({className:'lattice-pending'});
+ assert.equal(loading().length,1);
+ assert.equal(loading()[0].findAllByProps({className:'lattice-loader'}).length,0);
+ assert.equal(loading()[0].findByProps({className:'content-skeleton content-skeleton--cards'}).props['aria-hidden'],'true');
+ await act(async()=>{await delay(220);});
+ assert.equal(loading()[0].findByProps({className:'lattice-loader'}).props.style['--ll-n'],4);
+ assert.match(loading()[0].findByProps({role:'status'}).children.join(''),/Loading your saved homes/);
+ await act(async()=>{saved.resolve({data:null,error:new Error('Read failed')});await delay(10);});
+ assert.equal(loading().length,0);
+ const retry=h.renderer.root.findAllByType('button').find(node=>node.children.includes('Retry loading saved homes'));
+ h.backend.pending.delete('saved_homes');
+ await act(async()=>{retry.props.onClick();await delay(10);});
+ assert.equal(h.site.savedReady,true);assert.equal(loading().length,0);
+ await act(async()=>{profile.resolve({data:null,error:null});await delay(10);});
+});
+
+test('public navigation reveals Orbit after a delay with one accessible status',async t=>{
  const h=await harness(t,{guest:true,page:'loading',path:'/vi/homes',url:'https://gary.example/vi/homes'});
  assert.equal(h.sessionReads,1);
- const matches=layout=>h.renderer.root.findAllByProps({className:'content-skeleton content-skeleton--'+layout});
- assert.equal(matches('catalogue').length,1);
- await h.navigate('/vi/homes/fixture');assert.equal(matches('gallery').length,1);
- await h.navigate('/en/contact');assert.equal(matches('form').length,1);
+ const pending=()=>h.renderer.root.findByProps({className:'page-loading'});
+ const label=()=>h.renderer.root.findAllByProps({className:'lattice-loader__label'}).map(node=>node.children.join('')).join('');
+ assert.equal(h.renderer.root.findAllByProps({className:'lattice-loader'}).length,0);
+ assert.match(pending().findByProps({className:'sr-only'}).children.join(''),/Đang tải tin đăng/);
+ const status=pending().findByProps({role:'status'});
+ assert.equal(status.props['aria-busy'],undefined);
+ assert.equal(pending().findByProps({className:'content-skeleton content-skeleton--catalogue'}).props['aria-hidden'],'true');
+ await act(async()=>{await delay(220);});
+ assert.match(label(),/Đang tải tin đăng/);
+ const feedback=pending().findByProps({className:'lattice-feedback'});
+ assert.equal(feedback.props['aria-hidden'],'true');
+ const orbit=feedback.findByProps({className:'lattice-loader'});
+ assert.equal(orbit.props.style['--ll-cycle'],'864ms');
+ assert.equal(orbit.props.style['--ll-color'],'currentColor');
+ assert.equal(orbit.props['data-status'],'working');
+ assert.equal(pending().findByProps({role:'status'}),status);
+ await h.navigate('/vi/homes/fixture');assert.match(label(),/Đang tải thông tin bất động sản/);
+ await h.navigate('/en/contact');assert.match(label(),/Loading page…/);
+ await h.navigate('/account');assert.equal(label(),'');
  assert.equal(h.sessionReads,1);
  assert.equal(h.renderer.root.findAllByProps({className:'session-banner'}).length,0);
+ assert.equal(h.renderer.root.findAllByProps({className:'session-placeholder'}).length,0);
 });
 
 test('admin image uploads retain originals and metadata through cover changes, reordering, saving and reopening',async t=>{

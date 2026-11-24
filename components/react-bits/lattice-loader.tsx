@@ -52,7 +52,11 @@ type ResolvedPattern = { cells: (number | null)[]; loop: number; scale: number; 
 const PATTERNS: Record<LatticePatternName, Partial<Record<LatticeGrid, ResolvedPattern>>> = {
   arrow: { 3: { cells: [1, 2, 3, 0, 1, 2, 1, 2, 3], loop: 7.2, scale: 1 } },
   dots: { 3: { cells: [0, 1, 2, 0, 1, 2, 0, 1, 2], loop: 3, scale: 2.4 } },
-  ripple: { 3: { cells: [2, 1, 2, 1, 0, 1, 2, 1, 2], loop: 4.8, scale: 1.5 } },
+  ripple: {
+    3: { cells: [2, 1, 2, 1, 0, 1, 2, 1, 2], loop: 4.8, scale: 1.5 },
+    // Start at the four center cells and keep the original Ripple cadence.
+    4: { cells: [2, 1, 1, 2, 1, 0, 0, 1, 1, 0, 0, 1, 2, 1, 1, 2], loop: 4.8, scale: 1.5 }
+  },
   spiral: { 3: { cells: [0, 1, 2, 7, 8, 3, 6, 5, 4], loop: 9, scale: 1.2, lit: 0.35 } },
   orbit: {
     3: { cells: [0, 1, 2, 7, null, 3, 6, 5, 4], loop: 8, scale: 1.2 },
@@ -86,7 +90,7 @@ const resolvePattern = (pattern: LatticePatternName | LatticePattern, grid: Latt
 export function LatticeLoader({
   label = 'Loading…', doneLabel = 'Ready', errorLabel = 'Connection needs attention',
   status = 'working', pattern = 'orbit', grid = 3, shape = 'round',
-  color = 'currentColor', doneColor = '#22c55e', errorColor = '#ef4444',
+  color, doneColor, errorColor,
   cellSize = 5, gap = 2, fontSize = 12, step = 90, idleOpacity = 0.15,
   glow = false, glowColor = '', announce = true, className = '', style
 }: LatticeLoaderProps) {
@@ -94,14 +98,16 @@ export function LatticeLoader({
   const pat = resolvePattern(pattern, n), d = step * pat.scale;
   const mark = status === 'error' ? 'error' : 'done';
   const currentLabel = status === 'working' ? label : status === 'done' ? doneLabel : errorLabel;
+  const markColor = status === 'error' ? errorColor : doneColor;
   return <span role={announce ? 'status' : undefined} aria-busy={status === 'working'}
     className={`lattice-loader${className ? ` ${className}` : ''}`}
-    data-status={status} data-shape={shape} data-glow={glow ? '' : undefined}
+    data-status={status} data-shape={shape} data-pattern={typeof pattern === 'string' ? pattern : undefined} data-grid={n}
+    data-glow={glow ? '' : undefined}
     style={{
       '--ll-n': n, '--ll-cell': `${cellSize}px`, '--ll-gap': `${gap}px`, '--ll-font': `${fontSize}px`,
-      '--ll-color': color, '--ll-mark': status === 'error' ? errorColor : doneColor,
-      '--ll-idle': idleOpacity, '--ll-glow': glowColor || color,
-      '--ll-mark-glow': glowColor || (status === 'error' ? errorColor : doneColor),
+      ...(color ? { '--ll-color': color, '--ll-glow': glowColor || color } : {}),
+      ...(markColor ? { '--ll-mark': markColor, '--ll-mark-glow': glowColor || markColor } : {}),
+      '--ll-idle': idleOpacity,
       '--ll-cycle': `${Math.round(pat.loop * d)}ms`, ...style
     } as CSSProperties}>
     <span className="lattice-loader__grid" aria-hidden="true">

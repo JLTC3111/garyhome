@@ -5,6 +5,11 @@
 html[data-home-theme="dark"] .session-gate,
 html[data-home-theme="dark"] .session-placeholder p { color: var(--home-secondary); }
 
+.page-loading, .lattice-pending { color: var(--muted); }
+html[data-home-theme="dark"] :is(.page-loading, .lattice-pending) { color: var(--home-secondary); }
+.page-loading { min-height: 12rem; }
+.lattice-feedback { display: flex; align-items: center; min-height: 3rem; }
+
 .content-skeleton { --skeleton-fill: color-mix(in srgb, var(--ink) 10%, var(--paper)); }
 html[data-home-theme="dark"] .content-skeleton { --skeleton-fill: var(--home-elevated); }
 .skeleton-line, .skeleton-control, .skeleton-image { border-radius: 6px; background: var(--skeleton-fill); }

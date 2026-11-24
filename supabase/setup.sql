@@ -2808,3 +2808,889 @@ $$;
 
 notify pgrst,'reload schema';
 commit;
+
+-- Migration: 20261117202945_staff_eligibility_and_future_grants.sql
+-- PENDING APPROVAL: local follow-up only; do not apply without owner approval.
+-- Existing identities, memberships, roles and historical records are unchanged.
+begin;
+create function private.staff_identity_eligible(p_user uuid) returns boolean
+language sql stable security definer set search_path='' as $$
+ select exists(select 1 from auth.users u where u.id=p_user and u.email_confirmed_at is not null
+  and u.deleted_at is null and not coalesce(u.is_anonymous,false)
+  and (u.banned_until is null or u.banned_until<=now()));
+$$;
+revoke all on function private.staff_identity_eligible(uuid) from public,anon,authenticated;
+CREATE OR REPLACE FUNCTION private.staff_role()
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select m.role from public.team_members m
+  join auth.users u on u.id = m.user_id
+  join public.staff_settings s on s.id = 'main'
+  where private.staff_identity_eligible(auth.uid()) and m.user_id = auth.uid() and m.active
+    and u.email_confirmed_at is not null and m.email = lower(u.email)
+    and ((m.role = 'owner' and m.bootstrap_owner) or split_part(m.email,'@',2) = any(s.email_domains));
+$function$;
+
+-- AUTH-008: change defaults for future postgres-owned objects only, never
+-- existing API grants. Service-role and provider-owned defaults are untouched.
+alter default privileges for role postgres revoke execute on functions from public;
+alter default privileges for role postgres in schema public revoke all on functions from public,anon,authenticated;
+alter default privileges for role postgres in schema public revoke all on tables from public,anon,authenticated;
+alter default privileges for role postgres in schema public revoke all on sequences from public,anon,authenticated;
+-- Review supabase_admin-owned defaults separately with the project operator.
+-- Every future public API must explicitly grant its intended EXECUTE/table rights.
+revoke all on function private.staff_role() from public,anon;
+grant execute on function private.staff_role() to authenticated;
+commit;
+
+-- Migration: 20261119040445_property_photo_metadata.sql
+begin;
+
+alter table public.properties add column image_metadata jsonb not null default '{}'::jsonb
+  constraint properties_image_metadata_check check (
+    jsonb_typeof(image_metadata) = 'object'
+    and octet_length(image_metadata::text) <= 262144
+    and jsonb_array_length(jsonb_path_query_array(image_metadata, '$.keyvalue()')) <= 40
+    and not jsonb_path_exists(image_metadata, '$.keyvalue() ? (@.key == "" || @.value.type() != "object")')
+    and not jsonb_path_exists(image_metadata, '$.*.keyvalue() ? (
+      !(@.key like_regex "^(description_(en|vi)|alt_(en|vi)|public_filename)$")
+      || @.value.type() != "string"
+      || !(@.value like_regex "^.{1,240}$" flag "s")
+    )')
+  );
+
+comment on column public.properties.image_metadata is
+  'Public listing photo descriptions, alt text and explicitly approved original filenames, keyed by image URL or inline preview hash.';
+
+notify pgrst, 'reload schema';
+commit;
+
+-- Migration: 20261119054408_property_photo_storage_rename.sql
+-- Review before applying. Requires property image filenames and metadata.
+begin;
+
+create table private.property_photo_renames (
+  id uuid primary key default gen_random_uuid(),
+  property_id uuid not null,
+  origin text not null,
+  old_key text not null,
+  new_key text not null,
+  started_by uuid not null,
+  started_at timestamptz not null default now(),
+  sha256 text check (sha256 ~ '^[a-f0-9]{64}$'),
+  applied_by uuid,
+  applied_at timestamptz,
+  properties jsonb not null default '[]'::jsonb,
+  removal_requested_by uuid,
+  removed_at timestamptz,
+  unique(origin,old_key), unique(origin,new_key)
+);
+alter table private.property_photo_renames enable row level security;
+revoke all on private.property_photo_renames from public,anon,authenticated;
+create index property_photo_renames_old_key on private.property_photo_renames(old_key);
+
+-- Normal uploads can still insert new photos. Existing bytes and the rename
+-- destination directory are restricted to server-side Storage operations.
+create function private.home_photo_upload_key(p_key text) returns boolean language sql stable security definer set search_path='' as $$
+  select p_key not like 'properties/renamed/%'
+    and not exists(select 1 from private.property_photo_renames where old_key=p_key);
+$$;
+revoke all on function private.home_photo_upload_key(text) from public,anon,authenticated;
+grant execute on function private.home_photo_upload_key(text) to authenticated;
+create policy home_photo_rename_anon_insert_guard on storage.objects as restrictive for insert to anon
+  with check (bucket_id <> 'property-media');
+create policy home_photo_rename_insert_guard on storage.objects as restrictive for insert to authenticated
+  with check (bucket_id <> 'property-media' or private.home_photo_upload_key(name));
+create policy home_photo_rename_update_guard on storage.objects as restrictive for update to anon,authenticated
+  using (bucket_id <> 'property-media') with check (bucket_id <> 'property-media');
+create policy home_photo_rename_delete_guard on storage.objects as restrictive for delete to anon,authenticated
+  using (bucket_id <> 'property-media');
+
+create function private.home_photo_key(uri text, expected_origin text) returns text
+language plpgsql immutable set search_path='' as $$
+declare path text; token text; bytes bytea:=''::bytea;
+begin
+  if uri is null or (expected_origin is not null and not starts_with(uri,expected_origin||'/')) then return null;end if;
+  path:=substring(split_part(split_part(uri,'?',1),'#',1)
+    from '^https?://[a-zA-Z0-9.:-]+/storage/v1/(?:object|render/image)/public/property-media/(.+)$');
+  if path is null or char_length(path)>3072 or path ~ '%(?![0-9a-fA-F]{2})' then return null;end if;
+  for token in select (regexp_matches(path,'(%[0-9a-fA-F]{2}|[^%]+)','g'))[1] loop
+    if starts_with(token,'%') then
+      if lower(token) in ('%00','%2f','%5c') then return null;end if;
+      bytes:=bytes||decode(substr(token,2),'hex');
+    else bytes:=bytes||convert_to(token,'UTF8');end if;
+  end loop;
+  path:=convert_from(bytes,'UTF8');
+  if path ~ '(^|/)\.{1,2}(/|$)|[[:cntrl:]]' or position(chr(92) in path)>0 or char_length(path)>1024 then return null;end if;
+  return path;
+exception when character_not_in_repertoire or untranslatable_character then return null;
+end;$$;
+
+create function private.require_home_photo_admin() returns void language plpgsql stable security definer set search_path='' as $$
+begin
+  if coalesce(private.staff_role(),'') not in ('owner','admin') or not exists(
+    select 1 from auth.users u where u.id=auth.uid() and u.email_confirmed_at is not null and u.deleted_at is null
+    and not coalesce(u.is_anonymous,false) and (u.banned_until is null or u.banned_until<=now())
+  ) then raise exception 'photo_rename.forbidden' using errcode='42501';end if;
+end;$$;
+
+create view private.home_photo_references as
+  select unnest(images) as uri from public.properties
+  union all select jsonb_object_keys(image_filenames) from public.properties
+  union all select jsonb_object_keys(image_metadata) from public.properties
+  union all select source_url from public.properties
+  union all select image from public.neighbourhoods
+  union all select hero_image from public.site_settings
+  union all select portrait_url from public.listing_authors
+  union all select image_url from public.site_activities
+  union all select source_url from public.site_activities
+  union all select image_url from public.editorial_articles
+  union all select entry->>'url' from public.editorial_articles, jsonb_array_elements(sources) entry;
+
+create function private.home_photo_replacement(uri text, origin text, old_key text, new_uri text) returns text
+language sql immutable set search_path='' as $$
+  select case when private.home_photo_key(uri,origin)=old_key then
+    (case when starts_with(uri,origin||'/storage/v1/render/image/public/property-media/')
+      then replace(new_uri,'/storage/v1/object/public/','/storage/v1/render/image/public/') else new_uri end)
+      || coalesce(substring(uri from '[?#].*$'),'')
+    else uri end;
+$$;
+
+create function private.home_photo_map(fields jsonb, origin text, old_key text, new_uri text) returns jsonb
+language plpgsql immutable set search_path='' as $$
+declare result jsonb; conflict boolean;
+begin
+  with mapped as (
+    select private.home_photo_replacement(key,origin,old_key,new_uri) as key,value
+    from jsonb_each(fields)
+  ), merged as (
+    select key,jsonb_agg(distinct value) as values_present from mapped group by key
+  )
+  select coalesce(jsonb_object_agg(key,values_present->0),'{}'::jsonb),
+    coalesce(bool_or(jsonb_array_length(values_present)>1),false) into result,conflict from merged;
+  if conflict then raise exception 'photo_rename.metadata_conflict' using errcode='23514';end if;
+  return result;
+end;$$;
+
+create function private.home_photo_blocked(uri text) returns boolean language sql security definer set search_path='' as $$
+  select exists(
+    select 1 from private.property_photo_renames r
+    where case when r.applied_at is null then r.new_key else r.old_key end=private.home_photo_key(uri,null)
+  );
+$$;
+create function private.guard_home_photo_reference() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+  if tg_table_name='properties' then
+    if exists(select 1 from
+      (select unnest(new.images) uri union all select jsonb_object_keys(new.image_filenames)
+       union all select jsonb_object_keys(new.image_metadata) union all select new.source_url) refs
+       where private.home_photo_blocked(refs.uri))
+    then raise exception 'photo_rename.stale_reference' using errcode='40001';end if;
+  elsif tg_table_name='editorial_articles' then
+    if private.home_photo_blocked(new.image_url) or exists(
+      select 1 from jsonb_array_elements(new.sources) entry where private.home_photo_blocked(entry->>'url')
+    ) then raise exception 'photo_rename.stale_reference' using errcode='40001';end if;
+  elsif private.home_photo_blocked(to_jsonb(new)->>tg_argv[0])
+    or (tg_nargs>1 and private.home_photo_blocked(to_jsonb(new)->>tg_argv[1])) then
+    raise exception 'photo_rename.stale_reference' using errcode='40001';
+  end if;
+  return new;
+end;$$;
+create trigger guard_property_photo_reference before insert or update of images,image_filenames,image_metadata,source_url on public.properties
+  for each row execute function private.guard_home_photo_reference();
+create trigger guard_neighbourhood_photo_reference before insert or update of image on public.neighbourhoods
+  for each row execute function private.guard_home_photo_reference('image');
+create trigger guard_hero_photo_reference before insert or update of hero_image on public.site_settings
+  for each row execute function private.guard_home_photo_reference('hero_image');
+create trigger guard_author_photo_reference before insert or update of portrait_url on public.listing_authors
+  for each row execute function private.guard_home_photo_reference('portrait_url');
+create trigger guard_activity_photo_reference before insert or update of image_url,source_url on public.site_activities
+  for each row execute function private.guard_home_photo_reference('image_url','source_url');
+create trigger guard_editorial_photo_reference before insert or update of image_url,sources on public.editorial_articles
+  for each row execute function private.guard_home_photo_reference();
+
+create function public.home_photo_rename_lookup(p_property uuid,p_origin text,p_old_key text,p_name text) returns jsonb
+language plpgsql stable security definer set search_path='' as $$
+declare job private.property_photo_renames;
+begin
+  perform private.require_home_photo_admin();
+  select * into job from private.property_photo_renames
+    where property_id=p_property and origin=p_origin and old_key=p_old_key
+    and new_key='properties/renamed/'||p_property::text||'/'||p_name;
+  return case when found then to_jsonb(job) else null end;
+end;$$;
+
+create function public.home_photo_rename_reserve(p_property uuid,p_origin text,p_old_key text,p_name text,p_version timestamptz)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare job private.property_photo_renames; listing public.properties; target text;
+begin
+  perform private.require_home_photo_admin();
+  if p_name is null or p_name !~ '^[a-z0-9]+(-[a-z0-9]+)*\.(jpg|png|webp|avif)$' or char_length(p_name)>120
+    or p_origin is null or p_origin !~ '^https?://[a-zA-Z0-9.:-]+$' then raise exception 'photo_rename.invalid_name' using errcode='22023';end if;
+  target:='properties/renamed/'||p_property::text||'/'||p_name;
+  if p_old_key=target then raise exception 'photo_rename.same_name' using errcode='22023';end if;
+  perform pg_advisory_xact_lock(hashtextextended('home.photo.rename',0));
+  select * into job from private.property_photo_renames where origin=p_origin and old_key=p_old_key;
+  if found and (job.property_id<>p_property or job.new_key<>target) then
+    raise exception 'photo_rename.pending_name' using errcode='40001';
+  end if;
+  if job.applied_at is not null then return to_jsonb(job);end if;
+  select * into listing from public.properties where id=p_property;
+  if not found or listing.updated_at is distinct from p_version then raise exception 'photo_rename.stale_listing' using errcode='40001';end if;
+  if not exists(select 1 from unnest(listing.images) uri where private.home_photo_key(uri,p_origin)=p_old_key) then
+    raise exception 'photo_rename.photo_not_saved' using errcode='P0002';
+  end if;
+  if job.id is not null then return to_jsonb(job);end if;
+  if exists(select 1 from private.property_photo_renames r where r.new_key=target or r.old_key=target)
+    or exists(select 1 from storage.objects where bucket_id='property-media' and name=target)
+    or exists(select 1 from private.home_photo_references where private.home_photo_key(uri,null)=target)
+  then raise exception 'photo_rename.collision' using errcode='23505';end if;
+  insert into private.property_photo_renames(property_id,origin,old_key,new_key,started_by)
+    values(p_property,p_origin,p_old_key,target,auth.uid()) returning * into job;
+  return to_jsonb(job);
+end;$$;
+
+-- The server attests to the Storage copy only after comparing both objects.
+create function public.home_photo_rename_verified(p_id uuid,p_sha256 text) returns boolean
+language sql security definer set search_path='' as $$
+  with verified as (
+    update private.property_photo_renames r set sha256=p_sha256
+    where id=p_id and (sha256 is null or sha256=p_sha256)
+    and exists (select 1 from storage.objects o where o.bucket_id='property-media' and o.name=r.new_key)
+    returning id
+  ) select exists(select 1 from verified);
+$$;
+
+create function public.home_photo_rename_apply(p_id uuid,p_version timestamptz) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare job private.property_photo_renames; listing public.properties; new_uri text; changed jsonb;
+begin
+  perform private.require_home_photo_admin();
+  perform pg_advisory_xact_lock(hashtextextended('home.photo.rename',0));
+  select * into job from private.property_photo_renames where id=p_id for update;
+  if not found or job.sha256 is null then raise exception 'photo_rename.unverified' using errcode='40001';end if;
+  if job.applied_at is not null then return to_jsonb(job);end if;
+  -- Exclude concurrent reference changes for the duration of this transaction.
+  lock table public.properties, public.neighbourhoods, public.site_settings, public.listing_authors,
+    public.site_activities, public.editorial_articles in share row exclusive mode;
+  select * into listing from public.properties where id=job.property_id;
+  if not found or listing.updated_at is distinct from p_version or not exists(
+    select 1 from unnest(listing.images) uri where private.home_photo_key(uri,job.origin)=job.old_key
+  ) then raise exception 'photo_rename.stale_listing' using errcode='40001';end if;
+  if exists(select 1 from private.home_photo_references where private.home_photo_key(uri,null)=job.old_key
+    and private.home_photo_key(uri,job.origin) is null)
+  then raise exception 'photo_rename.other_origin' using errcode='40001';end if;
+  new_uri:=job.origin||'/storage/v1/object/public/property-media/'||job.new_key;
+  update private.property_photo_renames set applied_at=clock_timestamp(),applied_by=auth.uid() where id=job.id;
+  with before_rename as materialized (
+    select p.id,p.updated_at from public.properties p where exists(
+      select 1 from (select unnest(p.images) uri union all select jsonb_object_keys(p.image_filenames)
+        union all select jsonb_object_keys(p.image_metadata) union all select p.source_url) refs
+      where private.home_photo_key(refs.uri,job.origin)=job.old_key
+    )
+  ), rewritten as (
+    update public.properties p set
+      images=array(select private.home_photo_replacement(uri,job.origin,job.old_key,new_uri)
+        from unnest(p.images) with ordinality as i(uri,position) order by position),
+      image_filenames=private.home_photo_map(p.image_filenames,job.origin,job.old_key,new_uri),
+      image_metadata=private.home_photo_map(p.image_metadata,job.origin,job.old_key,new_uri),
+      source_url=private.home_photo_replacement(p.source_url,job.origin,job.old_key,new_uri),
+      updated_at=clock_timestamp()
+    from before_rename b where p.id=b.id
+    returning p.id,p.updated_at,b.updated_at as previous_updated_at
+  ) select coalesce(jsonb_agg(to_jsonb(rewritten)),'[]'::jsonb) into changed from rewritten;
+  update public.neighbourhoods set image=private.home_photo_replacement(image,job.origin,job.old_key,new_uri)
+    where private.home_photo_key(image,job.origin)=job.old_key;
+  update public.site_settings set hero_image=private.home_photo_replacement(hero_image,job.origin,job.old_key,new_uri)
+    where private.home_photo_key(hero_image,job.origin)=job.old_key;
+  update public.listing_authors set portrait_url=private.home_photo_replacement(portrait_url,job.origin,job.old_key,new_uri)
+    where private.home_photo_key(portrait_url,job.origin)=job.old_key;
+  update public.site_activities set
+    image_url=private.home_photo_replacement(image_url,job.origin,job.old_key,new_uri),
+    source_url=private.home_photo_replacement(source_url,job.origin,job.old_key,new_uri)
+    where private.home_photo_key(image_url,job.origin)=job.old_key or private.home_photo_key(source_url,job.origin)=job.old_key;
+  update public.editorial_articles set
+    image_url=private.home_photo_replacement(image_url,job.origin,job.old_key,new_uri),
+    sources=(select coalesce(jsonb_agg(
+      case when private.home_photo_key(entry->>'url',job.origin)=job.old_key
+      then jsonb_set(entry,'{url}',to_jsonb(private.home_photo_replacement(entry->>'url',job.origin,job.old_key,new_uri)))
+      else entry end order by position),'[]'::jsonb) from jsonb_array_elements(sources) with ordinality as s(entry,position))
+    where private.home_photo_key(image_url,job.origin)=job.old_key or exists(
+      select 1 from jsonb_array_elements(sources) entry where private.home_photo_key(entry->>'url',job.origin)=job.old_key
+    );
+  update private.property_photo_renames set properties=changed where id=job.id returning * into job;
+  return to_jsonb(job);
+end;$$;
+
+create function public.home_photo_rename_history(p_property uuid) returns jsonb
+language plpgsql stable security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_admin();
+  return coalesce((select jsonb_agg(to_jsonb(r)) from (
+    select id,old_key,new_key,applied_at,removed_at from private.property_photo_renames
+    where property_id=p_property order by started_at desc limit 40
+  ) r),'[]'::jsonb);
+end;$$;
+
+create function public.home_photo_rename_request_removal(p_id uuid,p_confirm boolean) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare job private.property_photo_renames; target text;
+begin
+  perform private.require_home_photo_admin();
+  if p_confirm is distinct from true then raise exception 'photo_rename.confirm_required' using errcode='22023';end if;
+  perform pg_advisory_xact_lock(hashtextextended('home.photo.rename',0));
+  select * into job from private.property_photo_renames where id=p_id and applied_at is not null for update;
+  if not found then raise exception 'photo_rename.unverified' using errcode='40001';end if;
+  if job.removed_at is not null then return to_jsonb(job)||jsonb_build_object('current_key',job.new_key);end if;
+  if exists(select 1 from private.home_photo_references where private.home_photo_key(uri,null)=job.old_key)
+    then raise exception 'photo_rename.in_use' using errcode='40001';end if;
+  with recursive chain(key) as (
+    select job.new_key union all
+    select r.new_key from private.property_photo_renames r join chain c on c.key=r.old_key
+      where r.origin=job.origin and r.applied_at is not null
+  ) select c.key into target from chain c where not exists(
+    select 1 from private.property_photo_renames r where r.old_key=c.key and r.origin=job.origin and r.applied_at is not null
+  );
+  if not exists(select 1 from public.properties p, unnest(p.images) uri where private.home_photo_key(uri,job.origin)=target)
+    then raise exception 'photo_rename.replacement_unavailable' using errcode='40001';end if;
+  update private.property_photo_renames set removal_requested_by=auth.uid() where id=job.id;
+  return to_jsonb(job)||jsonb_build_object('current_key',target);
+end;$$;
+
+create function public.home_photo_rename_removed(p_id uuid) returns boolean
+language sql security definer set search_path='' as $$
+  with removed as (
+    update private.property_photo_renames r set removed_at=coalesce(removed_at,clock_timestamp())
+    where id=p_id and applied_at is not null and removal_requested_by is not null
+     and not exists(select 1 from storage.objects o where o.bucket_id='property-media' and o.name=r.old_key)
+     returning id
+  ) select exists(select 1 from removed);
+$$;
+
+revoke all on private.home_photo_references from public,anon,authenticated;
+revoke all on function private.home_photo_key(text,text),private.require_home_photo_admin(),
+  private.home_photo_replacement(text,text,text,text),private.home_photo_map(jsonb,text,text,text),
+  private.home_photo_blocked(text),private.guard_home_photo_reference()
+  from public,anon,authenticated;
+revoke all on function public.home_photo_rename_lookup(uuid,text,text,text),public.home_photo_rename_reserve(uuid,text,text,text,timestamptz),
+  public.home_photo_rename_apply(uuid,timestamptz),public.home_photo_rename_history(uuid),public.home_photo_rename_request_removal(uuid,boolean),
+  public.home_photo_rename_verified(uuid,text),public.home_photo_rename_removed(uuid) from public,anon,authenticated;
+grant execute on function public.home_photo_rename_lookup(uuid,text,text,text),public.home_photo_rename_reserve(uuid,text,text,text,timestamptz),
+  public.home_photo_rename_apply(uuid,timestamptz),public.home_photo_rename_history(uuid),
+  public.home_photo_rename_request_removal(uuid,boolean) to authenticated;
+grant execute on function public.home_photo_rename_verified(uuid,text),public.home_photo_rename_removed(uuid) to service_role;
+
+notify pgrst,'reload schema';
+commit;
+
+-- Migration: 20261119073707_property_photo_rename_completion.sql
+-- Review before applying. Requires 20261119054408_property_photo_storage_rename.
+begin;
+
+-- The default protects every existing operation from automatic removal,
+-- including historical reservations resumed by a newer client.
+alter table private.property_photo_renames
+  add column auto_cleanup_requested boolean not null default false;
+
+create function public.home_photo_rename_resume(p_property uuid,p_origin text,p_old_key text)
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+  declare job private.property_photo_renames;
+begin
+  perform private.require_home_photo_admin();
+  select * into job from private.property_photo_renames
+    where property_id=p_property and origin=p_origin and old_key=p_old_key;
+  return case when found then to_jsonb(job) else null end;
+end;$$;
+
+create function public.home_photo_rename_reserve_v2(
+  p_property uuid,p_origin text,p_old_key text,p_name text,p_version timestamptz,p_cleanup_confirmed boolean
+) returns jsonb language plpgsql security definer set search_path='' as $$
+  declare existing boolean; job jsonb;
+begin
+  perform private.require_home_photo_admin();
+  perform pg_advisory_xact_lock(hashtextextended('home.photo.rename',0));
+  select exists(select 1 from private.property_photo_renames where origin=p_origin and old_key=p_old_key) into existing;
+  job:=public.home_photo_rename_reserve(p_property,p_origin,p_old_key,p_name,p_version);
+  if not existing and p_cleanup_confirmed is true then
+    update private.property_photo_renames r set auto_cleanup_requested=true
+      where r.id=(job->>'id')::uuid returning to_jsonb(r) into job;
+  end if;
+  return job;
+end;$$;
+
+create or replace function public.home_photo_rename_history(p_property uuid)
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_admin();
+  return coalesce((select jsonb_agg(to_jsonb(r)) from (
+    select id,old_key,new_key,applied_at,removed_at,auto_cleanup_requested
+    from private.property_photo_renames where property_id=p_property order by started_at desc limit 40
+  ) r),'[]'::jsonb);
+end;$$;
+
+revoke all on function public.home_photo_rename_resume(uuid,text,text),
+  public.home_photo_rename_reserve_v2(uuid,text,text,text,timestamptz,boolean),
+  public.home_photo_rename_history(uuid) from public,anon,authenticated;
+grant execute on function public.home_photo_rename_resume(uuid,text,text),
+  public.home_photo_rename_reserve_v2(uuid,text,text,text,timestamptz,boolean),
+  public.home_photo_rename_history(uuid) to authenticated;
+
+notify pgrst,'reload schema';
+commit;
+
+-- Migration: 20261119095000_property_deletion_media_cleanup.sql
+-- Requires the listing photo rename and completion migrations. Review before applying.
+begin;
+
+create table private.home_listing_deletions (
+  property_id uuid primary key,
+  listing_code text not null,
+  previous_status text,
+  requested_by uuid not null,
+  requested_at timestamptz not null default now()
+);
+create table private.home_listing_deletion_media (
+  property_id uuid not null references private.home_listing_deletions(property_id),
+  bucket text not null check (bucket in ('property-media','listing-videos')),
+  name text not null,
+  object_id uuid not null,
+  object_version text,
+  bytes bigint,
+  evidence text not null,
+  state text not null default 'captured' check (state in ('captured','pending','retained','review','removed')),
+  last_attempt_at timestamptz,
+  last_attempt_by uuid,
+  removed_at timestamptz,
+  primary key (property_id,bucket,name)
+);
+create unique index home_listing_deletion_reserved_key on private.home_listing_deletion_media(bucket,name)
+  where state in ('pending','review','removed');
+alter table private.home_listing_deletions enable row level security;
+alter table private.home_listing_deletion_media enable row level security;
+revoke all on private.home_listing_deletions,private.home_listing_deletion_media from public,anon,authenticated,service_role;
+
+-- Match whole URL paths, including percent-encoded names and transformed images.
+-- Treat links on other hosts conservatively when their bucket and key match.
+create function private.home_listing_storage_links(body text)
+returns table(bucket text,name text) language sql immutable set search_path='' as $$
+  select lower(hit[1]), private.home_photo_key('https://key.invalid/storage/v1/object/public/property-media/'||hit[2],null)
+  from regexp_matches(body,
+    '/(property-media|listing-videos)/([^[:space:]"<>?#,;\\]+\.(?:jpe?g|png|webp|avif|mp4))(?=$|[^[:alnum:]_%/-])','gi') hit;
+$$;
+
+create view private.home_listing_media_refs as
+  select 'property-media'::text bucket, private.home_photo_key(uri,null) name from private.home_photo_references
+  union all
+  select r.bucket,r.name from (
+    select to_jsonb(t)::text body from public.properties t
+    union all select to_jsonb(t)::text from public.neighbourhoods t
+    union all select to_jsonb(t)::text from public.site_settings t
+    union all select to_jsonb(t)::text from public.listing_authors t
+    union all select to_jsonb(t)::text from public.site_activities t
+    union all select to_jsonb(t)::text from public.editorial_articles t
+    union all select to_jsonb(t)::text from public.enquiries t
+    union all select to_jsonb(t)::text from public.enquiry_notes t
+    union all select to_jsonb(t)::text from public.feedback_public t
+    union all select to_jsonb(t)::text from public.feedback_submissions t
+    union all select to_jsonb(t)::text from public.property_assistance t
+    union all select to_jsonb(t)::text from public.assistance_reviews t
+    union all select to_jsonb(t)::text from public.landlord_submissions t
+    union all select to_jsonb(t)::text from public.landlord_submission_files t
+  ) records cross join lateral private.home_listing_storage_links(records.body) r;
+revoke all on private.home_listing_media_refs from public,anon,authenticated,service_role;
+
+create function private.guard_home_listing_media_ref() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare prior text;
+begin
+  if tg_op='UPDATE' then prior:=to_jsonb(old)::text; end if;
+  if exists(select 1 from private.home_listing_storage_links(to_jsonb(new)::text) l where (
+    exists(select 1 from private.home_listing_deletion_media m where m.bucket=l.bucket and m.name=l.name
+      and m.state in ('pending','review','removed')) or (l.bucket='property-media' and exists(
+        select 1 from private.property_photo_renames r where r.old_key=l.name and r.removal_requested_by is not null)))
+    and not exists(select 1 from private.home_listing_storage_links(prior) p where p.bucket=l.bucket and p.name=l.name)) then
+    raise exception 'listing_cleanup.retired_reference' using errcode='40001';
+  end if;
+  return new;
+end;
+$$;
+do $$
+declare table_name text;
+begin
+  foreach table_name in array array['properties','neighbourhoods','site_settings','listing_authors','site_activities',
+    'editorial_articles','enquiries','enquiry_notes','feedback_public','feedback_submissions','property_assistance',
+    'assistance_reviews','landlord_submissions','landlord_submission_files'] loop
+    execute format('create trigger guard_home_listing_media before insert or update on public.%I
+      for each row execute function private.guard_home_listing_media_ref()',table_name);
+  end loop;
+end;
+$$;
+
+-- The UUID for a scoped upload is part of its actual Storage path.
+create function private.home_listing_upload_id(p_bucket text,p_name text) returns text
+language sql immutable set search_path='' as $$
+  select case when p_bucket='property-media' and p_name ~ '^properties/listings/[0-9a-f-]{36}/[0-9a-f-]{36}/[a-z0-9-]+\.(jpg|png|webp|avif)$'
+    then split_part(p_name,'/',3)
+    when p_bucket='listing-videos' and p_name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/[0-9a-f-]{36}\.mp4$'
+    then split_part(p_name,'/',2) end;
+$$;
+create function private.home_listing_media_upload_allowed(p_bucket text,p_name text) returns boolean
+language sql stable security definer set search_path='' as $$
+  select not exists(select 1 from private.home_listing_deletions d
+      where d.property_id::text=private.home_listing_upload_id(p_bucket,p_name))
+    and not exists(select 1 from private.home_listing_deletion_media m
+      where m.bucket=p_bucket and m.name=p_name and m.state in ('pending','review','removed'));
+$$;
+revoke all on function private.home_listing_media_upload_allowed(text,text) from public,anon,authenticated;
+grant execute on function private.home_listing_media_upload_allowed(text,text) to authenticated;
+create policy home_listing_deleted_upload_guard on storage.objects as restrictive for insert to authenticated
+  with check (bucket_id not in ('property-media','listing-videos') or private.home_listing_media_upload_allowed(bucket_id,name));
+
+create function private.guard_home_listing_delete() returns trigger
+language plpgsql security definer set search_path='' as $$
+begin
+  if tg_op='INSERT' then
+    if exists(select 1 from private.home_listing_deletions d where d.property_id=new.id) then
+      raise exception 'listing_cleanup.deleted' using errcode='40001';
+    end if;
+    return new;
+  end if;
+  if not exists(select 1 from private.home_listing_deletions d where d.property_id=old.id) then
+    raise exception 'listing_cleanup.manifest_required' using errcode='42501';
+  end if;
+  return old;
+end;
+$$;
+create trigger guard_home_listing_delete before insert or delete on public.properties
+  for each row execute function private.guard_home_listing_delete();
+revoke delete on public.properties from public,anon,authenticated;
+revoke execute on function public.delete_property(uuid) from public,anon,authenticated;
+
+-- Serialize against rename reservations and writes to reference-bearing tables.
+-- EXCLUSIVE blocks Storage finalization, while public reads remain available.
+-- NOWAIT prevents contention with a live upload from stalling the shared project.
+create function private.lock_home_listing_media_snapshot(p_include_storage boolean default true) returns void
+language plpgsql set search_path='' as $$
+begin
+  if not pg_try_advisory_xact_lock(hashtextextended('home.photo.rename',0)) then
+    raise exception 'listing_cleanup.media_busy' using errcode='55P03';
+  end if;
+  lock table public.properties,public.neighbourhoods,public.site_settings,public.listing_authors,public.site_activities,
+    public.editorial_articles,public.enquiries,public.enquiry_notes,public.feedback_public,public.feedback_submissions,
+    public.property_assistance,public.assistance_reviews,public.landlord_submissions,public.landlord_submission_files
+    in share row exclusive mode nowait;
+  if p_include_storage then lock table storage.objects in exclusive mode nowait; end if;
+end;
+$$;
+
+create function private.home_listing_delete_result(p_property uuid) returns jsonb
+language sql stable set search_path='' as $$
+  select jsonb_build_object('propertyId',d.property_id,'listingCode',d.listing_code,'requestedAt',d.requested_at,
+    'pending',count(m.name) filter (where m.state in ('pending','captured')),
+    'removed',count(m.name) filter (where m.state='removed'),
+    'retained',count(m.name) filter (where m.state='retained'),
+    'review',count(m.name) filter (where m.state='review'))
+  from private.home_listing_deletions d left join private.home_listing_deletion_media m using(property_id)
+  where d.property_id=p_property group by d.property_id;
+$$;
+
+create function public.home_listing_delete_prepare(p_property uuid,p_version timestamptz) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare listing public.properties; storage_origin constant text:='https://duyiihsmaqfgwezmsnjs.supabase.co';
+begin
+  perform private.require_home_photo_admin();
+  perform private.lock_home_listing_media_snapshot();
+  if exists(select 1 from private.home_listing_deletions d where d.property_id=p_property) then
+    return private.home_listing_delete_result(p_property);
+  end if;
+  select * into listing from public.properties where id=p_property;
+  if not found then raise exception 'listing_cleanup.missing' using errcode='P0002'; end if;
+  if listing.updated_at is distinct from p_version then raise exception 'listing_cleanup.stale' using errcode='40001'; end if;
+  if exists(select 1 from private.property_photo_renames r where r.applied_at is null and
+    (r.property_id=p_property or r.old_key in
+      (select private.home_photo_key(uri,storage_origin) from unnest(listing.images) uri))) then
+    raise exception 'listing_cleanup.rename_pending' using errcode='40001';
+  end if;
+
+  insert into private.home_listing_deletions(property_id,listing_code,previous_status,requested_by)
+    values(p_property,listing.listing_code,listing.status,auth.uid());
+  insert into private.home_listing_deletion_media(property_id,bucket,name,object_id,object_version,bytes,evidence)
+    select p_property,o.bucket_id,o.name,o.id,o.version,
+      case when o.metadata->>'size' ~ '^[0-9]{1,15}$' then (o.metadata->>'size')::bigint end,
+      case when renamed.name is not null then 'rename_ledger' when owned.path then 'listing_path'
+        when owned.gallery then 'saved_gallery' when owned.prior then 'previously_shared' else 'unverified_ownership' end
+    from storage.objects o
+    left join lateral (
+      select o.name from private.property_photo_renames r where r.property_id=p_property and r.origin=storage_origin
+        and r.applied_at is not null and o.bucket_id='property-media' and o.name in (r.old_key,r.new_key) limit 1
+    ) renamed on true
+    cross join lateral (select (o.bucket_id='property-media' and o.name in
+      (select private.home_photo_key(uri,storage_origin) from unnest(listing.images) uri)) or
+      (o.bucket_id='listing-videos' and starts_with(listing.video_url,storage_origin||'/') and exists(
+        select 1 from private.home_listing_storage_links(listing.video_url) l where l.bucket=o.bucket_id and l.name=o.name)) as linked) saved
+    cross join lateral (select private.home_listing_upload_id(o.bucket_id,o.name)=p_property::text as path,
+      o.bucket_id='property-media' and saved.linked and o.name ~ '^properties/[0-9a-f-]{36}(/[a-z0-9-]+)?\.(jpe?g|png|webp|avif)$'
+        and not exists(select 1 from private.property_photo_renames r where o.name in (r.old_key,r.new_key) and r.property_id<>p_property) as gallery,
+      saved.linked and exists(select 1 from private.home_listing_deletion_media m
+        where m.bucket=o.bucket_id and m.name=o.name and m.object_id=o.id and m.object_version is not distinct from o.version
+          and m.state='retained' and m.evidence<>'unverified_ownership') as prior) owned
+    where o.bucket_id in ('property-media','listing-videos')
+      and coalesce(to_jsonb(o)->>'archived_at','')='' and coalesce((to_jsonb(o)->>'is_delete_marker')::boolean,false)=false
+      and (renamed.name is not null or owned.path or saved.linked)
+    and not exists(select 1 from private.home_listing_deletion_media m
+      where m.bucket=o.bucket_id and m.name=o.name and m.state in ('pending','review','removed'));
+
+  -- Keep the existing FK cascades and CRM attribution trigger in this transaction.
+  delete from public.properties where id=p_property;
+  update private.home_listing_deletion_media m set state=case
+    when m.evidence='unverified_ownership' or exists(
+      select 1 from private.home_listing_media_refs r where r.bucket=m.bucket and r.name=m.name) then 'retained'
+    when not exists(select 1 from private.home_listing_storage_links('/'||m.bucket||'/'||m.name) l
+      where l.bucket=m.bucket and l.name=m.name) then 'review'
+    else 'pending' end
+    where m.property_id=p_property;
+  return private.home_listing_delete_result(p_property);
+end;
+$$;
+
+-- Accept only an explicitly reviewed identity for each historical object.
+-- A committed rename is durable proof that the missing listing once existed.
+create function public.home_listing_delete_adopt(p_property uuid,p_manifest jsonb) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare item jsonb; target storage.objects; previous private.home_listing_deletion_media;
+begin
+  perform private.require_home_photo_admin();
+  perform private.lock_home_listing_media_snapshot();
+  if jsonb_typeof(p_manifest) is distinct from 'array' or jsonb_array_length(p_manifest) not between 1 and 80 then
+    raise exception 'listing_cleanup.invalid_manifest' using errcode='22023'; end if;
+  if exists(select 1 from public.properties p where p.id=p_property) or not exists(
+    select 1 from private.property_photo_renames r where r.property_id=p_property and r.applied_at is not null
+      and r.origin='https://duyiihsmaqfgwezmsnjs.supabase.co') then
+    raise exception 'listing_cleanup.ownership_unverified' using errcode='22023'; end if;
+  insert into private.home_listing_deletions(property_id,listing_code,requested_by)
+    values(p_property,'',auth.uid()) on conflict do nothing;
+  for item in select value from jsonb_array_elements(p_manifest) loop
+    select * into previous from private.home_listing_deletion_media m where m.property_id=p_property
+      and m.bucket=item->>'bucket' and m.name=item->>'name';
+    if found and previous.object_id::text=item->>'id' and previous.object_version is not distinct from item->>'version'
+      and previous.state in ('pending','removed') then continue; end if;
+    select o.* into target from storage.objects o join storage.buckets b on b.id=o.bucket_id
+      where o.bucket_id=item->>'bucket' and o.name=item->>'name' and o.id::text=item->>'id'
+        and o.version is not distinct from item->>'version'
+        and coalesce(to_jsonb(b)->>'versioning_status','DISABLED')='DISABLED'
+        and not coalesce((to_jsonb(o)->>'is_versioned')::boolean,false);
+    if not found or not exists(select 1 from private.home_listing_storage_links('/'||target.bucket_id||'/'||target.name) l
+        where l.bucket=target.bucket_id and l.name=target.name)
+      or exists(select 1 from private.home_listing_media_refs r where r.bucket=target.bucket_id and r.name=target.name) then
+      raise exception 'listing_cleanup.manifest_changed' using errcode='40001'; end if;
+    if not ((target.bucket_id='listing-videos' and coalesce(private.home_listing_upload_id(target.bucket_id,target.name)=p_property::text,false))
+       or (target.bucket_id='property-media' and exists(select 1 from private.property_photo_renames r
+        where r.property_id=p_property and r.applied_at is not null and target.name in (r.old_key,r.new_key)
+          and r.origin='https://duyiihsmaqfgwezmsnjs.supabase.co'))) then
+      raise exception 'listing_cleanup.ownership_unverified' using errcode='22023'; end if;
+    insert into private.home_listing_deletion_media(property_id,bucket,name,object_id,object_version,bytes,evidence,state)
+      values(p_property,target.bucket_id,target.name,target.id,target.version,
+        case when target.metadata->>'size' ~ '^[0-9]{1,15}$' then (target.metadata->>'size')::bigint end,'approved_history','pending');
+  end loop;
+  return private.home_listing_delete_result(p_property);
+end;
+$$;
+
+create function public.home_listing_delete_status(p_property uuid default null) returns jsonb
+language plpgsql stable security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_admin();
+  if p_property is not null then return private.home_listing_delete_result(p_property); end if;
+  return coalesce((select jsonb_agg(private.home_listing_delete_result(q.property_id) order by q.requested_at desc)
+    from (select d.property_id,d.requested_at from private.home_listing_deletions d where exists(
+      select 1 from private.home_listing_deletion_media m where m.property_id=d.property_id and m.state in ('pending','review'))
+      order by d.requested_at desc limit 40) q),'[]'::jsonb);
+end;
+$$;
+
+create function public.home_listing_delete_targets(p_property uuid,p_actor uuid)
+returns table(bucket text,name text) language plpgsql security definer set search_path='' as $$
+begin
+  update private.home_listing_deletion_media m set state=case
+    when exists(select 1 from private.home_listing_media_refs r where r.bucket=m.bucket and r.name=m.name) then 'retained'
+    else 'review' end
+  where m.property_id=p_property and m.state='pending' and (
+    exists(select 1 from private.home_listing_media_refs r where r.bucket=m.bucket and r.name=m.name)
+    or not exists(select 1 from storage.objects o join storage.buckets b on b.id=o.bucket_id
+      where o.bucket_id=m.bucket and o.name=m.name and o.id=m.object_id and o.version is not distinct from m.object_version
+        and coalesce(to_jsonb(b)->>'versioning_status','DISABLED')='DISABLED'
+        and not coalesce((to_jsonb(o)->>'is_versioned')::boolean,false)));
+  return query update private.home_listing_deletion_media m set last_attempt_at=clock_timestamp(),last_attempt_by=p_actor
+    where m.property_id=p_property and (m.bucket,m.name) in (
+      select q.bucket,q.name from private.home_listing_deletion_media q
+      where q.property_id=p_property and q.state='pending' order by q.bucket,q.name limit 300)
+    returning m.bucket,m.name;
+end;
+$$;
+
+create function public.home_listing_delete_confirm(p_property uuid,p_bucket text,p_names text[]) returns void
+language plpgsql security definer set search_path='' as $$
+begin
+  update private.home_listing_deletion_media m set state='removed',removed_at=clock_timestamp()
+    where m.property_id=p_property and m.bucket=p_bucket and m.name=any(p_names)
+      and m.state in ('pending','review') and m.last_attempt_at is not null and not exists(
+      select 1 from storage.objects o where o.bucket_id=m.bucket and o.name=m.name);
+end;
+$$;
+
+-- Prevent two app requests from sending the same server-only copy. If its
+-- outcome is unknown, the existing retry verifies the reserved object first.
+alter table private.property_photo_renames add column copy_claimed_at timestamptz;
+create function public.home_photo_rename_claim_copy(p_id uuid) returns boolean
+language sql security definer set search_path='' as $$
+  with claim as (update private.property_photo_renames r set copy_claimed_at=clock_timestamp()
+    where r.id=p_id and r.applied_at is null and r.copy_claimed_at is null returning id)
+  select exists(select 1 from claim);
+$$;
+
+-- Apply the broader reference inventory to the existing rename cleanup path.
+create or replace function public.home_photo_rename_request_removal(p_id uuid,p_confirm boolean) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare job private.property_photo_renames; target text;
+begin
+  perform private.require_home_photo_admin();
+  if p_confirm is distinct from true then raise exception 'photo_rename.confirm_required' using errcode='22023'; end if;
+  perform private.lock_home_listing_media_snapshot(false);
+  select * into job from private.property_photo_renames where id=p_id and applied_at is not null for update;
+  if not found then raise exception 'photo_rename.unverified' using errcode='40001'; end if;
+  if job.removed_at is not null then return to_jsonb(job)||jsonb_build_object('current_key',job.new_key); end if;
+  if exists(select 1 from private.home_listing_media_refs r where r.bucket='property-media' and r.name=job.old_key) then
+    raise exception 'photo_rename.in_use' using errcode='40001'; end if;
+  with recursive chain(key) as (
+    select job.new_key union all
+    select r.new_key from private.property_photo_renames r join chain c on c.key=r.old_key
+      where r.origin=job.origin and r.applied_at is not null
+  ) select c.key into target from chain c where not exists(
+    select 1 from private.property_photo_renames r where r.old_key=c.key and r.origin=job.origin and r.applied_at is not null
+  );
+  if not exists(select 1 from public.properties p, unnest(p.images) uri where private.home_photo_key(uri,job.origin)=target)
+    then raise exception 'photo_rename.replacement_unavailable' using errcode='40001'; end if;
+  update private.property_photo_renames set removal_requested_by=auth.uid() where id=job.id;
+  return to_jsonb(job)||jsonb_build_object('current_key',target);
+end;
+$$;
+
+revoke all on function private.home_listing_storage_links(text),private.home_listing_upload_id(text,text),
+  private.guard_home_listing_media_ref(),private.guard_home_listing_delete(),private.lock_home_listing_media_snapshot(boolean),
+  private.home_listing_delete_result(uuid) from public,anon,authenticated,service_role;
+revoke all on function public.home_listing_delete_prepare(uuid,timestamptz),public.home_listing_delete_status(uuid),
+  public.home_listing_delete_adopt(uuid,jsonb),
+  public.home_listing_delete_targets(uuid,uuid),public.home_listing_delete_confirm(uuid,text,text[]),
+  public.home_photo_rename_claim_copy(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.home_listing_delete_prepare(uuid,timestamptz),public.home_listing_delete_status(uuid) to authenticated;
+grant execute on function public.home_listing_delete_adopt(uuid,jsonb) to authenticated;
+grant execute on function public.home_listing_delete_targets(uuid,uuid),public.home_listing_delete_confirm(uuid,text,text[]),
+  public.home_photo_rename_claim_copy(uuid) to service_role;
+
+notify pgrst,'reload schema';
+commit;
+
+-- Migration: 20261119183631_property_photo_rename_owner_only.sql
+-- Keep listing deletion and its cleanup on the existing Admin/Owner guard.
+-- Restrict each user-facing photo rename RPC, including the legacy entry points.
+begin;
+
+create function private.require_home_photo_owner() returns void
+language plpgsql stable set search_path='' as $$
+begin
+  if private.staff_role() is distinct from 'owner' then
+    raise exception 'photo_rename.forbidden' using errcode='42501';
+  end if;
+  perform private.require_home_photo_admin();
+end;
+$$;
+revoke all on function private.require_home_photo_owner() from public,anon,authenticated,service_role;
+
+alter function public.home_photo_rename_lookup(uuid,text,text,text) set schema private;
+alter function public.home_photo_rename_reserve(uuid,text,text,text,timestamptz) set schema private;
+alter function public.home_photo_rename_resume(uuid,text,text) set schema private;
+alter function public.home_photo_rename_reserve_v2(uuid,text,text,text,timestamptz,boolean) set schema private;
+alter function public.home_photo_rename_apply(uuid,timestamptz) set schema private;
+alter function public.home_photo_rename_history(uuid) set schema private;
+alter function public.home_photo_rename_request_removal(uuid,boolean) set schema private;
+
+revoke all on function private.home_photo_rename_lookup(uuid,text,text,text),
+  private.home_photo_rename_reserve(uuid,text,text,text,timestamptz),
+  private.home_photo_rename_resume(uuid,text,text),
+  private.home_photo_rename_reserve_v2(uuid,text,text,text,timestamptz,boolean),
+  private.home_photo_rename_apply(uuid,timestamptz),private.home_photo_rename_history(uuid),
+  private.home_photo_rename_request_removal(uuid,boolean) from public,anon,authenticated,service_role;
+
+create function public.home_photo_rename_lookup(p_property uuid,p_origin text,p_old_key text,p_name text)
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_owner();
+  return private.home_photo_rename_lookup(p_property,p_origin,p_old_key,p_name);
+end;
+$$;
+
+create function public.home_photo_rename_reserve(p_property uuid,p_origin text,p_old_key text,p_name text,p_version timestamptz)
+returns jsonb language plpgsql security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_owner();
+  return private.home_photo_rename_reserve(p_property,p_origin,p_old_key,p_name,p_version);
+end;
+$$;
+
+create function public.home_photo_rename_resume(p_property uuid,p_origin text,p_old_key text)
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_owner();
+  return private.home_photo_rename_resume(p_property,p_origin,p_old_key);
+end;
+$$;
+
+create function public.home_photo_rename_reserve_v2(
+  p_property uuid,p_origin text,p_old_key text,p_name text,p_version timestamptz,p_cleanup_confirmed boolean
+) returns jsonb language plpgsql security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_owner();
+  return private.home_photo_rename_reserve_v2(p_property,p_origin,p_old_key,p_name,p_version,p_cleanup_confirmed);
+end;
+$$;
+
+create function public.home_photo_rename_apply(p_id uuid,p_version timestamptz)
+returns jsonb language plpgsql security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_owner();
+  return private.home_photo_rename_apply(p_id,p_version);
+end;
+$$;
+
+create function public.home_photo_rename_history(p_property uuid)
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_owner();
+  return private.home_photo_rename_history(p_property);
+end;
+$$;
+
+create function public.home_photo_rename_request_removal(p_id uuid,p_confirm boolean)
+returns jsonb language plpgsql security definer set search_path='' as $$
+begin
+  perform private.require_home_photo_owner();
+  return private.home_photo_rename_request_removal(p_id,p_confirm);
+end;
+$$;
+
+revoke all on function public.home_photo_rename_lookup(uuid,text,text,text),
+  public.home_photo_rename_reserve(uuid,text,text,text,timestamptz),public.home_photo_rename_resume(uuid,text,text),
+  public.home_photo_rename_reserve_v2(uuid,text,text,text,timestamptz,boolean),
+  public.home_photo_rename_apply(uuid,timestamptz),public.home_photo_rename_history(uuid),
+  public.home_photo_rename_request_removal(uuid,boolean) from public,anon,authenticated,service_role;
+grant execute on function public.home_photo_rename_lookup(uuid,text,text,text),
+  public.home_photo_rename_reserve(uuid,text,text,text,timestamptz),public.home_photo_rename_resume(uuid,text,text),
+  public.home_photo_rename_reserve_v2(uuid,text,text,text,timestamptz,boolean),
+  public.home_photo_rename_apply(uuid,timestamptz),public.home_photo_rename_history(uuid),
+  public.home_photo_rename_request_removal(uuid,boolean) to authenticated;
+
+notify pgrst,'reload schema';
+commit;

@@ -5,7 +5,7 @@
   --account-secondary: color-mix(in srgb, var(--ink) 75%, var(--paper));
   --account-line: var(--line);
   --account-focus: var(--green);
-  --account-danger: #a13a32;
+  --account-danger: color-mix(in srgb, var(--color-red-500, #fb2c36) 75%, var(--account-text));
   --account-danger-surface: #f9eae7;
   --account-item-hover: var(--account-hover);
   --account-item-ink: var(--account-text);
@@ -23,9 +23,9 @@ html[data-home-theme="dark"] .header-account-menu {
   --account-secondary: var(--home-secondary);
   --account-line: var(--home-border);
   --account-focus: var(--home-accent);
-  --account-danger: var(--home-danger);
+  --account-danger: #E99491;
   --account-danger-surface: var(--home-danger-surface);
-  --account-danger-pressed: color-mix(in srgb, var(--account-danger) 18%, var(--account-danger-surface));
+  --account-danger-pressed: color-mix(in srgb, var(--account-danger) 12%, var(--account-danger-surface));
   --account-item-hover: var(--home-menu-hover);
   --account-item-ink: var(--home-menu-ink);
   --account-item-active: var(--home-menu-active);
@@ -116,7 +116,32 @@ html[data-home-theme="dark"] .header-account-menu {
   text-align: start;
 }
 .header-account-panel svg { flex-shrink: 0; color: inherit; }
+.header-account-item-label { position: relative; display: inline-block; }
+.header-account-item-label::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: -2px;
+  block-size: 1px;
+  background: currentColor;
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 200ms ease-out;
+}
+.header-account-panel :is(a, button:not(:disabled)):focus-visible > .header-account-item-label::after { transform: scaleX(1); }
+@media (hover: hover) {
+  .header-account-panel :is(a, button:not(:disabled)):hover > .header-account-item-label::after { transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .header-account-item-label::after { transition: none; }
+}
 .header-account-footer { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--account-line); }
+.header-account-signout-description {
+  margin: 0 8px 4px;
+  color: var(--account-secondary);
+  font-size: .75rem;
+}
 .header-account-signout,
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .header-account-signout { color: var(--account-danger); }
 .header-account-signout:disabled { opacity: .7; cursor: progress; }

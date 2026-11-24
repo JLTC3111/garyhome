@@ -202,29 +202,30 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
         </div>
         <nav className="header-account-links" aria-label={t("Account destinations", "Điều hướng tài khoản")}>
           {showStaff && (staffActions
-            ? <button type="button" onClick={() => { close(); staffActions.dashboard(); trigger.current?.focus({preventScroll:true}); }}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</button>
-            : <a href={staffDashboard} aria-current={currentDestination(staffDashboard)} onClick={close}><LayoutDashboard size={19} aria-hidden="true"/>{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</a>)}
-          {showProfile && <Link href={staffActions ? CUSTOMER_ACCOUNT_URL : "/account"} aria-current={currentDestination(staffActions ? CUSTOMER_ACCOUNT_URL : "/account")} onClick={close}><House size={19} aria-hidden="true"/>{t("Customer Dashboard", "Bảng điều khiển khách hàng")}</Link>}
-          {staffActions ? showStaff && <button type="button" onClick={() => { close(); staffActions.profile(); }}><UserRound size={19} aria-hidden="true"/>{t("My Staff Profile", "Hồ sơ nhân viên của tôi")}</button>
-            : showProfile && <Link href="/account?tab=profile" aria-current={currentDestination("/account?tab=profile")} onClick={close}><UserRound size={19} aria-hidden="true"/>{t("My Profile", "Hồ sơ của tôi")}</Link>}
-          {showSaved && <Link href="/saved" aria-current={currentDestination("/saved")} onClick={close}><Heart size={19} aria-hidden="true"/>{t("Saved Homes", "Nhà đã lưu")}</Link>}
+            ? <button type="button" onClick={() => { close(); staffActions.dashboard(); trigger.current?.focus({preventScroll:true}); }}><LayoutDashboard size={19} aria-hidden="true"/><span className="header-account-item-label">{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</span></button>
+            : <a href={staffDashboard} aria-current={currentDestination(staffDashboard)} onClick={close}><LayoutDashboard size={19} aria-hidden="true"/><span className="header-account-item-label">{t("Staff Dashboard", "Bảng điều khiển nhân viên")}</span></a>)}
+          {showProfile && <Link href={staffActions ? CUSTOMER_ACCOUNT_URL : "/account"} aria-current={currentDestination(staffActions ? CUSTOMER_ACCOUNT_URL : "/account")} onClick={close}><House size={19} aria-hidden="true"/><span className="header-account-item-label">{t("Customer Dashboard", "Bảng điều khiển khách hàng")}</span></Link>}
+          {staffActions ? showStaff && <button type="button" onClick={() => { close(); staffActions.profile(); }}><UserRound size={19} aria-hidden="true"/><span className="header-account-item-label">{t("My Staff Profile", "Hồ sơ nhân viên của tôi")}</span></button>
+            : showProfile && <Link href="/account?tab=profile" aria-current={currentDestination("/account?tab=profile")} onClick={close}><UserRound size={19} aria-hidden="true"/><span className="header-account-item-label">{t("My Profile", "Hồ sơ của tôi")}</span></Link>}
+          {showSaved && <Link href="/saved" aria-current={currentDestination("/saved")} onClick={close}><Heart size={19} aria-hidden="true"/><span className="header-account-item-label">{t("Saved Homes", "Nhà đã lưu")}</span></Link>}
         </nav>
         {staffAccessRevoked && <p className="header-account-message" role="status">{t("Your staff access was removed.", "Quyền truy cập nhân viên của bạn đã bị thu hồi.")}</p>}
         {checking ? <p className="header-account-message" role="status">{t("Checking portal access…", "Đang kiểm tra quyền truy cập cổng…")}</p>
           : canRetry ? <div className="header-account-message"><p role="status">{t("Some portal access couldn’t be verified.", "Chưa thể xác minh một số quyền truy cập.")}</p>
-            <button type="button" className="text-link header-account-retry" onClick={() => void checkAccess()}>{t("Try again", "Thử lại")}</button></div>
+            <button type="button" className="text-link header-account-retry" onClick={() => void checkAccess()}><span className="header-account-item-label">{t("Try again", "Thử lại")}</span></button></div>
           : !showStaff && !showProfile && !showSaved && <p className="header-account-message" role="status">{t("This account has no Gary Home portal access.", "Tài khoản này không có quyền truy cập cổng Gary Home.")}</p>}
         <div className="header-account-footer">
-          <button type="button" className="header-account-signout" disabled={signingOut} aria-busy={signingOut} onClick={() => void signOut()}>
-            <LogOut size={19} aria-hidden="true"/>{signingOut ? t("Signing out…", "Đang đăng xuất…") : t("Sign Out", "Đăng xuất")}
+          <button type="button" className="header-account-signout" disabled={signingOut} aria-busy={signingOut} aria-describedby={`${id}-signout-description`} onClick={() => void signOut()}>
+            <LogOut size={19} aria-hidden="true"/><span className="header-account-item-label">{signingOut ? t("Signing out…", "Đang đăng xuất…") : t("Sign Out", "Đăng xuất")}</span>
           </button>
+          <p className="header-account-signout-description" id={`${id}-signout-description`}>{t("End your session on this website.", "Kết thúc phiên đăng nhập trên trang web này.")}</p>
           {signOutFailed && <p className="header-account-message" role="alert">{t("Couldn’t sign out. Try again.", "Chưa thể đăng xuất. Vui lòng thử lại.")}</p>}
         </div>
       </> : <>
         {sessionExpired && <p className="header-account-message" role="status">{t("Your session expired. Sign in again.", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")}</p>}
         <nav className="header-account-links" aria-label={t("Sign-in portals", "Cổng đăng nhập")}>
-          <Link href="/account" aria-current={currentDestination("/account")} onClick={close}><UserRound size={19} aria-hidden="true"/>{t("Customer Login", "Đăng nhập khách hàng")}</Link>
-          <a href={staffDashboard} aria-current={currentDestination(staffDashboard)} onClick={close}><ShieldCheck size={19} aria-hidden="true"/>{t("Staff Login", "Đăng nhập nhân viên")}</a>
+          <Link href="/account" aria-current={currentDestination("/account")} onClick={close}><UserRound size={19} aria-hidden="true"/><span className="header-account-item-label">{t("Customer Login", "Đăng nhập khách hàng")}</span></Link>
+          <a href={staffDashboard} aria-current={currentDestination(staffDashboard)} onClick={close}><ShieldCheck size={19} aria-hidden="true"/><span className="header-account-item-label">{t("Staff Login", "Đăng nhập nhân viên")}</span></a>
         </nav>
       </>)}
     </div>

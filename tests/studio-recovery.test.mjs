@@ -323,15 +323,16 @@ function headerAccount(h, className='header-account-menu') {
  const panel=()=>root().findByProps({className:'header-account-panel'});
  const menuText=()=>JSON.stringify(h.renderer.toJSON());
  const links=()=>panel().findAllByType('a').map(a=>a.props.href);
+ const action=label=>panel().findAllByType('button').find(button=>button.findAllByProps({className:'header-account-item-label'}).some(node=>node.children.join('')===label));
  const toggle=async()=>{await act(async()=>{trigger().props.onClick();await delay(5);});};
- return {root,trigger,panel,menuText,links,toggle};
+ return {root,trigger,panel,menuText,links,action,toggle};
 }
 
 const staffAccount = h => headerAccount(h, 'header-account-menu staff-account-menu');
 async function openStaffProfile(h) {
  const account=staffAccount(h);
  await account.toggle();
- const profile=account.panel().findAllByType('button').find(button=>button.children.includes('My Staff Profile'));
+ const profile=account.action('My Staff Profile');
  assert.ok(profile);
  await act(async()=>profile.props.onClick());
 }
@@ -348,6 +349,7 @@ test('header account shares one guest disclosure on desktop and mobile and close
  assert.equal(mobile().props['aria-expanded'],false);
  assert.equal(account.trigger().props['aria-expanded'],true);
  assert.deepEqual(account.links(),['/account','https://staff.garyhome.vn/admin']);
+ assert.deepEqual(account.panel().findAllByProps({className:'header-account-item-label'}).map(node=>node.children.join('')),['Customer Login','Staff Login']);
  assert.match(account.menuText(),/Customer Login/);assert.match(account.menuText(),/Staff Login/);
  await act(async()=>h.site.setLanguage('vi'));
  assert.equal(account.trigger().props['aria-label'],'Đăng nhập');assert.match(account.menuText(),/Đăng nhập nhân viên/);
@@ -406,8 +408,13 @@ test('staff account dropdown shows verified portrait, dashboard and profile acti
  await account.toggle();
  assert.match(account.menuText(),/Staff.*Admin/);
  assert.deepEqual(account.links(),['https://www.garyhome.vn/account']);
- const action=label=>account.panel().findAllByType('button').find(button=>button.children.includes(label));
+ const {action}=account;
+ const description=()=>account.panel().findByProps({className:'header-account-signout-description'});
  assert.ok(action('My Staff Profile'));assert.ok(action('Sign Out'));
+ assert.equal(description().props.id,action('Sign Out').props['aria-describedby']);
+ assert.equal(description().parent,action('Sign Out').parent);
+ assert.equal(description().type,'p');assert.equal(description().props.onClick,undefined);
+ assert.equal(description().children.join(''),'End your session on this website.');
  await act(async()=>action('Staff Dashboard').props.onClick());
  assert.equal(account.panel().props.hidden,true);
  assert.match(h.renderer.root.findByProps({className:'admin-breadcrumb'}).findByType('strong').children.join(''),/Overview/);
@@ -415,6 +422,7 @@ test('staff account dropdown shows verified portrait, dashboard and profile acti
  await account.toggle();assert.deepEqual(account.links(),[]);assert.ok(action('My Staff Profile'));
  await act(async()=>h.site.setLanguage('vi'));
  assert.equal(account.trigger().props['aria-label'],'Tài khoản nhân viên');
+ assert.equal(description().children.join(''),'Kết thúc phiên đăng nhập trên trang web này.');
  assert.ok(action('Hồ sơ nhân viên của tôi'));
  assert.ok(action('Bảng điều khiển nhân viên'));
  h.backend.role=null;
@@ -477,7 +485,7 @@ test('header account distinguishes staff-only and authenticated accounts with no
  await account.toggle();
  assert.deepEqual(account.links(),[]);
  assert.match(account.menuText(),/Visitor Name/);assert.match(account.menuText(),/no Gary Home portal access/);
- assert.ok(account.panel().findAllByType('button').some(control=>control.children.includes('Sign Out')));
+ assert.ok(account.action('Sign Out'));
  assert.doesNotMatch(account.menuText(),/Staff Dashboard|Customer Login|Staff Login/);
 });
 

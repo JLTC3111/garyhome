@@ -4,5 +4,44 @@
 .rental-search .search-fields>.rental-keyword-field{grid-column:1/-1;min-height:0}
 .rental-search .search-fields>.rental-keyword-field>span{font-size:12px;letter-spacing:0}
 .rental-search .rental-keyword-field input{font-size:16px;min-height:48px}
+.rental-keyword-results {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--warm);
+  color: var(--navy);
+}
+.rental-keyword-results > p { margin: 0; font-size: .8125rem; font-weight: 600; }
+.rental-keyword-results ul {
+  list-style: none;
+  padding: 2px;
+  margin: 4px 0 0;
+  max-height: min(20rem, 48dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rental-keyword-results li + li { border-top: 1px solid var(--line); }
+.rental-keyword-results li > a {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 6px;
+  border-radius: 4px;
+  font-size: .875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.rental-keyword-results li > a:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.rental-keyword-results li > a > span { color: var(--muted); font-size: .8125rem; }
+.rental-keyword-results > button { min-height: 44px; }
+@media (hover: hover) {
+  .rental-keyword-results li > a:hover { text-decoration: underline; }
+}
+.rental-keyword-match { background: #fce9ab; color: #243c31; border-radius: 2px; box-decoration-break: clone; }
+html[data-home-theme="dark"] .rental-keyword-match { background: #4e4b28; color: #fff1c3; }
+.rental-card-keyword-excerpt { margin: 6px 0 0; color: var(--muted); font-size: .8125rem; overflow-wrap: anywhere; }
 @media(max-width:1150px) and (min-width:641px){.rental-search .search-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.rental-search .search-submit{grid-column:1/-1}.rental-search-rooms-first .search-fields>.rental-room-field{grid-column:auto}.rental-search .search-fields>.rental-id-field{grid-column:auto}}
 @media(max-width:640px){.rental-search .search-fields{grid-template-columns:minmax(0,1fr)}.rental-search .search-fields>.rental-id-field{grid-column:1/-1}.rental-search .rental-id-field input{font-size:16px;min-height:48px}.rental-search .rental-id-field>span{font-size:10px}}

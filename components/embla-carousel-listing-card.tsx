@@ -9,7 +9,7 @@ import { useSite } from "./site-context";
 
 const reducedMotion = "(prefers-reduced-motion: reduce)";
 const reduced = () => window.matchMedia?.(reducedMotion).matches ?? false;
-const breakpoints = { [reducedMotion]: { duration: 0, dragFree: false } };
+const breakpoints = { [reducedMotion]: { duration: 0 } };
 
 export function EmblaCarouselListingCard({ photos, href, title, renderPhoto, children }: {
   photos: string[];
@@ -21,23 +21,34 @@ export function EmblaCarouselListingCard({ photos, href, title, renderPhoto, chi
   const { t } = useSite();
   const [selected, setSelected] = useState(0);
   const [mainRef, main] = useEmblaCarousel({ loop: true, watchFocus: false, breakpoints });
-  const [thumbsRef, thumbs] = useEmblaCarousel({ containScroll: "keepSnaps", dragFree: true, breakpoints });
+  // Give each thumbnail a snap point even when the full strip fits in the card.
+  const [thumbsRef, thumbs] = useEmblaCarousel({ align: "center", containScroll: false, breakpoints });
 
   useEffect(() => {
     if (!main) return;
+    let dragStart: number | undefined;
     const sync = () => {
       const index = main.selectedScrollSnap();
       setSelected(index);
-      thumbs?.scrollTo(index, reduced());
+      if (thumbs && thumbs.selectedScrollSnap() !== index) thumbs.scrollTo(index, reduced());
+    };
+    const startThumbDrag = () => { dragStart = thumbs?.selectedScrollSnap(); };
+    const finishThumbDrag = () => {
+      if (!thumbs || dragStart === undefined) return;
+      // Embla chooses the destination before emitting pointerUp.
+      const index = thumbs.selectedScrollSnap(), jump = reduced();
+      const changed = index !== dragStart;
+      dragStart = undefined;
+      if (jump) thumbs.scrollTo(index, true);
+      if (changed && main.selectedScrollSnap() !== index) main.scrollTo(index, jump);
     };
     const stopMotion = () => { if (reduced()) main.scrollTo(main.selectedScrollSnap(), true); };
-    const stopThumbMotion = () => { if (thumbs && reduced()) thumbs.scrollTo(thumbs.selectedScrollSnap(), true); };
     main.on("select", sync).on("reInit", sync).on("pointerUp", stopMotion);
-    thumbs?.on("reInit", sync).on("pointerUp", stopThumbMotion);
+    thumbs?.on("reInit", sync).on("pointerDown", startThumbDrag).on("pointerUp", finishThumbDrag);
     sync();
     return () => {
       main.off("select", sync).off("reInit", sync).off("pointerUp", stopMotion);
-      thumbs?.off("reInit", sync).off("pointerUp", stopThumbMotion);
+      thumbs?.off("reInit", sync).off("pointerDown", startThumbDrag).off("pointerUp", finishThumbDrag);
     };
   }, [main, thumbs]);
 
@@ -46,7 +57,7 @@ export function EmblaCarouselListingCard({ photos, href, title, renderPhoto, chi
 
   return <>
     <div className="property-image">
-      <Link href={href} tabIndex={-1} aria-hidden="true" aria-label={title}>
+      <Link href={href} tabIndex={-1} aria-hidden="true" aria-label={title} draggable={false}>
         <div className="embla-listing-viewport" ref={mainRef}>
           <div className="embla-listing-track">
             {photos.map((src, i) => <div className="embla-listing-slide" key={src+i}>{renderPhoto(src)}</div>)}
@@ -64,7 +75,7 @@ export function EmblaCarouselListingCard({ photos, href, title, renderPhoto, chi
       <div className="embla-listing-track">
         {photos.map((src,i)=><button key={src+i} type="button" aria-pressed={index===i}
           aria-label={t(`Photo ${i+1} of ${photos.length}`, `Ảnh ${i+1} trên ${photos.length}`)} onClick={()=>select(i)}>
-          <ContentImage src={src} alt="" width={96} height={64} sizes="56px" loading="lazy"/>
+          <ContentImage src={src} alt="" width={96} height={64} sizes="56px" loading="lazy" draggable={false}/>
         </button>)}
       </div>
     </div>

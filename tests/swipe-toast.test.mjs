@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
+import postcss from 'postcss';
 import React from 'react';
 import TestRenderer, {act} from 'react-test-renderer';
 import ts from 'typescript';
@@ -80,6 +81,7 @@ test('the curved fuse and single timeout share the longer reading duration',asyn
   const h=await harness(t,{},'A'.repeat(220));
   const fuse=()=>h.card().findByProps({className:'action-toast-fuse'});
   assert.equal(fuse().type,'svg');
+  assert.deepEqual(fuse().findAllByType('stop').map(stop=>stop.props.offset),['0%','50%','100%']);
   assert.match(fuse().findByType('path').props.d,/Q.*H.*Q/);
   assert.equal(fuse().findByType('path').props.pathLength,1);
   assert.equal(fuse().props.style['--toast-duration'],'6700ms');
@@ -92,6 +94,20 @@ test('the curved fuse and single timeout share the longer reading duration',asyn
   await act(async()=>h.card().props.onPointerLeave());
   await h.advance(2200);
   assert.equal(h.dismissed(),1);
+});
+
+test('both resolved themes bind the curved fuse to the sunset palette',()=>{
+  const css=postcss.parse(readFileSync(new URL('../app/swipe-toast.css',import.meta.url),'utf8'));
+  const declarations=selector=>Object.fromEntries(css.nodes.find(rule=>rule.selector===selector).nodes
+    .filter(node=>node.type==='decl').map(({prop,value})=>[prop,value]));
+  const stops=['first-child','nth-child(2)','last-child'];
+  const tokens=stops.map(stop=>declarations(`.action-toast-fuse stop:${stop}`)['stop-color'].match(/^var\((--[^)]+)\)$/)[1]);
+  const light=declarations('.action-toast');
+  const dark={...light,...declarations('html[data-home-theme="dark"] .action-toast')};
+  assert.deepEqual(tokens.map(token=>light[token]),['#B45309','rgb(187, 74, 10.5)','#C2410C']);
+  assert.deepEqual(tokens.map(token=>dark[token]),['#8E5030','#E88932','#F5A524']);
+  assert.equal(declarations('.action-toast-fuse path').animation,'action-toast-burn var(--toast-duration) linear forwards');
+  assert.equal(declarations('.action-toast-fuse[data-paused] path')['animation-play-state'],'paused');
 });
 
 test('downward swipe dismisses, while an upward drag and pointer cancellation keep the toast',async t=>{

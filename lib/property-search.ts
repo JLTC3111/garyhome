@@ -1,4 +1,4 @@
-import type { ExchangeRate, Neighbourhood, PriceCurrency, Property } from "./types";
+import type { ExchangeRate, Language, Neighbourhood, PriceCurrency, Property } from "./types";
 import { currencyValue } from "./currency.ts";
 import { propertyPrice } from "./property-pricing.ts";
 import { newestFirst } from "./property-order.ts";
@@ -6,6 +6,34 @@ import { amenityLabel, canonicalAmenity, isPublicRental, listingCode } from "./r
 import { normalizeListingId } from "./listing-id.ts";
 export type Filters = { q?: string; district?: string; type?: string; min?: string; max?: string; currency?: string; beds?: string; baths?: string; amenity?: string; listing?: string; id?: string; sort?: string };
 export function normalize(value: string) { return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g,"d"); }
+export function propertySearchTerms(query: string) {
+  return normalize(query).trim().split(/\s+/).filter(Boolean);
+}
+
+function searchableFields(p: Property, area?: string, language: Language = "en") {
+  const bilingual = (en?: string, vi?: string) => language === "vi" ? [vi, en] : [en, vi];
+  return [
+    ...bilingual(p.title_en, p.title_vi), p.address, area,
+    ...bilingual(p.location_en, p.location_vi), ...bilingual(p.overview_en, p.overview_vi),
+    ...bilingual(p.description_en, p.description_vi),
+    ...p.amenities.flatMap(value => [...bilingual(amenityLabel(value,"en"), amenityLabel(value,"vi")), value]),
+    p.property_type, listingCode(p), p.district_slug,
+  ].filter((value): value is string => typeof value === "string" && !!value.trim());
+}
+
+export function propertyMatchExcerpt(p: Property, terms: string[], title: string, area: string, language: Language) {
+  const visible = normalize([title, p.address, area].join(" "));
+  const remaining = terms.filter(term => !visible.includes(term));
+  if (!remaining.length) return "";
+  for (const field of searchableFields(p, area, language)) {
+    const words = field.trim().split(/\s+/);
+    const index = words.findIndex(word => remaining.some(term => normalize(word).includes(term)));
+    if (index < 0) continue;
+    const start = Math.max(0, index - 4), end = Math.min(words.length, start + 16);
+    return `${start ? "… " : ""}${words.slice(start,end).join(" ")}${end < words.length ? " …" : ""}`;
+  }
+  return "";
+}
 export function normalizePropertyId(value: string) {
   const id = value.trim().toUpperCase().replace(/[\u2010-\u2015\u2212]/g, "-");
   return normalizeListingId(id) ?? id;
@@ -18,17 +46,13 @@ export function filterProperties(properties: Property[], filters: Filters, optio
   currency?: PriceCurrency; exchangeRate?: ExchangeRate | null;
   neighbourhoods?: readonly Pick<Neighbourhood,"slug"|"name">[];
 } = {}): Property[] {
-  const terms=normalize(filters.q||"").trim().split(/\s+/).filter(Boolean);
+  const terms=propertySearchTerms(filters.q||"");
   const areas=new Map(options.neighbourhoods?.map(area=>[area.slug,area.name]));
   const requested=(filters.amenity||"").split(",").filter(Boolean).map(canonicalAmenity);
   const found=properties.filter(p=>{
     if(!isPublicRental(p))return false;
     if(terms.length){
-      const haystack=normalize([
-        p.title_en,p.title_vi,p.description_en,p.description_vi,p.overview_en,p.overview_vi,
-        p.address,p.location_en,p.location_vi,p.district_slug,areas.get(p.district_slug),
-        p.property_type,listingCode(p),...p.amenities.flatMap(amenity=>[amenity,amenityLabel(amenity,"en"),amenityLabel(amenity,"vi")]),
-      ].join(" "));
+      const haystack=normalize(searchableFields(p,areas.get(p.district_slug)).join(" "));
       if(!terms.every(term=>haystack.includes(term)))return false;
     }
     const type=filters.type;

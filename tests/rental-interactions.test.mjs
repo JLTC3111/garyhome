@@ -166,7 +166,7 @@ test('fullscreen metadata changes with arrows, keyboard, Embla snapping and thum
  assert.equal(caption().findByType('p').props.children,'Nhìn ra vườn');
 });
 
-test('homepage carousel keeps thumbnail activation, main selection and listing links separate',async t=>{
+test('homepage carousel snaps thumbnail drags and keeps selection separate from listing links',async t=>{
  const p=await platform(t),site={current:{t:en=>en,language:'en'}};
  const carousels={};
  const {EmblaCarouselListingCard}=loadComponents(site,options=>{
@@ -175,9 +175,11 @@ test('homepage carousel keeps thumbnail activation, main selection and listing l
    const handlers=new Map();
    const instance={
     calls:[],
+    options,
     on(event,fn){handlers.set(event,fn);return this;},
     off(event){handlers.delete(event);return this;},
-    scrollTo(index,jump){this.calls.push([index,jump]);selected=index;handlers.get('select')?.();},
+    emit(event){handlers.get(event)?.();},
+    scrollTo(index,jump){this.calls.push([index,jump]);selected=index;this.emit('select');},
     selectedScrollSnap:()=>selected,
    };
    carousels[options.loop?'main':'thumbs']=instance;
@@ -190,17 +192,52 @@ test('homepage carousel keeps thumbnail activation, main selection and listing l
  const strip=()=>renderer.root.findByProps({className:'embla-listing-thumbnails'});
  const buttons=()=>strip().findAllByType('button');
  assert.equal(buttons().length,4);
+ assert.equal(carousels.thumbs.options.containScroll,false);
+ assert.notEqual(carousels.thumbs.options.dragFree,true);
  await act(async()=>buttons()[2].props.onClick());
  assert.deepEqual(carousels.main.calls.at(-1),[2,false]);
  assert.deepEqual(carousels.thumbs.calls.at(-1),[2,false]);
  assert.equal(buttons()[2].props['aria-pressed'],true);
+ await act(async()=>{
+  carousels.thumbs.emit('pointerDown');
+  carousels.thumbs.scrollTo(1);
+  carousels.thumbs.emit('pointerUp');
+ });
+ assert.deepEqual(carousels.main.calls.at(-1),[1,false]);
+ assert.equal(buttons()[1].props['aria-pressed'],true);
+ // Tab can reveal a thumb without activating a new main photo.
+ await act(async()=>carousels.thumbs.scrollTo(0));
+ assert.equal(buttons()[1].props['aria-pressed'],true);
  p.window.matchMedia=()=>({matches:true});
  await act(async()=>carousels.main.scrollTo(3,false));
  assert.equal(buttons()[3].props['aria-pressed'],true);
  assert.deepEqual(carousels.thumbs.calls.at(-1),[3,true]);
  assert.equal(strip().findAllByType('a').length,0);
  assert.equal(renderer.root.findByType('a').props.href,'/en/homes/a-home');
+ assert.equal(renderer.root.findByType('a').props.draggable,false);
  assert.ok(renderer.root.findAllByType('img').every(image=>image.props.loading==='lazy'));
+});
+
+test('detail preview arrows, counter and current thumbnail follow the photo opened in the lightbox',async t=>{
+ const p=await platform(t),site={current:{t:en=>en,language:'en'}};
+ const {gallery:{PropertyGallery}}=loadComponents(site);
+ const view=images=>React.createElement(PropertyGallery,{images,title:'A rental'});
+ const renderer=await p.mount(view(['/front.jpg','/kitchen.jpg']));
+ const main=()=>renderer.root.findByProps({className:'rental-gallery-main'});
+ const button=label=>main().findByProps({'aria-label':label});
+ const activeThumb=()=>renderer.root.findByProps({className:'rental-inline-thumbs'}).findByProps({'aria-current':'true'});
+ await act(async()=>button('Next gallery photo').props.onClick());
+ assert.equal(currentSlide(main()).findByType('img').props.src,'/kitchen.jpg');
+ assert.equal(main().findByProps({className:'sr-only'}).props.children,'Photo 2 of 2');
+ assert.equal(activeThumb().props['aria-label'],'Open photo 2');
+ assert.equal(p.dialog.open,false);
+ await act(async()=>currentSlide(main()).findByType('button').props.onClick());
+ assert.equal(currentSlide(renderer.root.findByProps({className:'rental-lightbox-stage'})).findByType('img').props.src,'/kitchen.jpg');
+ await act(async()=>renderer.root.findByProps({'aria-label':'Close gallery'}).props.onClick());
+ await act(async()=>button('Previous gallery photo').props.onClick());
+ assert.equal(main().findByProps({className:'sr-only'}).props.children,'Photo 1 of 2');
+ await act(async()=>renderer.update(view(['/front.jpg'])));
+ assert.equal(main().findAllByProps({role:'group'}).length,0);
 });
 
 test('the fullscreen strip scrolls only enough to reveal an overflowing selection',async t=>{

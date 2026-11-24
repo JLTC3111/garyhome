@@ -17,6 +17,7 @@ Object.defineProperty(globalThis, 'document', { value: {}, configurable: true })
 const { Select } = require('@base-ui/react/select');
 if (initialDocument) Object.defineProperty(globalThis, 'document', initialDocument); else delete globalThis.document;
 let language = 'en';
+const navigated = [];
 const site = { content: { properties:[], neighbourhoods: [{ slug: 'tay-ho', name: 'Tây Hồ' }, { slug: 'ba-dinh', name: 'Ba Đình' }] },
   t: (en, vi) => language === 'en' ? en : vi };
 const modules = new Map();
@@ -28,7 +29,8 @@ function load(file) {
   }).outputText;
   function dependency(id) {
     if (id === './site-context') return { useSite: () => ({ ...site, language }) };
-    if (id === 'next/navigation') return { useRouter: () => ({push(){}}) };
+    if (id === 'next/navigation') return { usePathname:()=>'', useRouter: () => ({push:href=>navigated.push(href)}) };
+    if (id === 'next/link') return { __esModule:true, default:props=>React.createElement('a',props) };
     if (id.startsWith('.') || id.startsWith('@/')) {
       const target = id.startsWith('@/') ? path.join(root,id.slice(2)) : path.resolve(path.dirname(file), id);
       return load([target,target + '.tsx', target + '.ts'].find(file=>fs.existsSync(file)&&fs.statSync(file).isFile()));
@@ -122,7 +124,7 @@ test('the requirements disclosure opens from its three-dot trigger, closes with 
  language='en';const renderer=await harness(t,React.createElement(SearchForm,{initial:{amenity:'Pet-friendly,BBQ',beds:'2'}}));
  const trigger=()=>renderer.root.findAllByType('button').find(n=>n.props['aria-controls']?.endsWith('-panel'));
  assert.equal(trigger().props['aria-expanded'],true);
- const checked=renderer.root.findAllByType('input').filter(n=>n.props.name==='amenity'&&n.props.defaultChecked).map(n=>n.props.value);
+ const checked=renderer.root.findAllByType('input').filter(n=>n.props.name==='amenity'&&n.props.checked).map(n=>n.props.value);
  assert.deepEqual(checked,['Pet friendly','Barbecue']);
  let prevented=false;await act(async()=>renderer.root.findByProps({className:'rental-advanced'}).props.onKeyDown({key:'Escape',preventDefault(){prevented=true;}}));
  assert.equal(prevented,true);assert.equal(trigger().props['aria-expanded'],false);assert.equal(renderer.root.findAllByType('input').filter(n=>n.props.name==='amenity').length,21);
@@ -143,4 +145,53 @@ test('homepage search prioritizes bedrooms and bathrooms while retaining one bud
  assert.strictEqual(renderer.root.findAllByType(Select.Root).find(n=>n.props.name==='beds'),beds);
  assert.equal(selected().beds,'2');assert.equal(selected().baths,'1');assert.equal(selected().min,'300');assert.equal(selected().max,'900');assert.equal(selected().period,undefined);
  assert.equal(trigger().props['aria-expanded'],false);
+});
+
+test('typing shows accent-insensitive highlighted rentals and keeps filters and submitted URLs in sync',async t=>{
+ language='vi';
+ const property={
+  id:'visible',slug:'tay-ho-flat',title_en:'Tay Ho rental',title_vi:'Căn hộ Tây Hồ',
+  description_vi:'Có ban công nhìn ra hồ.',address:'Đường Tô Ngọc Vân',district_slug:'tay-ho',
+  status:'published',listing_type:'rent',availability:'available',property_type:'Apartment',
+  bedrooms:2,bathrooms:2,amenities:['Balcony','Elevator'],price:800,created_at:'2026-10-21',
+ };
+ const previous=site.content.properties;
+ site.content.properties=[
+  property,{...property,id:'draft',slug:'draft-flat',status:'draft'},
+  {...property,id:'other-area',slug:'other-area',district_slug:'ba-dinh'},
+ ];
+ t.after(()=>{site.content.properties=previous;language='en';navigated.length=0;});
+ const renderer=await harness(t,React.createElement(SearchForm,{initial:{district:'tay-ho',beds:'2',amenity:'Balcony'}}));
+ const keyword=()=>renderer.root.findByProps({name:'q'});
+ const preview=()=>renderer.root.findByProps({className:'rental-keyword-results'});
+ const type=async value=>act(async()=>keyword().props.onChange({target:{value}}));
+ await type('TAY');
+ assert.equal(preview().findByType('a').props.href,'/vi/homes/tay-ho-flat');
+ assert.ok(preview().findAllByType('mark').some(mark=>mark.children.join('')==='Tây'));
+ assert.equal(navigated.length,0);
+ await type('TAY HO BAN CONG');
+ const highlighted=preview().findAllByType('mark').map(mark=>mark.children.join(''));
+ assert.ok(highlighted.includes('ban'));
+ assert.ok(highlighted.includes('công'));
+ const changeArea=value=>act(async()=>renderer.root.findAllByType(Select.Root).find(node=>node.props.name==='district').props.onValueChange(value));
+ await changeArea('ba-dinh');
+ assert.equal(preview().findByType('a').props.href,'/vi/homes/other-area');
+ await type('sauna');
+ assert.match(preview().findByProps({role:'status'}).children.join(''),/Không có nhà cho thuê/);
+ await changeArea('tay-ho');
+ await type('TAY HO');
+ const entries=new URLSearchParams({q:keyword().props.value,district:'tay-ho',beds:'2',amenity:'Balcony',id:'GH-05'});
+ entries.append('amenity','Elevator');
+ const nativeFormData=globalThis.FormData;
+ try {
+  globalThis.FormData=class { constructor(form){return form.fields;} };
+  await act(async()=>renderer.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:{fields:entries}}));
+ } finally { globalThis.FormData=nativeFormData; }
+ const submitted=new URL(navigated[0],'https://www.garyhome.vn');
+ assert.equal(submitted.pathname,'/vi/homes');
+ assert.equal(submitted.searchParams.get('q'),'TAY HO');
+ assert.equal(submitted.searchParams.get('id'),'GH-05');
+ assert.deepEqual(submitted.searchParams.getAll('amenity'),['Balcony','Elevator']);
+ await type('');
+ assert.equal(renderer.root.findAllByProps({className:'rental-keyword-results'}).length,0);
 });

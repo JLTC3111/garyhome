@@ -11,6 +11,16 @@
 .embla-detail-slide img { display: block; user-select: none; -webkit-user-drag: none; }
 .embla-detail-slide > .rental-gallery-cover { display: block; height: 100%; }
 .embla-detail-slide > .rental-gallery-cover:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.rental-gallery-main { position: relative; min-width: 0; min-height: 0; }
+.rental-gallery-main > .rental-card-photo-nav { top: 50%; transform: translateY(-50%); }
+.rental-gallery-main > .rental-card-photo-nav > button { width: 44px; height: 44px; }
+.rental-gallery-main > .rental-photo-position {
+  inset: 12px auto auto 12px;
+  background: #15251de6;
+  font-size: .8125rem;
+  pointer-events: none;
+}
+.rental-inline-thumbs > button[aria-current="true"]:not(:focus-visible) { outline: 2px solid var(--green); outline-offset: -2px; }
 .rental-gallery-grid[data-single-photo] { grid-template-columns: minmax(0, 1fr); }
 .rental-gallery-grid[data-single-photo] > .rental-gallery-side { display: none; }
 .rental-gallery-side > button:only-child { grid-row: 1 / -1; }
@@ -35,6 +45,12 @@
 .embla-listing-thumbnails button[aria-pressed="true"] { border-color: var(--green); }
 .embla-listing-thumbnails button:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 .embla-listing-thumbnails img { display: block; width: 100%; height: 100%; object-fit: cover; }
+@media (any-pointer: fine) {
+  .embla-listing-viewport, .embla-listing-thumbnails button,
+  .rental-gallery-main[data-draggable] .rental-gallery-cover { cursor: grab; }
+  .embla-listing-viewport:active, .embla-listing-thumbnails:active button,
+  .rental-gallery-main[data-draggable] .rental-gallery-cover:active { cursor: grabbing; }
+}
 @media (max-width: 680px) {
   .rental-lightbox-stage > .embla-detail-viewport { grid-area: 1 / 1; }
 }

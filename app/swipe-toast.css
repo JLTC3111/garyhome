@@ -3,15 +3,29 @@
   inset: auto 16px calc(85px + env(safe-area-inset-bottom)) 16px;
   z-index: 150;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   gap: 6px;
-  width: min(360px, calc(100% - 32px));
-  max-width: none;
+  width: min(580px, calc(100vw - 32px));
+  max-width: calc(100% - 32px);
   margin: 0 auto;
   padding: 0;
   border: 0;
   overflow: visible;
   background: transparent;
   pointer-events: none;
+}
+
+/* Clear the desktop contact widget and the expanded mobile contact dock. */
+@media (width > 680px) {
+  body:has(.contact-widget-desktop:not(.contact-widget-single)) .action-toast-host {
+    bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 680px) {
+  body:has(.mobile-contact-panel[data-open="true"]) .action-toast-host {
+    bottom: calc(168px + env(safe-area-inset-bottom));
+  }
 }
 
 .action-toast-host:empty,
@@ -25,13 +39,19 @@
   --toast-warning-icon: #805323;
   --toast-error-icon: #9d2b27;
   --toast-info-icon: #305b80;
-  --toast-fuse-start: #2563EB;
-  --toast-fuse-end: #4F46E5;
+  --toast-fuse-start: #B45309;
+  --toast-fuse-end: #C2410C;
+  /* The middle stop lies on the same two-color ramp in light mode. */
+  --toast-fuse-middle: rgb(187, 74, 10.5);
   --toast-hover: #eff3fa;
   --toast-shadow: 0 6px 18px #15213124;
   --toast-accent: var(--toast-success-icon);
   position: relative;
   display: flex;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
@@ -59,8 +79,9 @@ html[data-home-theme="dark"] .action-toast {
   --toast-warning-icon: var(--studio-warning, #e9c796);
   --toast-error-icon: var(--home-danger, #f4b9a8);
   --toast-info-icon: #a4cced;
-  --toast-fuse-start: #C4B5FD;
-  --toast-fuse-end: #818CF8;
+  --toast-fuse-start: #8E5030;
+  --toast-fuse-middle: #E88932;
+  --toast-fuse-end: #F5A524;
   --toast-hover: #333d4e;
   --toast-shadow: 0 8px 22px #0005;
 }
@@ -68,11 +89,12 @@ html[data-home-theme="dark"] .action-toast {
 .action-toast[data-tone="error"] { --toast-accent: var(--toast-error-icon); }
 .action-toast[data-tone="info"] { --toast-accent: var(--toast-info-icon); }
 .action-toast-mark { flex: none; width: 1em; color: var(--toast-accent); font-weight: 750; text-align: center; }
-.action-toast-content { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.action-toast-content { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .action-toast [data-success-heading],
 .action-toast [data-success-title] { display: block; font-weight: 650; }
 .action-toast a { display: inline-block; margin-top: 4px; color: inherit; text-decoration: underline; }
 .action-toast button {
+  flex-shrink: 0;
   min-height: 44px;
   padding: 4px 8px;
   border: 1px solid var(--toast-line);
@@ -94,6 +116,7 @@ html[data-home-theme="dark"] .action-toast {
   pointer-events: none;
 }
 .action-toast-fuse stop:first-child { stop-color: var(--toast-fuse-start); }
+.action-toast-fuse stop:nth-child(2) { stop-color: var(--toast-fuse-middle); }
 .action-toast-fuse stop:last-child { stop-color: var(--toast-fuse-end); }
 .action-toast-fuse path {
   stroke-dasharray: 1 1;

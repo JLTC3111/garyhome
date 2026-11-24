@@ -2,7 +2,7 @@
 
 This application includes adapted components from the following projects. Existing dependency licenses remain with their respective packages.
 
-## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards, Squish Switch, Rubber Segment, Swipe Row, Swipe Toast, Lattice Loader and Counter
+## React Bits — Spotlight Card, Tech Text, Branched Menu, Bounce Cards, Squish Switch, Rubber Segment, Swipe Row, Swipe Toast, Lattice Loader, Counter and Pulse Heart
 
 Source: https://github.com/DavidHDev/react-bits
 
@@ -17,6 +17,8 @@ Swipe Toast is adapted from https://github.com/DavidHDev/react-bits/blob/main/sr
 Lattice Loader is adapted from the official TypeScript/CSS source at https://github.com/DavidHDev/react-bits/tree/main/src/ts-default/Micro/LatticeLoader (reviewed 2026-11-05). It retains the lattice patterns, staggered cell animation and completion/error marks. The session-loading adaptation uses translated visible status text, compact responsive sizing, a static reduced-motion fallback and no elapsed-time polling.
 
 Counter is adapted from the official TypeScript/CSS source at https://github.com/DavidHDev/react-bits/tree/main/src/ts-default/Components/Counter (reviewed 2026-11-06). It retains the odometer digit springs and adds a live reduced-motion fallback. Listing uploads use it for actual progress, elapsed time and the inactivity countdown.
+
+Pulse Heart is adapted for the homepage favourite control (reviewed 2026-11-24). It keeps the shrink, flip, rebound and beat timing. The listing button keeps its existing heart icon, colours, chrome and saved-home persistence. Like counts and the default pink and charcoal palette are not used.
 
 The following notice is retained from the upstream `LICENSE.md` reviewed on 2026-10-22:
 

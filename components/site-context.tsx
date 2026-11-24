@@ -547,7 +547,21 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   },[client,editor,activeUserId,refreshStaffProfile,sessionPhase]);
 
   const sessionMessage = sessionPhase === "offline" ? "You’re offline. Your edits are still here. Reconnect before saving." : "We couldn’t verify your connection. Your edits are still here.";
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage: l => { updateLanguage(l); persistLanguage(l); if(isPublicPagePath(window.location.pathname))routerRef.current.push(localizedPath(window.location.pathname+(window.location.search||"")+(window.location.hash||""),l),{scroll:false}); }, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
+  function setLanguage(next: Language) {
+    updateLanguage(next);
+    persistLanguage(next);
+    const { pathname, search, hash } = window.location;
+    if (!isPublicPagePath(pathname)) return;
+    const destination = localizedPath(pathname + (search || "") + (hash || ""), next);
+    if (localizedRoute(pathname)?.path.match(/^\/homes\/[^/]+$/)) {
+      // Both locale URLs render the same listing. Keep the live form and focus.
+      window.history.replaceState(null, "", destination);
+    } else {
+      routerRef.current.push(destination, {scroll:false});
+    }
+  }
+
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, compare, toggleCompare, configured: initial.configured, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady, enquiries, setEnquiries, refresh, notice }}>
     {initial.configured && sessionResolved && user && (sessionPhase === "offline" || sessionPhase === "error") &&
       <div className="session-banner" role="status">{studioText(sessionMessage, language)} <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button></div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}

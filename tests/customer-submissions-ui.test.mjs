@@ -1,5 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import vm from 'node:vm';import {createRequire} from 'node:module';import React from 'react';import TestRenderer,{act} from 'react-test-renderer';import ts from 'typescript';
 const root=path.resolve(import.meta.dirname,'..'),require=createRequire(import.meta.url);
+const Calendar=()=>null;
+const PopoverContent=({children})=>children;
+const Popover=({open,children})=>React.Children.toArray(children).filter(child=>open||child.type!==PopoverContent);
+const PopoverTrigger=({children})=>children;
 async function harness(t){
  class Element{}class HTMLElement extends Element{}
  const browser=Object.assign(new EventTarget(),{Element,HTMLElement,history:{length:1}}),document=Object.assign(new EventTarget(),{body:{style:{}},documentElement:{}});
@@ -7,9 +11,11 @@ async function harness(t){
  const globals={window:browser,document,Element,HTMLElement,FormData:FormDataBoundary,IS_REACT_ACT_ENVIRONMENT:true},previous=Object.entries(globals).map(([k,v])=>{const old=Object.getOwnPropertyDescriptor(globalThis,k);Object.defineProperty(globalThis,k,{value:v,writable:true,configurable:true});return [k,old];});
  let renderer,language='en',pathname='/',responseError=null;const calls=[],navigation=[];
  const property={id:'c6e53881-53a0-45cf-bdce-7fe020b0a610',listing_code:'GH-000001',status:'published',listing_type:'rent',availability:'on_request',address:'Hanoi'};
- const site={user:null,configured:true,content:{properties:[property],settings:{contact_phone:'+84 356 175 046'}},t:(en,vi)=>language==='vi'?vi:en,accountTask:async job=>job({auth:{getSession:async()=>({data:{session:{access_token:'test-session'}}})}},new AbortController().signal)};
+ const site={user:null,configured:true,get language(){return language;},content:{properties:[property],settings:{contact_phone:'+84 356 175 046'}},t:(en,vi)=>language==='vi'?vi:en,accountTask:async job=>job({auth:{getSession:async()=>({data:{session:{access_token:'test-session'}}})}},new AbortController().signal)};
  const modules=new Map();function load(file){if(modules.has(file))return modules.get(file).exports;const m={exports:{}};modules.set(file,m);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;function dep(id){
   if(id==='./site-context')return {useSite:()=>site};if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
+  if(id==='./ui/calendar')return {Calendar};
+  if(id==='./ui/popover')return {Popover,PopoverContent,PopoverTrigger};
    if(id==='next/link')return {__esModule:true,default:({children,...props})=>React.createElement('a',props,children)};
   if(id==='next/navigation')return {usePathname:()=>pathname,useRouter:()=>({back:()=>navigation.push('back'),push:href=>navigation.push(href)})};
   if(id==='@/lib/requests')return {fetchWithDeadline:async(url,init)=>{calls.push({url,headers:init.headers,body:JSON.parse(init.body)});if(responseError)throw responseError;return Response.json({ok:true},{status:201});}};
@@ -34,6 +40,37 @@ test('assistance records the linked property and who, where and when without cre
  const fields={name:'A Customer',email:'customer@example.invalid',consent:'on',helper_name:'Named Helper',channel:'zalo',helped_where:'Zalo conversation',helped_on:'2026-01-12',helped_time:'14:30',notes:'The viewing introduction'};
  await act(async()=>r.root.findByType('form').props.onSubmit({preventDefault(){},currentTarget:fields}));
  assert.equal(h.calls[0].url,'/api/assistance');for(const key of ['helper_name','channel','helped_where','helped_on','helped_time'])assert.equal(h.calls[0].body[key],fields[key]);assert.equal(h.calls[0].body.property_id,h.property.id);assert.ok(!('preferred_date' in h.calls[0].body));assert.ok(!('status' in h.calls[0].body));
+});
+test('open attribution calendar translates in place and submits the same Hanoi date and draft fields',async t=>{
+ const h=await harness(t),r=await h.render('CustomerSubmissionForm',{kind:'assistance',property:h.property});
+ const form=()=>r.root.findByType('form');
+ const field=name=>r.root.findAllByProps({name}).find(node=>node.type==='input'||node.type==='textarea');
+ const calendar=()=>r.root.findByType(Calendar);
+ const open=()=>act(async()=>r.root.findByType(Popover).props.onOpenChange(true));
+ const time=field('helped_time'),notes=field('notes'),formNode=form();
+ const fields={name:'A Customer',email:'customer@example.invalid',consent:'on',helper_name:'Named Helper',channel:'zalo',helped_where:'Zalo conversation',helped_time:'14:30',notes:'Unsaved viewing notes'};
+ await act(async()=>form().props.onSubmit({preventDefault(){},currentTarget:fields}));
+ assert.equal(h.calls.length,0);
+ assert.match(r.root.findByProps({role:'alert'}).children.join(''),/valid date/);
+ await open();
+ const future=new Date('2999-01-01T00:00:00Z');
+ await act(async()=>calendar().props.onSelect(future));
+ assert.equal(field('helped_on').props.value,'');
+ // This UTC instant is already January 13 in Hanoi.
+ await act(async()=>calendar().props.onSelect(new Date('2026-01-12T21:30:00Z')));
+ assert.equal(field('helped_on').props.value,'2026-01-13');
+ await open();
+ const picker=calendar();
+ await h.language('vi');
+ assert.strictEqual(calendar(),picker);assert.strictEqual(form(),formNode);
+ assert.strictEqual(field('helped_time'),time);assert.strictEqual(field('notes'),notes);
+ assert.equal(calendar().props.locale.code,'vi');
+ assert.equal(calendar().props.labels.labelYearDropdown(),'Chọn năm');
+ assert.equal(field('helped_on').props.value,'2026-01-13');
+ await act(async()=>form().props.onSubmit({preventDefault(){},currentTarget:{...fields,helped_on:field('helped_on').props.value}}));
+ assert.equal(h.calls[0].body.helped_on,'2026-01-13');
+ assert.equal(h.calls[0].body.helped_time,fields.helped_time);
+ assert.equal(h.calls[0].body.notes,fields.notes);
 });
 test('an ambiguous timeout leaves the form available and never automatically replays a submission',async t=>{
  const h=await harness(t),r=await h.render('CustomerSubmissionForm',{kind:'feedback'});h.error(Error('Timed out'));

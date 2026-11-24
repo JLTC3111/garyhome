@@ -28,6 +28,7 @@ function load(file) {
   }).outputText;
   function dependency(id) {
     if (id === './site-context') return { useSite: () => ({ ...site, language }) };
+    if (id === 'next/navigation') return { useRouter: () => ({push(){}}) };
     if (id.startsWith('.') || id.startsWith('@/')) {
       const target = id.startsWith('@/') ? path.join(root,id.slice(2)) : path.resolve(path.dirname(file), id);
       return load([target,target + '.tsx', target + '.ts'].find(file=>fs.existsSync(file)&&fs.statSync(file).isFile()));
@@ -39,9 +40,12 @@ function load(file) {
 }
 const { SelectField } = load(path.join(root, 'components/select-field.tsx'));
 const { SearchForm } = load(path.join(root, 'components/search-form.tsx'));
-test('property/post ID search is visible without expanding requirements in both rental forms',()=>{
+test('keyword and dedicated property/post ID are visible without expanding requirements in both rental forms',()=>{
  for(const roomsFirst of [false,true]){
-  const html=renderToString(React.createElement(SearchForm,{roomsFirst,initial:{id:'GH-000005'}}));
+  const html=renderToString(React.createElement(SearchForm,{roomsFirst,initial:{q:'Tây Hồ',id:'GH-000005'}}));
+  assert.equal((html.match(/name="q"/g)||[]).length,1);
+  assert.ok(html.indexOf('name="q"')<html.indexOf('name="district"'));
+  assert.match(html,/method="get"/);assert.match(html,/value="Tây Hồ"/);
   assert.equal((html.match(/name="id"/g)||[]).length,1);assert.match(html,/class="search-field rental-id-field"/);assert.match(html,/aria-label="Apartment or post ID"/);assert.match(html,/value="GH-000005"/);assert.match(html,/aria-expanded="false"/);
  }
 });

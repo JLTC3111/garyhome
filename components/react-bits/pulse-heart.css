@@ -1,0 +1,34 @@
+/* Motion only. Button size, radius, border and colours stay on .save-button. */
+.pulse-heart__pill,
+.pulse-heart__heart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  pointer-events: none;
+  transform-origin: center;
+}
+
+.pulse-heart__pill {
+  width: 100%;
+  height: 100%;
+}
+
+.pulse-heart__heart {
+  line-height: 0;
+}
+
+.pulse-heart[data-running],
+.pulse-heart[data-instant] {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-heart__pill,
+  .pulse-heart__heart {
+    transition: none;
+  }
+}

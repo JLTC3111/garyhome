@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type RefObject } from "react";
-import { ChevronDown, Heart, House, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { ChevronDown, ChevronRight, Heart, House, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { unlocalizedPath } from "@/lib/localized-routes";
 import { request } from "@/lib/requests";
@@ -187,7 +187,7 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
         setDisclosure({ identity, open: true });
         if (user) void checkAccess();
       }}>
-      <AccountAvatar photo={photo} name={name}/><span className="header-account-trigger-label">{staffActions && name ? name : label}</span><ChevronDown size={14} aria-hidden="true"/>
+      <AccountAvatar photo={photo} name={name}/><span className="header-account-trigger-label">{staffActions && name ? name : label}</span>{staffActions ? <ChevronRight size={14} aria-hidden="true"/> : <ChevronDown size={14} aria-hidden="true"/>}
     </button>
     <div className="header-account-panel" id={id} hidden={!open} inert={!open}>
       {open && (user ? <>

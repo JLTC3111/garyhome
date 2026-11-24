@@ -14,7 +14,7 @@ const source = ts.transpileModule(readFileSync(new URL('../components/swipe-toas
 vm.runInThisContext(`(function(exports, require){${source}\n})`)(module.exports,createRequire(import.meta.url));
 const {SwipeToast} = module.exports;
 
-async function harness(t, options = {}) {
+async function harness(t, options = {}, message = 'Listing saved') {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const page = new EventTarget(), timers = new Map();
   let now = 0, id = 0, dismissed = 0, captured, rendered;
@@ -31,7 +31,7 @@ async function harness(t, options = {}) {
     setPointerCapture(key){captured=key;}, hasPointerCapture:key=>key===captured, releasePointerCapture(){captured=undefined;},
     style:{setProperty:(key,value)=>offsets.set(key,value), removeProperty:key=>offsets.delete(key)}
   };
-  const view = (language = 'en') => React.createElement(SwipeToast,{language,dismiss:()=>dismissed++,...options},'Listing saved');
+  const view = (language = 'en') => React.createElement(SwipeToast,{language,dismiss:()=>dismissed++,...options},message);
   await act(async()=>{rendered=TestRenderer.create(view(),{createNodeMock:()=>node});});
   t.after(async()=>{await act(async()=>rendered?.unmount()); delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
   const card = () => rendered.root.findByProps({className:'action-toast'});
@@ -73,6 +73,24 @@ test('default expiry pauses for hover, focus and hidden pages and survives langu
   await h.advance(2499);
   assert.equal(h.dismissed(),0);
   await h.advance(1);
+  assert.equal(h.dismissed(),1);
+});
+
+test('the curved fuse and single timeout share the longer reading duration',async t=>{
+  const h=await harness(t,{},'A'.repeat(220));
+  const fuse=()=>h.card().findByProps({className:'action-toast-fuse'});
+  assert.equal(fuse().type,'svg');
+  assert.match(fuse().findByType('path').props.d,/Q.*H.*Q/);
+  assert.equal(fuse().findByType('path').props.pathLength,1);
+  assert.equal(fuse().props.style['--toast-duration'],'6700ms');
+  assert.equal(h.timers.size,1);
+  await h.advance(4500);
+  assert.equal(h.dismissed(),0);
+  await act(async()=>h.card().props.onPointerEnter({pointerType:'mouse'}));
+  assert.equal(fuse().props['data-paused'],true);
+  assert.equal(h.timers.size,0);
+  await act(async()=>h.card().props.onPointerLeave());
+  await h.advance(2200);
   assert.equal(h.dismissed(),1);
 });
 

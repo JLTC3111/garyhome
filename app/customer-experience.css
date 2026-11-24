@@ -42,7 +42,30 @@
 .assistance-report .customer-submission-form .site-select-trigger{background:#ffffff0d;color:#fff;border-color:#ffffff45}
 .assistance-report .customer-submission-form .site-select-trigger[data-placeholder]{color:#d4dec9}
 .assistance-report .customer-submission-form .form-row{grid-template-columns:1fr;gap:20px}
-.assistance-report input[type=date],.assistance-report input[type=time]{color-scheme:dark;min-width:0;max-width:100%}
+.assistance-report input[type=time]{color-scheme:dark;min-width:0;max-width:100%}
+.assistance-date-field{display:grid;gap:8px;min-width:0;font-size:13px}
+.assistance-date-trigger{
+  display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px;
+  border:1px solid #ffffff45;border-radius:8px;background:#ffffff0d;color:#fff;text-align:start;
+}
+.assistance-date-trigger:focus-visible{outline:2px solid #d4dec9;outline-offset:2px}
+.assistance-date-trigger[aria-invalid="true"]{border-color:#f4b9a8}
+.assistance-date-popover{
+  --date-surface:#fff;--date-ink:#243c31;--date-highlight:#e8eee3;
+  width:min(20rem,calc(100vw - 24px));max-height:min(var(--radix-popover-content-available-height,100dvh),calc(100dvh - 24px));
+  padding:8px;overflow:auto;background:var(--date-surface);color:var(--date-ink);
+  border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px #08160c26;
+}
+html[data-home-theme="dark"] .assistance-date-popover{--date-surface:var(--home-surface);--date-ink:var(--home-text);--date-highlight:var(--home-elevated);border-color:var(--home-border)}
+.assistance-date-popover [data-slot="calendar"]{width:100%;padding:0;background:transparent;--cell-size:2.5rem}
+.assistance-date-popover :is(.rdp-day,.rdp-weekday){flex:1;min-width:0}
+.assistance-date-popover button[data-day]{min-height:40px;min-width:0;color:var(--date-ink)}
+.assistance-date-popover button[data-day]:hover:not(:disabled,[data-selected-single="true"]){background:var(--date-highlight)}
+.assistance-date-popover .rdp-today button[data-day]:not([data-selected-single="true"]){box-shadow:inset 0 0 0 1px var(--green)}
+.assistance-date-popover button[data-selected-single="true"]{background:var(--green);color:var(--date-surface)}
+.assistance-date-popover :is(button,select):focus-visible{outline:2px solid var(--green);outline-offset:-2px}
+.assistance-date-popover button:disabled{opacity:.5}
+@media(prefers-reduced-motion:reduce){.assistance-date-popover{animation:none;transition:none}}
 .assistance-report .customer-submission-form .button{background:#f3e5d4;color:#243c31;border-color:#f3e5d4;white-space:normal}
 .assistance-report .customer-submission-form .button:hover{background:#fff2df}
 .assistance-report .form-fineprint{font-size:11px;line-height:1.7}

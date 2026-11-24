@@ -5,6 +5,15 @@
 .site-preferences-panel .home-theme-options{--segment-font:11px;--segment-padding:7px}
 .home-theme-options .rubber-segment__item{gap:5px}
 html[data-home-public="true"][data-home-theme="light"]{color-scheme:light}
+html[data-home-public="true"]{
+  --home-carousel-arrow-bg:#ffffff;
+  --home-carousel-arrow-ink:var(--green);
+  --home-carousel-arrow-border:#e2e4db;
+  --home-carousel-arrow-hover-bg:#315743;
+  --home-carousel-arrow-hover-ink:#ffffff;
+  --home-carousel-arrow-pressed-bg:#234333;
+  --home-carousel-arrow-pressed-ink:#ffffff;
+}
 
 :root{
   --home-background:#121c17;
@@ -43,6 +52,13 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
   --muted:var(--home-secondary);
   --navy:var(--home-text);
   --navy-deep:var(--home-elevated);
+  --home-carousel-arrow-bg:#2d4335;
+  --home-carousel-arrow-ink:var(--home-text);
+  --home-carousel-arrow-border:#2d4335;
+  --home-carousel-arrow-hover-bg:#bed5ad;
+  --home-carousel-arrow-hover-ink:#203529;
+  --home-carousel-arrow-pressed-bg:#91b18b;
+  --home-carousel-arrow-pressed-ink:var(--home-action-ink);
 }
 
 /* The explicit presence + value checks give this public theme bridge a
@@ -84,7 +100,7 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.search-box,.rental-search,.catalogue-filters,.rental-search .search-fields>.search-field,.rental-property-card,.rental-area-card,.rental-info-panel,.listing-author-card,.contact-form-card,.landlord-form-card,.submission-panel,.feedback-review,.homepage-feedback-reviews .feedback-review,.news-card,.vinhomes-card,.vinhomes-project-facts,.commercial-consultancy-grid>article,.property-order-tools,.comparison-panel,.compare-tray,.contact-widget-single,.viewing-card){background:var(--home-surface);border-color:var(--home-border);color:var(--home-text)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.neighbourhood-section,.bounce-district-section,.angled-district-section,.rental-area-section,.rental-home-contact,.contact-cta,.rental-guide-card,.article-sources,.vinhomes-project-enquiry,.commercial-consultancy,.catalogue-note,.rental-catalogue .catalogue-note,.activity-empty,.activity-photo-grid figure,.contact-enquiry-context,.rental-id,.rental-only-label,.form-info,.form-success>span,.feedback-staff-reply,.listing-author-card>h2,.author-portrait-placeholder,.photo-unavailable,.rental-photo-placeholder,.rental-gallery-empty,.empty-state,.contact-methods>a>span,.handwritten){background:var(--home-surface);border-color:var(--home-border);color:var(--home-secondary)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-guide-card:hover,.rental-guide-card:focus-visible,.news-card:hover,.rental-property-card:hover,.rental-area-card:hover){border-color:var(--home-field-border);box-shadow:var(--home-shadow)}
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-property-card .property-badges>span,.rental-property-card .property-badges>.property-code,.rental-property-card .save-button,.rental-card-photo-nav>button,.rental-gallery-count,.detail-gallery .gallery-all,.save-button,.compare-button,.category-tabs button,.activity-tabs>button,.active-filters button,.rental-catalogue .active-filters button,.district-pagination button){background:var(--home-elevated);border-color:var(--home-field-border);color:var(--home-text)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-property-card .property-badges>span,.rental-property-card .property-badges>.property-code,.rental-property-card .save-button,.rental-gallery-count,.detail-gallery .gallery-all,.save-button,.compare-button,.category-tabs button,.activity-tabs>button,.active-filters button,.rental-catalogue .active-filters button,.district-pagination button){background:var(--home-elevated);border-color:var(--home-field-border);color:var(--home-text)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-property-card .save-button.is-saved,.compare-button.is-compared,.category-tabs button.selected,.activity-tabs>button[aria-pressed=true],.district-pagination button[aria-current=page],.catalogue-filters .filter-toggle.selected){background:var(--home-accent);border-color:var(--home-accent);color:var(--home-action-ink)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.property-hotline-icon,.author-channels>a,.rental-viewing-form,.assistance-report){background:var(--home-elevated);color:var(--home-text);border-color:var(--home-border)}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.rental-viewing-form>p,.rental-viewing-form .field-optional,.rental-viewing-form .form-fineprint,.rental-viewing-form .enquiry-form label,.listing-author-card>p,.author-hotline,.rental-guide-article li,.commercial-consultancy li){color:var(--home-secondary)}
@@ -172,8 +188,44 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
   & :where(.help-attachments, .help-card-bottom) { border-color: var(--home-border); }
 }
 
+/* Photo-arrow colors sit above the dark button bridge. Size and position stay in rental.css. */
+html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button{
+  background-color:var(--home-carousel-arrow-bg);
+  border-color:var(--home-carousel-arrow-border);
+  color:var(--home-carousel-arrow-ink);
+}
+@media (hover:hover) and (pointer:fine){
+  html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button:hover:not(:disabled,[aria-disabled="true"]){
+    background-color:var(--home-carousel-arrow-hover-bg);
+    border-color:var(--home-carousel-arrow-hover-bg);
+    color:var(--home-carousel-arrow-hover-ink);
+  }
+}
+html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button:active:not(:disabled,[aria-disabled="true"]){
+  background-color:var(--home-carousel-arrow-pressed-bg);
+  border-color:var(--home-carousel-arrow-pressed-bg);
+  color:var(--home-carousel-arrow-pressed-ink);
+}
+html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button:focus-visible{
+  outline:2px solid currentColor;
+  outline-offset:-3px;
+}
+html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button:is(:disabled,[aria-disabled="true"]){
+  background-color:var(--home-carousel-arrow-bg);
+  border-color:var(--home-carousel-arrow-border);
+  color:var(--home-carousel-arrow-ink);
+  cursor:not-allowed;
+  opacity:.55;
+  scale:1;
+}
+
 @media(prefers-reduced-motion:reduce){
   .home-theme-options .rubber-segment__item{transition:none}
+  html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button,
+  html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button:hover:not(:disabled,[aria-disabled="true"]){
+    transition:none;
+    scale:1;
+  }
 }
 @media(forced-colors:active){
   .home-theme-options .rubber-segment__item{forced-color-adjust:auto}

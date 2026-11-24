@@ -134,7 +134,8 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
 }
 .staff-account-menu .header-account-trigger { width: 100%; min-height: 44px; justify-content: flex-start; }
 .staff-account-menu .header-account-trigger-label { overflow: hidden; text-overflow: ellipsis; }
-.staff-account-menu .header-account-trigger > svg { margin-inline-start: auto; flex: none; }
+.staff-account-menu .header-account-trigger > svg { margin-inline-start: auto; flex: none; transition: transform var(--gary-motion-chevron) var(--gary-motion-out); }
+.staff-account-menu .header-account-trigger[aria-expanded="true"] > svg { transform: rotate(-90deg); }
 .staff-account-menu .header-account-panel {
   inset-block: auto 0;
   inset-inline: calc(100% + 12px) auto;

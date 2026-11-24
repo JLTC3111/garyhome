@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Bath, BedDouble, Building2, MapPin, MoreVertical, Search, Hash, Wallet } from "lucide-react";
 import { useSite } from "./site-context";
 import { SelectField } from "./select-field";
@@ -30,24 +31,38 @@ function BathroomField({initial,main=false}:{initial:Filters;main?:boolean}){
 
 export function SearchForm({compact=false,initial={},action="/homes",roomsFirst=false}:{compact?:boolean;initial?:Filters;action?:string;roomsFirst?:boolean}) {
   const {t,content,language}=useSite();const id=useId(),trigger=useRef<HTMLButtonElement>(null);
-  const [advanced,setAdvanced]=useState(!!(initial.q||initial.amenity||(roomsFirst?(initial.min||initial.max):(initial.beds||initial.baths))));
+  const router=useRouter(),[searching,startSearch]=useTransition(),destination=localizedPath(action,language);
+  const [advanced,setAdvanced]=useState(!!(initial.amenity||(roomsFirst?(initial.min||initial.max):(initial.beds||initial.baths))));
   const amenities=[...new Set([...Object.keys(AMENITIES),...content.properties.flatMap(p=>p.amenities.map(canonicalAmenity))])];
   const selected=(initial.amenity||"").split(",").map(canonicalAmenity);
   return <SpotlightCard className={`search-box rental-search ${compact?"rental-search-compact":""} ${roomsFirst?"rental-search-rooms-first":""}`}>
-    <form action={localizedPath(action,language)} method="get" aria-labelledby={`${id}-heading`}>
+    <form action={destination} method="get" aria-labelledby={`${id}-heading`} onSubmit={event=>{
+      event.preventDefault();
+      if(searching)return;
+      const query=new URLSearchParams();
+      new FormData(event.currentTarget).forEach((value,key)=>{
+        if(typeof value==="string"&&value.trim())query.append(key,value.trim());
+      });
+      startSearch(()=>router.push(query.size?`${destination}?${query}`:destination));
+    }}>
       <div className="rental-search-heading"><h2 id={`${id}-heading`}>{t("Find Your Rental","Tìm nhà cho thuê")}</h2><button ref={trigger} type="button" className={`rental-requirements-trigger ${advanced?"active":""}`} onClick={()=>setAdvanced(!advanced)} id={`${id}-trigger`} aria-controls={`${id}-panel`} aria-expanded={advanced}><span>{t("Custom Requirements","Nhu cầu riêng")}</span><MoreVertical size={21}/></button></div>
       <input type="hidden" name="sort" value={initial.sort||""}/>
       <div className="search-fields">
+        <label className="search-field rental-keyword-field">
+          <span><Search size={15} aria-hidden="true"/>{t("Search by keyword","Tìm theo từ khóa")}</span>
+          <input name="q" type="search" defaultValue={initial.q||""} maxLength={200}
+            placeholder={t("Street, neighbourhood or amenity","Tên đường, khu vực hoặc tiện nghi")}/>
+        </label>
         <label className="search-field"><span><MapPin size={15}/>{t("DISTRICT / AREA","QUẬN / KHU VỰC")}</span><SelectField name="district" defaultValue={initial.district||""} aria-label={t("District or area","Quận hoặc khu vực")}><option value="">{t("Anywhere in Hanoi","Tất cả Hà Nội")}</option>{content.neighbourhoods.map(n=><option key={n.slug} value={n.slug}>{n.name}</option>)}</SelectField></label>
         <label className="search-field"><span><Building2 size={15}/>{t("PROPERTY TYPE","LOẠI BẤT ĐỘNG SẢN")}</span><SelectField name="type" defaultValue={initial.type||""}><option value="">{t("All property types","Tất cả loại hình")}</option>{RENTAL_TYPES.map(type=><option key={type} value={type}>{typeLabel(type,language)}</option>)}</SelectField></label>
         {roomsFirst?<div className="search-field rental-room-field"><BedroomField initial={initial} main/><BathroomField initial={initial} main/></div>:<BudgetField initial={initial}/>}
         <label className="search-field rental-id-field"><span><Hash size={15}/>{t("APARTMENT / POST ID","MÃ CĂN HỘ / BÀI ĐĂNG")}</span><input name="id" type="search" defaultValue={initial.id||""} placeholder="GH-05" maxLength={80} autoComplete="off" spellCheck={false} aria-label={t("Apartment or post ID","Mã căn hộ hoặc bài đăng")}/></label>
-        <button className="button search-submit" type="submit"><Search size={18}/>{t("Find a rental","Tìm nhà thuê")}<ArrowRight size={17}/></button>
+        <button className="button search-submit" type="submit" disabled={searching}><Search size={18}/>{searching?t("Searching…","Đang tìm…"):t("Find a rental","Tìm nhà thuê")}<ArrowRight size={17}/></button>
+        <span className="sr-only" role="status">{searching?t("Searching rentals…","Đang tìm nhà cho thuê…"):""}</span>
       </div>
       <div className="rental-search-secondary"><span className="rental-requirements-hint">{roomsFirst?t("Budget, pets, gym, BBQ & more in Custom Requirements","Ngân sách, thú cưng, phòng tập, BBQ… trong Nhu cầu riêng"):t("Pets, gym, BBQ, lake views & more in Custom Requirements","Thú cưng, phòng tập, BBQ, tầm nhìn hồ… trong Nhu cầu riêng")}</span><CurrencySwitcher/></div>
       <Disclosure open={advanced} id={`${id}-panel`} labelledBy={`${id}-trigger`}><div className="rental-advanced" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();setAdvanced(false);trigger.current?.focus();}}}>
         {roomsFirst?<BudgetField initial={initial} advanced/>:<><BedroomField initial={initial}/><BathroomField initial={initial}/></>}
-        <label>{t("Keyword / street","Từ khóa / tên đường")}<input name="q" defaultValue={initial.q||""} placeholder={t("A street or property detail","Tên đường hoặc đặc điểm nhà")} maxLength={200}/></label>
         <fieldset className="rental-amenities-filter"><legend>{t("Amenities · match all selected","Tiện nghi · có tất cả mục đã chọn")}</legend>{amenities.map(value=><label key={value}><input type="checkbox" name="amenity" value={value} defaultChecked={selected.includes(value)}/>{amenityLabel(value,language)}</label>)}</fieldset>
       </div></Disclosure>
     </form>

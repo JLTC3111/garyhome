@@ -16,7 +16,7 @@ import Counter from "./react-bits/counter";
 import { filterProperties,readFilters } from "@/lib/property-search";
 import { amenityLabel, typeLabel } from "@/lib/rentals";
 export function HomesPage({savedOnly=false}:{savedOnly?:boolean}){
- const {t,language,content,saved,currency,setCurrency,exchangeRate}=useSite(),router=useRouter(),params=useSearchParams();const filters=readFilters(params),matches=filterProperties(content.properties,filters,{currency,exchangeRate}).filter(p=>!savedOnly||saved.includes(p.id)),found=filters.sort||savedOnly?matches:applyPropertyOrder(matches,content.propertyOrders?.listings);
+ const {t,language,content,saved,currency,setCurrency,exchangeRate}=useSite(),router=useRouter(),params=useSearchParams();const filters=readFilters(params),matches=filterProperties(content.properties,filters,{currency,exchangeRate,neighbourhoods:content.neighbourhoods}).filter(p=>!savedOnly||saved.includes(p.id)),found=filters.sort||savedOnly?matches:applyPropertyOrder(matches,content.propertyOrders?.listings);
  useEffect(()=>{if(filters.currency==="USD"||filters.currency==="VND")setCurrency(filters.currency);},[filters.currency,setCurrency]);
  const base=savedOnly?"/saved":localizedPath("/homes",language);
  function change(key:string,value:string){const query=new URLSearchParams(params.toString());query.delete(key);if(value)query.set(key,value);router.replace(`${base}?${query.toString()}`,{scroll:false});}

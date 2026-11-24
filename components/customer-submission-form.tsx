@@ -1,13 +1,14 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "./localized-link";
 import { ArrowUpRight, Check, Phone, Star } from "lucide-react";
 import { useSite } from "./site-context";
 import { SelectField } from "./select-field";
 import { fetchWithDeadline } from "@/lib/requests";
-import { CHANNELS, hanoiToday } from "@/lib/submissions";
+import { CHANNELS, validHelpDate } from "@/lib/submissions";
 import { isPublicRental, listingCode } from "@/lib/rentals";
 import type { Property } from "@/lib/types";
+import { AssistanceDatePicker } from "./assistance-date-picker";
 
 const errors:Record<string,readonly[string,string]>={
  invalid:["Check all required fields and your privacy consent.","Kiểm tra các mục bắt buộc và đồng ý chính sách bảo mật."],
@@ -26,10 +27,13 @@ export function CustomerSubmissionForm(props:{kind:"feedback"|"assistance";prope
 function SubmissionBody({kind,property,onSent}:{kind:"feedback"|"assistance";property?:Property;onSent?:()=>void}){
  const {t,configured,user,accountTask,content}=useSite();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[sent,setSent]=useState(false),[rating,setRating]=useState(0);
+ const dateTrigger=useRef<HTMLButtonElement>(null);
  const feedback=kind==="feedback",phone=content.settings.contact_phone;
  async function submit(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();if(busy)return;setBusy(true);setError("");
+  event.preventDefault();if(busy)return;
   const data=new FormData(event.currentTarget);
+  if(!feedback&&!validHelpDate(String(data.get("helped_on")||""))){setError("date");dateTrigger.current?.focus();return;}
+  setBusy(true);setError("");
   const common={name:String(data.get("name")||""),email:String(data.get("email")||""),consent:data.get("consent")==="on",website:String(data.get("website")||"")};
   const input=feedback?{...common,rating,message:String(data.get("message")||""),property_id:String(data.get("property_id")||"")||null,publish_consent:data.get("publish_consent")==="on"}:{...common,property_id:property?.id,phone:String(data.get("phone")||""),helper_name:String(data.get("helper_name")||""),channel:String(data.get("channel")||""),helped_where:String(data.get("helped_where")||""),helped_on:String(data.get("helped_on")||""),helped_time:String(data.get("helped_time")||"")||null,notes:String(data.get("notes")||"")};
   try{
@@ -55,7 +59,7 @@ function SubmissionBody({kind,property,onSent}:{kind:"feedback"|"assistance";pro
    <label>{t("Who helped you find this property?","Ai đã hỗ trợ bạn tìm căn nhà này?")}<input name="helper_name" required minLength={2} maxLength={160} placeholder={t("Agent, staff member or referrer’s name","Tên nhân viên, môi giới hoặc người giới thiệu")}/></label>
    <label>{t("How did they help you?","Bạn được hỗ trợ qua đâu?")}<SelectField name="channel" defaultValue="" required><option value="">{t("Choose a channel","Chọn kênh hỗ trợ")}</option>{Object.entries(CHANNELS).map(([key,labels])=><option key={key} value={key}>{t(...labels)}</option>)}</SelectField></label>
    <label>{t("Where did you receive help?","Bạn nhận hỗ trợ ở đâu?")}<input name="helped_where" required minLength={2} maxLength={300} placeholder={t("Office, viewing address, website or conversation","Văn phòng, địa chỉ xem nhà, website hoặc cuộc trao đổi")}/></label>
-   <div className="form-row"><label>{t("When did they help?","Bạn được hỗ trợ ngày nào?")}<input name="helped_on" type="date" required min="2000-01-01" max={hanoiToday()}/></label><label>{t("Time (optional · Hanoi)","Giờ (tùy chọn · Hà Nội)")}<input name="helped_time" type="time"/></label></div>
+   <div className="form-row"><AssistanceDatePicker triggerRef={dateTrigger} invalid={error==="date"} onSelect={()=>setError(previous=>previous==="date"?"":previous)}/><label>{t("Time (optional · Hanoi)","Giờ (tùy chọn · Hà Nội)")}<input name="helped_time" type="time"/></label></div>
    <label>{t("Anything else? (optional)","Thông tin thêm (tùy chọn)")}<textarea name="notes" rows={3} maxLength={2000} placeholder={t("Details that help us verify the introduction or viewing.","Chi tiết giúp xác minh việc giới thiệu hoặc xem nhà.")}/></label>
   </>}
   <label className="honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>

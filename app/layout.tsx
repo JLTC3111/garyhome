@@ -12,6 +12,7 @@ import "./portal-access.css";
 import "./select.css";
 import "./rubber-segment.css";
 import "./rental.css";
+import "./embla-gallery.css";
 import "./customer-experience.css";
 import "./mobile-refinements.css";
 import "./contact-widget.css";
@@ -47,6 +48,7 @@ import "./gary-network-cards.css";
 import "./studio-theme.css";
 import "./ui-motion.css";
 import "./action-buttons.css";
+import "../components/react-bits/pulse-heart.css";
 import "./header-account.css";
 
 // Read CMS content at request time so publishing edits does not need a rebuild.

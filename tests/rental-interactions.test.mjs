@@ -11,7 +11,7 @@ import {LANGUAGE_BOOTSTRAP,persistLanguage} from '../lib/language.ts';
 
 const root=path.resolve(import.meta.dirname,'..'),require=createRequire(import.meta.url);
 
-function loadComponents(site){
+function loadComponents(site,embla){
  const cache=new Map();
  function load(file){
   if(cache.has(file))return cache.get(file).exports;
@@ -19,15 +19,21 @@ function loadComponents(site){
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   function dependency(id){
    if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
+   if(id==='next/link')return {__esModule:true,default:props=>React.createElement('a',props)};
+   if(id==='next/navigation')return {usePathname:()=>'/en'};
    if(id==='./site-context')return {useSite:()=>site.current};
+   if(embla&&id==='embla-carousel-react')return embla;
    if(id.startsWith('.')||id.startsWith('@/')){const target=id.startsWith('@/')?path.join(root,id.slice(2)):path.resolve(path.dirname(file),id);return load([target,target+'.ts',target+'.tsx'].find(p=>fs.existsSync(p)&&fs.statSync(p).isFile()));}
    return require(id);
   }
   vm.runInThisContext('(function(exports,require,module){'+source+'\n})',{filename:file})(loadedModule.exports,dependency,loadedModule);
   return loadedModule.exports;
  }
- return {gallery:load(path.join(root,'components/property-gallery.tsx'))};
+ return {gallery:load(path.join(root,'components/property-gallery.tsx')),
+  listing:()=>load(path.join(root,'components/embla-carousel-listing-card.tsx'))};
 }
+
+function currentSlide(stage) { return stage.findByProps({className:'embla-detail-slide','aria-hidden':false}); }
 
 async function platform(t,thumbs=null){
  const old=new Map(),stored=new Map();
@@ -55,7 +61,7 @@ test('gallery survives image shrink/removal, unlocks scrolling and reopens witho
  await act(async()=>button('Open photo 3').props.onClick());
  assert.equal(p.dialog.open,true);assert.equal(p.page.body.style.overflow,'hidden');
  await act(async()=>renderer.update(view(['one.jpg'])));
- const stage=renderer.root.findByProps({className:'rental-lightbox-stage'});
+ const stage=currentSlide(renderer.root.findByProps({className:'rental-lightbox-stage'}));
  assert.equal(stage.findByType('img').props.src,'one.jpg');
  await act(async()=>renderer.update(view([])));
  assert.equal(p.dialog.open,false);assert.equal(p.page.body.style.overflow,'clip');
@@ -79,11 +85,12 @@ test('gallery keeps its current image on translation, supports keyboard navigati
  site.current.t=(_en,vi)=>vi;await act(async()=>renderer.update(view()));
  const modal=()=>renderer.root.findByType('dialog');
  assert.equal(modal().props['aria-label'],'Thư viện ảnh bất động sản');
- assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img').props.src,'two.jpg');
+ const current=()=>currentSlide(renderer.root.findByProps({className:'rental-lightbox-stage'}));
+ assert.equal(current().findByType('img').props.src,'two.jpg');
  await act(async()=>modal().props.onKeyDown({key:'ArrowRight',preventDefault(){}}));
- const photo=renderer.root.findByProps({className:'rental-lightbox-stage'}).findByType('img');assert.equal(photo.props.src,'one.jpg');
+ const photo=current().findByType('img');assert.equal(photo.props.src,'one.jpg');
  await act(async()=>photo.props.onError());
- assert.equal(renderer.root.findByProps({className:'rental-lightbox-stage'}).findAllByType('img').length,0);
+ assert.equal(current().findAllByType('img').length,0);
  p.page.activeElement=p.last;let prevented=false;
  await act(async()=>modal().props.onKeyDown({key:'Tab',currentTarget:p.dialog,preventDefault(){prevented=true;}}));
  assert.equal(prevented,true);assert.equal(p.page.activeElement,p.first);
@@ -91,8 +98,28 @@ test('gallery keeps its current image on translation, supports keyboard navigati
  assert.equal(p.dialog.open,false);assert.equal(p.page.activeElement,p.opener);assert.equal(p.page.body.style.overflow,'clip');
 });
 
-test('fullscreen metadata changes with arrows, keyboard, swipes and thumbnails',async t=>{
- const p=await platform(t),site={current:{t:en=>en,language:'en'}}, {gallery:{PropertyGallery}}=loadComponents(site);
+test('fullscreen metadata changes with arrows, keyboard, Embla snapping and thumbnails',async t=>{
+ const p=await platform(t),site={current:{t:en=>en,language:'en'}};
+ let api,options,progress=0,reduced=false;
+ const moves=[];
+ p.window.matchMedia=()=>({matches:reduced});
+ const {gallery:{PropertyGallery}}=loadComponents(site,opts=>{
+  options=opts;
+  const [instance]=React.useState(()=>{
+   let selected=opts.startIndex;
+   const listeners=new Map();
+   return {
+    on(event,handler){listeners.set(event,handler);return this;},
+    off(event){listeners.delete(event);return this;},
+    emit(event){listeners.get(event)?.();},
+    scrollTo(index,jump){moves.push([index,jump]);selected=index;this.emit('select');},
+    scrollProgress:()=>progress, scrollSnapList:()=>[0,.5,1],
+    selectedScrollSnap:()=>selected, slideNodes:()=>[1,2,3],
+   };
+  });
+  api=instance;
+  return [()=>{},instance];
+ });
  const images=['/images/front-room.jpg','/images/balcony.jpg','https://storage.example/photos/d2f782a3-1001-4000-8000-112233445566.jpg'];
  const metadata={
   [images[0]]:{description_en:'Morning sun',alt_en:'A sofa by the window',public_filename:'Front room.JPG'},
@@ -107,31 +134,73 @@ test('fullscreen metadata changes with arrows, keyboard, swipes and thumbnails',
  await act(async()=>button('Open property gallery').props.onClick());
  assert.equal(caption().findByType('p').props.children,'Morning sun');
  assert.match(caption().findByType('small').props.children.join(''),/Front room.JPG/);
- assert.equal(stage().findByType('img').props.alt,'A sofa by the window');
+ assert.equal(currentSlide(stage()).findByType('img').props.alt,'A sofa by the window');
  assert.ok(modal().children.indexOf(caption())<modal().children.indexOf(renderer.root.findByProps({className:'rental-lightbox-thumbs'})));
  await act(async()=>button('Next photo').props.onClick());
  assert.equal(caption().findByType('p').props.children,'Overlooking the garden');
  await act(async()=>modal().props.onKeyDown({key:'ArrowRight',preventDefault(){}}));
  assert.equal(caption().findByType('p').props.children,'Photo 3 of 3');
  assert.equal(caption().findAllByType('small').length,0);
- const point=(x,y)=>({identifier:1,clientX:x,clientY:y});
- const target={closest:()=>null};
+ const fullscreenApi=api;
+ assert.equal(options.dragFree,true);
+ assert.equal(options.watchDrag(fullscreenApi,{touches:[{},{}]}),false);
+ p.window.visualViewport={scale:2};
+ assert.equal(options.watchDrag(fullscreenApi,{touches:[{}]}),false);
+ p.window.visualViewport.scale=1;
+ assert.equal(options.watchDrag(fullscreenApi,{touches:[{}]}),true);
  await act(async()=>{
-  stage().props.onTouchStart({target,touches:[point(40,60)]});
-  stage().props.onTouchEnd({touches:[],changedTouches:[point(140,65)]});
+  fullscreenApi.emit('pointerDown');
+  progress=.61;
+  fullscreenApi.emit('settle');
+  fullscreenApi.emit('settle');
  });
+ assert.deepEqual(moves.slice(-1),[[1,false]]);
  assert.equal(caption().findByType('p').props.children,'Overlooking the garden');
- await act(async()=>{
-  stage().props.onTouchStart({target,touches:[point(40,60),point(80,60)]});
-  stage().props.onTouchEnd({touches:[],changedTouches:[point(150,60)]});
- });
- assert.equal(caption().findByType('p').props.children,'Overlooking the garden');
+ reduced=true;
  await act(async()=>button('Photo 1').props.onClick());
+ assert.deepEqual(moves.slice(-1),[[0,true]]);
  assert.equal(caption().findByType('p').props.children,'Morning sun');
  site.current={t:(_en,vi)=>vi,language:'vi'};
  await act(async()=>renderer.update(view()));
  await act(async()=>button('Ảnh 2').props.onClick());
  assert.equal(caption().findByType('p').props.children,'Nhìn ra vườn');
+});
+
+test('homepage carousel keeps thumbnail activation, main selection and listing links separate',async t=>{
+ const p=await platform(t),site={current:{t:en=>en,language:'en'}};
+ const carousels={};
+ const {EmblaCarouselListingCard}=loadComponents(site,options=>{
+  const [api]=React.useState(()=>{
+   let selected=0;
+   const handlers=new Map();
+   const instance={
+    calls:[],
+    on(event,fn){handlers.set(event,fn);return this;},
+    off(event){handlers.delete(event);return this;},
+    scrollTo(index,jump){this.calls.push([index,jump]);selected=index;handlers.get('select')?.();},
+    selectedScrollSnap:()=>selected,
+   };
+   carousels[options.loop?'main':'thumbs']=instance;
+   return instance;
+  });
+  return [()=>{},api];
+ }).listing();
+ const photos=['/a.jpg','/b.jpg','/c.jpg','/d.jpg'];
+ const renderer=await p.mount(React.createElement(EmblaCarouselListingCard,{photos,href:'/homes/a-home',title:'A home',renderPhoto:src=>React.createElement('img',{src,loading:'lazy'})}));
+ const strip=()=>renderer.root.findByProps({className:'embla-listing-thumbnails'});
+ const buttons=()=>strip().findAllByType('button');
+ assert.equal(buttons().length,4);
+ await act(async()=>buttons()[2].props.onClick());
+ assert.deepEqual(carousels.main.calls.at(-1),[2,false]);
+ assert.deepEqual(carousels.thumbs.calls.at(-1),[2,false]);
+ assert.equal(buttons()[2].props['aria-pressed'],true);
+ p.window.matchMedia=()=>({matches:true});
+ await act(async()=>carousels.main.scrollTo(3,false));
+ assert.equal(buttons()[3].props['aria-pressed'],true);
+ assert.deepEqual(carousels.thumbs.calls.at(-1),[3,true]);
+ assert.equal(strip().findAllByType('a').length,0);
+ assert.equal(renderer.root.findByType('a').props.href,'/en/homes/a-home');
+ assert.ok(renderer.root.findAllByType('img').every(image=>image.props.loading==='lazy'));
 });
 
 test('the fullscreen strip scrolls only enough to reveal an overflowing selection',async t=>{

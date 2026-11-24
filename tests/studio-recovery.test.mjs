@@ -235,13 +235,17 @@ test('portal chooser identifies both destinations without changing authenticatio
 
 test('fresh server property props synchronize a persistent layout before rendering or translating',async t=>{
  const property={...fixture.properties[0],id:'fresh-property',slug:'freshly-published-rental',title_en:'4-bedroom rental · PETS ALLOWED · LAKE VIEW',title_vi:'Nhà 4 phòng ngủ · Cho phép thú cưng · Hướng hồ',bedrooms:4,price:1777,price_max:2000,updated_at:'2026-10-27T09:00:00Z'};
- const h=await harness(t,{guest:true,page:'property',propertyPage:property,path:'/homes/'+property.slug});
+ const path='/en/homes/'+property.slug;
+ const h=await harness(t,{guest:true,page:'property',propertyPage:property,path,url:'https://www.garyhome.vn'+path+'?ref=test#assistance-report'});
  assert.equal(h.renderer.root.findByType('h1').children.join(''),property.title_en);
  assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);
  assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('$1,777–$2,000')));
  assert.equal(h.site.content.properties.length,fixture.properties.length+1);
- assert.equal(h.renderer.root.findAllByProps({className:'enquiry-form customer-submission-form'}).length,1);
+ const form=h.renderer.root.findByProps({className:'enquiry-form customer-submission-form'});
  await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(h.browser.location.pathname,'/vi/homes/'+property.slug);
+ assert.equal(h.browser.location.search+h.browser.location.hash,'?ref=test#assistance-report');
+ assert.strictEqual(h.renderer.root.findByProps({className:'enquiry-form customer-submission-form'}),form);
  assert.equal(h.renderer.root.findByType('h1').children.join(''),property.title_vi);
  assert.ok(h.renderer.root.findAllByType('strong').some(node=>node.children.includes('$1.777–$2.000')));
  assert.equal(h.site.content.properties.find(row=>row.id===property.id).price,1777);

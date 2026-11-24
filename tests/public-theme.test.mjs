@@ -60,6 +60,73 @@ function contrast(first, second) {
   return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
 }
 
+test('property-card photo arrows keep readable fills in both themes', () => {
+  const theme = postcss.parse(css);
+  const rental = postcss.parse(fs.readFileSync(new URL('app/rental.css', root), 'utf8'));
+  const declarations = (rootNode, selector) => {
+    const rule = rootNode.nodes.find(node => node.type === 'rule' && node.selector === selector);
+    assert.ok(rule, selector);
+    return Object.fromEntries(rule.nodes.filter(node => node.type === 'decl').map(node => [node.prop.replace(/^--/, ''), node.value]));
+  };
+  const light = declarations(theme, 'html[data-home-public="true"]');
+  const dark = declarations(theme, 'html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"]');
+  const green = /--green:\s*(#[\da-f]{6})/i.exec(fs.readFileSync(new URL('app/globals.css', root), 'utf8'))[1];
+  const resolve = (palette, value) => {
+    const reference = /^var\(--([\w-]+)\)$/.exec(value);
+    if (!reference) return value;
+    if (reference[1] === 'green') return green;
+    return palette[reference[1]] || tokens[reference[1]];
+  };
+  const pairs = [
+    ['light default', light, 'home-carousel-arrow-ink', 'home-carousel-arrow-bg'],
+    ['light hover', light, 'home-carousel-arrow-hover-ink', 'home-carousel-arrow-hover-bg'],
+    ['light pressed', light, 'home-carousel-arrow-pressed-ink', 'home-carousel-arrow-pressed-bg'],
+    ['dark default', dark, 'home-carousel-arrow-ink', 'home-carousel-arrow-bg'],
+    ['dark hover', dark, 'home-carousel-arrow-hover-ink', 'home-carousel-arrow-hover-bg'],
+    ['dark pressed', dark, 'home-carousel-arrow-pressed-ink', 'home-carousel-arrow-pressed-bg']
+  ];
+  assert.equal(resolve(light, light['home-carousel-arrow-bg']), '#ffffff');
+  assert.equal(resolve(light, light['home-carousel-arrow-ink']), green);
+  assert.equal(resolve(light, light['home-carousel-arrow-hover-bg']), '#315743');
+  assert.equal(resolve(light, light['home-carousel-arrow-hover-ink']), '#ffffff');
+  assert.equal(resolve(light, light['home-carousel-arrow-pressed-bg']), '#234333');
+  assert.equal(resolve(light, light['home-carousel-arrow-pressed-ink']), '#ffffff');
+  assert.equal(resolve(dark, dark['home-carousel-arrow-bg']), '#2d4335');
+  assert.equal(resolve(dark, dark['home-carousel-arrow-ink']), tokens['home-text']);
+  assert.equal(resolve(dark, dark['home-carousel-arrow-hover-bg']), '#bed5ad');
+  assert.equal(resolve(dark, dark['home-carousel-arrow-hover-ink']), '#203529');
+  assert.equal(resolve(dark, dark['home-carousel-arrow-pressed-bg']), '#91b18b');
+  assert.equal(resolve(dark, dark['home-carousel-arrow-pressed-ink']), tokens['home-action-ink']);
+  for (const [name, palette, ink, surface] of pairs) {
+    assert.ok(contrast(resolve(palette, palette[ink]), resolve(palette, palette[surface])) >= 4.5, name);
+  }
+  const arrow = 'html:root[data-home-public][data-home-public="true"][data-home-theme] .rental-card-photo-nav>button';
+  assert.equal(declarations(theme, arrow).color, 'var(--home-carousel-arrow-ink)');
+  assert.equal(declarations(theme, `${arrow}:active:not(:disabled,[aria-disabled="true"])`).color, 'var(--home-carousel-arrow-pressed-ink)');
+  assert.equal(declarations(theme, `${arrow}:focus-visible`)['outline-offset'], '-3px');
+  const controls = theme.nodes.find(node => node.type === 'rule' && node.selector.includes('.rental-gallery-count') && node.selector.includes(':where('));
+  assert.equal(controls.selector.includes('.rental-card-photo-nav'), false);
+  const rentalRules = [];
+  rental.walkRules(rule => rentalRules.push(rule));
+  const buttonRules = rentalRules.filter(rule => rule.selector === '.rental-card-photo-nav>button');
+  const base = buttonRules.find(rule => rule.parent.type === 'root');
+  const baseDeclarations = Object.fromEntries(base.nodes.map(node => [node.prop, node.value]));
+  assert.equal(baseDeclarations.width, '33px');
+  assert.equal(baseDeclarations.height, '36px');
+  assert.match(baseDeclarations.transition, /180ms/);
+  assert.equal(baseDeclarations['touch-action'], 'manipulation');
+  const hover = rentalRules.find(rule => rule.selector.includes('.rental-card-photo-nav>button:hover') && rule.parent.params === '(hover:hover) and (pointer:fine)');
+  assert.equal(hover.nodes.find(node => node.prop === 'scale').value, '1.05');
+  const mobile = buttonRules.find(rule => rule.parent.params === '(max-width:680px)');
+  const mobileDeclarations = Object.fromEntries(mobile.nodes.map(node => [node.prop, node.value]));
+  assert.equal(mobileDeclarations.width, '36px');
+  assert.equal(mobileDeclarations.height, '40px');
+  const reduced = buttonRules.find(rule => rule.parent.params === '(prefers-reduced-motion:reduce)');
+  assert.equal(reduced.nodes.find(node => node.prop === 'transition').value, 'none');
+  const reducedHover = rentalRules.find(rule => rule.selector.includes('.rental-card-photo-nav>button:hover') && rule.parent.params === '(prefers-reduced-motion:reduce)');
+  assert.equal(reducedHover.nodes.find(node => node.prop === 'scale').value, '1');
+});
+
 test('forest surfaces, secondary copy, sage actions and input outlines meet AA contrast', () => {
   for (const surface of ['home-background', 'home-surface', 'home-elevated']) {
     for (const text of ['home-text', 'home-secondary', 'home-quiet', 'home-accent', 'home-copper']) {

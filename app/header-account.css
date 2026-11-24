@@ -5,7 +5,7 @@
   --account-secondary: color-mix(in srgb, var(--ink) 75%, var(--paper));
   --account-line: var(--line);
   --account-focus: var(--green);
-  --account-danger: color-mix(in srgb, var(--color-red-500, #fb2c36) 75%, var(--account-text));
+  --account-danger: #D51212;
   --account-danger-surface: #f9eae7;
   --account-item-hover: var(--account-hover);
   --account-item-ink: var(--account-text);
@@ -23,7 +23,7 @@ html[data-home-theme="dark"] .header-account-menu {
   --account-secondary: var(--home-secondary);
   --account-line: var(--home-border);
   --account-focus: var(--home-accent);
-  --account-danger: #E99491;
+  --account-danger: #EC8686;
   --account-danger-surface: var(--home-danger-surface);
   --account-danger-pressed: color-mix(in srgb, var(--account-danger) 12%, var(--account-danger-surface));
   --account-item-hover: var(--home-menu-hover);

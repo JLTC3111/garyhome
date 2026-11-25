@@ -15,7 +15,7 @@ export type AuditRunSummary = {
   score_basis?: string | null; coverage?: ReturnType<typeof reportCoverage>;
 };
 export type AuditRun = AuditRunSummary & { state: CrawlState };
-export type AuditSnapshot = { runs: AuditRunSummary[]; settings: AuditSettings; activeRun: AuditRun | null; selectedRun: AuditRun | null };
+export type AuditSnapshot = { runs: AuditRunSummary[]; settings: AuditSettings; activeRun: AuditRun | null; selectedRun: AuditRun | null; expiredActiveRun?: boolean };
 const summaryFields = "id,created_at,finished_at,status,scope,trigger,target_url,content_score,technical_score,page_count,critical_count,score_basis,coverage";
 function databaseError(error: {code?:string} | null) {
   if (!error) return;
@@ -33,22 +33,35 @@ export async function getAuditSettings(db: SupabaseClient): Promise<AuditSetting
   databaseError(error); if(!data)throw new Error("SEO audit settings are unavailable.");
   return {weeklyEnabled:data.weekly_enabled,nextRunAt:data.next_run_at,limits:{...defaultAuditLimits,...data.limits}};
 }
+function isExpired(start:unknown,duration:unknown,leaseUntil:string|null,now:number) {
+  return typeof start==="number"&&Number.isFinite(start)&&typeof duration==="number"&&Number.isFinite(duration)
+    &&(!leaseUntil||Date.parse(leaseUntil)<now)&&start+duration<=now;
+}
+export async function expiredAuditId(db: SupabaseClient, now = Date.now()): Promise<string | null> {
+  const {data,error}=await db.from("seo_audit_runs")
+    .select("id,lease_until,started_ms:state->startedAt,duration_ms:state->config->maxDurationMs")
+    .in("status",["queued","running"]).maybeSingle();
+  databaseError(error);
+  return data&&isExpired(data.started_ms,data.duration_ms,data.lease_until,now)?data.id:null;
+}
 export async function auditSnapshot(db: SupabaseClient, runId?: string): Promise<AuditSnapshot> {
   const [settings,runsResult,activeResult]=await Promise.all([
     getAuditSettings(db),
     db.from("seo_audit_runs").select(summaryFields).order("created_at",{ascending:false}).limit(20),
-    db.from("seo_audit_runs").select(summaryFields+",state").in("status",["queued","running"]).maybeSingle(),
+    db.from("seo_audit_runs").select(summaryFields+",state,lease_until").in("status",["queued","running"]).maybeSingle(),
   ]);
   databaseError(runsResult.error); databaseError(activeResult.error);
   const runs=((runsResult.data||[]) as unknown as AuditRunSummary[]).map(row=>row.score_basis==="evaluated-checks-v3"?row:{...row,content_score:null,technical_score:null,critical_count:0,score_basis:null});
-  const activeRun=activeResult.data?publicRun(activeResult.data as unknown as AuditRun):null;
+  const activeRow=activeResult.data as unknown as (AuditRun&{lease_until:string|null})|null;
+  const activeRun=activeRow?publicRun(activeRow):null;
+  const expiredActiveRun=!!activeRun&&isExpired(activeRun.state.startedAt,activeRun.state.config.maxDurationMs,activeRow?.lease_until??null,Date.now());
   const selectedId=runId||activeRun?.id||runs[0]?.id;
   let selectedRun=selectedId===activeRun?.id?activeRun:null;
   if(selectedId&&!selectedRun){
     const result=await db.from("seo_audit_runs").select(summaryFields+",state").eq("id",selectedId).maybeSingle();
     databaseError(result.error); selectedRun=result.data?publicRun(result.data as unknown as AuditRun):null;
   }
-  return {runs,settings,activeRun,selectedRun};
+  return {runs,settings,activeRun,selectedRun,expiredActiveRun};
 }
 export async function createAudit(db: SupabaseClient,state:CrawlState,options:{trigger:AuditRunSummary["trigger"];scope:AuditRunSummary["scope"];targetUrl?:string;actorId?:string}):Promise<AuditRun|null>{
   const {data,error}=await db.rpc("seo_create_audit",{p_state:state,p_trigger:options.trigger,p_scope:options.scope,p_target_url:options.targetUrl||null,p_actor_id:options.actorId||null});

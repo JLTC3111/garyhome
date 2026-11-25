@@ -18,7 +18,7 @@ function serviceHarness(options={}) {
  const db={from(table){assert.equal(table,'seo_audit_runs');return {select(){return this;},eq(name,value){assert.equal(name,'id');assert.equal(value,runId);return this;},async single(){return {data:options.missing?null:structuredClone(record),error:options.loadError?{code:'fixture'}:null};}};}};
  const config={auditEnvironment(){if(options.environmentError)throw new Error('fixture domain configuration error');return {base:origin,allowedOrigins:options.allowedOrigins||[origin]};},auditSeeds(){return [origin+'/'];}};
  const crawler={normalizeCrawlUrl:value=>value,isExcludedUrl:()=>false,createCrawl(config,seeds){return {...crawlState(),status:'queued',config,seeds};},async advanceCrawl(state,advanceOptions){calls.advanced.push({state:structuredClone(state),options:advanceOptions});if(options.workerError)throw new Error('unexpected worker fault');return options.advance?options.advance(state):state;}};
- const store={async claimAudit(database,id){assert.equal(database,db);calls.claims.push(id);return options.noLease?null:{run:structuredClone(record),leaseToken:'lease-fixture'};},async saveAudit(database,id,token,state){assert.equal(database,db);assert.equal(id,runId);assert.equal(token,'lease-fixture');calls.saved.push(structuredClone(state));if(options.checkpointError)throw new Error('fixture checkpoint timeout after commit');return options.checkpointResult!==false;},async resumeAuditRecord(database,id,state){assert.equal(database,db);calls.resumed.push({id,state:structuredClone(state)});return {...record,state};},async getAuditSettings(){return {weeklyEnabled:false,nextRunAt:'2099-01-01T00:00:00Z',limits:crawlState().config};},async createAudit(...args){calls.created.push(args);return record;}};
+ const store={async expiredAuditId(){return options.expiredRun?runId:null;},async claimAudit(database,id){assert.equal(database,db);calls.claims.push(id);return options.noLease?null:{run:structuredClone(record),leaseToken:'lease-fixture'};},async saveAudit(database,id,token,state){assert.equal(database,db);assert.equal(id,runId);assert.equal(token,'lease-fixture');calls.saved.push(structuredClone(state));if(options.checkpointError)throw new Error('fixture checkpoint timeout after commit');return options.checkpointResult!==false;},async resumeAuditRecord(database,id,state){assert.equal(database,db);calls.resumed.push({id,state:structuredClone(state)});return {...record,state};},async getAuditSettings(){return {weeklyEnabled:false,nextRunAt:'2099-01-01T00:00:00Z',limits:crawlState().config};},async createAudit(...args){calls.created.push(args);return record;}};
  const mocks=new Map([[path.join(root,'lib/server.ts'),{staffAdminClient:()=>db,loadContent:async()=>({content:{}})}],[path.join(root,'lib/seo-audit/config.ts'),config],[path.join(root,'lib/seo-audit/crawler.ts'),crawler],[path.join(root,'lib/seo-audit/store.ts'),store],[path.join(root,'lib/seo-audit-runtime.ts'),{auditNetworkOptions(){calls.network++;return {transportMode:'trusted-fetch'};}}],[path.join(root,'lib/seo-audit/compare.ts'),{compareAuditMetadata(state){calls.compared++;return state;}}]]);
  const cache=new Map();
  function load(file){
@@ -63,6 +63,28 @@ test('changed trusted domains stop advancement without issuing network work or d
  const h=serviceHarness({allowedOrigins:['https://new.garyhome.vn']});await h.advanceAudit(runId);
  assert.equal(h.calls.advanced.length,0);assert.equal(h.calls.network,0);assert.equal(h.calls.saved[0].status,'incomplete');
  assert.match(h.calls.saved[0].stopReason,/domains changed/);assert.equal(h.calls.saved[0].queue.length,1);
+});
+
+test('starting a new audit checkpoints an expired idle run and retains its evidence',async()=>{
+ const h=serviceHarness({expiredRun:true});
+ await h.startAudit('manual');
+ assert.deepEqual(h.calls.claims,[runId]);
+ assert.equal(h.calls.saved[0].status,'incomplete');
+ assert.equal(h.calls.saved[0].queue.length,1);
+ assert.equal(h.calls.saved[0].pages[0].url,origin+'/observed');
+ assert.equal(h.calls.advanced.length,0);
+ assert.equal(h.calls.created.length,1);
+});
+
+test('an active lease or a concurrent resume prevents stale audit reclamation',async()=>{
+ const busy=serviceHarness({expiredRun:true,noLease:true});
+ await busy.startAudit('manual');
+ assert.equal(busy.calls.saved.length,0);
+ const fresh=crawlState();fresh.startedAt=Date.now();
+ const resumed=serviceHarness({expiredRun:true,state:fresh});
+ await resumed.startAudit('manual');
+ assert.equal(resumed.calls.saved[0].status,'running');
+ assert.equal(resumed.calls.saved[0].finishedAt,undefined);
 });
 
 test('explicit resume starts a new bounded segment while preserving original time and successful evidence',async()=>{

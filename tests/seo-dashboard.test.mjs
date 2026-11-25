@@ -122,6 +122,20 @@ test('interrupted audits expose explicit resume without discarding the selected 
  assert.match(text(view.toJSON()),/10\/11\/2026/);
 });
 
+test('an expired idle audit offers restart and resume without polling its old lease',async t=>{
+ const snapshot=fixture('running'),calls=[];
+ snapshot.expiredActiveRun=true;
+ snapshot.selectedRun.state.queue=[{kind:'page',url:'https://garyhome.vn/pending',language:'en'}];
+ const Component=loader({current:siteValue()},async(url,init)=>{calls.push({url,init});return Response.json(snapshot);});
+ let view;await act(async()=>{view=TestRenderer.create(React.createElement(Component));});
+ t.after(async()=>{await act(async()=>view.unmount());});
+ const button=label=>view.root.findAllByType('button').find(node=>text(node).includes(label));
+ assert.equal(button('Run site audit').props.disabled,false);
+ assert.equal(button('Resume interrupted audit').props.disabled,false);
+ assert.match(text(view.toJSON()),/This audit reached its time limit/);
+ await act(async()=>button('Resume interrupted audit').props.onClick());
+ assert.deepEqual(JSON.parse(calls.at(-1).init.body),{action:'resume',runId:snapshot.selectedRun.id});
+});
 test('only safe advance requests retry transient failures with backoff and stop after three retries',async t=>{
  const originalTimer=globalThis.setTimeout,originalClear=globalThis.clearTimeout,pending=[];
  globalThis.setTimeout=(fn,delay,...args)=>[2500,5000,10000,20000].includes(delay)?(pending.push({fn,delay}),987654):originalTimer(fn,delay,...args);

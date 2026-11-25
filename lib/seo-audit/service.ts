@@ -6,7 +6,7 @@ import { report, type Finding } from "../seo-analysis/types";
 import { auditNetworkOptions } from "../seo-audit-runtime";
 import { normalizeAuditState } from "./normalize";
 import { compareAuditMetadata } from "./compare";
-import { claimAudit, createAudit, getAuditSettings, saveAudit, resumeAuditRecord } from "./store";
+import { claimAudit, createAudit, expiredAuditId, getAuditSettings, saveAudit, resumeAuditRecord } from "./store";
 
 export function auditDatabase() {
   const db = staffAdminClient();
@@ -59,12 +59,14 @@ export async function startAudit(trigger: "manual" | "weekly" | "page", actorId?
     seeds = auditSeeds(base, content);
   }
   const scope = targetUrl ? "page" : "site";
+  await settleExpiredAudit(db);
   const state = createCrawl({ ...settings.limits, allowedOrigins, scope, languages: ["en", "vi"], languageMode: "url" }, seeds);
   return createAudit(db, state, { trigger, scope, targetUrl, actorId });
 }
 
 export async function resumeAudit(runId:string) {
   const db=auditDatabase();
+  await settleExpiredAudit(db);
   const loaded=await db.from("seo_audit_runs").select("state,status").eq("id",runId).single();
   if(loaded.error||!loaded.data)throw new Error("The saved audit could not be loaded.");
   if(!["failed","incomplete"].includes(loaded.data.status))throw new Error("Only interrupted audits can be resumed.");
@@ -89,6 +91,23 @@ export async function resumeAudit(runId:string) {
   state.startedAt=Date.now();state.updatedAt=state.startedAt;delete state.finishedAt;delete state.stopReason;delete state.error;
   state.status="queued";state.analysisVersion=3;
   return resumeAuditRecord(db,runId,state);
+}
+
+async function settleExpiredAudit(db: ReturnType<typeof auditDatabase>) {
+  const id = await expiredAuditId(db);
+  if (!id) return;
+  const lease = await claimAudit(db, id);
+  if (!lease) return;
+  const state = normalizeAuditState(lease.run.state), now = Date.now();
+  // Recheck after claiming in case someone resumed the same run in the meantime.
+  if (state.startedAt + state.config.maxDurationMs <= now) {
+    state.status = "incomplete";
+    state.updatedAt = state.finishedAt = now;
+    state.stopReason = "Maximum audit duration reached; pending tasks were retained.";
+  }
+  if (!await saveAudit(db,id,lease.leaseToken,state)) {
+    throw new Error("The previous audit changed while it was being recovered. Refresh the audit list and try again.");
+  }
 }
 
 export async function advanceAudit(runId?: string) {

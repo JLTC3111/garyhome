@@ -243,6 +243,20 @@ test('detail preview arrows, counter and current thumbnail follow the photo open
  assert.equal(main().findAllByProps({role:'group'}).length,0);
 });
 
+test('a 40-photo listing initially renders one cover and four fixed-size thumbnails',async t=>{
+ const p=await platform(t),site={current:{t:en=>en,language:'en'}};
+ const {EmblaCarouselListingCard}=loadComponents(site,()=>[()=>{},undefined]).listing();
+ const photos=Array.from({length:40},(_,i)=>`/photo-${i}.jpg`);
+ const renderer=await p.mount(React.createElement(EmblaCarouselListingCard,{
+  photos,href:'/homes/a-home',title:'A home',renderPhoto:src=>React.createElement('img',{src}),
+ }));
+ const strip=renderer.root.findByProps({className:'embla-listing-thumbnails'});
+ assert.equal(renderer.root.findByType('a').findAllByType('img').length,1);
+ assert.equal(strip.findAllByType('button').length,40);
+ assert.equal(strip.findAllByType('img').length,4);
+ assert.ok(strip.findAllByType('img').every(img=>img.props.width===56&&!img.props.sizes));
+});
+
 test('the fullscreen strip scrolls only enough to reveal an overflowing selection',async t=>{
  const images=Array.from({length:5},(_,i)=>`/images/room-${i+1}.jpg`);
  const calls=[];

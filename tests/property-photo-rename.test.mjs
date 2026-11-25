@@ -10,7 +10,7 @@ import {propertyPhotoRenameHistory,renamePropertyPhoto,retirePropertyPhoto} from
 import {syncRenamedListingDraft} from '../lib/property-photo-rename-state.ts';
 import {deleteListingAndMedia,listingDeletionQueue,retryDueListingCleanup} from '../lib/property-deletion-server.ts';
 import {continuationCheckpoint,readStagedBatch,reviewedContinuation,runMediaStage,sealContinuation} from '../scripts/migrate-property-media.mjs';
-import {databaseStages} from '../scripts/property-media-migration-transport.mjs';
+import {databaseStages,storageStages} from '../scripts/property-media-migration-transport.mjs';
 
 const origin='https://duyiihsmaqfgwezmsnjs.supabase.co', bucket='property-media';
 const first='10101010-1111-4111-8111-111111111111', second='20202020-2222-4222-8222-222222222222';
@@ -252,14 +252,17 @@ test('local media stages reconcile interrupted writes, guard retirement and roll
   const result=await h.pg.exec(sql);
   return Object.values(result.at(-1).rows[0])[0];
  },helpers);
- let loseUpload=true,loseSwitch=true,loseRemoval=true,opens=0,reads=0,uploads=0,applies=0;
+ let loseSwitch=true,opens=0,reads=0,uploads=0,applies=0,retirements=0;
+ const lostWriteAck=storageStages({key:'sb_publishable_fixture',token:'owner-fixture',pace:async()=>{},
+  fetcher:async()=>Response.json({error:'unavailable'},{status:503})});
  const transport={
   ...db,owner:async()=>owner,
   async read(identity){reads++;return h.files.get(identity.key).bytes;},
   async upload(key,body,mime,metadata){
    uploads++;
    await register(key,body,mime,metadata);
-   if(loseUpload){loseUpload=false;throw new Error('fixture lost upload response');}
+   if(uploads===1) await lostWriteAck.upload(key,body,mime,metadata);
+   if(uploads===2) throw new Error('fixture lost upload response');
   },
   async switchPhotos(args){
    const result=await db.switchPhotos(args);
@@ -267,8 +270,9 @@ test('local media stages reconcile interrupted writes, guard retirement and roll
    return result;
   },
   async retire(id){
+   retirements++;
    await retirePropertyPhoto(h.client('authenticated',owner),h.client('service_role'),origin,id,signal());
-   if(loseRemoval){loseRemoval=false;throw new Error('fixture lost removal response');}
+   await lostWriteAck.retire(id);
   },
  };
  const factory=async()=>{opens++;return transport;};
@@ -333,9 +337,10 @@ test('local media stages reconcile interrupted writes, guard retirement and roll
  const oldAsset=audit.selected[0].key;
  await assert.rejects(run('cleanup',{tokens:[a]}),/retire-originals/);
  const handoff={tokens:[a],retireOriginals:true};
- assert.equal((await run('cleanup',handoff)).blocked,true);
+ assert.equal((await run('cleanup',handoff)).blocked,false);
  assert.equal(h.files.has(oldAsset),false);
  assert.equal((await run('cleanup',handoff)).blocked,false);
+ assert.equal(retirements,1);
  const cleanupCalls=h.calls.filter(([action])=>action==='remove');
  assert.deepEqual(cleanupCalls,[['remove',oldAsset]]);
  assert.equal((await run('report')).items.find(item=>item.token===a).state,'cleaned');

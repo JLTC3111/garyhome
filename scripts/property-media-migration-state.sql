@@ -26,7 +26,8 @@ returns jsonb language sql stable security invoker set search_path='' as $$
     'listing',(select jsonb_build_object('version',p.updated_at,'images',p.images,
       'fields',jsonb_build_object('images',p.images,'image_filenames',p.image_filenames,
         'image_metadata',p.image_metadata,'source_url',p.source_url)) from public.properties p where p.id=p_listing),
-    'retirement',(select jsonb_build_object('id',r.id,'removed',r.removed_at is not null)
+    'retirement',(select jsonb_build_object('id',r.id,'listing',r.property_id,'oldKey',r.old_key,'newKey',r.new_key,
+      'sha256',r.sha256,'requested',r.removal_requested_by is not null,'removed',r.removed_at is not null)
       from private.property_photo_renames r where r.id=p_job)
   );
 $$;

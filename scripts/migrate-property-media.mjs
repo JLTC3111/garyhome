@@ -6,7 +6,7 @@ import {isDeepStrictEqual as equal,parseArgs} from 'node:util';
 import {PROPERTY_IMAGE_MAX_BYTES,PROPERTY_IMAGE_ORIGIN,propertyPhotoPath} from '../lib/property-photo-files.ts';
 import {imageDetails,propertyPhoto} from '../lib/image-optimization.mjs';
 import {digest,planInventory,readJson,stagedDirectory,stageInventory,writeAtomic} from './plan-property-image-optimization.mjs';
-import {liveMigrationTransport,uuid} from './property-media-migration-transport.mjs';
+import {liveMigrationTransport,retryMediaRequest,uuid} from './property-media-migration-transport.mjs';
 
 const remote = new Set(['backup','upload','migrate','verify','cleanup','rollback']);
 const stages = new Set(['audit','convert','report',...remote]);
@@ -315,24 +315,40 @@ async function verifyDelivery(ctx,transport,entry,item,{result,backup}) {
   return 'verified';
 }
 
-async function cleanup(ctx,transport,entry,item,{result}) {
+function retirementConfirmed(state,entry,item,backup) {
+  assert(state.optimizedPresent&&equal(state.optimized,currentIdentity(item.uploaded))&&
+    state.sourceRefs===0&&state.targetRefs>0&&hasPhoto(state.listing,item.uploaded.key),
+  'The active replacement or its references changed before retirement.');
+  const job=state.retirement;
+  if (job) {
+    assert(job.id===item.retirementId&&job.listing===entry.listing.id&&job.oldKey===entry.key&&
+      job.newKey===item.uploaded.key&&job.sha256===item.uploaded.sha256&&job.requested,
+    'The live retirement record does not match the checkpoint.');
+  }
+  if (!state.originalPresent) {
+    assert(job?.removed,'The original is absent and retirement is unconfirmed. Reconcile the retirement record before continuing.');
+    return true;
+  }
+  assert(!job?.removed&&equal(state.original,currentIdentity(backup)),
+    'The original Storage identity or retirement record changed.');
+  return false;
+}
+
+async function cleanup(ctx,transport,entry,item,{result,backup}) {
   if (item.cleaned) return 'cleaned';
   assertUploaded(item,result);
   assert(item.verified&&item.migrated&&!item.rolledBack&&item.verified.sha256===item.uploaded?.sha256,
     'Verify the active replacement before cleanup.');
   const state=await liveState(transport,entry,result,item);
-  if (!(state.retirement?.removed&&!state.originalPresent)) {
+  if (!retirementConfirmed(state,entry,item,backup)) {
     const actor=await transport.owner(entry.listing.id);
     // The existing retire endpoint reads the replacement to verify its digest.
+    item.retirementId??=randomUUID();
     await charge(ctx,item,'retire',{egressBytes:PROPERTY_IMAGE_MAX_BYTES});
-    if (!item.retirementId) {
-      item.retirementId=randomUUID();
-      await ctx.save();
-    }
     await transport.reserveRetirement(item.migrated,item.retirementId,actor);
     await transport.retire(item.retirementId);
     const confirmed=await liveState(transport,entry,result,item);
-    assert(confirmed.retirement?.removed&&!confirmed.originalPresent,'Storage removal was not confirmed.');
+    assert(retirementConfirmed(confirmed,entry,item,backup),'Storage removal was not confirmed.');
   }
   item.cleaned=true;
   await ctx.save();
@@ -418,12 +434,18 @@ export async function runMediaStage(stage,options={},openTransport=liveMigration
         if (stage==='backup') results.push({token:entry.token,state:await backUp(ctx,transport,entry,item)});
         else {
           const local=await staged(work,entry);
-          if (stage==='upload') results.push({token:entry.token,state:await upload(ctx,transport,entry,item,local)});
+          if (stage==='upload'||stage==='cleanup') {
+            const action=stage==='upload'?upload:cleanup;
+            // Each attempt starts with a fresh catalogue and reference check.
+            const state=await retryMediaRequest(()=>action(ctx,transport,entry,item,local),{
+              operation:stage==='upload'?'upload':'retire',
+            });
+            results.push({token:entry.token,state});
+          }
           if (stage==='migrate'||stage==='rollback') {
             results.push({token:entry.token,state:await changeReferences(ctx,transport,entry,item,local,stage==='rollback')});
           }
           if (stage==='verify') results.push({token:entry.token,state:await verifyDelivery(ctx,transport,entry,item,local)});
-          if (stage==='cleanup') results.push({token:entry.token,state:await cleanup(ctx,transport,entry,item,local)});
         }
       } catch(error) {
         results.push({token:entry.token,state:'blocked',reason:error.code==='ENOENT'?'A required local artifact is missing.':error.message});

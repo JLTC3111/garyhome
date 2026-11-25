@@ -37,6 +37,43 @@ test('Storage transport rejects privileged keys, redirect paths and mismatched r
  await assert.rejects(client.read(identity),/audited size, MIME or ETag/);
 });
 
+test('public reads honor Retry-After and pace bounded transient retries',async()=>{
+ const calls=[];
+ const responses=[
+  Response.json({error:'SlowDown'},{status:429,headers:{'Retry-After':'3'}}),
+  Response.json({error:'unavailable'},{status:503}),
+  new Response(bytes,{headers:{'content-type':identity.mime,etag:'tag'}}),
+ ];
+ const client=storageStages({...options,pace:async()=>{calls.push('pace');},
+  wait:async ms=>{calls.push(ms);},fetcher:async()=>responses.shift()});
+ assert.deepEqual(await client.read(identity,true),bytes);
+ assert.deepEqual(calls,['pace',3000,'pace',4000,'pace']);
+
+ const retryAt=new Date(Date.now()+6000).toUTCString();
+ const waits=[];
+ let attempts=0;
+ const unavailable=storageStages({...options,pace:async()=>{},wait:async ms=>{waits.push(ms);},
+  fetcher:async()=>{attempts++;return Response.json({error:'unavailable'},
+   {status:503,headers:{'Retry-After':attempts===1?retryAt:'0'}});}});
+ await assert.rejects(unavailable.read(identity,true),/HTTP 503/);
+ assert.equal(attempts,3);
+ assert.ok(waits[0]>4000&&waits[0]<=6000);
+ assert.equal(waits[1],4000);
+});
+
+test('writes report a sanitized failure once and oversized Retry-After stops a read',async()=>{
+ let attempts=0;
+ const client=storageStages({...options,pace:async()=>{},wait:async()=>assert.fail('Unexpected retry'),
+  fetcher:async()=>{attempts++;return Response.json({error:'unavailable',message:'sensitive details'},
+   {status:503,headers:{'Retry-After':'120'}});}});
+ await assert.rejects(client.retire('retirement-fixture'),{
+  message:'Property media retire (POST https://staff.garyhome.vn/api/admin/property-photos) returned HTTP 503 {"error":"unavailable"}.',
+ });
+ assert.equal(attempts,1);
+ await assert.rejects(client.read(identity,true),/Retry-After exceeds the 30-second retry window/);
+ assert.equal(attempts,2);
+});
+
 test('interactive sign-in uses the configured Home project and stops on rejection without printing credentials',async()=>{
  const env={PGSERVICE:'gary-home-media'};
  const response=()=>Response.json({configured:true,url:'https://duyiihsmaqfgwezmsnjs.supabase.co',publishableKey:options.key});

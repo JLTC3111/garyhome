@@ -6,7 +6,7 @@ import {checkMediaDatabase,verifyMediaDatabase} from './property-media-migration
 import {withMediaSession} from './property-media-session.mjs';
 import {writeAtomic} from './plan-property-image-optimization.mjs';
 
-const stages=['upload','migrate','verify','cleanup'];
+const stages=Object.entries({upload:'uploaded',migrate:'migrated',verify:'verified',cleanup:'cleaned'});
 const log=value=>console.log(JSON.stringify(value));
 const reviewRows=source=>source.photos.map(({entry,result})=>({
   token:entry.token,listing:entry.listing.id,old_key:entry.key,new_key:result.replacementKey,
@@ -81,8 +81,11 @@ async function resume(root,batches,options,env,transport) {
     }
     const verifiedItems=[];
     for(const {entry} of source.photos) {
-      if(!checkpoint.journal.items[entry.token]?.cleaned) {
-        for(const stage of stages) {
+      const previous=checkpoint.journal.items[entry.token];
+      if(!previous?.cleaned) {
+        for(const [stage,field] of stages) {
+          // Cleanup can have succeeded before its acknowledgement reached the journal.
+          if(previous?.[field]) continue;
           const output=await runMediaStage(stage,{work,apply:true,approve:checkpoint.batch.id,
             tokens:[entry.token],retireOriginals:stage==='cleanup'},transport);
           if(output.blocked) throw new Error(name+' '+stage+' '+entry.token+' stopped. '+output.results[0].reason);

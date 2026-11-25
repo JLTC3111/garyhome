@@ -1,10 +1,18 @@
 import {spawn} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
+import {setTimeout as delay} from 'node:timers/promises';
 import {PROPERTY_IMAGE_BUCKET, PROPERTY_IMAGE_CACHE_SECONDS, PROPERTY_IMAGE_ORIGIN} from '../lib/property-photo-files.ts';
 import {digest} from './plan-property-image-optimization.mjs';
 
 export const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const staffEndpoint = 'https://staff.garyhome.vn/api/admin/property-photos';
+const retryableStatus = new Set([408,429,500,502,503,504]);
+const maxRetryDelay = 30_000;
+const safeErrorCodes = new Set([
+  'unavailable','migration_required','session_expired','forbidden','conflict','media_busy',
+  'remove_failed','object_unavailable','replacement_unavailable','integrity_failed',
+  'NoSuchKey','ResourceAlreadyExists','AccessDenied','SlowDown','InternalError','DatabaseTimeout','DatabaseError',
+]);
 const etag = value => String(value||'').replace(/^"|"$/g,'');
 const jsonArg = value => "convert_from(decode('" + Buffer.from(JSON.stringify(value)).toString('hex') + "','hex'),'UTF8')::jsonb";
 const textArg = value => value==null ? 'null' :
@@ -96,6 +104,79 @@ function objectEndpoint(key, audience='') {
   return `${PROPERTY_IMAGE_ORIGIN}/storage/v1/object/${prefix}${PROPERTY_IMAGE_BUCKET}/${parts.map(encodeURIComponent).join('/')}`;
 }
 
+let nextRequestAt=0;
+async function paceRequests() {
+  const now=performance.now(), startAt=Math.max(now,nextRequestAt);
+  nextRequestAt=startAt+300;
+  if (startAt>now) await delay(startAt-now);
+}
+
+function retryAfterMillis(header) {
+  const value=header?.trim();
+  if (!value) return 0;
+  if (/^\d+$/.test(value)) return Number(value)*1000;
+  const date=/[a-z]{3}/i.test(value)?Date.parse(value):NaN;
+  return Number.isFinite(date)?Math.max(0,date-Date.now()):0;
+}
+
+async function sanitizedErrorBody(response) {
+  if (!response.body) return '';
+  const limit=2048;
+  if (!/^application\/json\b/i.test(response.headers.get('content-type')??'') ||
+      Number(response.headers.get('content-length'))>limit) {
+    await response.body.cancel().catch(()=>{});
+    return '';
+  }
+  const reader=response.body.getReader(), buffer=Buffer.alloc(limit);
+  let length=0;
+  try {
+    for (;;) {
+      const {done,value}=await reader.read();
+      if (done) break;
+      if (length+value.length>limit) return '';
+      buffer.set(value,length);
+      length+=value.length;
+    }
+    const body=JSON.parse(buffer.toString('utf8',0,length));
+    for (const field of ['error','code']) {
+      if (safeErrorCodes.has(body?.[field])) return JSON.stringify({[field]:body[field]});
+    }
+    return '';
+  } catch {
+    return '';
+  } finally {
+    await reader.cancel().catch(()=>{});
+    reader.releaseLock();
+  }
+}
+
+class MediaRequestError extends Error {
+  constructor(operation, method, url, status, body='', retryAfter=0) {
+    const {origin,pathname}=new URL(url);
+    const path=pathname.replace(/(\/storage\/v1\/object\/(?:public\/)?property-media)\/.*/, '$1/<object-key>');
+    const outcome=status?('returned HTTP '+status+(body?' '+body:'')):'was interrupted or returned an incomplete response';
+    super(`Property media ${operation} (${method} ${origin}${path}) ${outcome}.`);
+    this.operation=operation;
+    this.retryable=!status||retryableStatus.has(status);
+    this.retryAfter=retryAfter;
+  }
+}
+
+export async function retryMediaRequest(action,{operation,wait=delay}={}) {
+  for (let attempt=1;;attempt++) {
+    try {
+      return await action();
+    } catch(error) {
+      if (!(error instanceof MediaRequestError) || !error.retryable || attempt===3 ||
+          (operation && error.operation!==operation)) throw error;
+      if (error.retryAfter>maxRetryDelay) {
+        throw new Error(error.message+' Retry-After exceeds the 30-second retry window.');
+      }
+      await wait(Math.max(error.retryAfter,2000*2**(attempt-1)));
+    }
+  }
+}
+
 async function readVerifiedBody(response, object) {
   const contentType=response.headers.get('content-type')?.split(';')[0].toLowerCase();
   if (!response.body || (response.headers.has('content-length') && Number(response.headers.get('content-length'))!==object.bytes)
@@ -123,44 +204,50 @@ async function readVerifiedBody(response, object) {
   return data;
 }
 
-export function storageStages({key,token,fetcher=fetch}) {
+export function storageStages({key,token,fetcher=fetch,wait=delay,pace=paceRequests}) {
   if (!publishable(key) || !token || /\s/.test(token)) throw new Error('Set a Home publishable key and current Owner access token.');
   const auth={apikey:key,authorization:'Bearer '+token};
-  const request = async (url,options={})=>{
-    let response;
-    try {
-      response=await fetcher(url,{...options,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(30_000)});
-    } catch {throw new Error('Storage or staff request interrupted. Reconcile before retrying.');}
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error('Storage or staff request returned HTTP '+response.status+'.');
-    }
-    return response;
+  const request = (operation,url,options={},retry=false)=>{
+    const method=options.method??'GET';
+    const send=async()=>{
+      await pace();
+      let response;
+      try {
+        response=await fetcher(url,{...options,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(30_000)});
+      } catch {throw new MediaRequestError(operation,method,url);}
+      if (!response.ok) {
+        const retryAfter=retryAfterMillis(response.headers.get('retry-after'));
+        throw new MediaRequestError(operation,method,url,response.status,await sanitizedErrorBody(response),retryAfter);
+      }
+      return response;
+    };
+    return retry?retryMediaRequest(send,{wait}):send();
   };
   return {
     async owner(listing) {
-      const access=await request(PROPERTY_IMAGE_ORIGIN+'/rest/v1/rpc/home_photo_rename_history',{
+      const access=await request('check Owner access',PROPERTY_IMAGE_ORIGIN+'/rest/v1/rpc/home_photo_rename_history',{
         method:'POST',headers:{...auth,'content-type':'application/json'},body:JSON.stringify({p_property:listing}),
-      });
+      },true);
       await access.body?.cancel();
-      const user=await (await request(PROPERTY_IMAGE_ORIGIN+'/auth/v1/user',{headers:auth})).json();
-      if (!uuid.test(user.id||'')) throw new Error('Owner identity could not be confirmed.');
+      const user=await (await request('read Owner identity',PROPERTY_IMAGE_ORIGIN+'/auth/v1/user',{headers:auth},true)).json().catch(()=>null);
+      if (!uuid.test(user?.id||'')) throw new Error('Owner identity could not be confirmed.');
       return user.id;
     },
-    read:(object,isPublic=false)=>request(objectEndpoint(object.key,isPublic?'public':'')+
-      '?cacheNonce='+crypto.randomUUID(),{headers:isPublic?{}:auth}).then(response=>readVerifiedBody(response,object)),
+    read:(object,isPublic=false)=>request('read',objectEndpoint(object.key,isPublic?'public':'')+
+      '?cacheNonce='+crypto.randomUUID(),{headers:isPublic?{}:auth},true).then(response=>readVerifiedBody(response,object)),
     async upload(key,body,mime,userMetadata) {
-      const response=await request(objectEndpoint(key),{method:'POST',body,headers:{
+      const response=await request('upload',objectEndpoint(key),{method:'POST',body,headers:{
         ...auth,'x-upsert':'false','content-type':mime,'cache-control':'max-age='+PROPERTY_IMAGE_CACHE_SECONDS,
         'x-metadata':Buffer.from(JSON.stringify(userMetadata||{})).toString('base64'),
       }});
       await response.body?.cancel();
     },
     async retire(id) {
-      const response=await request(staffEndpoint,{method:'POST',headers:{
+      const response=await request('retire',staffEndpoint,{method:'POST',headers:{
         authorization:auth.authorization,'content-type':'application/json',
       },body:JSON.stringify({action:'retire',confirm:true,id})});
-      if ((await response.json()).removed!==true) throw new Error('Retirement was not confirmed.');
+      const result=await response.json().catch(()=>null);
+      if (result?.removed!==true) throw new MediaRequestError('retire','POST',staffEndpoint);
     },
   };
 }

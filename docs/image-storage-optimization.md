@@ -4,7 +4,7 @@
 
 | Application | Upload policy | Delivery |
 | --- | --- | --- |
-| Home property-media | Source up to 8 MiB. Aim for 240 KB, with a 500 KB encoded cap. Use 1920, 1600 or 1280 px on the long edge and preserve aspect ratio. | Use Next's optimizer for thumbnails from the public Storage object. Resolve old Supabase transformation URLs at display and SEO boundaries. Open the stored full-size rendition when requested. |
+| Home property-media | Source up to 8 MiB. Aim for 240 KB, with a 500 KB encoded cap. Use 1920, 1600 or 1280 px on the long edge and preserve aspect ratio. | Serve covers, thumbnails, and full-size views directly from the stored public object. Resolve old Supabase transformation URLs at display and SEO boundaries. |
 | Home staff avatars | Source up to 2 MiB. Aim for 45 KB, with a 100 KB cap and a long edge up to 384 px. | Retain the immutable per-upload URL and the current avatar visibility. |
 | Visa editorial media | Source up to 5 MiB. Aim for 300 KB, with a 650 KB cap and a long edge up to 2400 px. | Keep lazy article cards and the five-minute public Storage browser TTL. |
 | Visa avatars | Keep the 384 px square crop and zoom controls. Encode toward 45 KB, with a 100 KB cap. | Keep the existing private bucket and short-lived signed previews. Use lazy images in the staff roster. |

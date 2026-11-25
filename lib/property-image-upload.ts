@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { imageOriginalFilename } from "./image-filenames";
 import { imageOptimizationErrorText, optimizeImage, propertyPhoto } from "./image-optimization.mjs";
 import { uploadListingFile, type ListingUploadOptions } from "./listing-file-upload";
-import { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET, propertyImageFormat, propertyPhotoFilename } from "./property-photo-files";
+import { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET, propertyImageFormat, propertyPhotoStorageKey } from "./property-photo-files";
 
 export { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET };
 const uploadPaths = new WeakMap<File, { scope: string; path: string }>();
@@ -67,8 +67,7 @@ export async function uploadPropertyImage(db: SupabaseClient, file: File, signal
   const scope=listingId ? `properties/listings/${listingId}` : "properties";
   let attempt = uploadPaths.get(file);
   if (!attempt || attempt.scope!==scope) {
-    const filename = propertyPhotoFilename(originalFilename, prepared.extension) || `photo.${prepared.extension}`;
-    attempt={scope,path:`${scope}/${crypto.randomUUID()}/${filename}`};
+    attempt={scope,path:propertyPhotoStorageKey(originalFilename,prepared.extension,crypto.randomUUID(),listingId)};
     uploadPaths.set(file, attempt);
   }
   try {

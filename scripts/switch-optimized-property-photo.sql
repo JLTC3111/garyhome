@@ -28,9 +28,20 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.optimized_photo_listing_refs(listing public.properties, photo_key text)
+returns bigint language sql stable security invoker set search_path='' as $$
+  select count(*) from (
+    select private.home_photo_key(uri,null) name from (select unnest(listing.images) uri
+      union all select jsonb_object_keys(listing.image_filenames)
+      union all select jsonb_object_keys(listing.image_metadata)
+      union all select listing.source_url) explicit
+    union all select name from private.home_listing_storage_links(to_jsonb(listing)::text) where bucket='property-media'
+  ) refs where name=photo_key;
+$$;
+
 create or replace function pg_temp.switch_optimized_property_photo(
   p_listing uuid, p_version timestamptz, p_original jsonb, p_optimized jsonb,
-  p_apply boolean, p_undo jsonb default null
+  p_apply boolean, p_undo jsonb default null, p_actor uuid default null
 ) returns jsonb language plpgsql security invoker set search_path='' as $$
 declare
   origin constant text:='https://duyiihsmaqfgwezmsnjs.supabase.co';
@@ -38,11 +49,15 @@ declare
   original_key text:=p_original->>'key'; optimized_key text:=p_optimized->>'key';
   from_key text; to_key text; identity jsonb; listing public.properties;
   before_fields jsonb; after_fields jsonb; confirmed_fields jsonb; after_version timestamptz;
-  known_refs bigint; listing_refs bigint;
+  known_refs bigint; listing_refs bigint; operator_role text:=current_setting('role');
 begin
+  if p_actor is null then raise exception 'photo_rename.forbidden' using errcode='42501'; end if;
+  perform set_config('request.jwt.claim.sub',p_actor::text,true);
+  perform private.require_home_photo_owner();
   if p_apply is null or p_listing is null or p_version is null or original_key is null or optimized_key is null
     or original_key=optimized_key
-    or optimized_key !~ ('^properties/listings/'||p_listing::text||'/[0-9a-f-]{36}/[a-z0-9-]{1,104}\.(webp|jpg)$')
+    or optimized_key !~ ('^properties/listings/'||p_listing::text||'/[0-9a-f-]{36}/[a-z0-9]+(-[a-z0-9]+)*\.(webp|jpg)$')
+    or char_length(split_part(optimized_key,'/',5))>120
     or (case p_optimized->>'mime' when 'image/webp' then right(optimized_key,5)<>'.webp'
       when 'image/jpeg' then right(optimized_key,4)<>'.jpg' else true end)
     or coalesce(p_optimized->>'bytes','') !~ '^[0-9]{1,6}$'
@@ -99,13 +114,7 @@ begin
   end if;
 
   select count(*) into known_refs from private.home_listing_media_refs where bucket='property-media' and name=from_key;
-  select count(*) into listing_refs from (
-    select private.home_photo_key(uri,null) name from (select unnest(listing.images) uri
-      union all select jsonb_object_keys(listing.image_filenames)
-      union all select jsonb_object_keys(listing.image_metadata)
-      union all select listing.source_url) explicit
-    union all select name from private.home_listing_storage_links(to_jsonb(listing)::text) where bucket='property-media'
-  ) refs where name=from_key;
+  listing_refs:=pg_temp.optimized_photo_listing_refs(listing,from_key);
   if known_refs<>listing_refs
     or exists(select 1 from private.home_listing_media_refs where bucket='property-media' and name=to_key)
     or exists(select 1 from private.home_listing_storage_links((to_jsonb(listing)||after_fields)::text)
@@ -113,6 +122,11 @@ begin
   then raise exception 'photo_optimization.shared_reference' using errcode='PT409'; end if;
 
   if p_apply then
+    -- Keep catalogue access with the operator and apply the actual listing write as the verified Owner under RLS.
+    perform set_config('role','authenticated',true);
+    if not row_security_active('public.properties') then
+      raise exception 'photo_optimization.listing_rls_required' using errcode='42501';
+    end if;
     update public.properties set
       images=array(select uri from jsonb_array_elements_text(after_fields->'images') with ordinality i(uri,ord) order by ord),
       image_filenames=after_fields->'image_filenames', image_metadata=after_fields->'image_metadata',
@@ -120,7 +134,8 @@ begin
     where id=p_listing and updated_at=p_version
     returning updated_at,jsonb_build_object('images',images,'image_filenames',image_filenames,
       'image_metadata',image_metadata,'source_url',source_url) into after_version,confirmed_fields;
-    if not found or confirmed_fields is distinct from after_fields
+    perform set_config('role',operator_role,true);
+    if after_version is null or confirmed_fields is distinct from after_fields
       or exists(select 1 from private.home_listing_media_refs where bucket='property-media' and name=from_key)
       or not exists(select 1 from private.home_listing_media_refs where bucket='property-media' and name=to_key)
     then raise exception 'photo_optimization.reference_verification' using errcode='PT409'; end if;
@@ -133,4 +148,5 @@ $$;
 
 revoke all on function pg_temp.optimized_photo_reference(text,text,text,text),
   pg_temp.optimized_photo_fields(jsonb,text,text,text),
-  pg_temp.switch_optimized_property_photo(uuid,timestamptz,jsonb,jsonb,boolean,jsonb) from public;
+  pg_temp.optimized_photo_listing_refs(public.properties,text),
+  pg_temp.switch_optimized_property_photo(uuid,timestamptz,jsonb,jsonb,boolean,jsonb,uuid) from public;

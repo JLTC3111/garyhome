@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PROPERTY_IMAGE_CACHE_SECONDS } from "./property-photo-files";
 import { browserBackendConfig } from "./browser-client";
 
 // This measures silence, not the total time allowed to upload a file.
@@ -61,7 +62,7 @@ export async function uploadListingFile({ client, file, resumeKey = file, bucket
       ...(previous && Date.now() - previous.at < 23 * 60 * 60 * 1000 ? { uploadUrl: previous.url } : {}),
       chunkSize: 6 * 1024 * 1024, retryDelays: [0, 1000, 3000, 5000, 10000],
       uploadDataDuringCreation: true, storeFingerprintForResuming: false, removeFingerprintOnSuccess: true,
-      metadata: { bucketName: bucket, objectName: path, contentType, cacheControl: "31536000", metadata: JSON.stringify({ original_filename: originalFilename }) },
+      metadata: { bucketName: bucket, objectName: path, contentType, cacheControl: PROPERTY_IMAGE_CACHE_SECONDS, metadata: JSON.stringify({ original_filename: originalFilename }) },
       onBeforeRequest: async request => {
         signal?.throwIfAborted();
         if (settled) throw new DOMException("Upload cancelled", "AbortError");

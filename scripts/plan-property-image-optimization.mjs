@@ -1,14 +1,17 @@
 // Local-only inventory and staging. Storage credentials are never used here.
 import {createHash, randomUUID} from 'node:crypto';
-import {mkdir, readFile, rename, stat, writeFile} from 'node:fs/promises';
+import {link, mkdir, readFile, rename, stat, unlink, writeFile} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {imageDetails, imagePixelError, propertyPhoto, webpWithDensity} from '../lib/image-optimization.mjs';
+import {imageDetails, imageEncodingQualities, imageEncodingSizes, imagePixelError, propertyPhoto, webpWithDensity, webpWithExif} from '../lib/image-optimization.mjs';
+import {canPreserveWebpMetadata} from './property-photo-webp-metadata.mjs';
+import {PROPERTY_IMAGE_BUCKET, PROPERTY_IMAGE_MAX_BYTES, propertyPhotoStorageKey} from '../lib/property-photo-files.ts';
 
 const formats = {'image/jpeg':'jpeg','image/png':'png'};
 const extensions = {'image/jpeg':/\.jpe?g$/i,'image/png':/\.png$/i};
-const batchCutoff = 500_000;
-const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+const batchCutoff = propertyPhoto.maxBytes;
+export const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+export const stagedDirectory = 'staged-v2';
 const snapshotKey = ({key,id,version}) => digest(JSON.stringify([key,id,version]));
 const approved = format => Object.hasOwn(formats,format);
 
@@ -25,7 +28,7 @@ function groups(entries, keyOf) {
 
 export function planInventory(inventory) {
   const {bucket, schemaVersion, objects, references, galleryListings} = inventory;
-  if (bucket !== 'property-media' || schemaVersion !== 1 || !Array.isArray(objects) ||
+  if (bucket !== PROPERTY_IMAGE_BUCKET || schemaVersion !== 1 || !Array.isArray(objects) ||
       !references || typeof references !== 'object' || Array.isArray(references)) throw new Error('Expected a Home property-media inventory.');
   const keys = new Map();
   for (const entry of objects) {
@@ -38,7 +41,7 @@ export function planInventory(inventory) {
     if (!Number.isSafeInteger(sightings) || sightings<0) throw new Error('Invalid reference count.');
     const protectedKey = entry.protected !== false || typeof entry.version !== 'string' || !entry.version ||
       typeof entry.id !== 'string' || !entry.id || !entry.etag || keys.get(entry.key)>1;
-    const supported = approved(entry.mime) && extensions[entry.mime].test(entry.key) && entry.bytes<=8*1024*1024;
+    const supported = approved(entry.mime) && extensions[entry.mime].test(entry.key) && entry.bytes<=PROPERTY_IMAGE_MAX_BYTES;
     const owners = galleryListings && Object.hasOwn(galleryListings,entry.key) ? galleryListings[entry.key] : [];
     const listing = Array.isArray(owners) && owners.length===1 ? owners[0] : null;
     let state = 'candidate';
@@ -61,11 +64,13 @@ export function planInventory(inventory) {
   };
 }
 
-const readJson = async path=>JSON.parse(await readFile(path,'utf8'));
-async function writeAtomic(path, data) {
+export const readJson = async path=>JSON.parse(await readFile(path,'utf8'));
+export async function writeAtomic(path, data, createOnly=false) {
   const temp = path+'.'+randomUUID()+'.tmp';
   await writeFile(temp,data,{mode:0o600,flag:'wx'});
-  await rename(temp,path);
+  if (createOnly) {
+    try {await link(temp,path);} finally {await unlink(temp);}
+  } else await rename(temp,path);
 }
 
 export async function measuredRendition(sharp, original, mime) {
@@ -73,27 +78,33 @@ export async function measuredRendition(sharp, original, mime) {
   const source = await make(original).metadata();
   const details = imageDetails(original);
   if (source.format !== formats[mime] || details?.type!==mime || source.pages > 1 || source.depth !== 'uchar' ||
-      details.protectedMetadata || details.animated || details.metadata?.some(segment=>!segment.tiff)) return null;
+      details.animated || details.metadata?.some(segment=>!segment.tiff)) return null;
+  const preserveWebpMetadata=details.protectedMetadata&&canPreserveWebpMetadata(original,source,details);
+  if(details.protectedMetadata&&!preserveWebpMetadata)return null;
   // Keep EXIF-bearing JPEGs in the original container. Untagged photographs
   // and ordinary PNGs with physical density can use WebP.
-  const outputMime = details.metadata?.length ? 'image/jpeg' : 'image/webp';
+  const outputMime = details.metadata?.length&&!preserveWebpMetadata ? 'image/jpeg' : 'image/webp';
   const sample = (bytes,size)=>make(bytes).rotate().resize(size,size,{fit:'fill'}).toColourspace('srgb').ensureAlpha().raw().toBuffer();
   const reference = await sample(original,192);
   const detailedReference = await sample(original,720);
-  const {targetBytes,maxBytes,maxEdge,minEdge} = propertyPhoto;
+  const {targetBytes,maxBytes} = propertyPhoto;
   let fallback;
-  for (const edge of new Set([maxEdge,Math.round((maxEdge+minEdge)/2),minEdge])) {
-    for (const quality of [86,78,72]) {
-      const resized = make(original).resize(edge,edge,{fit:'inside',withoutEnlargement:true});
+  for (const [width,height] of imageEncodingSizes(source.width,source.height,propertyPhoto)) {
+    for (const encodedQuality of imageEncodingQualities) {
+      const quality = Math.round(encodedQuality*100);
+      const resized = make(original).resize(width,height,{fit:'fill',withoutEnlargement:true});
+      if(preserveWebpMetadata&&source.icc)resized.keepIccProfile();
+      if(preserveWebpMetadata&&source.xmp)resized.keepXmp();
       const compressed = outputMime==='image/jpeg' ?
         await resized.keepMetadata().jpeg({quality}).toBuffer() :
         await resized.webp({quality}).toBuffer();
-      const encoded = details.density ? Buffer.from(webpWithDensity(compressed,details.density)) : compressed;
+      const encoded = preserveWebpMetadata&&source.exif ? Buffer.from(webpWithExif(compressed,source.exif)) :
+        details.density ? Buffer.from(webpWithDensity(compressed,details.density)) : compressed;
       if (encoded.length>=original.length || encoded.length>maxBytes) continue;
       const actual = await make(encoded).metadata();
       const sameMetadata = ['exif','icc','iptc','xmp'].every(key=>!source[key] ||
         actual[key] && Buffer.compare(source[key],actual[key])===0);
-      if (!sameMetadata || (actual.orientation??1)!==(source.orientation??1) ||
+      if (actual.width!==width || actual.height!==height || !sameMetadata || (actual.orientation??1)!==(source.orientation??1) ||
           outputMime==='image/jpeg' && source.density && actual.density!==source.density || source.comments &&
           JSON.stringify(actual.comments)!==JSON.stringify(source.comments)) continue;
       const error = imagePixelError(await sample(encoded,192),reference);
@@ -110,17 +121,16 @@ export async function measuredRendition(sharp, original, mime) {
 
 function replacementKey(entry, outputMime) {
   const id = entry.listing?.id;
-  const parent = id && /^[a-f0-9-]{36}$/.test(id) ? 'properties/listings/'+id : 'properties';
-  const basename = entry.key.split('/').at(-1).replace(extensions[entry.mime],'');
-  const stem = basename.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/đ/g,'d')
-    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,104).replace(/-+$/,'') || 'photo';
-  return parent+'/'+randomUUID()+'/'+stem+(outputMime==='image/webp'?'.webp':'.jpg');
+  const savedName = entry.userMetadata?.original_filename;
+  const name = typeof savedName==='string' && savedName ? savedName : entry.key.split('/').at(-1);
+  return propertyPhotoStorageKey(name,outputMime==='image/webp'?'webp':'jpg',randomUUID(),
+    id && /^[a-f0-9-]{36}$/.test(id) ? id : undefined);
 }
 
 export async function stageInventory(plan, work, limit) {
   if (!Number.isSafeInteger(limit)||limit<1) throw new Error('Provide a positive maximum number of new candidates to stage.');
   const {default:sharp} = await import('sharp');
-  const output = join(work,'staged-v2'), backups = join(work,'backups');
+  const output = join(work,stagedDirectory), backups = join(work,'backups');
   await mkdir(output,{recursive:true,mode:0o700});
   const results = [];
   let attempted = 0;

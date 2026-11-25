@@ -17,6 +17,7 @@ with refs as materialized (
     o.metadata->>'mimetype' as mime,
     coalesce(o.metadata->>'eTag',o.metadata->>'etag') as etag,
     o.metadata->>'cacheControl' as "cacheControl",
+    o.metadata as "objectMetadata",
     o.user_metadata as "userMetadata",
     coalesce(b.versioning_status::text <> 'DISABLED', true) or coalesce(o.is_versioned,true)
     or coalesce(o.is_delete_marker,true) or o.archived_at is not null
@@ -28,7 +29,7 @@ with refs as materialized (
   where o.bucket_id = 'property-media'
 )
 select jsonb_build_object(
-  'schemaVersion',1,'bucket','property-media','capturedAt',statement_timestamp(),
+  'schemaVersion',1,'bucket','property-media','origin','https://duyiihsmaqfgwezmsnjs.supabase.co','capturedAt',statement_timestamp(),
   'objects',coalesce((select jsonb_agg(to_jsonb(o) order by o.key,o.version) from objects o),'[]'::jsonb),
   'references',coalesce((select jsonb_object_agg(name,sightings) from refs),'{}'::jsonb),
   'galleryListings',coalesce((select jsonb_object_agg(key,listings) from gallery_lists),'{}'::jsonb)

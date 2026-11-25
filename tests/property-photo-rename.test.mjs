@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {PGlite} from '@electric-sql/pglite';
+import sharp from 'sharp';
 import {propertyPhotoFilename,propertyPhotoPath,propertyPhotoUrl,replacePropertyPhotoUrl} from '../lib/property-photo-files.ts';
 import {propertyPhotoRenameHistory,renamePropertyPhoto,retirePropertyPhoto} from '../lib/property-photo-rename-server.ts';
 import {syncRenamedListingDraft} from '../lib/property-photo-rename-state.ts';
 import {deleteListingAndMedia,listingDeletionQueue,retryDueListingCleanup} from '../lib/property-deletion-server.ts';
+import {continuationCheckpoint,readStagedBatch,reviewedContinuation,runMediaStage,sealContinuation} from '../scripts/migrate-property-media.mjs';
+import {databaseStages} from '../scripts/property-media-migration-transport.mjs';
 
 const origin='https://duyiihsmaqfgwezmsnjs.supabase.co', bucket='property-media';
 const first='10101010-1111-4111-8111-111111111111', second='20202020-2222-4222-8222-222222222222';
@@ -73,7 +78,7 @@ async function setup(t) {
   create table public.properties(id uuid primary key,images text[] not null,image_metadata jsonb not null default '{}',
     image_filenames jsonb not null default '{}', source_url text,updated_at timestamptz not null,
     status text not null default 'draft',listing_code text not null default 'TEST',address text not null default 'Test address',
-    video_url text,listing_type text default 'rent',availability text default 'available');
+    video_url text,listing_type text default 'rent',availability text default 'available',slug text default 'fixture-home');
   create table public.neighbourhoods(image text);create table public.site_settings(hero_image text);
   create table public.listing_authors(portrait_url text);create table public.site_activities(image_url text,source_url text);
   create table public.editorial_articles(image_url text,sources jsonb not null default '[]');
@@ -96,6 +101,9 @@ async function setup(t) {
   grant select,insert,update,delete on storage.objects to authenticated;
   create policy legacy_storage_editor on storage.objects for all to authenticated using(true) with check(true);
   grant select,update,insert,delete on public.properties to authenticated;
+  alter table public.properties enable row level security;
+  create policy fixture_property_select on public.properties for select to authenticated using(true);
+  create policy fixture_property_update on public.properties for update to authenticated using(true) with check(true);
  `);
  for(const [id,name] of [[admin,'admin'],[editor,'editor'],[manager,'manager'],[owner,'owner']])
   await pg.query('insert into auth.users(id,role) values($1,$2)',[id,name]);
@@ -177,11 +185,13 @@ test('approved WebP switch checks storage identities and references, preserves g
  };
  const original=await identity(oldKey,'image/jpeg',900000,'before');
  const optimized=await identity(optimizedKey,'image/webp',232000,'after');
- const call=(apply=false,undo=null,expected=version,src=original)=>h.pg.query(
-   'select pg_temp.switch_optimized_property_photo($1,$2,$3,$4,$5,$6) as result',
-   [first,expected,src,optimized,apply,undo]).then(({rows})=>rows[0].result);
+ const call=(apply=false,undo=null,expected=version,src=original,actor=owner)=>h.pg.query(
+   'select pg_temp.switch_optimized_property_photo($1,$2,$3,$4,$5,$6,$7) as result',
+   [first,expected,src,optimized,apply,undo,actor]).then(({rows})=>rows[0].result);
 
  await assert.rejects(h.role('authenticated',owner,()=>call(true)),error=>error.code==='42501');
+ await assert.rejects(call(false,null,version,original,editor),/photo_rename.forbidden/);
+ await assert.rejects(call(false,null,version,original,null),/photo_rename.forbidden/);
  await assert.rejects(call(false,null,changedVersion),error=>error.code==='PT409'&&/stale_listing/.test(error.message));
  await assert.rejects(call(false,null,version,{...original,version:'missing'}),/object_changed/);
  await assert.rejects(call(true),/shared_reference/);
@@ -201,6 +211,10 @@ test('approved WebP switch checks storage identities and references, preserves g
  await h.pg.query("update storage.objects set user_metadata='{}' where name=$1",[optimizedKey]);
  await assert.rejects(call(true),/storage_metadata_changed/);
  await h.pg.query('update storage.objects set user_metadata=$1 where name=$2',[metadata,optimizedKey]);
+ await h.pg.exec('alter policy fixture_property_update on public.properties using(false)');
+ await assert.rejects(call(true),/reference_verification/);
+ assert.deepEqual((await h.listing(first)).images,preview.before.images);
+ await h.pg.exec('alter policy fixture_property_update on public.properties using(true)');
  const applied=await call(true);
  assert.deepEqual(applied.after.image_filenames,{[optimizedUrl]:'Room.JPG'});
  assert.deepEqual((await h.listing(first)).images,preview.after.images);
@@ -211,6 +225,130 @@ test('approved WebP switch checks storage identities and references, preserves g
  assert.deepEqual((await h.listing(first)).image_metadata,preview.before.image_metadata);
  assert.equal((await h.pg.query('select count(*)::integer count from private.property_photo_renames')).rows[0].count,0);
  assert.deepEqual(h.calls,[]);
+});
+
+test('local media stages reconcile interrupted writes, guard retirement and roll back in listing order',async t=>{
+ const h=await setup(t);
+ const directory=await mkdtemp(join(tmpdir(),'gary-media-stages-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const work=join(directory,'batch'), inventory=join(directory,'inventory.json');
+ const source=await sharp(await readFile(new URL('../public/images/apartments/lux-apartment-in-dang-thai-ma-tay-ho-1.jpg',import.meta.url))).png().toBuffer();
+ const keys=['properties/pilot-room.png','properties/pilot-living.png'];
+ const urls=keys.map(key=>propertyPhotoUrl(origin,key));
+ const saved={original_filename:'Căn hộ (3).png'};
+ const register=async(key,body,mime,metadata)=>{
+  h.files.set(key,{mime,bytes:body});
+  await h.pg.query('insert into storage.objects(bucket_id,name,metadata,user_metadata) values($1,$2,$3,$4)',
+    [bucket,key,{size:body.length,mimetype:mime,eTag:'fixture-etag'},metadata]);
+ };
+ for(const key of keys)await register(key,source,'image/png',saved);
+ await h.pg.query('update public.properties set images=$1,image_metadata=$2,image_filenames=$3 where id=$4',
+   [[another,...urls],Object.fromEntries(urls.map(uri=>[uri,h.caption])),Object.fromEntries(urls.map(uri=>[uri,saved.original_filename])),first]);
+ const {rows:[captured]}=await h.pg.query(await readFile(new URL('../scripts/inventory-property-images.sql',import.meta.url),'utf8'));
+ await writeFile(inventory,JSON.stringify(captured.inventory));
+ const helpers=(await Promise.all(['switch-optimized-property-photo.sql','property-media-migration-state.sql']
+   .map(name=>readFile(new URL('../scripts/'+name,import.meta.url),'utf8')))).join('\n');
+ const db=databaseStages(async sql=>{
+  const result=await h.pg.exec(sql);
+  return Object.values(result.at(-1).rows[0])[0];
+ },helpers);
+ let loseUpload=true,loseSwitch=true,loseRemoval=true,opens=0,reads=0,uploads=0,applies=0;
+ const transport={
+  ...db,owner:async()=>owner,
+  async read(identity){reads++;return h.files.get(identity.key).bytes;},
+  async upload(key,body,mime,metadata){
+   uploads++;
+   await register(key,body,mime,metadata);
+   if(loseUpload){loseUpload=false;throw new Error('fixture lost upload response');}
+  },
+  async switchPhotos(args){
+   const result=await db.switchPhotos(args);
+   if(args.apply){applies++;if(loseSwitch){loseSwitch=false;throw new Error('fixture lost switch response');}}
+   return result;
+  },
+  async retire(id){
+   await retirePropertyPhoto(h.client('authenticated',owner),h.client('service_role'),origin,id,signal());
+   if(loseRemoval){loseRemoval=false;throw new Error('fixture lost removal response');}
+  },
+ };
+ const factory=async()=>{opens++;return transport;};
+ const audit=await runMediaStage('audit',{inventory,work,apply:true,limit:2,egressBytes:50_000_000,storageBytes:1_000_000});
+ const [a,b]=audit.selected.map(entry=>entry.token);
+ const run=(stage,extra={})=>runMediaStage(stage,{work,apply:true,approve:audit.batchId,...extra},factory);
+ assert.equal((await run('backup',{apply:false})).dryRun,true);
+ await assert.rejects(run('backup',{approve:'wrong'}),/explicit approval/);
+ assert.equal(opens,0);
+ const tiny=await runMediaStage('audit',{inventory,work:join(directory,'tiny'),apply:true,limit:1,
+   egressBytes:source.length-1,storageBytes:500000});
+ const capped=await run('backup',{work:join(directory,'tiny'),approve:tiny.batchId});
+ assert.match(capped.results[0].reason,/budget would be exceeded/);
+ assert.equal(reads,0);
+ const retryWork=join(directory,'retry');
+ const retry=await runMediaStage('audit',{inventory,work:retryWork,apply:true,limit:1,
+   egressBytes:source.length*4,storageBytes:500000});
+ let retries=0;
+ const failRead=()=>({...transport,read:async()=>{retries++;throw new Error('fixture stalled transfer');}});
+ for(let attempt=0;attempt<4;attempt++){
+  const outcome=await runMediaStage('backup',{work:retryWork,apply:true,approve:retry.batchId},failRead);
+  assert.equal(outcome.blocked,true);
+  if(attempt===3)assert.match(outcome.results[0].reason,/attempt limit/);
+ }
+ assert.equal(retries,3);
+
+ assert.equal((await run('backup')).blocked,false);
+ assert.equal((await run('backup')).blocked,false);
+ assert.equal(reads,2);
+ const conversion=await run('convert');
+ assert.equal(conversion.results.length,2);
+ assert.ok(conversion.results.every(result=>result.outputMime==='image/webp'&&result.replacementKey.endsWith('/can-ho-03.webp')));
+ const sourceBatch=await readStagedBatch(work);
+ const rows=sourceBatch.photos.map(({entry,result})=>({token:entry.token,listing:first,old_key:entry.key,new_key:result.replacementKey}));
+ await h.pg.query('update public.properties set updated_at=$1 where id=$2',[changedVersion,first]);
+ const review=await db.review(rows);
+ const reviewed=reviewedContinuation(sourceBatch,review);
+ assert.equal(Date.parse(reviewed.entries[0].listing.version),Date.parse(changedVersion));
+ assert.equal(reviewed.sourceBatchId,audit.batchId);
+ assert.notEqual(reviewed.id,audit.batchId);
+ const resumedWork=join(directory,'continuation');
+ await sealContinuation(resumedWork,work,reviewed);
+ assert.equal((await continuationCheckpoint(resumedWork,sourceBatch)).batch.id,reviewed.id);
+ await h.pg.query('update public.editorial_articles set image_url=$1',[urls[0]]);
+ const sharedReview=await db.review(rows);
+ assert.throws(()=>reviewedContinuation(sourceBatch,sharedReview),/live reference or object audit failed/);
+ await h.pg.query('update public.editorial_articles set image_url=$1',[another]);
+ await h.pg.query('update public.properties set updated_at=$1 where id=$2',[version,first]);
+ assert.equal((await run('upload')).blocked,true);
+ assert.equal((await run('upload')).blocked,false);
+ assert.equal(uploads,2);
+ assert.equal((await run('migrate')).blocked,true);
+ assert.equal(applies,1);
+ assert.equal((await run('migrate')).blocked,false);
+ assert.equal(applies,2);
+ assert.equal((await run('verify')).blocked,false);
+ assert.equal((await run('rollback',{tokens:[b]})).blocked,false);
+ const restored=await h.listing(first);
+ const bUrl=urls[keys.indexOf(audit.selected[1].key)];
+ assert.ok(restored.images.includes(bUrl));
+ assert.deepEqual(restored.image_metadata[bUrl],h.caption);
+ const oldAsset=audit.selected[0].key;
+ await assert.rejects(run('cleanup',{tokens:[a]}),/retire-originals/);
+ const handoff={tokens:[a],retireOriginals:true};
+ assert.equal((await run('cleanup',handoff)).blocked,true);
+ assert.equal(h.files.has(oldAsset),false);
+ assert.equal((await run('cleanup',handoff)).blocked,false);
+ const cleanupCalls=h.calls.filter(([action])=>action==='remove');
+ assert.deepEqual(cleanupCalls,[['remove',oldAsset]]);
+ assert.equal((await run('report')).items.find(item=>item.token===a).state,'cleaned');
+ const {items}=JSON.parse(await readFile(join(work,'journal.json'),'utf8'));
+ const {uploaded,retirementId}=items[a];
+ const retired=[{listing:first,old_key:oldAsset,new_key:uploaded.key,job:retirementId,identity:uploaded}];
+ await h.pg.query("update public.properties set status='published' where id=$1",[first]);
+ const productionCheck=await db.verifyRun(retired);
+ assert.equal(productionCheck.confirmed,1);
+ assert.deepEqual(productionCheck.sample,{slug:'fixture-home',key:uploaded.key});
+ await h.pg.query("update storage.objects set metadata=metadata||'{\"eTag\":\"new\"}'::jsonb where name=$1",[uploaded.key]);
+ assert.equal((await db.verifyRun(retired)).confirmed,0);
+ await assert.rejects(h.pg.query('update site_settings set hero_image=$1',[propertyPhotoUrl(origin,oldAsset)]),/retired_reference|stale_reference/);
 });
 
 test('Owner-only copy, stale edit retry, atomic references, retained originals and explicit removal',async t=>{

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as photoFiles from '../lib/property-photo-files.ts';
 const base=path.resolve(import.meta.dirname,'..');
 function harness(t){
  const state={uploads:[],progress:[],token:'first',user:'owner',aborts:0},controller=new AbortController();t.after(()=>controller.abort());
@@ -11,7 +12,7 @@ function harness(t){
  class Upload {constructor(file,options){this.file=file;this.options=options;this.url=options.uploadUrl||null;state.uploads.push(this);}start(){this.started=true;}async abort(){state.aborts++;}}
  const client={auth:{getSession:async()=>({data:{session:{access_token:state.token,user:{id:state.user}}},error:null})},storage:{from:bucket=>({getPublicUrl:p=>({data:{publicUrl:'https://media.example/'+bucket+'/'+p}})})}};
  const source=ts.transpileModule(fs.readFileSync(base+'/lib/listing-file-upload.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
- const loaded={exports:{}};function dependency(id){if(id==='tus-js-client')return {Upload};if(id==='./browser-client')return {browserBackendConfig:()=>({url:'https://exampleproject.supabase.co',publishableKey:'public-key'})};throw new Error(id);}
+ const loaded={exports:{}};function dependency(id){if(id==='tus-js-client')return {Upload};if(id==='./property-photo-files')return photoFiles;if(id==='./browser-client')return {browserBackendConfig:()=>({url:'https://exampleproject.supabase.co',publishableKey:'public-key'})};throw new Error(id);}
  class ClockDate extends Date {static now(){return now;}}
  vm.runInThisContext('(function(exports,require,module,setTimeout,clearTimeout,Date){'+source+'\n})')(loaded.exports,dependency,loaded,(fn,delay)=>{timers.set(++sequence,{fn,at:now+delay});return sequence;},id=>timers.delete(id),ClockDate);
  const file=new File(['1234567890'],'Căn hộ * lake view.JPG',{type:'image/jpeg'});

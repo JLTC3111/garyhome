@@ -1,5 +1,7 @@
 export const PROPERTY_IMAGE_BUCKET = "property-media";
 export const PROPERTY_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+export const PROPERTY_IMAGE_ORIGIN = "https://duyiihsmaqfgwezmsnjs.supabase.co";
+export const PROPERTY_IMAGE_CACHE_SECONDS = "31536000";
 const publicPhotoRoot = "/storage/v1/object/public/property-media/";
 const renderedPhotoRoot = "/storage/v1/render/image/public/property-media/";
 const imageSuffix = /\.(jpe?g|png|webp|avif)$/i;
@@ -34,6 +36,11 @@ export function propertyPhotoFilename(value: string, extension: Extension, requi
   if (!base) return "";
   if (copyNumber && !base.endsWith("-" + copyNumber)) base += "-" + copyNumber;
   return `${base}.${extension}`;
+}
+
+export function propertyPhotoStorageKey(filename: string, extension: Extension, revision: string, listingId?: string) {
+  const scope = listingId ? `properties/listings/${listingId}` : "properties";
+  return `${scope}/${revision}/${propertyPhotoFilename(filename,extension) || `photo.${extension}`}`;
 }
 
 export function propertyPhotoPath(source: string, origin?: string): string | null {

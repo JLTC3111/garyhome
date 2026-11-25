@@ -16,8 +16,8 @@ export function listingUploadEndpoint(value: string) {
 
 // TUS resumes acknowledged chunks after a network interruption. Upload URLs
 // remain in this tab's memory and are scoped to both the file and signed-in user.
-export async function uploadListingFile({ client, file, resumeKey = file, bucket, path, contentType, originalFilename, signal, onProgress }: {
-  client: SupabaseClient; file: Blob; resumeKey?: Blob; bucket: string; path: string; contentType: string; originalFilename: string;
+export async function uploadListingFile({ client, file, resumeKey = file, bucket, path, contentType, originalFilename, expectedUserId, signal, onProgress }: {
+  client: SupabaseClient; file: Blob; resumeKey?: Blob; bucket: string; path: string; contentType: string; originalFilename: string; expectedUserId?: string;
 } & ListingUploadOptions): Promise<string> {
   signal?.throwIfAborted();
   const config = browserBackendConfig(client);
@@ -26,6 +26,7 @@ export async function uploadListingFile({ client, file, resumeKey = file, bucket
   signal?.throwIfAborted();
   const userId = data.session?.user.id;
   if (error || !userId || !data.session?.access_token) throw new Error("Your sign-in expired. Reconnect and try uploading again.");
+  if (expectedUserId && userId !== expectedUserId) throw new Error("Your account changed. Sign in again before continuing.");
   const { Upload } = await import("tus-js-client");
   signal?.throwIfAborted();
   const key = `${config.url}/${userId}/${bucket}/${path}`;

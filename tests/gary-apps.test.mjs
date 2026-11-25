@@ -78,7 +78,12 @@ test('service links separate same-site navigation from new-tab external destinat
  const h=await harness(t,'directory');
  for(const link of h.renderer.root.findAllByType('a'))if(link.props.href.startsWith('/'))assert.equal(link.props.target,undefined);else{assert.equal(link.props.target,'_blank');assert.equal(link.props.rel,'noopener noreferrer');}
  await h.update({language:'vi',currentApp:'jobs'});const content=JSON.stringify(h.renderer.toJSON());assert.match(content,/Tìm việc làm/);assert.match(content,/Du lịch Việt Nam/);assert.match(content,/Hỗ trợ visa/);assert.match(content,/Tìm nơi để gọi là nhà/);
- for(const name of ['Tìm Nhà','Tìm Việc','Dịch Vụ Visa'])assert.ok(content.includes(name),name);assert.doesNotMatch(content,/Gary (Home|Jobs|Visa Service)/);
+ const cards=h.renderer.root.findAllByType('article');
+ assert.deepEqual(cards.map(card=>card.findByType('h3').props.children),['Gary Home','Gary Jobs','Gary Visa Service']);
+ assert.deepEqual(cards.map(card=>card.findByProps({className:'gary-app-sector'}).props.children),['Nhà ở & cho thuê','Giảng dạy & tuyển dụng','Visa & hồ sơ']);
+ assert.deepEqual(cards.map(card=>card.findByProps({className:'gary-app-mark'}).findByType('svg').props['data-gary-brand-mark']),['home','jobs','visa']);
+ assert.deepEqual(cards.map(card=>card.props['data-current']),[false,true,false]);
+ assert.equal(cards[1].findByProps({className:'gary-app-current'}).props.children,'Trang hiện tại');
  assert.ok(h.renderer.root.findAllByType('a').some(link=>link.props.href==='/#opportunities'));assert.ok(h.renderer.root.findAllByType('a').some(link=>link.props.href==='https://garyhome.vn/homes'));
 });
 
@@ -87,7 +92,14 @@ test('the apps menu preserves its open state through translation, closes outside
  await h.toggle();assert.equal(h.renderer.root.findByType('summary').props['aria-expanded'],true);assert.equal(h.listeners.size,1);assert.equal(h.opens,1);
  assert.match(JSON.stringify(h.renderer.toJSON()),/Other Services/);
  await h.update({language:'vi'});assert.equal(h.renderer.root.findByType('details').props.open,true);assert.equal(h.renderer.root.findByType('summary').props['aria-label'],'Khám phá các trang và dịch vụ Gary');assert.match(JSON.stringify(h.renderer.toJSON()),/Dịch vụ khác/);assert.doesNotMatch(JSON.stringify(h.renderer.toJSON()),/Our Services|Dịch vụ Gary/);
- const menu=JSON.stringify(h.renderer.toJSON());for(const name of ['Tìm Nhà','Tìm Việc','Dịch Vụ Visa'])assert.ok(menu.includes(name),name);
+ const brands=h.renderer.root.findAllByType('strong').filter(node=>node.props.className==='gary-app-name');
+ assert.deepEqual(brands.map(node=>node.findByType('span').props.children),['Gary Home','Gary Jobs','Gary Visa Service']);
+ const marks=h.renderer.root.findAllByType('svg').filter(node=>node.props['data-gary-brand-mark']);
+ assert.deepEqual(marks.map(node=>node.props['data-gary-brand-mark']),['home','jobs','visa']);
+ assert.ok(marks.every(node=>node.props['aria-hidden']==='true'&&node.props.viewBox==='0 0 40 40'));
+ assert.equal(h.renderer.root.findByProps({className:'gary-app-current'}).props.children,'Trang hiện tại');
+ assert.equal(h.renderer.root.findAllByType('a').find(link=>link.props['aria-current']==='true').props.href,'/vi');
+ assert.match(JSON.stringify(h.renderer.toJSON()),/Việc làm giảng dạy, tuyển dụng & cuộc sống Việt Nam/);
  await act(async()=>h.document.dispatchEvent(new Event('pointerdown')));assert.equal(h.renderer.root.findByType('details').props.open,false);assert.equal(h.listeners.size,0);
 });
 

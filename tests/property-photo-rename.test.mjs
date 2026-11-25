@@ -88,7 +88,9 @@ async function setup(t) {
   create table storage.buckets(id text primary key,versioning_status text not null default 'DISABLED');
   insert into storage.buckets(id) values('property-media'),('listing-videos');
   create table storage.objects(bucket_id text,name text,id uuid not null default gen_random_uuid(),
-    version text default gen_random_uuid()::text,metadata jsonb default '{"size":8}',primary key(bucket_id,name));
+    version text default gen_random_uuid()::text,metadata jsonb default '{"size":8}',user_metadata jsonb,
+    is_versioned boolean not null default false,is_delete_marker boolean not null default false,archived_at timestamptz,
+    primary key(bucket_id,name));
   alter table storage.objects enable row level security;
   grant usage on schema storage,private to authenticated;
   grant select,insert,update,delete on storage.objects to authenticated;
@@ -161,6 +163,55 @@ async function setup(t) {
  return {pg,role,client,files,calls,caption,listing,
   onCopy:callback=>{onCopy=callback;},onRemove:callback=>{onRemove=callback;}};
 }
+
+test('approved WebP switch checks storage identities and references, preserves gallery metadata and rolls back exactly',async t=>{
+ const h=await setup(t);
+ await h.pg.exec(await readFile(new URL('../scripts/switch-optimized-property-photo.sql',import.meta.url),'utf8'));
+ const optimizedKey=`properties/listings/${first}/${second}/room.webp`, optimizedUrl=propertyPhotoUrl(origin,optimizedKey);
+ const metadata={original_filename:'Room.JPG'};
+ const identity=async(key,mime,bytes,etag)=>{
+  const result=await h.pg.query(`insert into storage.objects(bucket_id,name,metadata,user_metadata)
+    values($1,$2,$3,$4) on conflict(bucket_id,name) do update set metadata=excluded.metadata,user_metadata=excluded.user_metadata
+    returning id,version`,[bucket,key,{size:bytes,mimetype:mime,eTag:etag},metadata]);
+  return {...result.rows[0],key,mime,bytes,etag,sha256:'a'.repeat(64)};
+ };
+ const original=await identity(oldKey,'image/jpeg',900000,'before');
+ const optimized=await identity(optimizedKey,'image/webp',232000,'after');
+ const call=(apply=false,undo=null,expected=version,src=original)=>h.pg.query(
+   'select pg_temp.switch_optimized_property_photo($1,$2,$3,$4,$5,$6) as result',
+   [first,expected,src,optimized,apply,undo]).then(({rows})=>rows[0].result);
+
+ await assert.rejects(h.role('authenticated',owner,()=>call(true)),error=>error.code==='42501');
+ await assert.rejects(call(false,null,changedVersion),error=>error.code==='PT409'&&/stale_listing/.test(error.message));
+ await assert.rejects(call(false,null,version,{...original,version:'missing'}),/object_changed/);
+ await assert.rejects(call(true),/shared_reference/);
+ assert.deepEqual((await h.listing(first)).images,[oldUrl,another]);
+
+ await h.pg.query("update public.properties set images=$1,image_metadata='{}',image_filenames='{}',source_url=null where id=$2",[[another],second]);
+ await h.pg.query('update public.site_settings set hero_image=$1',[another]);
+ await h.pg.exec("update public.editorial_articles set sources='[]'");
+ await h.pg.query('update public.properties set images=$1,image_metadata=$2,image_filenames=$3 where id=$4',
+   [[transformed,another],{[transformed]:h.caption},{[transformed]:'Room.JPG'},first]);
+ const preview=await call();
+ assert.deepEqual(preview.before.images,[transformed,another]);
+ assert.deepEqual(preview.after.images,[optimizedUrl,another]);
+ assert.deepEqual(preview.after.image_metadata,{[optimizedUrl]:h.caption});
+ assert.deepEqual((await h.listing(first)).images,preview.before.images);
+
+ await h.pg.query("update storage.objects set user_metadata='{}' where name=$1",[optimizedKey]);
+ await assert.rejects(call(true),/storage_metadata_changed/);
+ await h.pg.query('update storage.objects set user_metadata=$1 where name=$2',[metadata,optimizedKey]);
+ const applied=await call(true);
+ assert.deepEqual(applied.after.image_filenames,{[optimizedUrl]:'Room.JPG'});
+ assert.deepEqual((await h.listing(first)).images,preview.after.images);
+ assert.equal((await h.pg.query("select count(*)::integer count from storage.objects where bucket_id='property-media'")).rows[0].count,2);
+ await assert.rejects(call(true),/stale_listing/);
+ const undone=await call(true,applied,applied.versionAfter);
+ assert.deepEqual(undone.after,preview.before);
+ assert.deepEqual((await h.listing(first)).image_metadata,preview.before.image_metadata);
+ assert.equal((await h.pg.query('select count(*)::integer count from private.property_photo_renames')).rows[0].count,0);
+ assert.deepEqual(h.calls,[]);
+});
 
 test('Owner-only copy, stale edit retry, atomic references, retained originals and explicit removal',async t=>{
  const h=await setup(t), write=h.client('authenticated',owner), system=h.client('service_role');

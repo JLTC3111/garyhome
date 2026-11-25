@@ -7,6 +7,7 @@ import { useEffect,useRef,useState,type FormEvent } from "react";
 import { Camera,KeyRound,LoaderCircle,Save } from "lucide-react";
 import { useSite } from "./site-context";
 import { setAccountPassword } from "@/lib/password-actions";
+import { avatarPhoto, imageOptimizationErrorText, optimizeImage } from "@/lib/image-optimization.mjs";
 
 export function StaffAccountMenu({ onDashboard, onSignedOut }: { onDashboard: () => void; onSignedOut: () => void }){
  const {editor,sessionResolved,sessionPhase}=useSite(),[open,setOpen]=useState(false);
@@ -28,7 +29,7 @@ export function StaffPasswordReminder(){
  return <div className="staff-password-reminder" role="status"><KeyRound size={18}/><span>{t("Please change your staff password after your first login.","Hãy đổi mật khẩu nhân viên sau lần đăng nhập đầu tiên.")}</span><button type="button" className="text-link" onClick={()=>window.dispatchEvent(new Event("gary-open-staff-profile"))}>{t("Change password","Đổi mật khẩu")}</button></div>;
 }
 function StaffProfileDialog({close}:{close:()=>void}){
- const site=useSite(),{user,client,staffProfile,t,editorTask,accountTask,refreshStaffProfile,notice}=site;
+ const site=useSite(),{user,client,staffProfile,t,language,editorTask,accountTask,refreshStaffProfile,notice}=site;
  const active=useRef(true);
  const [busy,setBusy]=useState(""),[error,setError]=useState("");
  const [password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[photoChanged,setPhotoChanged]=useState(false),[photoFailed,setPhotoFailed]=useState(false);
@@ -36,17 +37,19 @@ function StaffProfileDialog({close}:{close:()=>void}){
  async function upload(file:File){
   if(!user||busy)return;
   if(!["image/jpeg","image/png","image/webp","image/avif"].includes(file.type)||file.size>2097152){setPhotoFailed(true);setError(t("Choose a JPG, PNG, WebP or AVIF image up to 2 MB.","Chọn ảnh JPG, PNG, WebP hoặc AVIF tối đa 2 MB."));return;}
-  const path=user.id+"/"+crypto.randomUUID()+"."+({"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/avif":"avif"}[file.type]);
   setBusy("photo");setPhotoFailed(false);setError("");
   try{
    await editorTask(async(db,signal)=>{
-    const uploaded=await db.storage.from("staff-avatars").upload(path,file,{upsert:false,contentType:file.type,cacheControl:"31536000"});if(uploaded.error)throw uploaded.error;
+    const photo=await optimizeImage(file,avatarPhoto,{signal,inputMax:2*1024*1024,stillOnly:true});
+    signal.throwIfAborted();
+    const path=user.id+"/"+crypto.randomUUID()+"."+photo.extension;
+    const uploaded=await db.storage.from("staff-avatars").upload(path,photo.body,{upsert:false,contentType:photo.contentType,cacheControl:"31536000"});if(uploaded.error)throw uploaded.error;
     signal.throwIfAborted();
     const saved=await db.from("staff_profiles").upsert({user_id:user.id,avatar_path:path}).select("user_id").abortSignal(signal).single();if(saved.error)throw saved.error;
    });
    if(!active.current)return;
    setPhotoChanged(true);notice("Profile photo updated.");window.dispatchEvent(new Event("gary-staff-profile-changed"));await refreshStaffProfile().catch(()=>{});
-  }catch{if(active.current){setPhotoFailed(true);setError(t("Couldn’t confirm the photo update. Reconnect and try again.","Chưa xác nhận được ảnh mới. Hãy kết nối lại rồi thử lại."));}}
+  }catch(error){if(active.current){setPhotoFailed(true);setError(imageOptimizationErrorText(error,language)||t("Couldn’t confirm the photo update. Reconnect and try again.","Chưa xác nhận được ảnh mới. Hãy kết nối lại rồi thử lại."));}}
   finally{if(active.current)setBusy("");}
  }
  async function saveChanges(event:FormEvent<HTMLFormElement>){

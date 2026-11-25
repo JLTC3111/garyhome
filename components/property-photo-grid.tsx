@@ -9,6 +9,7 @@ import { PropertyGallery } from "./property-gallery";
 import { PropertyPhotoRenameForm, PropertyPhotoRenameTools, type PhotoRenameControls } from "./property-photo-rename";
 import { useSite } from "./site-context";
 import { ContentImage } from "./content-image";
+import { publicPropertyImageSource } from "@/lib/optimized-property-images";
 import { useStudioText } from "./use-studio-text";
 
 export type PhotoCardBox = { index: number; left: number; top: number; right: number; bottom: number };
@@ -234,7 +235,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
     <p className="sr-only editor-photo-order-status" role="status" aria-atomic="true">{orderMessage}</p>
     {selected && onMetadataChange && <section id={panelId} ref={panel} tabIndex={-1} aria-labelledby={`${panelId}-title`} className="editor-photo-panel">
       <div className="editor-photo-panel-header">
-        <img src={selected.src} alt=""/>
+        <img src={publicPropertyImageSource(selected.src)} alt="" decoding="async"/>
         <div>
           <h3 id={`${panelId}-title`}>{t(`Photo ${selectedIndex + 1} of ${images.length}`, `Ảnh ${selectedIndex + 1} trên ${images.length}`)}</h3>
           <p className="muted">{selected.storageName ? storageLabel : filenameLabel(selected.source)}</p>

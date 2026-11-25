@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { imageOriginalFilename } from "./image-filenames";
+import { imageOptimizationErrorText, optimizeImage, propertyPhoto } from "./image-optimization.mjs";
 import { uploadListingFile, type ListingUploadOptions } from "./listing-file-upload";
 import { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET, propertyImageFormat, propertyPhotoFilename } from "./property-photo-files";
 
 export { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET };
 const uploadPaths = new WeakMap<File, { scope: string; path: string }>();
+const encodedPhotos = new WeakMap<File, Awaited<ReturnType<typeof optimizeImage>>>();
 
 const unsupportedImage = "This file is not a supported image. Choose a JPG, PNG, WebP, or AVIF file.";
 const imageTooLarge = "Images must be 8 MB or smaller.";
@@ -31,7 +33,9 @@ export async function preparePropertyImage(file: File) {
   return { ...format, body: file.slice(0, file.size, format.contentType) };
 }
 
-export function imageUploadError(error: unknown): string {
+export function imageUploadError(error: unknown, language = "en"): string {
+  const optimization = imageOptimizationErrorText(error, language);
+  if (optimization) return optimization;
   const issue = error && typeof error === "object" ? error as { name?: unknown; message?: unknown; code?: unknown; status?: unknown; statusCode?: unknown } : {};
   const message = typeof issue.message === "string" ? issue.message : typeof error === "string" ? error : "";
   if (knownMessages.has(message)) return message;
@@ -46,13 +50,19 @@ export function imageUploadError(error: unknown): string {
   return unknownUpload;
 }
 
-export type PropertyImageUploadOptions = ListingUploadOptions & { listingId?: string };
+export type PropertyImageUploadOptions = ListingUploadOptions & { listingId?: string; expectedUserId?: string };
 
 export async function uploadPropertyImage(db: SupabaseClient, file: File, signal?: AbortSignal, options: PropertyImageUploadOptions = {}): Promise<string> {
   signal?.throwIfAborted();
-  const prepared = await preparePropertyImage(file);
-  signal?.throwIfAborted();
   const originalFilename = imageOriginalFilename(file.name);
+  let prepared = encodedPhotos.get(file);
+  if (!prepared) {
+    await preparePropertyImage(file);
+    prepared = await optimizeImage(file, propertyPhoto, {signal, inputMax:PROPERTY_IMAGE_MAX_BYTES});
+    // A resumable transfer must continue with the same encoded bytes.
+    encodedPhotos.set(file, prepared);
+  }
+  signal?.throwIfAborted();
   const {listingId,...progress}=options;
   const scope=listingId ? `properties/listings/${listingId}` : "properties";
   let attempt = uploadPaths.get(file);
@@ -65,6 +75,7 @@ export async function uploadPropertyImage(db: SupabaseClient, file: File, signal
     const url = await uploadListingFile({ client: db, file: prepared.body, resumeKey: file, bucket: PROPERTY_IMAGE_BUCKET,
       path: attempt.path, contentType: prepared.contentType, originalFilename, ...progress, signal });
     uploadPaths.delete(file);
+    encodedPhotos.delete(file);
     return url;
   } catch (error) { throw new Error(imageUploadError(error)); }
 }

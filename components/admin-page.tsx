@@ -344,10 +344,10 @@ export function AdminPage() {
         return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error("Couldn’t read image."));reader.readAsDataURL(prepared.body);});
       }
       if(!client)throw new Error("Connect Supabase before uploading.");
-      const url=await editorTask((db,signal)=>uploadPropertyImage(db,file,options.signal?AbortSignal.any([signal,options.signal]):signal,options),null);
+      const url=await editorTask((db,signal)=>uploadPropertyImage(db,file,options.signal?AbortSignal.any([signal,options.signal]):signal,{...options,expectedUserId:user?.id}),null);
       notice(site.t("Image uploaded.", "Đã tải ảnh lên."));
       return url;
-    } catch(error) { throw new Error(imageUploadError(error)); }
+    } catch(error) { throw new Error(imageUploadError(error, language)); }
   }
 
   const authConnectionLabel=site.t("Connecting to sign-in…", "Đang kết nối để đăng nhập…");

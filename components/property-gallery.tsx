@@ -6,6 +6,7 @@ import { galleryPhotoMetadata, type ImageMetadata } from "@/lib/image-metadata";
 import { useSite } from "./site-context";
 import { EmblaCarouselDetailGallery } from "./embla-carousel-detail-gallery";
 import { ContentImage } from "./content-image";
+import { publicPropertyImageSource } from "@/lib/optimized-property-images";
 
 function revealActiveThumbnail(strip: HTMLDivElement, behavior: ScrollBehavior) {
   if (strip.scrollWidth <= strip.clientWidth) return false;
@@ -109,7 +110,7 @@ export function PropertyGallery({images,title,metadata,variant="property",render
     const attributes={src,alt,width:feedback?900:1200,height:feedback?1600:800,
       loading:priority?"eager" as const:"lazy" as const,fetchPriority:priority?"high" as const:"auto" as const,
       onError:()=>setFailed(previous=>[...new Set([...previous,key])])};
-    return variant==="original" ? <img {...attributes}/> :
+    return variant==="original" ? <img {...attributes} src={publicPropertyImageSource(src)}/> :
       <ContentImage {...attributes} sizes={variant==="thumbnail"?"72px":"(max-width: 860px) 100vw, 70vw"}/>;
   }
   if(!hasImages)return renderOpeners ? renderOpeners(show) : <div className="rental-gallery-empty"><ImageOff size={35}/>{t("Ask the team for property photographs.","Liên hệ đội ngũ để nhận ảnh bất động sản.")}</div>;

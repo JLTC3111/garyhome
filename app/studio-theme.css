@@ -174,15 +174,19 @@ html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .s
     --gary-app-ink: var(--ink);
     --gary-app-muted: var(--muted);
     --gary-app-line: var(--line);
+    --gary-app-surface: var(--surface);
+    --gary-app-raised: var(--warm);
+    --gary-app-hover: var(--warm);
+    --gary-app-control: var(--surface);
+    --gary-app-control-border: var(--studio-control-border);
+    --gary-app-action: var(--green);
+    --gary-app-focus: var(--studio-focus);
+    --gary-app-shadow: var(--home-shadow);
+    --gary-app-icon-accent: 38%;
   }
-  & :is(.gary-apps-menu > summary, .gary-apps-menu-panel, .studio-preferences .site-preferences-panel) {
+  & .studio-preferences .site-preferences-panel {
     background-color: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--home-shadow);
   }
-  & :is(.gary-apps-menu > summary:is(:hover, :focus-visible), .gary-apps-menu[open] > summary, .gary-app-menu-item:hover,
-    .gary-app-mark, .gary-app-menu-item strong > small, .gary-apps-menu-panel .gary-apps-menu-all) {
-    background-color: var(--warm); color: var(--green); border-color: var(--line);
-  }
-  & :is(.gary-app-menu-host, .gary-apps-menu-travel, .gary-app-menu-item > svg) { color: var(--muted); }
 
   /* Dashboard, directories, tables and notifications */
   & :is(.admin-panel, .admin-stats > div, .admin-media-grid > button, .customer-metrics > button,

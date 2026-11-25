@@ -16,14 +16,20 @@ function avif(brand='avif',compatible='mif1'){
  bytes.set(new TextEncoder().encode('ftyp'+brand),4);bytes.set(new TextEncoder().encode(compatible),16);return bytes;
 }
 
-function harness(t,{session=true,configured=true,transport}={}){
- const calls=[],cache=new Map();
+function harness(t,{session=true,configured=true,transport,encode}={}){
+ const calls=[],encodes=[],cache=new Map();
  const db={};
  function load(file){
   if(cache.has(file))return cache.get(file).exports;
   const loaded={exports:{}};cache.set(file,loaded);
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
   function dependency(id){
+   if(id==='./image-optimization.mjs')return {propertyPhoto:{maxBytes:500000},imageOptimizationErrorText:()=>'',optimizeImage:async(file,profile,options)=>{
+    encodes.push({file,profile,options});if(encode)return encode(file);
+    const {propertyImageFormat}=load(path.join(root,'lib/property-photo-files.ts'));
+    const format=propertyImageFormat(new Uint8Array(await file.arrayBuffer()),file.size);
+    return {...format,body:file.slice(0,file.size,format.contentType)};
+   }};
    if(id==='./listing-file-upload')return {uploadListingFile:async input=>{
     if(!configured)throw new Error('Connect Supabase before uploading.');
     if(!session)throw new Error('Your sign-in expired. Reconnect and try uploading again.');
@@ -36,7 +42,7 @@ function harness(t,{session=true,configured=true,transport}={}){
   vm.runInThisContext('(function(exports,require,module){'+source+'\n})',{filename:file})(loaded.exports,dependency,loaded);
   return loaded.exports;
  }
- return {...load(path.join(root,'lib/property-image-upload.ts')),db,calls};
+ return {...load(path.join(root,'lib/property-image-upload.ts')),db,calls,encodes};
 }
 
 test('image bytes determine type when renamed JPEG files have empty, nonstandard or misleading MIME labels',async t=>{
@@ -94,6 +100,19 @@ test('listing uploads reserve a per-listing path and retry the same key',async t
  const url=await h.uploadPropertyImage(h.db,file,undefined,{listingId});
  assert.match(url,new RegExp('^properties/listings/'+listingId+'/[a-f0-9-]{36}/living-room\\.jpg$'));
  assert.equal(h.calls[0].path,h.calls[1].path);
+ assert.equal(h.calls[0].file,h.calls[1].file);
+ assert.equal(h.encodes.length,1);
+});
+
+test('encoded bytes, extension, and original filename travel together',async t=>{
+ const file=new File([jpeg],'Living Room.jpg');
+ const h=harness(t,{encode:()=>({body:new Blob([webp],{type:'image/webp'}),extension:'webp',contentType:'image/webp'})});
+ const url=await h.uploadPropertyImage(h.db,file,undefined,{expectedUserId:'actor'});
+ assert.match(url,/living-room\.webp$/);
+ assert.equal(h.calls[0].originalFilename,'Living Room.jpg');
+ assert.equal(h.calls[0].contentType,'image/webp');
+ assert.equal(h.calls[0].expectedUserId,'actor');
+ assert.equal(h.calls[0].file.type,'image/webp');
 });
 
 test('image uploads forward cancellation and progress to the resumable transport',async t=>{

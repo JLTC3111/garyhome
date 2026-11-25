@@ -153,13 +153,20 @@ html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .contact-widget-desktop .contact-widget-art{display:none}
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] .contact-widget-night-art{display:block}
 
-/* Shared directory remains local styling only: destinations and logos stay. */
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-apps-directory,.gary-apps-menu){--gary-app-ink:var(--home-text);--gary-app-muted:var(--home-secondary);--gary-app-line:var(--home-border)}
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-card,.gary-apps-menu-panel,.gary-apps-menu>summary,.gary-apps-goals>a){background:var(--home-surface);border-color:var(--home-border);color:var(--home-text)}
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-mark,.gary-app-visit,.gary-app-card[data-current=true] .gary-app-card-top>span:last-child,.gary-app-menu-item strong>small,.gary-apps-menu-panel .gary-apps-menu-all){background:var(--home-elevated);color:var(--home-accent)}
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-name,.gary-apps-eyebrow,.gary-app-card li>a,.gary-app-menu-host,.gary-apps-menu-travel,.gary-app-menu-item>svg){color:var(--home-secondary)}
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-apps-menu>summary:hover,.gary-app-menu-item:hover,.gary-apps-goals>a:hover){background:var(--home-elevated);border-color:var(--home-field-border)}
-html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-app-card ul,.gary-app-card li,.gary-apps-menu-heading,.gary-apps-menu-travel,.mobile-app-services){border-color:var(--home-border)}
+html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.gary-apps-directory,.gary-apps-menu,.mobile-app-services) {
+  --gary-app-ink: var(--home-text);
+  --gary-app-muted: var(--home-secondary);
+  --gary-app-line: var(--home-border);
+  --gary-app-surface: var(--home-surface);
+  --gary-app-raised: var(--home-elevated);
+  --gary-app-hover: var(--home-elevated);
+  --gary-app-control: var(--home-surface);
+  --gary-app-control-border: var(--home-field-border);
+  --gary-app-action: var(--home-accent);
+  --gary-app-focus: var(--home-accent);
+  --gary-app-shadow: var(--home-shadow);
+  --gary-app-icon-accent: 38%;
+}
 
 /* Footer, comparison and gallery overlays retain their established layouts. */
 html:root[data-home-public][data-home-public="true"][data-home-theme][data-home-theme="dark"] :where(.site-footer,.rental-footer,.mobile-bottom-nav){background:var(--home-background);border-color:var(--home-border);color:var(--home-text)}

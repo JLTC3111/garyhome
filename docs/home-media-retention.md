@@ -42,7 +42,7 @@ The legacy RPC rebuilt the normalized reference inventory and assembled a file h
 
 ## Current Owner orphan review and cleanup activation
 
-Production manual cleanup is enabled. The deployed worker `media-orphan-cleanup` is active and the verification queue was empty at activation. Cron is pending its dedicated Edge and Vault credential and the scheduler extensions. All 14 GH-645 recovery objects and both GH-56 objects matched their existing protected listing paths. Keeping these and other unresolved files out of enrollment preserves their custody without disabling cleanup for eligible files.
+Production manual cleanup is enabled. The deployed worker `media-orphan-cleanup` is active and the verification queue was empty at activation. The dedicated Vault entry exists. Cron still needs its extensions and schedule. All 14 GH-645 recovery objects and both GH-56 objects matched their existing protected listing paths. Keeping these and other unresolved files out of enrollment preserves their custody without disabling cleanup for eligible files.
 
 ### Release orphan review
 
@@ -81,24 +81,15 @@ In Supabase project `duyiihsmaqfgwezmsnjs`, open **Vault**, save the clipboard v
 printf '' | pbcopy
 ```
 
-Use **Check cleanup worker** under the protected Owner session. It should confirm Worker access and report a configured Cron credential. Enable the Cron Postgres module and `pg_net` on this project through Supabase Integrations and Extensions, or use the following operational SQL. [Install Supabase Cron](https://supabase.com/docs/guides/cron/install) · [Enable pg_net](https://supabase.com/docs/guides/database/extensions/pg_net)
+Use **Check cleanup worker** under the protected Owner session. It should confirm Worker access and report a configured Cron credential. The production permanent cleanup gate is already enabled. From `gary_home_website`, use the installed Homebrew `psql` executable directly. This command enables the scheduler extensions, then runs the operational script at the same connection. The script checks the gate and Vault credential and sets the job for minute 7 of each hour. [Install Supabase Cron](https://supabase.com/docs/guides/cron/install) · [Enable pg_net](https://supabase.com/docs/guides/database/extensions/pg_net) · [Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions)
 
-```sql
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 -f - -f supabase/ops/schedule-home-media-cleanup.sql <<'SQL'
 create extension if not exists pg_cron with schema pg_catalog;
 grant usage on schema cron to postgres;
 grant all privileges on all tables in schema cron to postgres;
 create extension if not exists pg_net with schema extensions;
-```
-
-The permanent deletion gate is already enabled in production. The exact idempotent activation command, if needed, is shown below. The scheduler script checks the gate and Vault credential and sets the job for minute 7 of each hour. It is an operational script and does not apply any pending application migrations. [Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions)
-
-```sql
-update private.home_media_control set permanent_enabled=true where singleton and not permanent_enabled;
-```
-
-```sh
-psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
-  -f supabase/ops/schedule-home-media-cleanup.sql
+SQL
 ```
 
 After the first scheduled dispatch, check the job status and the corresponding scheduler-authenticated worker run. A successful Cron dispatch alone does not establish worker success. With an empty queue, expect a completed run with zero attempted and zero removed. The panel's **Cleanup runs** should show the same record. Credentials stay out of these results.

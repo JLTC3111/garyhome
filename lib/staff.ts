@@ -1,7 +1,7 @@
 export type StaffRole = "owner" | "admin" | "manager" | "editor";
 export type StaffAccount = {
   user_id: string; email: string; display_name: string; role: StaffRole;
-  active: boolean; confirmed: boolean; created_at: string; updated_at: string; avatar_path?:string; password_change_reminder?:boolean;
+  active: boolean; confirmed: boolean; created_at: string; updated_at: string; avatar_path?:string; avatar_bucket?:string|null; password_change_reminder?:boolean;
 };
 export function isStaffRole(role: unknown): role is StaffRole {
   return role === "owner" || role === "admin" || role === "manager" || role === "editor";
@@ -18,4 +18,4 @@ export function canRenamePropertyPhotos(role: unknown) { return role === "owner"
 
 export function canReorderProperties(role:unknown){return role==="owner"||role==="admin"||role==="manager";}
 
-export type StaffProfile={user_id:string;display_name:string;avatar_path:string;updated_at:string|null;password_change_reminder:boolean};
+export type StaffProfile={user_id:string;display_name:string;avatar_path:string;avatar_bucket?:string|null;updated_at:string|null;password_change_reminder:boolean};

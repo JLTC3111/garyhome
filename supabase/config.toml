@@ -368,3 +368,6 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.media-orphan-cleanup]
 # The handler verifies a fresh Owner JWT or the separate scheduled secret.
 verify_jwt = false
+
+[functions.home-profile-avatar]
+verify_jwt = false # The handler verifies the user with Auth before reserving an upload.

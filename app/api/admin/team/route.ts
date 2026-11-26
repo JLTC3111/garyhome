@@ -36,9 +36,10 @@ export async function GET(request: Request) {
       if (managing&&!settings.data?.email_domains?.length) throw new StaffRequestError("Apply the staff access database migration before managing the team.", 503);
       const rows = ((members.data ?? []) as StaffAccount[]).filter(member=>canViewRole(role,member.role));
       const selected=rows.slice(0,50);
-      const photos=selected.length?await db.from("staff_profiles").select("user_id,avatar_path").in("user_id",selected.map(m=>m.user_id)).abortSignal(signal):{data:[],error:null};
+      const photos=selected.length?await db.from("staff_profiles").select("user_id,avatar_path,avatar_bucket").in("user_id",selected.map(m=>m.user_id)).abortSignal(signal):{data:[],error:null};
       staffDataError(photos.error);
-      return { members:selected.map(member=>({...member,avatar_path:photos.data?.find(p=>p.user_id===member.user_id)?.avatar_path||""})),next:rows.length>50?rows[49].email:null,domains:settings.data?.email_domains??[],role,directCreationEnabled:managing&&!!staffAdminClient() };
+      const byUser=new Map(photos.data?.map(photo=>[photo.user_id,photo]));
+      return { members:selected.map(member=>({...member,avatar_path:byUser.get(member.user_id)?.avatar_path||"",avatar_bucket:byUser.get(member.user_id)?.avatar_bucket})),next:rows.length>50?rows[49].email:null,domains:settings.data?.email_domains??[],role,directCreationEnabled:managing&&!!staffAdminClient() };
     });
     return Response.json(result, { headers });
   } catch (error) { return failure(error); }

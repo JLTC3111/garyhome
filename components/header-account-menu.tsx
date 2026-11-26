@@ -9,6 +9,7 @@ import { CUSTOMER_ACCOUNT_URL, STAFF_PORTAL_ORIGIN } from "@/lib/site-origin";
 import type { StaffRole } from "@/lib/staff";
 import Link from "./localized-link";
 import { useSite } from "./site-context";
+import { useStaffAvatar } from "./staff-avatar-image";
 
 const staffDashboard = `${STAFF_PORTAL_ORIGIN}/admin`;
 
@@ -149,6 +150,9 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
     finally { setSigningOut(false); }
   }
 
+  const role = sessionPhase === "ready" && editor ? staffRole : null;
+  const staff = !customerAvatar && role && staffProfile?.user_id === user?.id ? staffProfile : null;
+  const photo = useStaffAvatar(staff?.avatar_path, staff?.avatar_bucket);
   if (!sessionResolved) {
     const pending = sessionPhase === "checking" || sessionPhase === "recovering";
     return <div className="header-account-menu">
@@ -159,12 +163,12 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
     </div>;
   }
 
-  const role = sessionPhase === "ready" && editor ? staffRole : null;
-  const staff = !customerAvatar && role && staffProfile?.user_id === user?.id ? staffProfile : null;
-  const photo = staff?.avatar_path && client ? client.storage.from("staff-avatars").getPublicUrl(staff.avatar_path).data.publicUrl : "";
   const email = user?.email ?? "";
   const signupName = user?.user_metadata?.full_name;
-  const name = staff?.display_name?.trim() || (!staffActions && customer?.name) || (typeof signupName === "string" ? signupName.trim() : "") || email;
+  const savedName = [staff?.display_name, !staffActions && customer?.name, signupName]
+    .find(value => typeof value === "string" && value.trim() && !value.includes("@"));
+  const avatarName = typeof savedName === "string" ? savedName.trim() : "";
+  const name = avatarName || email;
   const verified = sessionPhase === "ready" && !checking && customer !== null;
   const showStaff = verified && !!role;
   const showProfile = verified && customer.profile;
@@ -187,12 +191,12 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
         setDisclosure({ identity, open: true });
         if (user) void checkAccess();
       }}>
-      <AccountAvatar photo={photo} name={name}/><span className="header-account-trigger-label">{staffActions && name ? name : label}</span>{staffActions ? <ChevronRight size={14} aria-hidden="true"/> : <ChevronDown size={14} aria-hidden="true"/>}
+      <AccountAvatar photo={photo} name={avatarName}/><span className="header-account-trigger-label">{staffActions && name ? name : label}</span>{staffActions ? <ChevronRight size={14} aria-hidden="true"/> : <ChevronDown size={14} aria-hidden="true"/>}
     </button>
     <div className="header-account-panel" id={id} hidden={!open} inert={!open}>
       {open && (user ? <>
         <div className="header-account-identity">
-          <AccountAvatar photo={photo} name={name}/>
+          <AccountAvatar photo={photo} name={avatarName}/>
           <div><strong>{name || label}</strong>{email && email !== name && <small>{email}</small>}
             {(showStaff || showProfile || showSaved) && <div className="header-account-badges">
               {showStaff && role && <span>{t("Staff", "Nhân viên")} · {t(...roleNames[role])}</span>}

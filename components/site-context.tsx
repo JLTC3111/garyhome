@@ -38,6 +38,7 @@ type SiteContext = {
   configured: boolean; seedPreview: boolean; backendError: boolean; client: SupabaseClient | null; publicClient:SupabaseClient|null; ready: boolean;
   user: User | null; editor: boolean; staffRole: StaffRole | null; demo: boolean; enterDemo: () => void; exitDemo: () => void;
   staffProfile:StaffProfile|null;refreshStaffProfile:()=>Promise<void>;
+  confirmStaffPhoto:(id:string,path:string|null)=>void;
   passwordLink:PasswordLink|null;
   passwordLinkIssue:EmailLinkIssue|null;
   emailVerification:{type:PasswordLink["type"];busy:boolean;failed:boolean}|null;
@@ -166,16 +167,26 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
   const publicContentFlight = useRef<{ promise: Promise<void>; controller: AbortController } | null>(null);
   const activeUserId = user?.id;
 
+  const staffPhotoRevision=useRef(0);
+  const confirmStaffPhoto=useCallback((id:string,path:string|null)=>{
+    const state=sessionRef.current?.state;
+    if(!studioRouteRef.current||!state?.editor||state.user?.id!==id)return;
+    staffPhotoRevision.current++;
+    profileFlight.current=null;
+    setStaffProfile(previous=>previous?.user_id===id
+      ? {...previous,avatar_path:path||"",avatar_bucket:path?"gary-home-profile-photos":null}
+      : previous);
+  },[]);
   const refreshStaffProfile=useCallback(async()=>{
     const db=clientRef.current,state=sessionRef.current?.state;
     if(!db||!state?.editor||!state.user||!studioRouteRef.current){setStaffProfile(null);return;}
-    const id=state.user.id,generation=state.generation;
+    const id=state.user.id,generation=state.generation,revision=staffPhotoRevision.current;
     if(profileFlight.current?.generation===generation)return profileFlight.current.promise;
     const promise=(async()=>{
       const {data,error}=await request(signal=>db.rpc("get_staff_profile").abortSignal(signal));
       if(error)throw error;
       const current=sessionRef.current?.state;
-      if(studioRouteRef.current&&current?.user?.id===id&&current.generation===generation&&current.editor&&data?.user_id===id)setStaffProfile(data as StaffProfile);
+      if(revision===staffPhotoRevision.current&&studioRouteRef.current&&current?.user?.id===id&&current.generation===generation&&current.editor&&data?.user_id===id)setStaffProfile(data as StaffProfile);
     })();
     profileFlight.current={generation,promise};
     try{await promise;}finally{if(profileFlight.current?.promise===promise)profileFlight.current=null;}
@@ -636,7 +647,7 @@ export function SiteProvider({ children, initial, initialLanguage = "en", initia
     }
   }
 
-  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, retrySavedHomes, compare, toggleCompare, configured: initial.configured, seedPreview: initial.seedPreview !== false, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile:studioRoute?staffProfile:null,refreshStaffProfile,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady:studioRoute&&studioDataReady, enquiries:studioRoute?enquiries:[], setEnquiries, refresh, notice }}>
+  return <Context.Provider value={{ publicOrigin: initial.publicOrigin || "https://www.garyhome.vn", publicPath: pathname && localizedRoute(pathname) ? pathname : initial.publicPath, content, setContent, currency, setCurrency, exchangeRate, language, setLanguage, t: (en, vi) => language === "vi" ? vi : en, saved, toggleSaved, savedReady: !user || savedAccount === user.id, savedError:savedError||(guestImportError?(language==="vi"?"Chưa thể đồng bộ nhà yêu thích trên trình duyệt. Danh sách vẫn được giữ trên thiết bị; hãy thử Đồng bộ trong tài khoản.":"Browser favourites could not be synced. They remain on this device; retry Sync from your account."):""), pendingSaved, importSaved, retrySavedHomes, compare, toggleCompare, configured: initial.configured, seedPreview: initial.seedPreview !== false, backendError, client, publicClient, ready, user, editor, staffRole, staffProfile:studioRoute?staffProfile:null,refreshStaffProfile,confirmStaffPhoto,passwordLink,passwordLinkIssue,emailVerification,verifyEmailLink, sessionPhase, sessionResolved, sessionExpired, staffAccessRevoked, reconnect, revalidateSession, signOutSession, editorTask, accountTask, demo, enterDemo, exitDemo, studioDataReady:studioRoute&&studioDataReady, enquiries:studioRoute?enquiries:[], setEnquiries, refresh, notice }}>
     {initial.configured && sessionResolved && user && (sessionPhase === "offline" || sessionPhase === "error") &&
       <div className="session-banner" role="status">{studioText(sessionMessage, language)} <button type="button" onClick={() => void reconnect()}>{studioText("Reconnect", language)}</button></div>}
     {demo && <div className="preview-banner">{studioText("CMS preview · changes and enquiries stay in this browser", language)} <button onClick={exitDemo}>{studioText("Exit preview", language)}</button></div>}

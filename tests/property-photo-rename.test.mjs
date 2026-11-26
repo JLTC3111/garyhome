@@ -790,6 +790,42 @@ test('historical review joins the retention queue only after its current identit
  assert.equal((await h.pg.query('select count(*) n from private.property_photo_renames')).rows[0].n,0);
 });
 
+test('inventory diagnostics preserve the Owner boundary and distinguish the schedule from the permanent gate',async t=>{
+ const h=await setup(t,true);
+ await h.pg.exec(await readFile(new URL('../supabase/migrations/20261126114500_home_media_inventory_diagnostics.sql',import.meta.url),'utf8'));
+ const inventory=(user,action='status')=>h.role('authenticated',user,()=>
+  h.pg.query('select public.home_media_management($1) value',[action])).then(result=>result.rows[0].value);
+ await assert.rejects(inventory(admin),error=>error.code==='42501');
+ await assert.rejects(h.role('authenticated',admin,()=>h.pg.query("select private.home_media_management('status')")),error=>error.code==='42501');
+ const initial=await inventory(owner);
+ assert.equal(initial.enabled,false);
+ assert.equal(initial.automaticScheduled,false);
+ assert.equal(initial.lastScanAt,null);
+ assert.equal(initial.verifiedCandidates,0);
+
+ const key=`properties/listings/${first}/${first}/detached.webp`;
+ const url=propertyPhotoUrl(origin,key);
+ await h.pg.query("insert into storage.objects(bucket_id,name) values('property-media',$1)",[key]);
+ await h.pg.query('update public.properties set images=$1 where id=$2',[[url],first]);
+ await h.pg.query('update public.properties set images=$1 where id=$2',[[another],first]);
+ await h.pg.exec(`create schema cron;create table cron.job(jobname text,active boolean);
+  insert into cron.job values('gary-home-media-expiry',true);`);
+ const scanned=await inventory(owner,'scan');
+ assert.equal(scanned.enabled,false);
+ assert.equal(scanned.automaticScheduled,true);
+ assert.ok(scanned.lastScanAt);
+ assert.equal(scanned.verifiedCandidates,0);
+ const staged=await inventory(owner,'trash');
+ assert.equal(staged.verifiedCandidates,1);
+ assert.equal(staged.verifiedCandidateBytes,8);
+ assert.ok(staged.items.some(item=>item.name===key&&item.state==='trashed'));
+ await assert.rejects(h.pg.query('update public.editorial_articles set image_url=$1',[url]),error=>error.code==='PT409');
+ await h.pg.query("update storage.objects set version='changed' where name=$1",[key]);
+ const changed=await inventory(owner);
+ assert.equal(changed.verifiedCandidates,0);
+ assert.equal(changed.heldCandidates,staged.heldCandidates+1);
+});
+
 test('confirmed early purge scopes the job to one file and reconciles a lost final acknowledgement',async t=>{
  const h=await setup(t,true);
  const query=(as,user,sql,args=[])=>h.role(as,user,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);

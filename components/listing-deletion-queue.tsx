@@ -43,6 +43,7 @@ type MediaReport = {
   objects:number; bytes:number; candidates:number; candidateBytes:number; broken:number;
   activeUploads:number; abandoned:number; trashed:number; overdue:number;
   enabled:boolean; lastScanAt:string|null; checkedAt:string; newlyTrashed:number;
+  automaticScheduled?:boolean; verifiedCandidates?:number; verifiedCandidateBytes?:number; heldCandidates?:number;
   totalItems:number; items:MediaItem[]; runs:MediaRun[];
 };
 const pageSize=30;
@@ -138,6 +139,12 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
         code==="restore_conflict"?t("The listing media changed. Review the current listing before restoring this file.","Tệp tin đăng đã thay đổi. Kiểm tra tin đăng hiện tại trước khi khôi phục."):
         code==="purge_unavailable"||code==="purge_unconfirmed"?t("Permanent deletion could not be confirmed. Refresh to review the current file status.","Chưa xác nhận được việc xóa vĩnh viễn. Làm mới để xem trạng thái hiện tại của tệp."):
         code==="cleanup_disabled"?t("Permanent cleanup is paused.","Đang tạm dừng xóa vĩnh viễn."):
+        code==="cleanup_worker_missing"?t("The cleanup worker is missing from the Home project. Ask the operator to deploy media-orphan-cleanup.","Thiếu tác vụ dọn tệp trong dự án Home. Hãy nhờ người vận hành triển khai media-orphan-cleanup."):
+        code==="cleanup_unconfirmed"?t("The cleanup worker did not confirm the result. Check File Trash and the cleanup history before retrying.","Tác vụ dọn tệp chưa xác nhận kết quả. Kiểm tra Thùng rác và lịch sử dọn tệp trước khi thử lại."):
+        code==="backend_config"?t("Check the staff deployment’s Home Supabase URL and publishable key.","Kiểm tra URL Supabase và khóa công khai của Home trong bản triển khai nhân viên."):
+        code==="owner_check_unavailable"?t("Couldn’t verify Home Owner access. Sign in again or ask the operator to check the staff membership service.","Chưa xác minh được quyền Chủ sở hữu Home. Đăng nhập lại hoặc nhờ người vận hành kiểm tra dịch vụ phân quyền."):
+        code==="inventory_rpc_missing"?t("The Home storage inventory RPC is missing. Ask the database operator to apply the Home media retention migration.","Thiếu RPC kiểm kê kho Home. Hãy nhờ người vận hành cơ sở dữ liệu áp dụng bản cập nhật lưu giữ tệp Home."):
+        code==="inventory_unavailable"||code==="unavailable"?t("Home storage inventory did not respond. Retry the scan or ask the operator to check the Owner inventory RPC.","Kho lưu trữ Home không phản hồi. Thử quét lại hoặc nhờ người vận hành kiểm tra RPC kiểm kê của Chủ sở hữu."):
         code==="forbidden"?t("This panel requires the active Gary Home Owner.","Mục này yêu cầu tài khoản Chủ sở hữu Gary Home đang hoạt động."):
         listingDeletionMessage(issue,t);
       setError(message);
@@ -157,19 +164,26 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
           <div><dt>{t("Potential orphans","Tệp có thể bị bỏ lại")}</dt><dd>{formatCount(report.candidates)}</dd></div>
           <div><dt>{t("Potentially recoverable","Dung lượng có thể thu hồi")}</dt><dd>{formatBytes(report.candidateBytes)}</dd></div>
         </dl>
-        <p>{t("Last scan","Lần quét gần nhất")} <strong>{formatTime(report.lastScanAt)}</strong> · {t("Inventory checked","Đã kiểm tra kho")} <strong>{formatTime(report.checkedAt)}</strong></p>
+        {report.verifiedCandidates!==undefined&&report.verifiedCandidateBytes!==undefined&&<p>
+          {t("Verified files in Trash","Tệp đã xác minh trong Thùng rác")} <strong>{formatCount(report.verifiedCandidates)} · {formatBytes(report.verifiedCandidateBytes)}</strong> · {t("Held or unreviewed","Đang giữ hoặc chưa kiểm tra")} <strong>{formatCount(report.heldCandidates??0)}</strong>
+        </p>}
+        <p>{t("Last scan","Lần quét gần nhất")} <strong>{report.lastScanAt?formatTime(report.lastScanAt):t("No scan recorded","Chưa ghi nhận lần quét")}</strong> · {t("Inventory checked","Đã kiểm tra kho")} <strong>{formatTime(report.checkedAt)}</strong></p>
         <p>{t("Coverage includes listing photo and video buckets, saved listing states, editorial links and the existing media ledgers.",
           "Phạm vi gồm kho ảnh và video tin đăng, các trạng thái tin đăng đã lưu, liên kết biên tập và sổ theo dõi tệp hiện có.")}</p>
         <p>{t("Active upload leases","Lượt tải lên đang được bảo vệ")} <strong>{report.activeUploads}</strong> · {t("Verified abandoned uploads","Lượt tải bị bỏ dở đã xác minh")} <strong>{report.abandoned}</strong> · {t("Broken indexed links","Liên kết tệp bị hỏng")} <strong>{report.broken}</strong></p>
-        <p>{report.enabled?t("Hourly cleanup follows the 48-hour restore window.","Hệ thống dọn tệp mỗi giờ sau thời gian khôi phục 48 giờ."):
-          t("Permanent cleanup is paused. Files in Trash have a 48-hour restore window.","Đang tạm dừng xóa vĩnh viễn. Tệp trong Thùng rác có thể khôi phục trong 48 giờ.")}{" "}
+        <p>{report.enabled?t("Manual permanent cleanup is enabled.","Đã bật xóa vĩnh viễn thủ công."):
+          t("Manual permanent cleanup is paused.","Đang tạm dừng xóa vĩnh viễn thủ công.")}{" "}
+          {report.automaticScheduled===undefined?t("Apply the inventory diagnostics migration to show the automatic schedule.","Áp dụng bản cập nhật chẩn đoán kho để hiển thị lịch dọn tự động."):
+            report.automaticScheduled?(report.enabled?t("Automatic cleanup is scheduled.","Đã lập lịch dọn tệp tự động."):
+              t("Automatic cleanup is scheduled and paused by policy.","Đã lập lịch dọn tệp tự động và đang tạm dừng theo chính sách.")):
+              t("Automatic cleanup is unscheduled.","Chưa lập lịch dọn tệp tự động.")}{" "}
           {!!report.overdue&&<strong role="status">{t(`${report.overdue} files need attention.`,`${report.overdue} tệp cần xử lý.`)}</strong>}</p>
       </>}
       {latest&&latest!==seen&&<p>{t("Refresh to see files from the most recent listing deletion.","Làm mới để xem tệp của tin đăng vừa xóa.")}</p>}
       <div className="storage-media-actions">
         <button type="button" className="button button-outline" disabled={busy} onClick={()=>void manage("scan",undefined,0)}>{t("Run storage scan","Quét kho lưu trữ")}</button>
         <button type="button" className="button button-outline" disabled={busy||!report?.lastScanAt} onClick={()=>void manage("trash",undefined,0)}>{t("Move verified orphans to Trash","Chuyển tệp thừa đã xác minh vào Thùng rác")}</button>
-        <span title={!report?.enabled?t("Permanent cleanup is paused.","Đang tạm dừng xóa vĩnh viễn."):undefined}>
+        <span title={report&&!report.enabled?t("Permanent cleanup is paused.","Đang tạm dừng xóa vĩnh viễn."):undefined}>
           <button data-button-variant="danger" type="button" className="button button-outline" disabled={busy||!report?.enabled||!report.overdue}
             onClick={()=>void manage("run")}>{t("Run permanent cleanup","Xóa vĩnh viễn tệp hết hạn")}</button>
         </span>

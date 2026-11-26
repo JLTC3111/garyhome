@@ -35,3 +35,16 @@ test('database and worker failures have separate actionable codes without provid
  const missing=await executeStorageMedia(db('unknown'),{action:'worker_status'},signal,async()=>new Response('Provider details',{status:404}));
  assert.deepEqual(missing,{status:503,data:{error:'cleanup_worker_missing'}});
 });
+
+test('Owner orphan actions use the guarded review RPC and report missing review setup separately',async()=>{
+ const calls=[];
+ const db={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:{result:'fixture'}})};}};
+ const worker=()=>assert.fail('Orphan review must stay on the authenticated database path');
+ for(const operation of ['page','verify','hold','release','enroll']){
+  const input={action:'orphan_'+operation,objectId:'fixture',offset:30};
+  assert.equal((await executeStorageMedia(db,input,signal,worker)).status,200);
+  assert.deepEqual(calls.at(-1),{name:'home_media_review',args:{p_action:operation,p_payload:input}});
+ }
+ const missing={rpc(){return {abortSignal:async()=>({error:{code:'PGRST202',message:'discarded provider detail'}})};}};
+ assert.deepEqual(await executeStorageMedia(missing,{action:'orphan_page'},signal,worker),{status:503,data:{error:'orphan_review_setup'}});
+});

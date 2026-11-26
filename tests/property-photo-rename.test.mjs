@@ -886,6 +886,51 @@ test('paged media panel separates permanent receipts, records scans and stages o
  assert.deepEqual((await panel('run_page')).items,[]);
 });
 
+test('Owner orphan review protects draft paths and holds while enrollment still requires exact evidence',async t=>{
+ const h=await setup(t,true);
+ for(const name of ['20261126114500_home_media_inventory_diagnostics.sql','20261126170756_home_media_panel_pagination.sql','20261126175956_home_media_orphan_review.sql'])
+  await h.pg.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ const query=(role,actor,sql,args=[])=>h.role(role,actor,()=>h.pg.query(sql,args)).then(result=>result.rows[0]?.value);
+ const review=(action,payload={},actor=owner,role='authenticated')=>query(role,actor,'select public.home_media_review($1,$2) value',[action,payload]);
+ const current=await h.pg.query('select listing_code from public.properties where id=$1',[first]);
+ await h.pg.query("update public.properties set listing_code='GH-645' where id=$1",[first]);
+ assert.notEqual(current.rows[0].listing_code,'GH-645');
+ const draft=`properties/listings/${first}/${second}/Recovered Draft.webp`;
+ const free='properties/legacy-review.webp',upload='properties/incomplete.webp';
+ for(const name of [draft,free,upload]) await h.pg.query("insert into storage.objects(bucket_id,name,metadata) values('property-media',$1,'{\"size\":8,\"eTag\":\"fixture\"}')",[name]);
+ await h.pg.query("insert into storage.s3_multipart_uploads values('property-media',$1)",[upload]);
+ await query('authenticated',owner,"select public.home_media_management('inventory_scan') value");
+ await assert.rejects(review('page',{},admin),error=>error.code==='42501');
+ await assert.rejects(review('page',{},null,'anon'),error=>error.code==='42501');
+ const draftPage=await review('page',{query:'gh-645'});
+ assert.deepEqual(draftPage.items.map(row=>[row.key,row.listingCode,row.reason]),[[draft,'GH-645','listing']]);
+ const byKey=Object.fromEntries((await review('page')).items.map(row=>[row.key,row]));
+ assert.deepEqual(await review('verify',byKey[draft]),{result:'listing'});
+ assert.deepEqual(await review('verify',byKey[upload]),{result:'upload'});
+ const proof={...byKey[free],confirm:true,backupSha256:'a'.repeat(64),evidenceRef:'reviewed-backup-fixture'};
+ await assert.rejects(review('enroll',{...proof,...byKey[draft]}),/manifest_changed/);
+ await assert.rejects(review('hold',proof,admin),error=>error.code==='42501');
+ assert.deepEqual(await review('verify',byKey[free]),{result:'evidence_required'});
+ assert.deepEqual(await review('hold',proof),{held:true});
+ assert.equal((await review('page')).holds,1);
+ assert.deepEqual(await review('verify',byKey[free]),{result:'owner_hold'});
+ await assert.rejects(query('authenticated',owner,'select public.home_media_enroll_historical($1,true) value',[proof]),/manifest_changed/);
+ assert.deepEqual(await review('release',proof),{held:false});
+ await assert.rejects(review('enroll',{...proof,backupSha256:undefined}),/invalid_manifest/);
+ await assert.rejects(review('enroll',{...proof,confirm:false}),/invalid_manifest/);
+ const receipt=await review('enroll',proof);
+ assert.deepEqual(await review('enroll',proof),receipt);
+ assert.ok(Date.parse(receipt.expiresAt)-Date.now()>47*60*60*1000);
+ assert.equal((await h.pg.query('select count(*) n from private.home_media_items')).rows[0].n,1);
+ assert.deepEqual(await review('hold',proof),{held:true});
+ await h.pg.query("update private.home_media_items set expires_at=now()-interval '1 second' where id=$1",[receipt.id]);
+ await h.pg.exec('update private.home_media_control set permanent_enabled=true where singleton');
+ const claimed=await query('service_role',null,'select public.home_media_claim() value');
+ assert.equal(claimed.items[0].id,receipt.id);
+ assert.equal(await query('service_role',null,'select public.home_media_target($1,$2,true) value',[claimed.id,receipt.id]),null);
+ assert.equal((await h.pg.query('select count(*) n from storage.objects where name=$1',[free])).rows[0].n,1);
+});
+
 test('confirmed early purge scopes the job to one file and reconciles a lost final acknowledgement',async t=>{
  const h=await setup(t,true);
  const query=(as,user,sql,args=[])=>h.role(as,user,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);

@@ -26,7 +26,7 @@ The legacy RPC rebuilt the normalized reference inventory and assembled a file h
    ```
 
 2. Release the reviewed Home application to the existing Vercel project serving `staff.garyhome.vn` and `garyhome.vn`. Sign in as the protected Owner and run a storage scan. It records a completion timestamp and an inventory snapshot, and performs full verification for one tracked file per scan. Further scans advance through the guarded queue. An authenticated Admin or Editor request must receive 403.
-3. Open Inventory files, File Trash and Cleanup History separately. Each request carries up to 30 rows. Verify that a missing or failed page read leaves the scan time visible. Confirm that the migration originals appear in Cleanup History and there are no permanent receipts in File Trash. If there are zero verified files, the disabled Move action should explain that the potential files still need review. The 617 historical candidates still require the enrollment procedure below. When a file is ready, moving it to Trash rechecks its current identity, dependencies and lease and uses its existing restore window.
+3. Open Inventory files, File Trash and Cleanup History separately. Each request carries up to 30 rows. Verify that a missing or failed page read leaves the scan time visible. Confirm that the migration originals appear in Cleanup History and there are no permanent receipts in File Trash. If there are zero verified files, the disabled Move action should explain that the potential files still need review. Historical candidates require the enrollment procedure below. When a file is ready, moving it to Trash rechecks its current identity, dependencies and lease and uses its existing restore window.
 
    ```sql
    select to_regprocedure('private.home_media_panel_page(text,integer)') as panel_page_helper,
@@ -40,20 +40,59 @@ The legacy RPC rebuilt the normalized reference inventory and assembled a file h
    supabase functions deploy media-orphan-cleanup --project-ref duyiihsmaqfgwezmsnjs --no-verify-jwt
    ```
 
-### Activate permanent cleanup only after recovery review
+## Current Owner orphan review and cleanup activation
 
-Keep `permanent_enabled=false` and leave Cron unscheduled while the affected draft galleries are recovered and verified. At inspection GH-645 and GH-56 still had empty galleries. Review the unresolved drafts and current public gallery delivery before approving any activation. [Gallery recovery instructions](production-media-incident-20261126.md)
+Production manual cleanup is enabled. The deployed worker `media-orphan-cleanup` is active and the verification queue was empty at activation. Cron is pending its dedicated Edge and Vault credential and the scheduler extensions. All 14 GH-645 recovery objects and both GH-56 objects matched their existing protected listing paths. Keeping these and other unresolved files out of enrollment preserves their custody without disabling cleanup for eligible files.
 
-After approval, enable the `pg_cron` and `pg_net` extensions in the existing project. Set `HOME_MEDIA_CRON_SECRET` for the Edge Function using a protected local env file and put the identical value in Vault as `gary_home_media_cron_secret`. Keep the secret out of checked-in files, command arguments and logs. Use the Owner health check before enabling the gate. [Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions)
+### Release orphan review
+
+The inventory counts unlinked Storage identities. The scan can verify existing queue records with known provenance. Historical objects enter File Trash only after independent custody review and a checksum-verified local backup. This is why 639 inventory candidates and 49 reported protected candidates can coexist with an empty verification queue.
+
+Apply the outstanding review migration through the approved database service, then release the reviewed Staff application. It is separate from Cron activation. It does not enroll objects, change the permanent cleanup setting or schedule a job.
 
 ```sh
-supabase secrets set --project-ref duyiihsmaqfgwezmsnjs --env-file "$GARY_HOME_MEDIA_SECRET_FILE"
+psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/20261126175956_home_media_orphan_review.sql
 ```
 
-Then run the following manual activation SQL and the existing hourly schedule script. The schedule script verifies the gate and the Vault credential before it installs the job for minute 7 of each hour.
+Under **Properties → Storage & Media Management → Orphan review**, search by listing code or filename. Inspect the exact Storage identity and protection reason. Select up to eight files for a batch of individual dependency checks. Use **Protect file** for an unresolved file that needs a durable hold. **Release review hold** removes that hold while the existing dependency and backup requirements still apply. The historical procedure below remains the enrollment path. A completed dependency check does not indicate ownership. The application sends no file bytes during review or enrollment. Back up only files whose custody is resolved, using the verified identity and existing egress limits.
+
+### Configure the hourly scheduler from the authenticated local terminal
+
+The same high-entropy value belongs in the Edge secret `HOME_MEDIA_CRON_SECRET` and in project Vault as `gary_home_media_cron_secret`. The existing function is already deployed. In the authenticated local zsh session, generate a fresh value in a private temporary env file and use the CLI to set the Edge secret. The clipboard step is for pasting the matching value into Vault locally. Paste it into the Vault secret field and clear the clipboard when done. Keep terminal tracing disabled. [Vault](https://supabase.com/docs/guides/database/vault) · [Edge Function secrets](https://supabase.com/docs/guides/functions/secrets)
+
+```sh
+(
+  set +x
+  set -e -o pipefail
+  umask 077
+  GARY_HOME_MEDIA_SECRET_FILE="$(mktemp -t gary-home-media-cron)"
+  trap 'rm -f "$GARY_HOME_MEDIA_SECRET_FILE"' EXIT
+  openssl rand -hex 32 | sed 's/^/HOME_MEDIA_CRON_SECRET=/' > "$GARY_HOME_MEDIA_SECRET_FILE"
+  supabase secrets set --project-ref duyiihsmaqfgwezmsnjs --env-file "$GARY_HOME_MEDIA_SECRET_FILE"
+  sed 's/^HOME_MEDIA_CRON_SECRET=//' "$GARY_HOME_MEDIA_SECRET_FILE" | tr -d '\n' | pbcopy
+)
+```
+
+In Supabase project `duyiihsmaqfgwezmsnjs`, open **Vault**, save the clipboard value as `gary_home_media_cron_secret`, and clear the clipboard. The command removes the temporary file on exit. Using the Vault form keeps the value out of SQL statements and database query logs.
+
+```sh
+printf '' | pbcopy
+```
+
+Use **Check cleanup worker** under the protected Owner session. It should confirm Worker access and report a configured Cron credential. Enable the Cron Postgres module and `pg_net` on this project through Supabase Integrations and Extensions, or use the following operational SQL. [Install Supabase Cron](https://supabase.com/docs/guides/cron/install) · [Enable pg_net](https://supabase.com/docs/guides/database/extensions/pg_net)
 
 ```sql
-update private.home_media_control set permanent_enabled=true where singleton;
+create extension if not exists pg_cron with schema pg_catalog;
+grant usage on schema cron to postgres;
+grant all privileges on all tables in schema cron to postgres;
+create extension if not exists pg_net with schema extensions;
+```
+
+The permanent deletion gate is already enabled in production. The exact idempotent activation command, if needed, is shown below. The scheduler script checks the gate and Vault credential and sets the job for minute 7 of each hour. It is an operational script and does not apply any pending application migrations. [Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions)
+
+```sql
+update private.home_media_control set permanent_enabled=true where singleton and not permanent_enabled;
 ```
 
 ```sh
@@ -61,16 +100,20 @@ psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
   -f supabase/ops/schedule-home-media-cleanup.sql
 ```
 
-With the Cron extension installed, verify the referenced job and its recent status without selecting its command or Vault values.
+After the first scheduled dispatch, check the job status and the corresponding scheduler-authenticated worker run. A successful Cron dispatch alone does not establish worker success. With an empty queue, expect a completed run with zero attempted and zero removed. The panel's **Cleanup runs** should show the same record. Credentials stay out of these results.
 
 ```sql
 select jobname,schedule,active from cron.job where jobname='gary-home-media-expiry';
 select r.start_time,r.end_time,r.status
 from cron.job_run_details r join cron.job j using(jobid)
 where j.jobname='gary-home-media-expiry' order by r.start_time desc limit 10;
+select started_at,finished_at,attempted,removed,failed
+from private.home_media_runs where actor is null order by started_at desc limit 10;
+select source,state,unreferenced_since,expires_at,expires_at-unreferenced_since as retention_window
+from private.home_media_items where state in ('trashed','deleting') order by expires_at limit 20;
 ```
 
-A successful Cron invocation confirms dispatch. Check the worker logs and Cleanup runs for the actual outcome.
+Check that an approved historical receipt gets 48 hours from its enrollment and is excluded from scheduled work before expiration. Keep drafts, upload leases, existing holds, and unresolved historical receipts protected throughout verification. Older untracked videos do not have a historical photo enrollment path. Keep them in custody review or use their existing guarded listing/upload workflow when applicable.
 
 ## Restore and permanent removal
 
@@ -101,7 +144,9 @@ The original audit cohort has 617 files. A read-only follow-up found that all 11
 
    A successful receipt creates a historical review entry directly in File Trash and starts its 48-hour window in the same transaction. A retry with the same identity and review returns the same receipt. A held or changed object remains in review with its evidence. Historical enrollment has its own audit record and uses the existing snapshot lock and media guards.
 
-## Coordinated cutover
+## Original WebP cutover procedure
+
+These steps describe the earlier migration cutover. The live cleanup activation instructions are above.
 
 1. Keep the deployed app and database on their current releases while the existing 509-image runner is active. Keep its staging root, source backups and sealed journals. The existing retirement API returns `removed: true` after confirmed removal. The retention release changes that path to return a Trash deadline. Applying the new SQL or serving the new route during the job risks incomplete retirement checkpoints.
 2. Confirm the runner released its lock and recorded 509 completed retirements and a public gallery check in `guarded-write/completion.json`. Use the current runner for a fresh read-only check when needed.

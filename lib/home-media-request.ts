@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 const panelActions = new Set(["overview", "inventory_scan", "inventory_page", "trash_page", "removed_page", "run_page"]);
 const inventoryActions = new Set(["status", "scan", "trash", "restore", ...panelActions]);
-export const storageMediaActions = new Set([...inventoryActions, "worker_status", "run", "purge"]);
+const reviewActions = new Map<string, string>(["page", "verify", "hold", "release", "enroll"].map(action => [`orphan_${action}`, action]));
+export const storageMediaActions = new Set([...inventoryActions, ...reviewActions.keys(), "worker_status", "run", "purge"]);
 
 export async function executeStorageMedia(
   db: SupabaseClient,
@@ -10,23 +11,26 @@ export async function executeStorageMedia(
   signal: AbortSignal,
   worker: () => Promise<Response>,
 ) {
-  if (inventoryActions.has(input.action)) {
-    const { data, error } = await db.rpc("home_media_management", {
+  const review = reviewActions.get(input.action);
+  if (review || inventoryActions.has(input.action)) {
+    const args = review ? { p_action: review, p_payload: input } : {
       p_action: input.action,
       p_id: input.action === "restore" ? input.id : null,
       p_offset: Number.isInteger(input.offset) ? input.offset : 0,
-    }).abortSignal(signal);
+    };
+    const { data, error } = await db.rpc(review ? "home_media_review" : "home_media_management", args).abortSignal(signal);
     if (!error && data) return { status: 200, data };
     const code = error?.code;
     if (code === "42501") return { status: 403, data: { error: "forbidden" } };
-    if (code === "PGRST202" || code === "42883") return { status: 503, data: { error: "inventory_rpc_missing" } };
+    if (code === "PGRST202" || code === "42883") return { status: 503, data: { error: review ? "orphan_review_setup" : "inventory_rpc_missing" } };
     if (code === "57014") return { status: 504, data: { error: "inventory_timeout" } };
     if (code === "22023" && panelActions.has(input.action) && error?.message === "listing_cleanup.invalid_manifest") {
       return { status: 503, data: { error: "inventory_panel_upgrade" } };
     }
     if (code === "55P03") return { status: 409, data: { error: error?.message === "listing_cleanup.scan_busy" ? "scan_busy" : "media_busy" } };
+    if (code === "22023" && review) return { status: 400, data: { error: "invalid_manifest" } };
     if (code === "PT409") {
-      const issue = error?.message.match(/^listing_cleanup\.(restore_unavailable|restore_conflict|restore_snapshot_missing|manifest_changed|scan_required)$/)?.[1];
+      const issue = error?.message.match(/^listing_cleanup\.(restore_unavailable|restore_conflict|restore_snapshot_missing|manifest_changed|scan_required|video_review)$/)?.[1];
       return { status: 409, data: { error: issue || "conflict" } };
     }
     return { status: 503, data: { error: "inventory_unavailable" } };

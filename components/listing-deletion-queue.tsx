@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { PROPERTY_IMAGE_ORIGIN } from "@/lib/property-photo-files";
 import type { ListingDeletion } from "@/lib/property-deletion-server";
 import { useSite } from "./site-context";
+import { StorageOrphanReview } from "./storage-orphan-review";
 
 export function listingDeletionRequest<T>(editorTask: ReturnType<typeof useSite>["editorTask"], payload: Record<string, unknown>) {
   return editorTask(async (db,signal)=>{
@@ -91,6 +92,7 @@ function mediaMessage(issue:unknown,t:ReturnType<typeof useSite>["t"]) {
 export function StorageMediaManagement({latest,onListingRestored}: {latest:ListingDeletion|null;onListingRestored:()=>void}) {
   const {editorTask,language,t,notice}=useSite();
   const [report,setReport]=useState<MediaReport|null>(null),[open,setOpen]=useState(false);
+  const [reviewOpen,setReviewOpen]=useState(false);
   const [selected,setSelected]=useState<PageKind|null>(null),[page,setPage]=useState<MediaPage|null>(null),[offset,setOffset]=useState(0);
   const [busy,setBusy]=useState<MediaAction|PageKind|null>(null),[error,setError]=useState(""),[resultText,setResultText]=useState("");
   const [restoredHref,setRestoredHref]=useState("");
@@ -104,6 +106,7 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
   const formatTime=(value:string|null)=>value?date.format(new Date(value)):"—";
   const formatBytes=(value:number)=>bytes.format(value/1_000_000);
   const upgraded=report?.panelVersion===2;
+  const requestMedia=useCallback(<T,>(payload:Record<string,unknown>)=>mediaRequest<T>(editorTask,payload),[editorTask]);
 
   useEffect(()=>{
     if(!open||selected!=="trash_page"||!page?.items.length)return;
@@ -132,7 +135,7 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
   }
   async function loadPage(kind:PageKind,next=0) {
     if(flight.current||!upgraded)return;
-    setSelected(kind);setPage(null);setOffset(next);
+    setReviewOpen(false);setSelected(kind);setPage(null);setOffset(next);
     await work(kind,async()=>{setPage(await mediaRequest<MediaPage>(editorTask,{action:kind,offset:next}));setNow(Date.now());});
   }
   async function manage(action:MediaAction,item?:MediaItem) {
@@ -187,7 +190,7 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
   const progress=busy==="inventory_scan"?t("Scanning storage and checking queued files…","Đang quét kho và kiểm tra tệp trong hàng đợi…"):
     busy?t("Checking storage…","Đang kiểm tra kho lưu trữ…"):"";
   const trashReason=busy?progress:!upgraded?upgrade:!report?.lastScanAt?t("Run a storage scan first.","Hãy quét kho trước."):
-    !report.readyToTrash?t("This scan found no verified file to move. Potential files still need review.","Lần quét này chưa tìm thấy tệp đã xác minh để chuyển. Các tệp tiềm năng vẫn cần kiểm tra."):"";
+    !report.readyToTrash?t("The tracked queue has no verified file to move. Use Orphan review for historical candidates.","Hàng đợi chưa có tệp đã xác minh để chuyển. Dùng Rà soát tệp thừa để kiểm tra tệp tồn từ trước."):"";
   const workerReason=worker?.status==="missing"?mediaMessage(new Error("cleanup_worker_missing"),t):worker?.status==="unavailable"?
     mediaMessage(new Error("cleanup_worker_unavailable"),t):worker?.status==="ready"?"":t("Check the cleanup worker deployment first.","Kiểm tra bản triển khai tác vụ dọn tệp trước.");
   const removalReason=busy?progress:!report?.enabled?paused:workerReason;
@@ -263,8 +266,12 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
       {progress&&<p role="status">{progress}</p>}
       {resultText&&<p role="status">{resultText} {restoredHref&&<a className="text-link" href={restoredHref} target="_blank" rel="noopener noreferrer">{t("Open restored file","Mở tệp đã khôi phục")}</a>}</p>}
       {error&&<p role="alert">{error}</p>}
-      {upgraded&&<nav className="storage-media-actions" aria-label={t("Media lists","Danh sách tệp")}>{tabs.map(([kind,label])=>
-        <button type="button" key={kind} className="button button-outline button-small" aria-pressed={selected===kind} disabled={!!busy} onClick={()=>void loadPage(kind)}>{label}</button>)}</nav>}
+      {upgraded&&<nav className="storage-media-actions" aria-label={t("Media lists","Danh sách tệp")}>
+        <button type="button" className="button button-outline button-small" aria-pressed={reviewOpen} disabled={!!busy}
+          onClick={()=>{setSelected(null);setReviewOpen(true);}}>{t("Orphan review","Rà soát tệp thừa")}</button>
+        {tabs.map(([kind,label])=><button type="button" key={kind} className="button button-outline button-small" aria-pressed={selected===kind} disabled={!!busy} onClick={()=>void loadPage(kind)}>{label}</button>)}
+      </nav>}
+      {upgraded&&reviewOpen&&<StorageOrphanReview request={requestMedia} disabled={!!busy} onStaged={()=>void manage("overview")}/>}
       {selected&&<section>
         <h3>{tabs.find(([kind])=>kind===selected)?.[1]}</h3>
         {!page&&!busy&&<button type="button" className="text-link" onClick={()=>void loadPage(selected,offset)}>{t("Refresh this list","Làm mới danh sách này")}</button>}

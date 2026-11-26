@@ -57,3 +57,30 @@ test('scheduled removal is gated, validates the target, and reconciles an interr
  assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'ok',attempted:1,removed:1,overdue:0});
  assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
 });
+
+test('early purge requires an explicit exact-item confirmation from a signed Owner',async()=>{
+ const expiresAt='2099-11-26T12:00:00.000Z';
+ const calls=[];
+ const handler=createMediaCleanup({...configuration,warn:()=>{},fetcher:async(url,init)=>{
+  const path=new URL(url).pathname;
+  const args=init.body&&JSON.parse(init.body);
+  calls.push({path,args});
+  if(path.endsWith('/auth/v1/user'))return Response.json({id:owner});
+  if(path.endsWith('_management'))return Response.json({actor:owner});
+  if(path.endsWith('_claim'))return Response.json({status:'ok',id:run,items:[{id}]});
+  if(path.endsWith('_target'))return Response.json({bucket:'property-media',name:key,present:true});
+  if(path.endsWith('/object/property-media'))return Response.json([{name:key}]);
+  if(path.endsWith('_settle'))return Response.json(true);
+  if(path.endsWith('_finish'))return Response.json(0);
+  throw new Error('Unexpected request');
+ }});
+ const request=(headers,confirm)=>handler(new Request('https://edge.example/cleanup',{
+  method:'POST',headers,body:JSON.stringify({action:'purge',id,expiresAt,confirm}),
+ }));
+ const signed={Authorization:'Bearer owner-fixture'};
+ assert.equal((await request(signed,false)).status,400);
+ assert.equal((await request(cron,true)).status,403);
+ assert.deepEqual(calls,[]);
+ assert.equal((await (await request(signed,true)).json()).removed,1);
+ assert.deepEqual(calls.find(call=>call.path.endsWith('_claim')).args,{p_actor:owner,p_item:id,p_expiry:expiresAt});
+});

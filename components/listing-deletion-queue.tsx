@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PROPERTY_IMAGE_ORIGIN } from "@/lib/property-photo-files";
 import type { ListingDeletion } from "@/lib/property-deletion-server";
 import { useSite } from "./site-context";
 
@@ -32,8 +33,10 @@ export function listingDeletionMessage(error: unknown,t: ReturnType<typeof useSi
 }
 
 type MediaItem = {
-  id:string; name:string; bucket:string; state:"trashed"|"deleting"|"removed"|"restored"|"review";
-  expires_at:string|null; removed_at:string|null;
+  id:string; name:string; bucket:"property-media"|"listing-videos";
+  state:"candidate"|"trashed"|"deleting"|"removed"|"restored"|"retained"|"review";
+  expires_at:string|null; removed_at:string|null; hold_reason?:string|null;
+  restore_mode:"listing"|"draft"|"rename"|"file"|"unavailable";
 };
 type MediaRun = {started_at:string; finished_at:string|null; attempted:number; removed:number; failed:number};
 type MediaReport = {
@@ -53,7 +56,7 @@ function mediaRequest<T>(editorTask: ReturnType<typeof useSite>["editorTask"], p
       body:JSON.stringify(payload),
     });
     const result=await response.json().catch(()=>null);
-    if(!response.ok||!result)throw new Error(result?.error||"unavailable");
+    if(!response.ok||!result)throw new Error(typeof result==="object"&&result&&"error" in result&&typeof result.error==="string"?result.error:"unavailable");
     return result as T;
   },59000);
 }
@@ -61,13 +64,19 @@ function mediaRequest<T>(editorTask: ReturnType<typeof useSite>["editorTask"], p
 function restoreReason(item:MediaItem,now:number,t:ReturnType<typeof useSite>["t"]) {
   if(item.state==="removed")return t("This file was permanently deleted and can no longer be restored.","Tệp đã bị xóa vĩnh viễn và không thể khôi phục.");
   if(item.state==="restored")return t("This file has already been restored.","Tệp này đã được khôi phục.");
+  if(item.state==="retained")return item.hold_reason==="reference"
+    ?t("A saved reference still uses this file.","Tệp này vẫn đang được sử dụng bởi một tham chiếu đã lưu.")
+    :t("The file was retained because upload ownership or dependencies need review.","Tệp được giữ lại để kiểm tra quyền sở hữu hoặc các tham chiếu.");
   if(item.state==="review")return t("The file needs review before its state can be confirmed.","Cần kiểm tra để xác nhận trạng thái của tệp.");
-  if(item.state==="deleting"||!item.expires_at||Date.parse(item.expires_at)<=now)
+  if(item.state==="deleting")return t("Permanent removal is in progress.","Tệp đang được xóa vĩnh viễn.");
+  if(!item.expires_at||Date.parse(item.expires_at)<=now)
     return t("The 48-hour restore window ended. Permanent removal is pending.","Đã hết 48 giờ khôi phục. Tệp đang chờ xóa vĩnh viễn.");
+  if(item.restore_mode==="unavailable")return t("The saved listing details needed to restore this file are unavailable.",
+    "Thiếu dữ liệu tin đăng đã lưu cần thiết để khôi phục tệp này.");
   return "";
 }
 
-export function StorageMediaManagement({latest}: {latest:ListingDeletion|null}) {
+export function StorageMediaManagement({latest,onListingRestored}: {latest:ListingDeletion|null;onListingRestored:()=>void}) {
   const {editorTask,language,t,notice}=useSite();
   const [report,setReport]=useState<MediaReport|null>(null),[offset,setOffset]=useState(0);
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[now,setNow]=useState(Date.now);
@@ -76,7 +85,7 @@ export function StorageMediaManagement({latest}: {latest:ListingDeletion|null}) 
   const formatCount=(value:number)=>new Intl.NumberFormat(locale).format(value);
   const formatTime=(value:string|null)=>value?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"—";
   const formatBytes=(value:number)=>new Intl.NumberFormat(locale,{style:"unit",unit:"megabyte",maximumFractionDigits:2}).format(value/1_000_000);
-  const nextExpiry=Math.min(...(report?.items||[]).filter(item=>item.state==="trashed"&&item.expires_at)
+  const nextExpiry=Math.min(...(report?.items||[]).filter(item=>(item.state==="trashed"||item.state==="candidate")&&item.expires_at)
     .map(item=>Date.parse(item.expires_at!)).filter(expiry=>expiry>now));
 
   useEffect(()=>{
@@ -85,22 +94,31 @@ export function StorageMediaManagement({latest}: {latest:ListingDeletion|null}) 
     return ()=>clearTimeout(timer);
   },[nextExpiry]);
 
-  async function manage(action:"status"|"scan"|"trash"|"run"|"restore",id?:string,nextOffset=offset) {
+  async function manage(action:"status"|"scan"|"trash"|"run"|"restore"|"purge",item?:MediaItem,nextOffset=offset) {
     if(busy)return;
     if(action==="trash"&&!window.confirm(t("Move verified orphans to Trash? Each file can be restored for 48 hours.",
       "Chuyển các tệp thừa đã xác minh vào Thùng rác? Có thể khôi phục từng tệp trong 48 giờ.")))return;
     if(action==="run"&&!window.confirm(t("Permanently remove eligible files whose restore window has ended?",
       "Xóa vĩnh viễn các tệp đủ điều kiện đã hết thời gian khôi phục?")))return;
+    if(action==="restore"&&item?.restore_mode==="draft"&&!window.confirm(t("Restore this file to a new draft of the deleted listing?",
+      "Khôi phục tệp này vào bản nháp mới của tin đăng đã xóa?")))return;
+    if(action==="purge"&&(!item?.expires_at||!report?.enabled||!window.confirm(t(
+      `Permanently delete ${item.name.split("/").at(-1)} now and end its restore window?`,
+      `Xóa vĩnh viễn ${item.name.split("/").at(-1)} ngay và kết thúc thời gian khôi phục?`))))return;
     setBusy(true);setError("");
     try {
       if(action==="restore") {
-        const result=await mediaRequest<{id:string;restored:boolean}>(editorTask,{action,id});
-        if(result.id!==id||!result.restored)throw new Error("unavailable");
-        setReport(current=>current&&({...current,items:current.items.map(item=>item.id===id?{...item,state:"restored"}:item)}));
-        notice(t("File restored.","Đã khôi phục tệp."));
+        const result=await mediaRequest<{id:string;restored:boolean;listingId:string|null}>(editorTask,{action,id:item?.id});
+        if(result.id!==item?.id||!result.restored)throw new Error("unavailable");
+        setReport(current=>current&&({...current,items:current.items.map(row=>row.id===result.id?{...row,state:"restored"}:row)}));
+        if(result.listingId) {
+          onListingRestored();
+          notice(t("Listing media and metadata restored.","Đã khôi phục tệp và siêu dữ liệu của tin đăng."));
+        } else notice(t("File kept in Storage.","Đã giữ tệp trong kho lưu trữ."));
       }
-      if(action==="run") {
-        const result=await mediaRequest<{status:string;removed?:number;overdue?:number}>(editorTask,{action});
+      if(action==="run"||action==="purge") {
+        const result=await mediaRequest<{status:string;removed?:number;overdue?:number}>(editorTask,action==="purge"?
+          {action,id:item?.id,expiresAt:item?.expires_at,confirm:true}:{action});
         if(result.status==="disabled")throw new Error("cleanup_disabled");
         if(result.status==="busy")throw new Error("media_busy");
         if(result.status!=="ok")throw new Error("unavailable");
@@ -108,7 +126,7 @@ export function StorageMediaManagement({latest}: {latest:ListingDeletion|null}) 
           result.overdue?"warning":undefined);
       }
       const fresh=await mediaRequest<MediaReport>(editorTask,{
-        action:action==="run"||action==="restore"?"status":action,offset:nextOffset,
+        action:action==="run"||action==="purge"||action==="restore"?"status":action,offset:nextOffset,
       });
       setReport(fresh);setOffset(nextOffset);setNow(Date.now());setSeen(latest);
       if(action==="scan")notice(t("Storage scan complete.","Đã quét xong kho lưu trữ."));
@@ -116,11 +134,14 @@ export function StorageMediaManagement({latest}: {latest:ListingDeletion|null}) 
     } catch(issue) {
       const code=issue instanceof Error?issue.message:"";
       const message=code==="restore_unavailable"?t("Restore is unavailable. Refresh to check the current file status.","Không thể khôi phục. Làm mới để kiểm tra trạng thái hiện tại của tệp."):
+        code==="restore_snapshot_missing"?t("The original listing details needed for restore are unavailable.","Thiếu dữ liệu của tin đăng gốc cần thiết để khôi phục."):
+        code==="restore_conflict"?t("The listing media changed. Review the current listing before restoring this file.","Tệp tin đăng đã thay đổi. Kiểm tra tin đăng hiện tại trước khi khôi phục."):
+        code==="purge_unavailable"||code==="purge_unconfirmed"?t("Permanent deletion could not be confirmed. Refresh to review the current file status.","Chưa xác nhận được việc xóa vĩnh viễn. Làm mới để xem trạng thái hiện tại của tệp."):
         code==="cleanup_disabled"?t("Permanent cleanup is paused.","Đang tạm dừng xóa vĩnh viễn."):
         code==="forbidden"?t("This panel requires the active Gary Home Owner.","Mục này yêu cầu tài khoản Chủ sở hữu Gary Home đang hoạt động."):
         listingDeletionMessage(issue,t);
       setError(message);
-      if(action==="restore"||action==="run"||action==="trash")notice(message,"warning");
+      if(action==="restore"||action==="run"||action==="trash"||action==="purge")notice(message,"warning");
     } finally {setBusy(false);}
   }
 
@@ -160,16 +181,24 @@ export function StorageMediaManagement({latest}: {latest:ListingDeletion|null}) 
         {report.items.length===0&&<p>{t("No files in the cleanup history.","Chưa có tệp trong lịch sử dọn dẹp.")}</p>}
         <ul className="storage-media-rows">{report.items.map(item=>{
           const reason=restoreReason(item,now,t), hint="media-restore-"+item.id;
+          const canPurge=report.enabled&&(item.state==="candidate"||item.state==="trashed")&&item.expires_at&&Date.parse(item.expires_at)>now;
           return <li key={item.id}>
             <div><strong>{item.name.split("/").at(-1)}</strong>
               <small>{item.bucket} · {item.removed_at?t("Removed","Đã xóa"):t("Restore until","Khôi phục đến")} {formatTime(item.removed_at||item.expires_at)}</small>
               {reason&&<small id={hint}>{reason}</small>}
+              {item.state==="restored"&&<a className="text-link" target="_blank" rel="noopener noreferrer"
+                href={PROPERTY_IMAGE_ORIGIN+"/storage/v1/object/public/"+item.bucket+"/"+item.name.split("/").map(encodeURIComponent).join("/")}>
+                {t("Open restored file","Mở tệp đã khôi phục")}</a>}
             </div>
-            <span title={reason||undefined} tabIndex={reason?0:undefined} aria-describedby={reason?hint:undefined}>
-              <button type="button" className="button button-outline button-small" data-button-variant="restore"
-                disabled={busy||Boolean(reason)} aria-describedby={reason?hint:undefined}
-                onClick={()=>void manage("restore",item.id)}>{t("Restore","Khôi phục")}</button>
-            </span>
+            <div className="storage-media-actions">
+              <span title={reason||undefined} tabIndex={reason?0:undefined} aria-describedby={reason?hint:undefined}>
+                <button type="button" className="button button-outline button-small" data-button-variant="restore"
+                  disabled={busy||Boolean(reason)} aria-describedby={reason?hint:undefined}
+                  onClick={()=>void manage("restore",item)}>{item.restore_mode==="file"?t("Keep file","Giữ tệp"):t("Restore","Khôi phục")}</button>
+              </span>
+              {canPurge&&<button type="button" className="button button-outline button-small" data-button-variant="danger"
+                disabled={busy} onClick={()=>void manage("purge",item)}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</button>}
+            </div>
           </li>;
         })}</ul>
         {report.totalItems>pageSize&&<nav className="storage-media-actions" aria-label={t("File Trash pages","Trang Thùng rác tệp")}>

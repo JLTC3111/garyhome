@@ -93,6 +93,7 @@ async function setup(t,retention=false) {
   create table public.saved_homes(property_id uuid references public.properties(id) on delete cascade);
   create table storage.buckets(id text primary key,versioning_status text not null default 'DISABLED');
   insert into storage.buckets(id) values('property-media'),('listing-videos');
+  create table storage.s3_multipart_uploads(bucket_id text,key text);
   create table storage.objects(bucket_id text,name text,id uuid not null default gen_random_uuid(),
     version text default gen_random_uuid()::text,metadata jsonb default '{"size":8}',user_metadata jsonb,
     is_versioned boolean not null default false,is_delete_marker boolean not null default false,archived_at timestamptz,owner_id text,
@@ -126,7 +127,13 @@ async function setup(t,retention=false) {
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119183631_property_photo_rename_owner_only.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261124102511_home_listing_cleanup_retry.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261124202612_home_postgrest_conflict_sqlstates.sql',import.meta.url),'utf8'));
- if(retention)await pg.exec(await readFile(new URL('../supabase/migrations/20261126100000_home_media_retention.sql',import.meta.url),'utf8'));
+ if(retention){
+  const codeMigration=await readFile(new URL('../supabase/migrations/20261102065952_short_listing_ids.sql',import.meta.url),'utf8');
+  await pg.exec('create sequence public.property_listing_code_seq;');
+  await pg.exec(codeMigration.match(/create or replace function private\.assign_listing_code\(\)[\s\S]*?end \$\$;/)[0]);
+  await pg.exec('create trigger properties_assign_listing_code before insert or update of listing_code on public.properties for each row execute function private.assign_listing_code()');
+  await pg.exec(await readFile(new URL('../supabase/migrations/20261126100000_home_media_retention.sql',import.meta.url),'utf8'));
+ }
  const files=new Map([[oldKey,{mime:'image/jpeg',bytes:jpeg}]]), calls=[];
  let onCopy=()=>{}, onRemove=()=>{};
  const original=globalThis.fetch;
@@ -625,7 +632,8 @@ test('media Trash reserves listing files, admits only Owners, and confirms expir
  const kept=`properties/listings/${first}/${first}/restorable.webp`;
  const urls=[propertyPhotoUrl(origin,tracked),propertyPhotoUrl(origin,kept)];
  for(const key of [tracked,kept])await h.pg.query('insert into storage.objects(bucket_id,name) values($1,$2)',[bucket,key]);
- await h.pg.query('update public.properties set images=$1 where id=$2',[urls,first]);
+ await h.pg.query('update public.properties set images=$1,image_metadata=$2,image_filenames=$3 where id=$4',
+   [urls,{[urls[1]]:h.caption},{[urls[1]]:'Saved filename.webp'},first]);
  await stageListingDeletion(h.client('authenticated',admin),first,{version},signal());
  await assert.rejects(manage('status',null,admin),error=>error.code==='42501');
  await assert.rejects(manage('trash',null,editor),error=>error.code==='42501');
@@ -639,7 +647,14 @@ test('media Trash reserves listing files, admits only Owners, and confirms expir
  assert.ok(Date.parse(a.expires_at)-Date.now()>47*60*60*1000);
  await assert.rejects(h.pg.query('update public.editorial_articles set image_url=$1',[urls[0]]),/retired_reference/);
  await assert.rejects(h.pg.query("update public.editorial_articles set sources=jsonb_build_array(jsonb_build_object('url',$1::text))",[tracked]),/retired_reference/);
- assert.deepEqual(await manage('restore',b.id),{id:b.id,restored:true});
+ const restored=await manage('restore',b.id);
+ assert.equal(restored.restored,true);
+ assert.notEqual(restored.listingId,first);
+ const draft=await h.listing(restored.listingId);
+ assert.deepEqual({status:draft.status,images:draft.images,metadata:draft.image_metadata,filenames:draft.image_filenames},
+  {status:'draft',images:[urls[1]],metadata:{[urls[1]]:h.caption},filenames:{[urls[1]]:'Saved filename.webp'}});
+ assert.deepEqual(await manage('restore',b.id),restored);
+ assert.equal(await h.listing(first),null);
  await h.pg.query('update public.editorial_articles set image_url=$1',[urls[1]]);
  await h.pg.exec("update private.home_media_control set permanent_enabled=true");
  const empty=await worker('select public.home_media_claim() value');
@@ -648,6 +663,11 @@ test('media Trash reserves listing files, admits only Owners, and confirms expir
  await worker('select public.home_media_finish($1) value',empty.id);
  await h.pg.query("update private.home_media_items set expires_at=now()-interval '1 second' where id=$1",[a.id]);
  await assert.rejects(manage('restore',a.id),/restore_unavailable/);
+ const manual=await worker('select public.home_media_claim($1) value',owner);
+ await h.pg.query("update auth.users set banned_until=now()+interval '1 hour' where id=$1",[owner]);
+ await assert.rejects(worker('select public.home_media_target($1,$2,true) value',manual.id,a.id),error=>error.code==='42501');
+ await worker('select public.home_media_finish($1) value',manual.id);
+ await h.pg.query('update auth.users set banned_until=null where id=$1',[owner]);
  const run=await worker('select public.home_media_claim() value');
  assert.deepEqual(run.items.map(item=>item.id),[a.id]);
  assert.equal((await worker('select public.home_media_target($1,$2,true) value',run.id,a.id)).present,true);
@@ -660,6 +680,10 @@ test('media Trash reserves listing files, admits only Owners, and confirms expir
  assert.equal(await worker('select public.home_media_settle($1,$2,true) value',recovery.id,a.id),true);
  assert.equal((await manage('status')).items.find(row=>row.id===a.id).state,'removed');
  await assert.rejects(manage('restore',a.id),/restore_unavailable/);
+ await h.pg.query('update public.editorial_articles set image_url=$1',[another]);
+ await h.pg.query("update public.properties set images='{}',image_metadata='{}',image_filenames='{}' where id=$1",[restored.listingId]);
+ assert.equal((await manage('status')).items.find(row=>row.id===b.id).state,'candidate');
+ assert.equal((await manage('restore',b.id)).listingId,restored.listingId);
 });
 
 test('orphan scan holds active uploads, draft-scoped keys, shared references and uncertain legacy files',async t=>{
@@ -669,7 +693,8 @@ test('orphan scan holds active uploads, draft-scoped keys, shared references and
  const detached=`properties/${first}/abandoned.webp`, active=`properties/${first}/active.webp`;
  const draftPath=`properties/listings/${first}/${second}/draft.webp`;
  const shared=`properties/${first}/shared.webp`, legacy='properties/unknown-unused.jpg';
- for(const key of [detached,active,draftPath,shared])await upload(key);
+ const incomplete=`properties/${first}/incomplete.webp`;
+ for(const key of [detached,active,draftPath,shared,incomplete])await upload(key);
  await assert.rejects(upload(active,admin),/retired_reference/);
  for(const key of [detached,active,draftPath,shared,legacy])await h.pg.query(
    "insert into storage.objects(bucket_id,name,owner_id) values('property-media',$1,$2)",[key,editor]);
@@ -677,13 +702,16 @@ test('orphan scan holds active uploads, draft-scoped keys, shared references and
  await h.pg.query("update private.home_media_items set upload_until=now()-interval '1 hour' where name<>$1",[active]);
  const run=await h.role('authenticated',owner,()=>h.pg.query("select public.home_media_management('trash') value"));
  assert.equal(run.rows[0].value.newlyTrashed,1);
- assert.deepEqual(run.rows[0].value.items.map(item=>item.name),[detached]);
+ assert.deepEqual(run.rows[0].value.items.filter(item=>item.state==='trashed').map(item=>item.name),[detached]);
+ assert.equal(run.rows[0].value.items.find(item=>item.name===shared).state,'retained');
+ assert.equal((await h.pg.query('select 1 from private.home_media_items where name=$1',[incomplete])).rows.length,0);
  assert.ok(run.rows[0].value.candidates>=3);
 });
 
 test('Owner queues a verified renamed original for 48 hours through the existing rename guard',async t=>{
  const h=await setup(t,true);
  const write=h.client('authenticated',owner),service=h.client('service_role');
+ const beforeFirst=await h.listing(first),beforeSecond=await h.listing(second);
  const {id}=await renamePropertyPhoto(write,service,origin,{propertyId:first,source:oldUrl,filename:'room-03.jpg',version},signal());
  const result=await trashOldPropertyPhoto(write,origin,id,signal());
  assert.equal(result.removed,false);
@@ -691,4 +719,118 @@ test('Owner queues a verified renamed original for 48 hours through the existing
  assert.equal((await propertyPhotoRenameHistory(write,first,signal()))[0].trash_expires_at,result.expiresAt);
  assert.ok(h.files.has(oldKey));
  assert.deepEqual(h.calls.map(([operation])=>operation),['copy']);
+ const panel=payload=>h.role('authenticated',owner,()=>h.pg.query('select public.home_media_management($1,$2) value',payload))
+  .then(r=>r.rows[0].value);
+ const item=(await panel(['status',null])).items.find(row=>row.name===oldKey);
+ assert.equal(item.restore_mode,'rename');
+ const after=await h.listing(first);
+ await h.pg.query('update public.properties set image_metadata=$1 where id=$2',[{[newUrl]:{alt_en:'New edit'}},first]);
+ await assert.rejects(panel(['restore',item.id]),/restore_conflict/);
+ assert.equal((await panel(['status',null])).items.find(row=>row.id===item.id).state,'trashed');
+ await h.pg.query('update public.properties set image_metadata=$1 where id=$2',[after.image_metadata,first]);
+ assert.equal((await panel(['restore',item.id])).listingId,first);
+ for(const before of [beforeFirst,beforeSecond]) {
+  const saved=await h.listing(before.id);
+  for(const field of ['images','image_metadata','image_filenames','source_url'])assert.deepEqual(saved[field],before[field]);
+ }
+});
+
+test('saved removals create recoverable entries and preserve files another record still uses',async t=>{
+ const h=await setup(t,true);
+ const shared=`properties/listings/${first}/${first}/shared.webp`;
+ const removed=`properties/listings/${first}/${second}/removed.webp`;
+ const sharedUrl=propertyPhotoUrl(origin,shared);
+ for(const name of [shared,removed])await h.pg.query('insert into storage.objects(bucket_id,name) values($1,$2)',[bucket,name]);
+ const removedUrl=propertyPhotoUrl(origin,removed);
+ await h.pg.query('update public.properties set images=$1,image_metadata=$2,image_filenames=$3 where id=$4',
+  [[sharedUrl,removedUrl,another],{[removedUrl]:h.caption},{[removedUrl]:'Restored.webp'},first]);
+ await h.pg.query('update public.editorial_articles set image_url=$1',[sharedUrl]);
+ await h.pg.query("update public.properties set images=$1,image_metadata='{}',image_filenames='{}' where id=$2",[[another],first]);
+ const manage=(action,id=null)=>h.role('authenticated',owner,()=>h.pg.query('select public.home_media_management($1,$2) value',[action,id]))
+   .then(({rows})=>rows[0].value);
+ const pending=(await manage('status')).items.find(row=>row.name===removed);
+ assert.equal(pending.state,'candidate');
+ assert.deepEqual(await manage('restore',pending.id),{id:pending.id,restored:true,listingId:first});
+ const restored=await h.listing(first);
+ assert.deepEqual(restored.images,[removedUrl,another]);
+ assert.deepEqual(restored.image_metadata,{[removedUrl]:h.caption});
+ assert.deepEqual(restored.image_filenames,{[removedUrl]:'Restored.webp'});
+ const report=await manage('trash');
+ assert.equal(report.items.find(row=>row.name===shared).state,'retained');
+ assert.equal(report.items.find(row=>row.name===removed).state,'restored');
+ assert.deepEqual(h.calls,[]);
+});
+
+test('historical review joins the retention queue only after its current identity and dependencies pass',async t=>{
+ const h=await setup(t,true);
+ const enroll=(review,confirm=true,actor=owner)=>h.role('authenticated',actor,()=>h.pg.query(
+   'select public.home_media_enroll_historical($1,$2) value',[review,confirm])).then(result=>result.rows[0].value);
+ const key='properties/verified-historical.webp', filename='Legacy Living Room.webp';
+ const {rows:[object]}=await h.pg.query(`insert into storage.objects(bucket_id,name,metadata,user_metadata)
+   values('property-media',$1,$2,$3) returning id,version`,[key,{size:8,eTag:'known'},{original_filename:filename}]);
+ const review={key,objectId:object.id,version:object.version,bytes:8,etag:'known',
+   backupSha256:'a'.repeat(64),evidenceRef:'fixture-audit-lease-42'};
+ await assert.rejects(enroll(review,true,admin),error=>error.code==='42501');
+ await assert.rejects(enroll(review,false),error=>error.code==='22023');
+ await assert.rejects(enroll({...review,etag:'different'}),/manifest_changed/);
+ await h.pg.query('update public.editorial_articles set sources=$1',[JSON.stringify([{name:filename}])]);
+ await assert.rejects(enroll(review),/manifest_changed/);
+ await h.pg.query("update public.editorial_articles set sources='[]'");
+ await h.pg.query("insert into storage.s3_multipart_uploads values('property-media',$1)",[key]);
+ await assert.rejects(enroll(review),/manifest_changed/);
+ await h.pg.exec('delete from storage.s3_multipart_uploads');
+ const result=await enroll(review);
+ assert.deepEqual(await enroll(review),result);
+ const {rows:[record]}=await h.pg.query('select * from private.home_media_items where id=$1',[result.id]);
+ assert.equal(record.source,'historical');
+ assert.equal(record.state,'trashed');
+ assert.equal(record.historical_review.actor,owner);
+ assert.ok(Date.parse(result.expiresAt)-Date.now()>47*60*60*1000);
+ assert.equal((await h.pg.query('select count(*) n from private.home_listing_deletions')).rows[0].n,0);
+ assert.equal((await h.pg.query('select count(*) n from private.property_photo_renames')).rows[0].n,0);
+});
+
+test('confirmed early purge scopes the job to one file and reconciles a lost final acknowledgement',async t=>{
+ const h=await setup(t,true);
+ const query=(as,user,sql,args=[])=>h.role(as,user,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);
+ const worker=(sql,...args)=>query('service_role',null,sql,args);
+ const keys=['early','shared','changed'].map((name,index)=>`properties/listings/${first}/${index?second:first}/${name}.webp`);
+ for(const key of keys)await h.pg.query("insert into storage.objects(bucket_id,name) values('property-media',$1)",[key]);
+ await h.pg.query('update public.properties set images=$1 where id=$2',[keys.map(key=>propertyPhotoUrl(origin,key)),first]);
+ await h.pg.query('update public.properties set images=$1 where id=$2',[[another],first]);
+ const list=await query('authenticated',owner,"select public.home_media_management('status') value");
+ const [early,shared,changed]=keys.map(key=>list.items.find(item=>item.name===key));
+ const claim=(actor,item,expiry=item.expires_at)=>worker('select public.home_media_claim($1,$2,$3) value',actor,item.id,expiry);
+ const target=(job,item)=>worker('select public.home_media_target($1,$2,true) value',job.id,item.id);
+ const finish=job=>worker('select public.home_media_finish($1) value',job.id);
+ await assert.rejects(claim(null,early),error=>error.code==='42501');
+ await assert.rejects(claim(admin,early),error=>error.code==='42501');
+ assert.deepEqual(await claim(owner,early),{status:'disabled'});
+ await h.pg.exec('update private.home_media_control set permanent_enabled=true');
+ await assert.rejects(claim(owner,early,'2001-01-01'),/purge_unavailable/);
+ for(const item of [shared,changed]) {
+  const job=await claim(owner,item);
+  if(item===shared)await h.pg.query('update public.editorial_articles set image_url=$1',[propertyPhotoUrl(origin,item.name)]);
+  else await h.pg.query("update storage.objects set version='changed' where name=$1",[item.name]);
+  assert.equal(await target(job,item),null);
+  await finish(job);
+ }
+ await h.pg.query('update private.home_media_items set attempts=3 where id=$1',[early.id]);
+ const job=await claim(owner,early);
+ assert.equal(job.items.length,1);
+ assert.equal(await target(job,shared),null);
+ assert.equal((await target(job,early)).present,true);
+ assert.equal(await worker('select public.home_media_settle($1,$2,false) value',job.id,early.id),false);
+ await finish(job);
+ // The provider completed the removal after the acknowledgement was lost.
+ await h.pg.query("delete from storage.objects where bucket_id='property-media' and name=$1",[early.name]);
+ await h.pg.query("update private.home_media_items set retry_after=now()-interval '1 second' where id=$1",[early.id]);
+ const recovery=await worker('select public.home_media_claim() value');
+ assert.equal((await target(recovery,early)).present,false);
+ assert.equal(await worker('select public.home_media_settle($1,$2,false) value',recovery.id,early.id),true);
+ assert.equal(await worker('select public.home_media_settle($1,$2,false) value',recovery.id,early.id),true);
+ const {rows:[final]}=await h.pg.query('select state,attempts,expires_at from private.home_media_items where id=$1',[early.id]);
+ assert.equal(final.state,'removed');
+ assert.equal(final.attempts,4);
+ assert.ok(Date.parse(final.expires_at)>Date.now());
 });

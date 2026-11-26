@@ -1,5 +1,5 @@
 const mediaBuckets = new Set(['property-media','listing-videos']);
-const actions = new Set(['status','scan','trash','restore','run']);
+const actions = new Set(['status','scan','trash','restore','run','purge']);
 const json = (body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const encode=new TextEncoder();
 const sha=async data=>new Uint8Array(await crypto.subtle.digest('SHA-256',data));
@@ -52,8 +52,8 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
     return hex(await sha(await new Blob(chunks).arrayBuffer()))===item.replacementSha256;
   }
 
-  async function run(actor,signal) {
-    const claim=await internal('claim',{p_actor:actor});
+  async function run(actor,signal,early) {
+    const claim=await internal('claim',{p_actor:actor,...(early?{p_item:early.id,p_expiry:early.expiresAt}:{})});
     if(claim?.status!=='ok')return claim;
     let attempted=0,removed=0,overdue=0;
     const start=Date.now();
@@ -88,7 +88,11 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
     if(!url||!publishable||!service) return json({error:'unavailable'},503);
     try {
       const body=await req.json().catch(()=>null);
-      if(!body||!actions.has(body.action)||(body.action==='restore'&&!uuid.test(body.id||''))) return json({error:'invalid_request'},400);
+      if(!body||!actions.has(body.action)||(['restore','purge'].includes(body.action)&&!uuid.test(body.id||'')))
+        return json({error:'invalid_request'},400);
+      const early=body.action==='purge'?body:null;
+      if(early&&(early.confirm!==true||typeof early.expiresAt!=='string'||early.expiresAt.length>48||!Number.isFinite(Date.parse(early.expiresAt))))
+        return json({error:'invalid_request'},400);
       const cron=req.headers.get('x-gary-home-cleanup');
       if(cron!==null) {
         if(body.action!=='run'||!await matchesSecret(cron,cronSecret))return json({error:'forbidden'},403);
@@ -100,10 +104,12 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       if(!user.ok) return json({error:user.status===401||user.status===403?'session_expired':'unavailable'},user.status===401||user.status===403?401:503);
       const {id}=await user.json();
       if(!uuid.test(id||''))return json({error:'session_expired'},401);
-      if(body.action==='run') {
+      if(body.action==='run'||early) {
         const owner=await rpc('management',token,{p_action:'authorize'});
         if(owner?.actor!==id) return json({error:'forbidden'},403);
-        return json(await run(id,req.signal));
+        const result=await run(id,req.signal,early);
+        if(early&&result.status==='ok'&&result.removed!==1) return json({error:'purge_unconfirmed'},409);
+        return json(result);
       }
       return json(await rpc('management',token,{p_action:body.action,p_id:body.action==='restore'?body.id:null,
         p_offset:Number.isInteger(body.offset)?body.offset:0}));

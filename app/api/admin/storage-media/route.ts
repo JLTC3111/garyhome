@@ -11,14 +11,17 @@ export async function POST(req:Request) {
     return await request(async signal=>{
       const {role}=await staffRequest(req,signal);
       if(role!=="owner")return json({error:"forbidden"},403);
-      const input=await req.json().catch(()=>null);
-      if(!input||!["status","scan","trash","restore","run"].includes(input.action))return json({error:"invalid_request"},400);
+      const raw:unknown=await req.json().catch(()=>null);
+      if(!raw||typeof raw!=="object"||Array.isArray(raw))return json({error:"invalid_request"},400);
+      const input=raw as Record<string,unknown>;
+      if(typeof input.action!=="string"||!["status","scan","trash","restore","run","purge"].includes(input.action))
+        return json({error:"invalid_request"},400);
       const {url,key}=backendConfig();
       if(new URL(url).origin!==PROPERTY_IMAGE_ORIGIN||!key)return json({error:"unavailable"},503);
       const response=await fetch(PROPERTY_IMAGE_ORIGIN+"/functions/v1/media-orphan-cleanup",{
         method:"POST",signal,redirect:"error",cache:"no-store",headers:{
           Authorization:req.headers.get("authorization")!,apikey:key,"Content-Type":"application/json",
-        },body:JSON.stringify({action:input.action,id:input.id,offset:input.offset}),
+        },body:JSON.stringify({action:input.action,id:input.id,offset:input.offset,expiresAt:input.expiresAt,confirm:input.confirm}),
       });
       return json(await response.json(),response.status);
     },55000);

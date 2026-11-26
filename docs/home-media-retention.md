@@ -48,7 +48,7 @@ Production manual cleanup is enabled. The deployed worker `media-orphan-cleanup`
 
 The inventory counts unlinked Storage identities. The scan can verify existing queue records with known provenance. Historical objects enter File Trash only after independent custody review and a checksum-verified local backup. This is why 639 inventory candidates and 49 reported protected candidates can coexist with an empty verification queue.
 
-Apply the outstanding review migration through the approved database service, then release the reviewed Staff application. It is separate from Cron activation. It does not enroll objects, change the permanent cleanup setting or schedule a job.
+The review RPC and holds table are installed in production. Apply the review migration only to an environment where it is missing, then release the reviewed Staff application. Cron activation is separate.
 
 ```sh
 psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
@@ -59,7 +59,7 @@ Under **Properties → Storage & Media Management → Orphan review**, search by
 
 ### Configure the hourly scheduler from the authenticated local terminal
 
-The same high-entropy value belongs in the Edge secret `HOME_MEDIA_CRON_SECRET` and in project Vault as `gary_home_media_cron_secret`. The existing function is already deployed. In the authenticated local zsh session, generate a fresh value in a private temporary env file and use the CLI to set the Edge secret. The clipboard step is for pasting the matching value into Vault locally. Paste it into the Vault secret field and clear the clipboard when done. Keep terminal tracing disabled. [Vault](https://supabase.com/docs/guides/database/vault) · [Edge Function secrets](https://supabase.com/docs/guides/functions/secrets)
+The same high-entropy value belongs in the Edge secret `HOME_MEDIA_CRON_SECRET` and in project Vault as `gary_home_media_cron_secret`. The existing function is already deployed. Run the command from Gary Home with an authenticated Supabase CLI v3 session. The local `supabase/config.toml` uses `[local_smtp]`, as required by CLI v3. Confirm the operation if prompted for the production project. The command copies the value to the clipboard only after the Edge secret is saved. [CLI v3 upgrade guide](https://supabase.com/docs/guides/local-development/cli/migrating-to-v3) · [Vault](https://supabase.com/docs/guides/database/vault) · [Edge Function secrets](https://supabase.com/docs/guides/functions/secrets)
 
 ```sh
 (
@@ -69,8 +69,9 @@ The same high-entropy value belongs in the Edge secret `HOME_MEDIA_CRON_SECRET` 
   GARY_HOME_MEDIA_SECRET_FILE="$(mktemp -t gary-home-media-cron)"
   trap 'rm -f "$GARY_HOME_MEDIA_SECRET_FILE"' EXIT
   openssl rand -hex 32 | sed 's/^/HOME_MEDIA_CRON_SECRET=/' > "$GARY_HOME_MEDIA_SECRET_FILE"
-  supabase secrets set --project-ref duyiihsmaqfgwezmsnjs --env-file "$GARY_HOME_MEDIA_SECRET_FILE"
+  supabase secrets set --remote=duyiihsmaqfgwezmsnjs --env-file "$GARY_HOME_MEDIA_SECRET_FILE"
   sed 's/^HOME_MEDIA_CRON_SECRET=//' "$GARY_HOME_MEDIA_SECRET_FILE" | tr -d '\n' | pbcopy
+  printf '%s\n' 'Cron secret copied for the Gary Home Vault.'
 )
 ```
 

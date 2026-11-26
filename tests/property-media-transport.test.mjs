@@ -37,6 +37,42 @@ test('Storage transport rejects privileged keys, redirect paths and mismatched r
  await assert.rejects(client.read(identity),/audited size, MIME or ETag/);
 });
 
+test('public delivery probes the hash-verified object with a bounded range and rejects mismatches',async()=>{
+ const webp=Buffer.from('RIFF....WEBPfixture bytes');
+ const object={...identity,bytes:webp.length,mime:'image/webp',sha256:digest(webp)};
+ const expectedRange='bytes 0-11/'+webp.length;
+ const prefix=webp.subarray(0,12);
+ const partial=(body,headers={})=>new Response(body,{status:206,
+  headers:{'content-type':object.mime,'content-range':expectedRange,etag:object.etag,...headers}});
+ const responses=[
+  partial(prefix),
+  partial(prefix,{'content-range':'bytes 0-11/999'}),
+  partial(prefix,{etag:'W/"tag"'}),
+  partial(Buffer.alloc(12)),
+ ];
+ const client=storageStages({...options,pace:async()=>{},fetcher:async(url,init)=>{
+  assert.match(new URL(url).pathname,/\/object\/public\/property-media\//);
+  assert.deepEqual(init.headers,{'if-match':object.etag,range:'bytes=0-11'});
+  return responses.shift();
+ }});
+ await client.verifyPublic(object,webp);
+ await assert.rejects(client.verifyPublic(object,webp),/range did not match/);
+ await assert.rejects(client.verifyPublic(object,webp),/range did not match/);
+ await assert.rejects(client.verifyPublic(object,webp),/SHA-256/);
+});
+
+test('public delivery still checks the complete SHA-256 if Storage ignores Range',async()=>{
+ const webp=Buffer.from('RIFF....WEBPfixture bytes');
+ const object={...identity,bytes:webp.length,mime:'image/webp',sha256:digest(webp)};
+ const bodies=[webp,Buffer.alloc(webp.length)];
+ const client=storageStages({...options,pace:async()=>{},fetcher:async(_url,init)=>{
+  assert.equal(init.headers.range,'bytes=0-11');
+  return new Response(bodies.shift(),{headers:{'content-type':object.mime,etag:object.etag}});
+ }});
+ await client.verifyPublic(object,webp);
+ await assert.rejects(client.verifyPublic(object,webp),/SHA-256/);
+});
+
 test('public reads honor Retry-After and pace bounded transient retries',async()=>{
  const calls=[];
  const responses=[

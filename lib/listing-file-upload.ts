@@ -28,6 +28,13 @@ export async function uploadListingFile({ client, file, resumeKey = file, bucket
   const userId = data.session?.user.id;
   if (error || !userId || !data.session?.access_token) throw new Error("Your sign-in expired. Reconnect and try uploading again.");
   if (expectedUserId && userId !== expectedUserId) throw new Error("Your account changed. Sign in again before continuing.");
+  async function renewLease() {
+    const reservation=client.rpc("home_media_upload_lease",{p_bucket:bucket,p_name:path});
+    const {error:leaseError}=await (signal?reservation.abortSignal(signal):reservation);
+    if(leaseError)throw Object.assign(new Error("The upload could not be reserved. Refresh and try again."),{status:leaseError.code==="42501"?403:409});
+  }
+  await renewLease();
+  let leaseRenewal=Date.now()+60*60*1000;
   const { Upload } = await import("tus-js-client");
   signal?.throwIfAborted();
   const key = `${config.url}/${userId}/${bucket}/${path}`;
@@ -70,6 +77,7 @@ export async function uploadListingFile({ client, file, resumeKey = file, bucket
         signal?.throwIfAborted();
         if (settled) throw new DOMException("Upload cancelled", "AbortError");
         if (authError || !current.session?.access_token || current.session.user.id !== userId) throw new Error("Your account changed. Sign in again before continuing.");
+        if(Date.now()>=leaseRenewal) { await renewLease(); leaseRenewal=Date.now()+60*60*1000; }
         request.setHeader("authorization", `Bearer ${current.session.access_token}`);
         request.setHeader("apikey", config.publishableKey);
         // Progress events reset the inactivity watchdog; a slow chunk has no

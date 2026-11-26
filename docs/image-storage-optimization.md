@@ -75,7 +75,9 @@ Run from the Gary Home repository with Node 24 and the existing dependencies. Th
      --expected-count 509 --apply --prompt-db-password
    ```
 
-   Keep the complete staging directory so each checkpoint can read its original and optimized file. The final report is `guarded-write/completion.json`. The continuation checks confirmed retirement records, live bucket totals and a public gallery. The individual stage commands below also accept a publishable API key and an existing signed Owner access token from a local credential manager through `GARY_MEDIA_PUBLISHABLE_KEY` and `GARY_MEDIA_OWNER_TOKEN`.
+   For an approved increase, add `--egress-increase batch-NN=BYTES` with `--apply`. The increase is relative to that batch's sealed limit for the current invocation. Keep using the same allowance if you resume again. The journal retains its prior charges. The budget reserves enough for a full response to the public range check and the staff retirement integrity check.
+
+   Keep the complete staging directory so each checkpoint can read its original and optimized file. The final report is `guarded-write/completion.json`. The continuation checks confirmed retirement records, live bucket totals and a public gallery. Run the same command with `--verify-complete` in place of `--apply`, and omit any egress increases, to repeat the final checks without writing to production or the workspace. The individual stage commands below also accept a publishable API key and an existing signed Owner access token from a local credential manager through `GARY_MEDIA_PUBLISHABLE_KEY` and `GARY_MEDIA_OWNER_TOKEN`.
 
 ### Audit and seal a batch
 

@@ -50,6 +50,23 @@ async function verifySite(sample) {
   return {pages:routes.length,gallery:Boolean(sample)};
 }
 
+function confirmedRow(source,entry,item) {
+  if(!item?.cleaned||!item.uploaded||!item.retirementId) {
+    throw new Error(basename(source.work)+' is missing a completed retirement checkpoint.');
+  }
+  return {listing:entry.listing.id,old_key:entry.key,new_key:item.uploaded.key,
+    job:item.retirementId,identity:item.uploaded};
+}
+
+async function verifyCompletion(env,completed,report) {
+  const database=await verifyMediaDatabase(env,completed);
+  const result={confirmed:completed.length,database,site:null};
+  if(report) await writeAtomic(report,JSON.stringify(result,null,2)+'\n');
+  result.site=await verifySite(database.sample);
+  if(report) await writeAtomic(report,JSON.stringify(result,null,2)+'\n');
+  log(result);
+}
+
 async function resume(root,batches,options,env,transport) {
   const writeRoot=join(root,'guarded-write');
   const workFor=source=>join(writeRoot,basename(source.work));
@@ -62,6 +79,11 @@ async function resume(root,batches,options,env,transport) {
   const db=await transport();
   await checkMediaDatabase(env,first,await db.owner(first));
   log({homeOwner:'verified',postgres:'verified with TLS and listing RLS'});
+  if(options['verify-complete']) {
+    const completed=batches.flatMap((source,index)=>source.photos.map(({entry})=>
+      confirmedRow(source,entry,checkpoints[index]?.journal.items[entry.token])));
+    return verifyCompletion(env,completed);
+  }
   const pending=batches.filter((_,index)=>!checkpoints[index]);
   if(pending.length) {
     const review=await db.review(pending.flatMap(reviewRows));
@@ -79,49 +101,59 @@ async function resume(root,batches,options,env,transport) {
       await sealContinuation(work,source.work,reviewed);
       checkpoint=await continuationCheckpoint(work,source);
     }
+    const egressIncreaseBytes=options.egressIncreases.get(name)??0;
+    if(egressIncreaseBytes&&source.photos.some(({entry})=>!checkpoint.journal.items[entry.token]?.cleaned)) {
+      log({batch:name,egressBudgetBytes:checkpoint.batch.budget.egressBytes,egressIncreaseBytes,
+        egressReservedBytes:checkpoint.journal.spent.egressBytes});
+    }
     const verifiedItems=[];
     for(const {entry} of source.photos) {
       const previous=checkpoint.journal.items[entry.token];
+      let item=previous;
       if(!previous?.cleaned) {
         for(const [stage,field] of stages) {
           // Cleanup can have succeeded before its acknowledgement reached the journal.
           if(previous?.[field]) continue;
           const output=await runMediaStage(stage,{work,apply:true,approve:checkpoint.batch.id,
-            tokens:[entry.token],retireOriginals:stage==='cleanup'},transport);
+            tokens:[entry.token],retireOriginals:stage==='cleanup',egressIncreaseBytes},transport);
           if(output.blocked) throw new Error(name+' '+stage+' '+entry.token+' stopped. '+output.results[0].reason);
         }
+        item=(await continuationCheckpoint(work,source)).journal.items[entry.token];
       }
-      const current=await continuationCheckpoint(work,source);
-      const item=current.journal.items[entry.token];
-      if(!item?.cleaned||!item.uploaded||!item.retirementId) throw new Error(name+' is missing a completed retirement checkpoint.');
-      verifiedItems.push({listing:entry.listing.id,old_key:entry.key,new_key:item.uploaded.key,
-        job:item.retirementId,identity:item.uploaded});
+      verifiedItems.push(confirmedRow(source,entry,item));
     }
     completed.push(...verifiedItems);
     log({batch:name,confirmed:verifiedItems.length,confirmedTotal:completed.length});
   }
-  const database=await verifyMediaDatabase(env,completed);
-  const result={confirmed:completed.length,database,site:null};
-  const report=join(writeRoot,'completion.json');
-  await writeAtomic(report,JSON.stringify(result,null,2)+'\n');
-  result.site=await verifySite(database.sample);
-  await writeAtomic(report,JSON.stringify(result,null,2)+'\n');
-  log(result);
+  await verifyCompletion(env,completed,join(writeRoot,'completion.json'));
 }
 
 process.umask(0o077);
 try {
   const {values}=parseArgs({options:{work:{type:'string'},'expected-count':{type:'string'},apply:{type:'boolean'},
-    'check-auth':{type:'boolean'},'prompt-db-password':{type:'boolean'},help:{type:'boolean'}}});
-  const usage='Usage: node scripts/resume-property-media.mjs --work <existing execution dir> --expected-count <number> [--check-auth | --apply] [--prompt-db-password]';
+    'check-auth':{type:'boolean'},'verify-complete':{type:'boolean'},'egress-increase':{type:'string',multiple:true},
+    'prompt-db-password':{type:'boolean'},help:{type:'boolean'}}});
+  const usage='Usage: node scripts/resume-property-media.mjs --work <existing execution dir> --expected-count <number> [--check-auth | --verify-complete | --apply [--egress-increase <batch>=<bytes> ...]] [--prompt-db-password]';
   if(values.help) console.log(usage);
   else {
     const count=Number(values['expected-count']);
-    if(!values.work||!Number.isSafeInteger(count)||count<1||values.apply&&values['check-auth']) throw new Error(usage);
+    const modes=[values.apply,values['check-auth'],values['verify-complete']].filter(Boolean);
+    if(!values.work||!Number.isSafeInteger(count)||count<1||modes.length>1) throw new Error(usage);
+    const egressIncreases=new Map();
+    for(const option of values['egress-increase']??[]) {
+      const [,batch,amount]=/^((?:batch-\d+)|pilot)=(\d+)$/.exec(option)??[];
+      const bytes=Number(amount);
+      if(!values.apply||!batch||!Number.isSafeInteger(bytes)||bytes<1||egressIncreases.has(batch)) {
+        throw new Error('Use --egress-increase <batch>=<bytes> once per approved batch with --apply.');
+      }
+      egressIncreases.set(batch,bytes);
+    }
     const root=resolve(values.work), batches=await loadStaging(root,count);
-    if(values.apply||values['check-auth']) {
+    const names=new Set(batches.map(source=>basename(source.work)));
+    if([...egressIncreases.keys()].some(name=>!names.has(name))) throw new Error('An egress increase names an unknown batch.');
+    if(modes.length) {
       const run=()=>withMediaSession({promptDatabasePassword:values['prompt-db-password']},
-        (env,transport)=>resume(root,batches,values,env,transport));
+        (env,transport)=>resume(root,batches,{...values,egressIncreases},env,transport));
       if(values.apply) await withWorkspace(join(root,'guarded-write'),run);
       else await run();
     }

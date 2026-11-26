@@ -7,10 +7,11 @@ import ts from 'typescript';
 import * as photoFiles from '../lib/property-photo-files.ts';
 const base=path.resolve(import.meta.dirname,'..');
 function harness(t){
- const state={uploads:[],progress:[],token:'first',user:'owner',aborts:0},controller=new AbortController();t.after(()=>controller.abort());
+ const state={uploads:[],progress:[],token:'first',user:'owner',aborts:0,leases:[],leaseError:null},controller=new AbortController();t.after(()=>controller.abort());
  let now=1000,sequence=0;const timers=new Map();
  class Upload {constructor(file,options){this.file=file;this.options=options;this.url=options.uploadUrl||null;state.uploads.push(this);}start(){this.started=true;}async abort(){state.aborts++;}}
- const client={auth:{getSession:async()=>({data:{session:{access_token:state.token,user:{id:state.user}}},error:null})},storage:{from:bucket=>({getPublicUrl:p=>({data:{publicUrl:'https://media.example/'+bucket+'/'+p}})})}};
+ const client={auth:{getSession:async()=>({data:{session:{access_token:state.token,user:{id:state.user}}},error:null})},storage:{from:bucket=>({getPublicUrl:p=>({data:{publicUrl:'https://media.example/'+bucket+'/'+p}})})},
+   rpc(name,args){state.leases.push({name,args});return {abortSignal:async()=>({error:state.leaseError})};}};
  const source=ts.transpileModule(fs.readFileSync(base+'/lib/listing-file-upload.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
  const loaded={exports:{}};function dependency(id){if(id==='tus-js-client')return {Upload};if(id==='./property-photo-files')return photoFiles;if(id==='./browser-client')return {browserBackendConfig:()=>({url:'https://exampleproject.supabase.co',publishableKey:'public-key'})};throw new Error(id);}
  class ClockDate extends Date {static now(){return now;}}
@@ -25,11 +26,19 @@ const turn=()=>new Promise(setImmediate);
 test('listing uploads use private in-memory resumable sessions, required chunks, original metadata and refreshed credentials',async t=>{
  const h=harness(t),pending=h.run();await turn();const {options}=h.state.uploads[0];
  assert.equal(options.chunkSize,6*1024*1024);assert.equal(options.storeFingerprintForResuming,false);assert.equal(options.uploadDataDuringCreation,true);
+ assert.deepEqual(h.state.leases,[{name:'home_media_upload_lease',args:{p_bucket:'property-media',p_name:'properties/uuid.jpg'}}]);
  assert.match(options.endpoint,/exampleproject\.storage\.supabase\.co/);assert.deepEqual(JSON.parse(options.metadata.metadata),{original_filename:h.file.name});
  const first=h.request();await options.onBeforeRequest(first);h.state.token='refreshed';const next=h.request();await options.onBeforeRequest(next);
  assert.equal(first.headers.authorization,'Bearer first');assert.equal(next.headers.authorization,'Bearer refreshed');assert.equal(next.headers.apikey,'public-key');
  options.onProgress(5,10);assert.equal(h.state.progress.at(-1).percent,50);options.onProgress(10,10);assert.equal(h.state.progress.at(-1).percent,99);
  options.onSuccess();assert.equal(await pending,'https://media.example/property-media/properties/uuid.jpg');assert.equal(h.state.progress.at(-1).percent,100);assert.equal(h.timers.size,0);
+});
+
+test('a refused media lease prevents the resumable transfer from starting',async t=>{
+ const h=harness(t);
+ h.state.leaseError={code:'42501'};
+ await assert.rejects(h.run(),error=>error.status===403);
+ assert.deepEqual(h.state.uploads,[]);
 });
 test('a progressing upload continues for more than 120 seconds without a total deadline',async t=>{
  const h=harness(t),pending=h.run();await turn();const {options}=h.state.uploads[0];

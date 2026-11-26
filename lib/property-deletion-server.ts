@@ -31,6 +31,14 @@ export function listingDeletionQueue(db: SupabaseClient, signal: AbortSignal) {
   return rpc<ListingDeletion[]>(db,"status",{},signal);
 }
 
+export function stageListingDeletion(db: SupabaseClient, propertyId: string,
+  action: { version: string } | { manifest: ReviewedListingObject[] }, signal: AbortSignal) {
+  const args={p_property:propertyId};
+  return "version" in action
+    ? rpc<ListingDeletion>(db,"prepare",{...args,p_version:action.version},signal)
+    : rpc<ListingDeletion>(db,"adopt",{...args,p_manifest:action.manifest},signal);
+}
+
 async function cleanListingMedia(system: SupabaseClient, propertyId: string, actor: string | null, signal: AbortSignal) {
   const args = {p_property:propertyId};
   const lease = await rpc<string|null>(system,"claim",{...args,p_background:actor===null},signal);
@@ -70,9 +78,8 @@ export async function deleteListingAndMedia(
 ): Promise<ListingDeletion> {
   const args = {p_property:propertyId};
   let job: ListingDeletion | null;
-  if ("version" in action) job=await rpc<ListingDeletion>(db,"prepare",{...args,p_version:action.version},signal);
-  else if ("manifest" in action) job=await rpc<ListingDeletion>(db,"adopt",{...args,p_manifest:action.manifest},signal);
-  else job=await rpc<ListingDeletion|null>(db,"status",args,signal);
+  if ("retry" in action) job=await rpc<ListingDeletion|null>(db,"status",args,signal);
+  else job=await stageListingDeletion(db,propertyId,action,signal);
   if (!job) throw new ListingDeletionError("missing",404);
   if (!job.pending) return job;
 

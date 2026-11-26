@@ -223,6 +223,8 @@ export function storageStages({key,token,fetcher=fetch,wait=delay,pace=paceReque
     };
     return retry?retryMediaRequest(send,{wait}):send();
   };
+  const readObject=(object,isPublic,headers={})=>request('read',objectEndpoint(object.key,isPublic?'public':'')+
+    '?cacheNonce='+crypto.randomUUID(),{headers:isPublic?headers:auth},true);
   return {
     async owner(listing) {
       const access=await request('check Owner access',PROPERTY_IMAGE_ORIGIN+'/rest/v1/rpc/home_photo_rename_history',{
@@ -233,8 +235,25 @@ export function storageStages({key,token,fetcher=fetch,wait=delay,pace=paceReque
       if (!uuid.test(user?.id||'')) throw new Error('Owner identity could not be confirmed.');
       return user.id;
     },
-    read:(object,isPublic=false)=>request('read',objectEndpoint(object.key,isPublic?'public':'')+
-      '?cacheNonce='+crypto.randomUUID(),{headers:isPublic?{}:auth},true).then(response=>readVerifiedBody(response,object)),
+    read:(object,isPublic=false)=>readObject(object,isPublic).then(response=>readVerifiedBody(response,object)),
+    async verifyPublic(object,stagedBytes) {
+      const prefix=stagedBytes.subarray(0,12);
+      const tag=object.etag;
+      const canProbe=/^"[\x21\x23-\x7e]+"$/.test(tag??'') && object.bytes>prefix.length &&
+        stagedBytes.length===object.bytes && /^[a-f0-9]{64}$/.test(object.sha256??'');
+      const last=prefix.length-1;
+      const response=await readObject(object,true,canProbe?{'if-match':tag,range:'bytes=0-'+last}:{});
+      if (response.status===200) {
+        await readVerifiedBody(response,object);
+        return;
+      }
+      if (!canProbe || response.status!==206 || response.headers.get('etag')!==tag ||
+          response.headers.get('content-range')!==`bytes 0-${last}/${object.bytes}`) {
+        await response.body?.cancel();
+        throw new Error('The public Storage range did not match the verified object identity.');
+      }
+      await readVerifiedBody(response,{...object,bytes:prefix.length,sha256:digest(prefix)});
+    },
     async upload(key,body,mime,userMetadata) {
       const response=await request('upload',objectEndpoint(key),{method:'POST',body,headers:{
         ...auth,'x-upsert':'false','content-type':mime,'cache-control':'max-age='+PROPERTY_IMAGE_CACHE_SECONDS,

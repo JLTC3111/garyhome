@@ -72,11 +72,11 @@ async function readPhoto(origin:string,key:string,signal:AbortSignal) {
   return {sha256,format,contentType:response.headers.get("content-type")?.split(";")[0].trim().toLowerCase()};
 }
 
-export type RenamePhotoInput = {propertyId:string; source:string; filename:string; version:string; cleanupConfirmed?:boolean};
+export type RenamePhotoInput = {propertyId:string; source:string; filename:string; version:string; cleanupConfirmed?:boolean; retainOldCopy?:boolean};
 export type RenamePhotoResult = {
   id:string; oldKey:string; url:string; selectedUrl:string; properties:PhotoVersion[];
   savedListing:Property;
-  cleanup:{status:"removed"}|{status:"pending"; reason:string};
+  cleanup:{status:"removed"}|{status:"trashed"; expiresAt:string}|{status:"pending"; reason:string};
 };
 
 export async function renamePropertyPhoto(
@@ -131,8 +131,15 @@ export async function renamePropertyPhoto(
   let cleanup:RenamePhotoResult["cleanup"]=job.removed_at ? {status:"removed"} : {status:"pending",reason:"review_required"};
   if(!job.removed_at&&job.auto_cleanup_requested){
     try {
-      await request(cleanupSignal=>retirePropertyPhoto(db,system,origin,job.id,AbortSignal.any([signal,cleanupSignal])),10000);
-      cleanup={status:"removed"};
+      cleanup=await request(async cleanupSignal=>{
+        const combined=AbortSignal.any([signal,cleanupSignal]);
+        if(input.retainOldCopy) {
+          const result=await trashOldPropertyPhoto(db,origin,job.id,combined);
+          return result.removed?{status:"removed"}:{status:"trashed",expiresAt:result.expiresAt!};
+        }
+        await retirePropertyPhoto(db,system,origin,job.id,combined);
+        return {status:"removed"};
+      },10000);
     } catch(error) {
       cleanup={status:"pending",reason:error instanceof PhotoRenameError?error.code:"unavailable"};
     }
@@ -140,25 +147,42 @@ export async function renamePropertyPhoto(
   return {id:job.id,oldKey,url,selectedUrl,properties:job.properties,savedListing,cleanup};
 }
 
-export type PhotoRenameHistory = {id:string;old_key:string;new_key:string;applied_at:string|null;removed_at:string|null;auto_cleanup_requested?:boolean};
+export type PhotoRenameHistory = {id:string;old_key:string;new_key:string;applied_at:string|null;removed_at:string|null;auto_cleanup_requested?:boolean;trash_expires_at?:string|null};
 export function propertyPhotoRenameHistory(db:SupabaseClient,propertyId:string,signal:AbortSignal) {
   return rpc<PhotoRenameHistory[]>(db,"history",{p_property:propertyId},signal);
 }
 
-export async function retirePropertyPhoto(db:SupabaseClient, system:SupabaseClient, origin:string,id:string,signal:AbortSignal) {
+async function checkedRemoval(db:SupabaseClient,origin:string,id:string,signal:AbortSignal) {
   const job = await rpc<RenameJob>(db,"request_removal",{p_id:id,p_confirm:true},signal);
   if (job.origin!==origin || !job.current_key || !job.sha256) throw new PhotoRenameError("replacement_unavailable");
-  if (job.removed_at) return;
+  if (job.removed_at) return job;
   const replacement = await readPhoto(origin,job.current_key,signal);
   if (replacement.sha256!==job.sha256 || replacement.contentType!==replacement.format.contentType)
     throw new PhotoRenameError("integrity_failed");
   const confirmed = await rpc<RenameJob>(db,"request_removal",{p_id:id,p_confirm:true},signal);
   if (confirmed.current_key!==job.current_key || confirmed.old_key!==job.old_key)
     throw new PhotoRenameError("replacement_unavailable");
+  return confirmed;
+}
+
+export async function trashOldPropertyPhoto(db:SupabaseClient,origin:string,id:string,signal:AbortSignal) {
+  const confirmed=await checkedRemoval(db,origin,id,signal);
+  if(confirmed.removed_at)return {removed:true};
+  const {data,error}=await db.rpc("home_media_trash_rename",{p_id:id}).abortSignal(signal);
+  if(error||!data||!(data.removed===true||typeof data.expiresAt==="string")) {
+    if(error?.code==="42501")throw new PhotoRenameError("forbidden",403);
+    if(error?.code==="55P03")throw new PhotoRenameError("media_busy");
+    throw new PhotoRenameError(error?.code==="PGRST202"?"migration_required":"replacement_unavailable");
+  }
+  return data as {removed:boolean;expiresAt?:string};
+}
+
+export async function retirePropertyPhoto(db:SupabaseClient, system:SupabaseClient, origin:string,id:string,signal:AbortSignal) {
+  const confirmed=await checkedRemoval(db,origin,id,signal);
   if (confirmed.removed_at) return;
   signal.throwIfAborted();
   // An interrupted removal can already have succeeded. The catalogue check
   // determines the outcome even if the Storage response was lost.
-  await system.storage.from(PROPERTY_IMAGE_BUCKET).remove([job.old_key]).catch(()=>null);
+  await system.storage.from(PROPERTY_IMAGE_BUCKET).remove([confirmed.old_key]).catch(()=>null);
   if (!await rpc<boolean>(system,"removed",{p_id:id},signal)) throw new PhotoRenameError("remove_failed");
 }

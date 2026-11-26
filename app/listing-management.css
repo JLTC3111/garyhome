@@ -37,3 +37,13 @@
   .listing-price-range input{min-height:44px;font-size:16px}
 }
 @media(prefers-reduced-motion:reduce){.listing-column-popover[data-slot="popover-content"]{animation:none;transition:none}}
+.storage-media-body { display:grid; gap:14px; margin-block-start:14px; }
+.storage-media-body :is(p,ul,dl,h3) { margin:0; }
+.storage-media-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; }
+.storage-media-stats dd { margin:3px 0 0; font-size:clamp(1.15rem,4vw,1.65rem); font-weight:650; }
+.storage-media-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.storage-media-rows { list-style:none; padding:0; }
+.storage-media-rows li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-block:8px; }
+.storage-media-rows li > :first-child { min-width:0; overflow-wrap:anywhere; }
+.storage-media-rows li small { display:block; }
+.storage-media-rows li > span { flex-shrink:0; }

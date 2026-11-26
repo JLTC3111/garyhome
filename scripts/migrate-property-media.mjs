@@ -173,7 +173,8 @@ function assertUploaded(item,result) {
 }
 
 function remaining(ctx,kind,bytes) {
-  assert(ctx.journal.spent[kind]+bytes<=ctx.batch.budget[kind],kind+' budget would be exceeded.');
+  const limit=kind==='egressBytes'?ctx.egressLimit:ctx.batch.budget[kind];
+  assert(ctx.journal.spent[kind]+bytes<=limit,kind+' budget would be exceeded.');
 }
 
 async function charge(ctx,item,operation,{egressBytes=0,storageBytes=0}={}) {
@@ -245,9 +246,10 @@ async function upload(ctx,transport,entry,item,{result,bytes,backup}) {
     equal(after.optimized.userMetadata,backup.userMetadata),'The uploaded object metadata does not match.');
   const uploaded={...after.optimized,sha256:intent.sha256};
   await charge(ctx,item,'upload-check',{egressBytes:bytes.length});
-  await transport.read(uploaded);
+  await transport.read(uploaded,true);
   assertObjects(await liveState(transport,entry,result,item),backup,uploaded);
   item.uploaded=uploaded;
+  item.publicUploadVerified=true;
   await ctx.save();
   return 'uploaded';
 }
@@ -295,7 +297,7 @@ async function changeReferences(ctx,transport,entry,item,{result,backup},undo=fa
   return undo?'rolled-back':'migrated';
 }
 
-async function verifyDelivery(ctx,transport,entry,item,{result,backup}) {
+async function verifyDelivery(ctx,transport,entry,item,{result,backup,bytes}) {
   assert(item.migrated&&!item.rolledBack&&!item.cleaned,'Verification requires an active reference switch.');
   assertUploaded(item,result);
   const state=await liveState(transport,entry,result,item);
@@ -303,8 +305,10 @@ async function verifyDelivery(ctx,transport,entry,item,{result,backup}) {
   assert(state.sourceRefs===0&&state.targetRefs>0&&hasPhoto(state.listing,result.replacementKey),
     'The current reference audit does not match the switch.');
   if (!item.verified) {
+    // Keep a full-response allowance and use a range only after a full public SHA-256 check.
     await charge(ctx,item,'verify',{egressBytes:item.uploaded.bytes});
-    await transport.read(item.uploaded,true);
+    if (item.publicUploadVerified) await transport.verifyPublic(item.uploaded,bytes);
+    else await transport.read(item.uploaded,true);
     const current=await liveState(transport,entry,result,item);
     assertObjects(current,backup,item.uploaded);
     assert(current.sourceRefs===0&&current.targetRefs>0&&hasPhoto(current.listing,result.replacementKey),
@@ -383,7 +387,10 @@ async function report(ctx,entries) {
 
 export async function runMediaStage(stage,options={},openTransport=liveMigrationTransport) {
   assert(stages.has(stage),'Choose a media migration stage.');
-  const {inventory,work,apply=false,approve,tokens=[],limit,egressBytes,storageBytes,retireOriginals=false}=options;
+  const {inventory,work,apply=false,approve,tokens=[],limit,egressBytes,storageBytes,retireOriginals=false,
+    egressIncreaseBytes=0}=options;
+  assert(Number.isSafeInteger(egressIncreaseBytes)&&egressIncreaseBytes>=0&&
+    (!egressIncreaseBytes||apply&&remote.has(stage)),'An egress increase requires an approved remote stage and a valid byte count.');
   if (stage==='audit') {
     assert(inventory,'Supply a local inventory JSON export.');
     const {batch,summary}=auditMedia(await readJson(inventory),{limit,egressBytes,storageBytes,tokens});
@@ -416,9 +423,12 @@ export async function runMediaStage(stage,options={},openTransport=liveMigration
     assert(approve===check.batch.id,'Supply explicit approval for this sealed batch ID.');
     if(stage==='cleanup')assert(retireOriginals&&tokens.length>0,'Cleanup requires --retire-originals and each reviewed --token.');
   }
+  const egressLimit=check.batch.budget.egressBytes+egressIncreaseBytes;
+  assert(Number.isSafeInteger(egressLimit),'The increased egress limit is too large.');
   return withWorkspace(work,async()=>{
     const ctx=await loadWorkspace(work);
     assert(ctx.batch.id===check.batch.id,'The sealed batch changed.');
+    ctx.egressLimit=egressLimit;
     const entries=choose(ctx.batch);
     if (stage==='convert') {
       const plan={entries,queue:entries.map(entry=>entry.token)};

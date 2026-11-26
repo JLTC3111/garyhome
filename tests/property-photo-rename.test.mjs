@@ -5,10 +5,10 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {PGlite} from '@electric-sql/pglite';
 import sharp from 'sharp';
-import {propertyPhotoFilename,propertyPhotoPath,propertyPhotoUrl,replacePropertyPhotoUrl} from '../lib/property-photo-files.ts';
-import {propertyPhotoRenameHistory,renamePropertyPhoto,retirePropertyPhoto} from '../lib/property-photo-rename-server.ts';
+import {PROPERTY_IMAGE_MAX_BYTES,propertyPhotoFilename,propertyPhotoPath,propertyPhotoUrl,replacePropertyPhotoUrl} from '../lib/property-photo-files.ts';
+import {propertyPhotoRenameHistory,renamePropertyPhoto,retirePropertyPhoto,trashOldPropertyPhoto} from '../lib/property-photo-rename-server.ts';
 import {syncRenamedListingDraft} from '../lib/property-photo-rename-state.ts';
-import {deleteListingAndMedia,listingDeletionQueue,retryDueListingCleanup} from '../lib/property-deletion-server.ts';
+import {deleteListingAndMedia,listingDeletionQueue,retryDueListingCleanup,stageListingDeletion} from '../lib/property-deletion-server.ts';
 import {continuationCheckpoint,readStagedBatch,reviewedContinuation,runMediaStage,sealContinuation} from '../scripts/migrate-property-media.mjs';
 import {databaseStages,storageStages} from '../scripts/property-media-migration-transport.mjs';
 
@@ -58,7 +58,7 @@ test('filename normalization fixes duplicate and copy suffixes with the actual e
  assert.equal(propertyPhotoPath(origin+'/storage/v1/object/public/property-media/one%2Ftwo.jpg',origin),null);
 });
 
-async function setup(t) {
+async function setup(t,retention=false) {
  const pg=new PGlite();
  const role=async (as,actor,operation)=>{
   await pg.exec('reset role');
@@ -75,6 +75,7 @@ async function setup(t) {
   create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
   create function private.staff_role() returns text language sql stable as $$select role from auth.users where id=auth.uid()$$;
   create function private.is_staff_admin() returns boolean language sql stable as $$select private.staff_role() in ('admin','owner')$$;
+  create function private.is_editor() returns boolean language sql stable as $$select private.staff_role() is not null$$;
   create table public.properties(id uuid primary key,images text[] not null,image_metadata jsonb not null default '{}',
     image_filenames jsonb not null default '{}', source_url text,updated_at timestamptz not null,
     status text not null default 'draft',listing_code text not null default 'TEST',address text not null default 'Test address',
@@ -94,12 +95,13 @@ async function setup(t) {
   insert into storage.buckets(id) values('property-media'),('listing-videos');
   create table storage.objects(bucket_id text,name text,id uuid not null default gen_random_uuid(),
     version text default gen_random_uuid()::text,metadata jsonb default '{"size":8}',user_metadata jsonb,
-    is_versioned boolean not null default false,is_delete_marker boolean not null default false,archived_at timestamptz,
+    is_versioned boolean not null default false,is_delete_marker boolean not null default false,archived_at timestamptz,owner_id text,
     primary key(bucket_id,name));
   alter table storage.objects enable row level security;
   grant usage on schema storage,private to authenticated;
   grant select,insert,update,delete on storage.objects to authenticated;
   create policy legacy_storage_editor on storage.objects for all to authenticated using(true) with check(true);
+  create policy listing_video_delete_guard on storage.objects as restrictive for delete to authenticated using(true);
   grant select,update,insert,delete on public.properties to authenticated;
   alter table public.properties enable row level security;
   create policy fixture_property_select on public.properties for select to authenticated using(true);
@@ -124,6 +126,7 @@ async function setup(t) {
  await pg.exec(await readFile(new URL('../supabase/migrations/20261119183631_property_photo_rename_owner_only.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261124102511_home_listing_cleanup_retry.sql',import.meta.url),'utf8'));
  await pg.exec(await readFile(new URL('../supabase/migrations/20261124202612_home_postgrest_conflict_sqlstates.sql',import.meta.url),'utf8'));
+ if(retention)await pg.exec(await readFile(new URL('../supabase/migrations/20261126100000_home_media_retention.sql',import.meta.url),'utf8'));
  const files=new Map([[oldKey,{mime:'image/jpeg',bytes:jpeg}]]), calls=[];
  let onCopy=()=>{}, onRemove=()=>{};
  const original=globalThis.fetch;
@@ -258,6 +261,7 @@ test('local media stages reconcile interrupted writes, guard retirement and roll
  const transport={
   ...db,owner:async()=>owner,
   async read(identity){reads++;return h.files.get(identity.key).bytes;},
+  async verifyPublic(identity,bytes){assert.deepEqual(h.files.get(identity.key).bytes,bytes);},
   async upload(key,body,mime,metadata){
    uploads++;
    await register(key,body,mime,metadata);
@@ -337,14 +341,28 @@ test('local media stages reconcile interrupted writes, guard retirement and roll
  const oldAsset=audit.selected[0].key;
  await assert.rejects(run('cleanup',{tokens:[a]}),/retire-originals/);
  const handoff={tokens:[a],retireOriginals:true};
- assert.equal((await run('cleanup',handoff)).blocked,false);
+ const manifestFile=join(work,'batch.json');
+ const manifest=await readFile(manifestFile,'utf8');
+ const cap=JSON.parse(manifest).budget.egressBytes;
+ const journalFile=join(work,'journal.json');
+ const journal=JSON.parse(await readFile(journalFile,'utf8'));
+ // Simulate previous charges that left the current retirement one byte short.
+ journal.spent.egressBytes=cap-PROPERTY_IMAGE_MAX_BYTES+1;
+ await writeFile(journalFile,JSON.stringify(journal));
+ const blocked=await run('cleanup',handoff);
+ assert.equal(blocked.results[0].reason,'egressBytes budget would be exceeded.');
+ assert.equal(retirements,0);
+ assert.deepEqual(JSON.parse(await readFile(journalFile,'utf8')),journal);
+ assert.equal((await run('cleanup',{...handoff,egressIncreaseBytes:1})).blocked,false);
  assert.equal(h.files.has(oldAsset),false);
  assert.equal((await run('cleanup',handoff)).blocked,false);
  assert.equal(retirements,1);
  const cleanupCalls=h.calls.filter(([action])=>action==='remove');
  assert.deepEqual(cleanupCalls,[['remove',oldAsset]]);
  assert.equal((await run('report')).items.find(item=>item.token===a).state,'cleaned');
- const {items}=JSON.parse(await readFile(join(work,'journal.json'),'utf8'));
+ const {items,spent}=JSON.parse(await readFile(journalFile,'utf8'));
+ assert.equal(spent.egressBytes,cap+1);
+ assert.equal(await readFile(manifestFile,'utf8'),manifest);
  const {uploaded,retirementId}=items[a];
  const retired=[{listing:first,old_key:oldAsset,new_key:uploaded.key,job:retirementId,identity:uploaded}];
  await h.pg.query("update public.properties set status='published' where id=$1",[first]);
@@ -596,4 +614,81 @@ test('authoritative rename refresh merges open edits and retains the stale-save 
  assert.equal(stale.updated_at,version);
  assert.equal(stale.title_en,'Unsaved title');
  assert.deepEqual(stale.images,[another,newUrl]);
+});
+
+test('media Trash reserves listing files, admits only Owners, and confirms expiry and interrupted removal',async t=>{
+ const h=await setup(t,true);
+ const as=(role,actor,sql,args=[])=>h.role(role,actor,()=>h.pg.query(sql,args)).then(result=>result.rows[0]?.value);
+ const manage=(action,id=null,actor=owner)=>as('authenticated',actor,'select public.home_media_management($1,$2) value',[action,id]);
+ const worker=(sql,...args)=>as('service_role',null,sql,args);
+ const tracked=`properties/listings/${first}/${second}/owned.webp`;
+ const kept=`properties/listings/${first}/${first}/restorable.webp`;
+ const urls=[propertyPhotoUrl(origin,tracked),propertyPhotoUrl(origin,kept)];
+ for(const key of [tracked,kept])await h.pg.query('insert into storage.objects(bucket_id,name) values($1,$2)',[bucket,key]);
+ await h.pg.query('update public.properties set images=$1 where id=$2',[urls,first]);
+ await stageListingDeletion(h.client('authenticated',admin),first,{version},signal());
+ await assert.rejects(manage('status',null,admin),error=>error.code==='42501');
+ await assert.rejects(manage('trash',null,editor),error=>error.code==='42501');
+ await assert.rejects(as('authenticated',admin,'select public.home_listing_delete_status() value'),error=>error.code==='42501');
+ await assert.rejects(as('authenticated',owner,'select public.home_media_claim() value'),error=>error.code==='42501');
+ await assert.rejects(worker('select public.home_listing_delete_targets($1,null) value',first),error=>error.code==='42501');
+ assert.deepEqual(await worker('select public.home_media_claim() value'),{status:'disabled'});
+ const {items}=await manage('scan');
+ const a=items.find(x=>x.name===tracked),b=items.find(x=>x.name===kept);
+ assert.equal(a.state,'trashed');
+ assert.ok(Date.parse(a.expires_at)-Date.now()>47*60*60*1000);
+ await assert.rejects(h.pg.query('update public.editorial_articles set image_url=$1',[urls[0]]),/retired_reference/);
+ await assert.rejects(h.pg.query("update public.editorial_articles set sources=jsonb_build_array(jsonb_build_object('url',$1::text))",[tracked]),/retired_reference/);
+ assert.deepEqual(await manage('restore',b.id),{id:b.id,restored:true});
+ await h.pg.query('update public.editorial_articles set image_url=$1',[urls[1]]);
+ await h.pg.exec("update private.home_media_control set permanent_enabled=true");
+ const empty=await worker('select public.home_media_claim() value');
+ assert.deepEqual(empty.items,[]);
+ assert.deepEqual(await worker('select public.home_media_claim() value'),{status:'busy'});
+ await worker('select public.home_media_finish($1) value',empty.id);
+ await h.pg.query("update private.home_media_items set expires_at=now()-interval '1 second' where id=$1",[a.id]);
+ await assert.rejects(manage('restore',a.id),/restore_unavailable/);
+ const run=await worker('select public.home_media_claim() value');
+ assert.deepEqual(run.items.map(item=>item.id),[a.id]);
+ assert.equal((await worker('select public.home_media_target($1,$2,true) value',run.id,a.id)).present,true);
+ assert.equal(await worker('select public.home_media_settle($1,$2,true) value',run.id,a.id),false);
+ await h.pg.query('delete from storage.objects where bucket_id=$1 and name=$2',[bucket,tracked]);
+ await worker('select public.home_media_finish($1) value',run.id);
+ await h.pg.query("update private.home_media_items set retry_after=now()-interval '1 sec' where id=$1",[a.id]);
+ const recovery=await worker('select public.home_media_claim() value');
+ assert.equal((await worker('select public.home_media_target($1,$2,true) value',recovery.id,a.id)).present,false);
+ assert.equal(await worker('select public.home_media_settle($1,$2,true) value',recovery.id,a.id),true);
+ assert.equal((await manage('status')).items.find(row=>row.id===a.id).state,'removed');
+ await assert.rejects(manage('restore',a.id),/restore_unavailable/);
+});
+
+test('orphan scan holds active uploads, draft-scoped keys, shared references and uncertain legacy files',async t=>{
+ const h=await setup(t,true);
+ const uploader='authenticated';
+ const upload=(key,actor=editor)=>h.role(uploader,actor,()=>h.pg.query("select public.home_media_upload_lease('property-media',$1)",[key]));
+ const detached=`properties/${first}/abandoned.webp`, active=`properties/${first}/active.webp`;
+ const draftPath=`properties/listings/${first}/${second}/draft.webp`;
+ const shared=`properties/${first}/shared.webp`, legacy='properties/unknown-unused.jpg';
+ for(const key of [detached,active,draftPath,shared])await upload(key);
+ await assert.rejects(upload(active,admin),/retired_reference/);
+ for(const key of [detached,active,draftPath,shared,legacy])await h.pg.query(
+   "insert into storage.objects(bucket_id,name,owner_id) values('property-media',$1,$2)",[key,editor]);
+ await h.pg.query('update public.editorial_articles set image_url=$1',[propertyPhotoUrl(origin,shared)]);
+ await h.pg.query("update private.home_media_items set upload_until=now()-interval '1 hour' where name<>$1",[active]);
+ const run=await h.role('authenticated',owner,()=>h.pg.query("select public.home_media_management('trash') value"));
+ assert.equal(run.rows[0].value.newlyTrashed,1);
+ assert.deepEqual(run.rows[0].value.items.map(item=>item.name),[detached]);
+ assert.ok(run.rows[0].value.candidates>=3);
+});
+
+test('Owner queues a verified renamed original for 48 hours through the existing rename guard',async t=>{
+ const h=await setup(t,true);
+ const write=h.client('authenticated',owner),service=h.client('service_role');
+ const {id}=await renamePropertyPhoto(write,service,origin,{propertyId:first,source:oldUrl,filename:'room-03.jpg',version},signal());
+ const result=await trashOldPropertyPhoto(write,origin,id,signal());
+ assert.equal(result.removed,false);
+ assert.ok(Date.parse(result.expiresAt)>Date.now());
+ assert.equal((await propertyPhotoRenameHistory(write,first,signal()))[0].trash_expires_at,result.expiresAt);
+ assert.ok(h.files.has(oldKey));
+ assert.deepEqual(h.calls.map(([operation])=>operation),['copy']);
 });

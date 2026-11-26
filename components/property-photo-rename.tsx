@@ -9,7 +9,7 @@ export type PhotoRenameControls = {
   savedImages:string[];
   run:(source:string, filename:string)=>Promise<string>;
   history:()=>Promise<PhotoRenameHistory[]>;
-  retire:(id:string)=>Promise<void>;
+  retire:(id:string)=>Promise<{removed:boolean;expiresAt?:string}>;
 };
 
 const messages:Record<string,[string,string]> = {
@@ -88,13 +88,15 @@ export function PropertyPhotoRenameTools({rename,disabled}: {rename:PhotoRenameC
     try{setHistory(await rename.history());}catch(error){setError(message(error,t));}finally{setBusy(false);}
   }
   async function retire(id:string) {
-    if(!window.confirm(t("Delete the old Storage object? Old links and saved image URLs outside Gary Home may stop working.",
-      "Xóa tệp lưu trữ cũ? Các liên kết và địa chỉ ảnh cũ lưu bên ngoài Gary Home có thể ngừng hoạt động.")))return;
+    if(!window.confirm(t("Move the old file to Trash? You can restore it for 48 hours.",
+      "Chuyển tệp cũ vào Thùng rác? Bạn có thể khôi phục trong 48 giờ.")))return;
     setBusy(true);setError("");setStatus("");
     try{
-      await rename.retire(id);
-      setHistory(previous=>previous?.map(row=>row.id===id?{...row,removed_at:new Date().toISOString()}:row)||null);
-      setStatus(t("Old Storage object removed.","Đã xóa tệp lưu trữ cũ."));
+      const result=await rename.retire(id);
+      setHistory(previous=>previous?.map(row=>row.id===id?{...row,trash_expires_at:result.expiresAt,
+        removed_at:result.removed?new Date().toISOString():null}:row)||null);
+      setStatus(result.removed?t("Old Storage object removed.","Đã xóa tệp lưu trữ cũ."):
+        t("Old file moved to Trash. Restore it from Storage & Media Management.","Đã chuyển tệp cũ vào Thùng rác. Khôi phục trong mục Quản lý kho lưu trữ và tệp."));
     }catch(error){setError(message(error,t));}finally{setBusy(false);}
   }
   return <div className="editor-photo-rename-tools">
@@ -109,9 +111,9 @@ export function PropertyPhotoRenameTools({rename,disabled}: {rename:PhotoRenameC
       <button type="button" className="text-link" disabled={disabled||busy} onClick={()=>void load()}>{t("Refresh history","Làm mới lịch sử")}</button>
       {history?.length ? <ul>{history.map(row=><li key={row.id}>
         <span>{basename(row.old_key)} → {basename(row.new_key)}</span>
-        <small>{row.removed_at?t("Old copy removed","Đã xóa bản cũ"):!row.applied_at?t("Rename pending","Đang chờ hoàn tất đổi tên"):
+        <small>{row.removed_at?t("Old copy removed","Đã xóa bản cũ"):row.trash_expires_at?t("Old copy in File Trash","Bản cũ trong Thùng rác tệp"):!row.applied_at?t("Rename pending","Đang chờ hoàn tất đổi tên"):
           row.auto_cleanup_requested?t("Cleanup pending confirmation","Chưa xác nhận đã xóa bản cũ"):t("Old copy retained for review","Đang giữ bản cũ để kiểm tra")}</small>
-        {row.applied_at&&!row.removed_at&&<button data-button-variant="danger" type="button" className="text-link" disabled={disabled||busy}
+        {row.applied_at&&!row.removed_at&&!row.trash_expires_at&&<button data-button-variant="danger" type="button" className="text-link" disabled={disabled||busy}
           onClick={()=>void retire(row.id)}>{t("Remove old copy","Xóa bản cũ")}</button>}
       </li>)}</ul> : history&&<p>{t("No renames for this listing.","Tin đăng này chưa đổi tên ảnh.")}</p>}
       {busy&&<p role="status">{t("Checking Storage references…","Đang kiểm tra tham chiếu lưu trữ…")}</p>}

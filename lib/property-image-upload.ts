@@ -3,6 +3,7 @@ import { imageOriginalFilename } from "./image-filenames";
 import { imageOptimizationErrorText, optimizeImage, propertyPhoto } from "./image-optimization.mjs";
 import { uploadListingFile, type ListingUploadOptions } from "./listing-file-upload";
 import { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET, propertyImageFormat, propertyPhotoStorageKey } from "./property-photo-files";
+import type { PlannedListingPhoto } from "./listing-gallery-checkpoint";
 
 export { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET };
 const uploadPaths = new WeakMap<File, { scope: string; path: string }>();
@@ -40,6 +41,17 @@ export function imageUploadError(error: unknown, language = "en"): string {
   const message = typeof issue.message === "string" ? issue.message : typeof error === "string" ? error : "";
   if (knownMessages.has(message)) return message;
   const code = String(issue.code || "").toLowerCase(), status = Number(issue.status || issue.statusCode);
+  if (issue.name === "ListingUploadLeaseError") {
+    if (code === "pgrst202" || code === "42883") return language === "vi"
+      ? "Chưa có chức năng bảo vệ ảnh tải lên. Hãy báo người vận hành kiểm tra bản cập nhật kho Home."
+      : "Upload reservations are unavailable. Ask the operator to check the Home media migration.";
+    if (code === "pt409") return language === "vi"
+      ? "Đường dẫn ảnh đang bận hoặc đã có tệp. Kiểm tra bộ ảnh khôi phục trước khi tải lại."
+      : "This upload path is already in use or reserved. Check the gallery recovery before uploading again.";
+    if (status !== 403) return language === "vi"
+      ? "Chưa thể giữ chỗ tải ảnh. Kiểm tra kết nối rồi thử lại."
+      : "The photo upload could not be reserved. Reconnect and try again.";
+  }
   if (status === 413 || /entitytoolarge|payloadtoolarge|invalidfilesize/.test(code) || /file too large|payload too large|entity too large|size.*exceed|exceed.*size|size limit/i.test(message)) return imageTooLarge;
   if (status === 415 || /invalidmimetype/.test(code) || /mime.*(?:unsupported|not supported)|unsupported.*(?:mime|media|image)/i.test(message)) return unsupportedImage;
   if (status === 401 || /invalidjwt|jwtexpired|invalidtoken|expiredtoken/.test(code) || /jwt.*(?:invalid|expired)|token.*expired/i.test(message)) return expiredSignIn;
@@ -50,7 +62,7 @@ export function imageUploadError(error: unknown, language = "en"): string {
   return unknownUpload;
 }
 
-export type PropertyImageUploadOptions = ListingUploadOptions & { listingId?: string; expectedUserId?: string };
+export type PropertyImageUploadOptions = ListingUploadOptions & { listingId?: string; expectedUserId?: string; onPlanned?: (photo: PlannedListingPhoto) => void };
 
 export async function uploadPropertyImage(db: SupabaseClient, file: File, signal?: AbortSignal, options: PropertyImageUploadOptions = {}): Promise<string> {
   signal?.throwIfAborted();
@@ -63,18 +75,23 @@ export async function uploadPropertyImage(db: SupabaseClient, file: File, signal
     encodedPhotos.set(file, prepared);
   }
   signal?.throwIfAborted();
-  const {listingId,...progress}=options;
+  const {listingId,onPlanned,...progress}=options;
   const scope=listingId ? `properties/listings/${listingId}` : "properties";
   let attempt = uploadPaths.get(file);
   if (!attempt || attempt.scope!==scope) {
     attempt={scope,path:propertyPhotoStorageKey(originalFilename,prepared.extension,crypto.randomUUID(),listingId)};
     uploadPaths.set(file, attempt);
   }
+  onPlanned?.({path:attempt.path,url:db.storage.from(PROPERTY_IMAGE_BUCKET).getPublicUrl(attempt.path).data.publicUrl,
+    filename:originalFilename,bytes:prepared.body.size,mime:prepared.contentType});
   try {
     const url = await uploadListingFile({ client: db, file: prepared.body, resumeKey: file, bucket: PROPERTY_IMAGE_BUCKET,
       path: attempt.path, contentType: prepared.contentType, originalFilename, ...progress, signal });
     uploadPaths.delete(file);
     encodedPhotos.delete(file);
     return url;
-  } catch (error) { throw new Error(imageUploadError(error)); }
+  } catch (error) {
+    if (error instanceof Error && error.name === "ListingUploadLeaseError") throw error;
+    throw new Error(imageUploadError(error));
+  }
 }

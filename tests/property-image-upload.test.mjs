@@ -95,13 +95,29 @@ test('listing uploads reserve a per-listing path and retry the same key',async t
   if(first){first=false;throw new Error('Failed to fetch');}
   return input.path;
  }});
+ h.db.storage={from:bucket=>({getPublicUrl:path=>({data:{publicUrl:`https://unit-test.invalid/storage/v1/object/public/${bucket}/${path}`}})})};
  const file=new File([jpeg],'Living room.jpg.jpg');
- await assert.rejects(h.uploadPropertyImage(h.db,file,undefined,{listingId}),/connection failed/);
+ const planned=[];
+ await assert.rejects(h.uploadPropertyImage(h.db,file,undefined,{listingId,onPlanned:photo=>{
+  assert.equal(h.calls.length,0,'the gallery checkpoint precedes the transfer');planned.push(photo);
+ }}),/connection failed/);
  const url=await h.uploadPropertyImage(h.db,file,undefined,{listingId});
  assert.match(url,new RegExp('^properties/listings/'+listingId+'/[a-f0-9-]{36}/living-room\\.jpg$'));
  assert.equal(h.calls[0].path,h.calls[1].path);
+ assert.deepEqual(planned,[{path:h.calls[0].path,url:`https://unit-test.invalid/storage/v1/object/public/property-media/${h.calls[0].path}`,
+  filename:'Living room.jpg.jpg',bytes:jpeg.length,mime:'image/jpeg'}]);
  assert.equal(h.calls[0].file,h.calls[1].file);
  assert.equal(h.encodes.length,1);
+});
+
+test('listing upload reservation failures preserve actionable localized reasons',async t=>{
+ const leaseError=Object.assign(new Error('The upload could not be reserved.'),{name:'ListingUploadLeaseError',code:'PT409',status:409});
+ const h=harness(t,{transport:()=>{throw leaseError;}});
+ await assert.rejects(h.uploadPropertyImage(h.db,new File([jpeg],'Exposure.jpg')),error=>error===leaseError);
+ assert.match(h.imageUploadError(leaseError),/Check the gallery recovery/);
+ assert.match(h.imageUploadError(leaseError,'vi'),/Kiểm tra bộ ảnh khôi phục/);
+ const missing=Object.assign(new Error('The upload could not be reserved.'),{name:'ListingUploadLeaseError',code:'PGRST202',status:409});
+ assert.match(h.imageUploadError(missing),/Home media migration/);
 });
 
 test('encoded bytes, extension, and original filename travel together',async t=>{

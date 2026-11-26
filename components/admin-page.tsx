@@ -41,9 +41,11 @@ import { firstPageCount, readAllRows } from "@/lib/pagination";
 import { photoMetadata, pruneImageMetadata, type PhotoMetadata } from "@/lib/image-metadata";
 import type { ListingUploadProgress } from "@/lib/listing-file-upload";
 import { ListingUploadStatus } from "./listing-upload-status";
+import { useListingGalleryCheckpoint } from "./use-listing-gallery-checkpoint";
+import { canResumeGallery, confirmedListingWrite, listingGallery, matchesPlannedPhoto, sameJson, type GalleryCheckpoint, type PlannedListingPhoto } from "@/lib/listing-gallery-checkpoint";
 import { EditorModal } from "./editor-modal";
 import { preparePropertyImage, uploadPropertyImage, imageUploadError, type PropertyImageUploadOptions } from "@/lib/property-image-upload";
-import { replacePropertyPhotoUrl } from "@/lib/property-photo-files";
+import { PROPERTY_IMAGE_BUCKET, propertyPhotoPath, replacePropertyPhotoUrl } from "@/lib/property-photo-files";
 import { remapListingPhotos, syncRenamedListingDraft } from "@/lib/property-photo-rename-state";
 import type { PhotoRenameHistory, RenamePhotoResult } from "@/lib/property-photo-rename-server";
 import type { PhotoRenameControls } from "./property-photo-rename";
@@ -101,6 +103,9 @@ export function AdminPage() {
   const lastAccount=useRef<string|null>(null);const currentAccount=useRef(user?.id);useLayoutEffect(()=>{currentAccount.current=user?.id;},[user?.id]);
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [authBusy,setAuthBusy]=useState(false);const [resetMode,setResetMode]=useState(false);
   const accountId=user?.id;
+  const gallery=useListingGalleryCheckpoint(!demo&&editor?accountId:undefined,editing);
+  const [photoTransfer,setPhotoTransfer]=useState(false);
+  const propertySaveFlight=useRef(false);
   const detailFlight=useRef<AbortController|null>(null);
   const [openingProperty,setOpeningProperty]=useState<string|null>(null);
   const [mediaFilenames,setMediaFilenames]=useState<Record<string,Property["image_filenames"]>>({});
@@ -115,7 +120,61 @@ export function AdminPage() {
     return()=>{active=false;};
   },[tab,demo,accountId,editor,workspaceReady,editorTask]);
   function openLoadedProperty(property:Property){
+    gallery.begin(property,false);
     setNewPropertyId(null);setEditing({...property,images:[...property.images],amenities:[...property.amenities]});setError("");
+  }
+  function newListing() {
+    const property={...emptyProperty(),author_id:defaultListingAuthorId(content.authors||[],user?.id)};
+    gallery.begin(property,true);setNewPropertyId(property.id);setEditing(property);setError("");
+  }
+  function closeListing() {
+    if(busy||photoTransfer)return;
+    if(editing&&gallery.hasChanges(editing)&&gallery.unavailable&&!window.confirm(site.t(
+      "This device couldn’t keep the unsaved gallery. Close the editor anyway?","Thiết bị này không lưu được bộ ảnh chưa lưu. Vẫn đóng trình chỉnh sửa?")))return;
+    setEditing(null);
+  }
+  async function resumeGallery(checkpoint:GalleryCheckpoint) {
+    if(busy||editing||detailFlight.current||!accountId)return;
+    const actor=accountId,controller=new AbortController();
+    detailFlight.current=controller;setOpeningProperty(checkpoint.listingId);setError("");
+    try {
+      const recovered=await editorTask(async(db,signal)=>{
+        const abort=AbortSignal.any([signal,controller.signal]);
+        const latest=await db.from("properties").select("*").eq("id",checkpoint.listingId).abortSignal(abort).maybeSingle();
+        if(latest.error)throw latest.error;
+        const saved=latest.data as Property|null;
+        if(!canResumeGallery(checkpoint,saved))return null;
+        const storage=db.storage.from(PROPERTY_IMAGE_BUCKET);
+        const draft={...checkpoint.gallery,images:[...checkpoint.gallery.images]};
+        const pending=[];
+        for(const photo of checkpoint.pending){
+          if(draft.images.length>=40){pending.push(photo);continue;}
+          abort.throwIfAborted();
+          const url=storage.getPublicUrl(photo.path).data.publicUrl;
+          if(url!==photo.url||propertyPhotoPath(url)!==photo.path){pending.push(photo);continue;}
+          if(draft.images.includes(url))continue;
+          const {data,error}=await storage.info(photo.path);
+          if(error||!data||!matchesPlannedPhoto(photo,data)){pending.push(photo);continue;}
+          draft.images.push(url);
+          draft.image_filenames=addImageFilename(draft.image_filenames,url,photo.filename);
+        }
+        return {saved,draft,pending};
+      });
+      if(actor!==currentAccount.current||controller.signal.aborted)return;
+      if(!recovered){
+        setError(site.t("The saved listing changed. Your earlier gallery is still available for review on this device.","Tin đăng đã thay đổi. Bộ ảnh trước vẫn còn trên thiết bị này để kiểm tra."));
+        return;
+      }
+      const base=recovered.saved??{...emptyProperty(),id:checkpoint.listingId,title_en:checkpoint.title,
+        author_id:defaultListingAuthorId(content.authors||[],actor)};
+      gallery.begin(base,!recovered.saved,{...checkpoint,gallery:recovered.draft,pending:recovered.pending});
+      setNewPropertyId(recovered.saved?null:base.id);setEditing({...base,...recovered.draft});
+      if(recovered.pending.length)setError(site.t("Some uploads are still unconfirmed. Reconnect or select those original files again. Confirmed photos are in the gallery.","Một số ảnh tải lên chưa được xác nhận. Hãy kết nối lại hoặc chọn lại tệp gốc. Các ảnh đã xác nhận có trong bộ ảnh."));
+    } catch {
+      if(actor===currentAccount.current&&!controller.signal.aborted)setError(site.t("Couldn’t check the saved listing or uploads. Reconnect and try recovery again.","Không thể kiểm tra tin đăng hoặc ảnh tải lên. Hãy kết nối lại rồi thử khôi phục."));
+    } finally {
+      if(detailFlight.current===controller){detailFlight.current=null;setOpeningProperty(null);}
+    }
   }
   async function openProperty(property:Property){
     if(demo){openLoadedProperty(property);return;}
@@ -150,7 +209,7 @@ export function AdminPage() {
   useLayoutEffect(()=>{
     // Clear private workspace state before a different account can paint it.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPendingDelete(null);setDeleteError("");setBusy(false);setOpeningProperty(null);setMediaFilenames({});setError("");reading.current.clear();if(accountId){if(lastAccount.current && lastAccount.current!==accountId){setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);setError("");}lastAccount.current=accountId;}},[accountId]);
+    setPendingDelete(null);setDeleteError("");setBusy(false);setPhotoTransfer(false);setOpeningProperty(null);setMediaFilenames({});setError("");reading.current.clear();if(accountId){if(lastAccount.current && lastAccount.current!==accountId){setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);setError("");}lastAccount.current=accountId;}},[accountId]);
   function discardStaffDrafts(){
     setEditing(null);setNewPropertyId(null);setArea(null);setLead(null);setSettingsDraft(null);setTeamDraft(emptyTeamDraft());setCustomerDraft(null);
   }
@@ -161,7 +220,13 @@ export function AdminPage() {
     catch(e){setError(e instanceof Error?e.message:"Couldn’t sign out.");}
     finally{setAuthBusy(false);}
   }
-  useEffect(()=>{const handler=(e:KeyboardEvent)=>{if(e.key==="Escape"){setEditing(null);setArea(null);setLead(null);}};window.addEventListener("keydown",handler);return ()=>window.removeEventListener("keydown",handler);},[]);
+  useEffect(()=>{const handler=(e:KeyboardEvent)=>{if(e.key==="Escape"){setArea(null);setLead(null);}};window.addEventListener("keydown",handler);return ()=>window.removeEventListener("keydown",handler);},[]);
+  useEffect(()=>{
+    if(!editing||!(busy||photoTransfer||gallery.unavailable))return;
+    const protect=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
+    window.addEventListener("beforeunload",protect);
+    return ()=>window.removeEventListener("beforeunload",protect);
+  },[editing,busy,photoTransfer,gallery.unavailable]);
   async function signIn(e:FormEvent<HTMLFormElement>) {
     e.preventDefault();if(!ready||!client)return;setAuthBusy(true);setError("");const form=new FormData(e.currentTarget);
     try {
@@ -170,6 +235,10 @@ export function AdminPage() {
     }catch(e){const issue=e as {code?:string;message?:string};setError(issue?.code==="invalid_credentials"||issue?.message==="Invalid login credentials"?"The email or password is incorrect. Use the password you chose or request a reset link.":e instanceof Error?e.message:"Couldn’t sign in.");}finally{setAuthBusy(false);}
   }
   async function saveProperty(p:Property) {
+    if(propertySaveFlight.current||photoTransfer)return;
+    if(gallery.hasPending(p)&&!window.confirm(site.t("Some uploads are unconfirmed. Save the completed gallery and keep the other uploads available for recovery?","Một số ảnh tải lên chưa được xác nhận. Lưu ảnh đã hoàn tất và giữ các ảnh còn lại để khôi phục?")))return;
+    propertySaveFlight.current=true;
+    const actor=accountId;
     setBusy(true);setError("");try{
       if(!p.title_en.trim()||!p.title_vi.trim()||!p.address.trim())throw new Error("Enter both property titles and the public location / street.");
       const isNew=newPropertyId===p.id,automaticUrl=isListingUrlAutomatic(isNew,content.properties.find(row=>row.id===p.id));
@@ -189,7 +258,21 @@ export function AdminPage() {
       if(resolvedAuthor.author){const author=resolvedAuthor.author;setContent(previous=>({...previous,authors:(previous.authors||[]).some(row=>row.id===author.id)?previous.authors!.map(row=>row.id===author.id?author:row):[...(previous.authors||[]),author]}));}
       let record={...p,slug,image_filenames:pruneImageFilenames(p.images,p.image_filenames),
         ...(p.image_metadata?{image_metadata:pruneImageMetadata(p.images,p.image_metadata)}:{}),video_url:p.video_url||null,author_id:resolvedAuthor.authorId,map_address:mapAddress,listing_code:code,updated_at:new Date().toISOString(),seo_features:(p.seo_features||[]).filter(value=>p.amenities.includes(value))};
-      if(!demo){const {error,data,submitted}=await editorTask(async(db,signal)=>{
+      if(!demo){
+        let attempted:Property|undefined;
+        let checked=false;
+        let latest:Property|null=null;
+        async function checkSavedListing() {
+          if(checked||actor!==currentAccount.current)return latest;
+          checked=true;
+          try {
+            const result=await editorTask((db,signal)=>db.from("properties").select("*").eq("id",p.id).abortSignal(signal).maybeSingle());
+            if(!result.error)latest=result.data;
+          }catch{/* Recovery remains available when the confirmation read fails. */}
+          return latest;
+        }
+        const unconfirmed=()=>new Error(site.t("The save could not be confirmed. Reconnect and check the saved listing before trying again. Your gallery and edits are still open.","Chưa thể xác nhận đã lưu. Hãy kết nối và kiểm tra tin đăng trước khi thử lại. Bộ ảnh và nội dung sửa vẫn còn đang mở."));
+        const result=await editorTask(async(db,signal)=>{
         const reserved:string[]=[];let candidate=record.slug;
         for(let attempt=0;attempt<20;attempt++){
           signal.throwIfAborted();
@@ -199,25 +282,44 @@ export function AdminPage() {
             if(available.data&&available.data.id!==p.id){reserved.push(candidate);candidate=generateListingSlug(p,content.properties,reserved);continue;}
           }
           const submitted={...record,slug:candidate};
+          attempted=submitted;
           const saved=await (isNew?db.from("properties").insert(submitted):db.from("properties").update(submitted).eq("id",p.id).eq("updated_at",p.updated_at)).select("*").abortSignal(signal).single();
           if(automaticUrl&&saved.error?.code==="23505"&&/slug/.test((saved.error.message||"")+" "+(saved.error.details||""))){reserved.push(candidate);candidate=generateListingSlug(p,content.properties,reserved);continue;}
           return {...saved,submitted};
         }
         throw new Error("Couldn’t assign a unique listing link. Save again. Your draft is still open.");
-      });if(error?.code==="PGRST116"||isConflictResponse(error)){
-        try{const latest=await editorTask((db,signal)=>db.from("properties").select("*").eq("id",p.id).abortSignal(signal).maybeSingle());if(!latest.error)setContent(content=>({...content,properties:latest.data?content.properties.map(row=>row.id===p.id&&Date.parse(row.updated_at)<=Date.parse(latest.data.updated_at)?latest.data:row):content.properties.filter(row=>row.id!==p.id)}));}catch{/* Keep the draft open even if refreshing the saved version fails. */}
-        throw new Error("This listing no longer exists or was changed by another editor. Your draft is still open. Copy any edits you want to keep, then close and reopen the listing to review the saved version.");
-      }
+        }).catch(async issue=>{
+          if(!attempted||actor!==currentAccount.current)throw issue;
+          const saved=await checkSavedListing();
+          if(saved&&confirmedListingWrite(attempted,saved,isNew?null:p.updated_at))return {data:saved,error:null,submitted:attempted,status:200};
+          throw unconfirmed();
+        });
+        let {error,data}=result;const {submitted}=result;
+        if(!data&&(result.status===0||result.status>=500||error?.code==="PGRST116"||error?.code==="23505"||isConflictResponse(error))){
+          const saved=await checkSavedListing();
+          if(saved&&confirmedListingWrite(submitted,saved,isNew?null:p.updated_at)){data=saved;error=null;}
+          else if(result.status===0||result.status>=500)throw unconfirmed();
+          else if(error?.code==="PGRST116"||isConflictResponse(error)){
+            if(saved)setContent(current=>({...current,properties:current.properties.map(row=>row.id===p.id&&Date.parse(row.updated_at)<=Date.parse(saved.updated_at)?saved:row)}));
+            throw new Error(site.t("This listing changed or no longer exists. Review the saved listing before retrying. Your unsaved gallery and edits are still open.","Tin đăng đã thay đổi hoặc không còn tồn tại. Kiểm tra tin đã lưu trước khi thử lại. Bộ ảnh và nội dung sửa vẫn còn đang mở."));
+          }
+        }
       if((error?.code==="PGRST204"||error?.code==="42703")&&/\bimage_metadata\b/.test(error.message||""))
         throw new Error(site.t("Ask the database administrator to apply the photo metadata migration, then save again. Your edits are still open.", "Hãy nhờ quản trị viên áp dụng bản cập nhật dữ liệu ảnh, rồi bấm lưu lại. Nội dung đang sửa vẫn được giữ."));
       if(error)throw new Error(error.code==="23505"&&/listing_code|listing ID/.test(error.message||"")?"That listing ID is already in use. Choose another ID.":error.message||"Couldn’t save property.");
       if(data?.id!==p.id)throw new Error(site.t("The listing save could not be confirmed. Your edits are still open.", "Chưa thể xác nhận đã lưu tin đăng. Nội dung đang sửa vẫn được giữ."));
-      record={...submitted,...data};}
+      if(data.status!==submitted.status||!sameJson(listingGallery(submitted),listingGallery(data)))throw new Error(site.t(
+        "The saved gallery or status differs from this draft. Review the saved listing before retrying. Your edits are still open.",
+        "Bộ ảnh hoặc trạng thái đã lưu khác với bản nháp. Kiểm tra tin đã lưu trước khi thử lại. Nội dung đang sửa vẫn còn mở."));
+      record={...submitted,...data};
+      }
       else record={...record,listing_code:code||previewListingId(content.properties)};
+      if(actor!==currentAccount.current)return;
+      gallery.confirm(p,record);
       setNewPropertyId(previous=>previous===p.id?null:previous);setContent(previous=>({...previous,properties:previous.properties.some(x=>x.id===p.id)?previous.properties.map(x=>x.id===p.id?record:x):[...previous.properties,record]}));setEditing(previous=>previous===p?null:previous?.id===p.id?{...previous,updated_at:record.updated_at,slug:previous.slug===p.slug?record.slug:previous.slug,author_id:previous.author_id===p.author_id?record.author_id:previous.author_id,listing_code:previous.listing_code===p.listing_code?record.listing_code:previous.listing_code}:previous);notice(demo ? text("Property saved in this browser’s CMS preview.") : record.status === "published"
         ? site.t("Published listing saved.", "Đã lưu tin đăng đã xuất bản.")
         : record.status === "archived" ? site.t("Listing archived.", "Đã lưu trữ tin đăng.") : site.t("Listing draft saved.", "Đã lưu bản nháp tin đăng."));
-    }catch(e){setError(e instanceof Error?e.message:"Couldn’t save property.");}finally{setBusy(false);}
+    }catch(e){if(actor===currentAccount.current)setError(e instanceof Error?e.message:"Couldn’t save property.");}finally{propertySaveFlight.current=false;if(actor===currentAccount.current)setBusy(false);}
   }
   function photoRequest<T>(payload:Record<string,unknown>) {
     return editorTask(async (db,signal)=>{
@@ -346,7 +448,7 @@ export function AdminPage() {
       }
       if(!client)throw new Error("Connect Supabase before uploading.");
       const url=await editorTask((db,signal)=>uploadPropertyImage(db,file,options.signal?AbortSignal.any([signal,options.signal]):signal,{...options,expectedUserId:user?.id}),null);
-      notice(site.t("Image uploaded.", "Đã tải ảnh lên."));
+      if(!options.listingId)notice(site.t("Image uploaded.", "Đã tải ảnh lên."));
       return url;
     } catch(error) { throw new Error(imageUploadError(error, language)); }
   }
@@ -370,7 +472,7 @@ export function AdminPage() {
     <div className="admin-sidebar-bottom">
       {demo ? <div><span className="avatar">G</span><span className="admin-sidebar-identity"><strong>{text("Preview workspace")}</strong><small>{text("Saved on this device")}</small></span><button className="icon-button admin-sidebar-signout" type="button" aria-label={text("Exit preview")} data-tooltip={text("Exit preview")} onClick={exitDemo}><LogOut size={20}/></button></div>
         : <StaffAccountMenu key={user?.id} onDashboard={()=>{setTab("overview");setError("");}} onSignedOut={discardStaffDrafts}/>}
-    </div></aside><div className="admin-main"><header className="admin-topbar"><BackNavigation/><div className="admin-breadcrumb"><span>{text("Staff workspace")}</span><ChevronRight size={13}/><strong>{text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</strong></div><div className="admin-topbar-actions"><ServiceAppsMenu className="gary-apps-menu--studio"/>{!demo&&<StudioNotifications key={user?.id+"-"+site.staffRole} navigate={category=>{if(category==="profile"){window.dispatchEvent(new Event("gary-open-staff-profile"));return;}setTab(category==="landlord"?"landlords":category==="enquiry"?"enquiries":category==="feedback"?"feedback":category==="commission"?"assistance":canViewTeam(site.staffRole)?"team":"overview");}}/>}<span className={`admin-connection ${demo||sessionPhase!=="ready"?"demo":""}`} title={text(connectionLabel)}><span className="live-dot"/><span className="connection-label">{text(connectionLabel)}</span></span><SitePreferences studio/></div></header><div className="admin-content">{!demo&&<StaffPasswordReminder/>}<div className="admin-page-heading"><div><div className="eyebrow">{tab==="overview"?text("A LITTLE OVERVIEW"): "GARY HOME STUDIO"}</div><h1>{tab==="overview"?text("Good homes. Well looked after."):text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</h1><p>{tab==="overview"?text("Here’s what’s happening in your corner of Hanoi."):tab==="properties"?text("From a first draft to someone’s next chapter."):tab==="enquiries"?text("Every good move starts with a conversation."):tab==="customers"?text("Every customer deserves a little care."):tab==="media"?text("Original photos. An honest first impression."):tab==="neighbourhoods"?text("Help people find their kind of Hanoi."):text("The details that make this website yours.")}</p></div>{(tab==="properties"||tab==="media"||tab==="overview")&&<button className="button" disabled={!workspaceReady} onClick={()=>{const created={...emptyProperty(),author_id:defaultListingAuthorId(content.authors||[],user?.id)};setNewPropertyId(created.id);setEditing(created);setError("");}}><Plus size={17}/>{text("Add a property")}</button>}{tab==="neighbourhoods"&&<button className="button" disabled={!workspaceReady} onClick={()=>{setNewArea(true);setArea({slug:"",name:"",tagline_en:"",tagline_vi:"",description_en:"",description_vi:"",image:"",sort_order:content.neighbourhoods.length});setError("");}}><Plus size={17}/>{text("Add neighbourhood")}</button>}</div>{error&&workspaceReady&&<div className="form-error admin-error" role="alert">{text(error)}<button onClick={()=>setError("")} aria-label={text("Dismiss error")}><X size={15}/></button></div>}
+    </div></aside><div className="admin-main"><header className="admin-topbar"><BackNavigation/><div className="admin-breadcrumb"><span>{text("Staff workspace")}</span><ChevronRight size={13}/><strong>{text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</strong></div><div className="admin-topbar-actions"><ServiceAppsMenu className="gary-apps-menu--studio"/>{!demo&&<StudioNotifications key={user?.id+"-"+site.staffRole} navigate={category=>{if(category==="profile"){window.dispatchEvent(new Event("gary-open-staff-profile"));return;}setTab(category==="landlord"?"landlords":category==="enquiry"?"enquiries":category==="feedback"?"feedback":category==="commission"?"assistance":canViewTeam(site.staffRole)?"team":"overview");}}/>}<span className={`admin-connection ${demo||sessionPhase!=="ready"?"demo":""}`} title={text(connectionLabel)}><span className="live-dot"/><span className="connection-label">{text(connectionLabel)}</span></span><SitePreferences studio/></div></header><div className="admin-content">{!demo&&<StaffPasswordReminder/>}<div className="admin-page-heading"><div><div className="eyebrow">{tab==="overview"?text("A LITTLE OVERVIEW"): "GARY HOME STUDIO"}</div><h1>{tab==="overview"?text("Good homes. Well looked after."):text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</h1><p>{tab==="overview"?text("Here’s what’s happening in your corner of Hanoi."):tab==="properties"?text("From a first draft to someone’s next chapter."):tab==="enquiries"?text("Every good move starts with a conversation."):tab==="customers"?text("Every customer deserves a little care."):tab==="media"?text("Original photos. An honest first impression."):tab==="neighbourhoods"?text("Help people find their kind of Hanoi."):text("The details that make this website yours.")}</p></div>{(tab==="properties"||tab==="media"||tab==="overview")&&<button className="button" disabled={!workspaceReady} onClick={newListing}><Plus size={17}/>{text("Add a property")}</button>}{tab==="neighbourhoods"&&<button className="button" disabled={!workspaceReady} onClick={()=>{setNewArea(true);setArea({slug:"",name:"",tagline_en:"",tagline_vi:"",description_en:"",description_vi:"",image:"",sort_order:content.neighbourhoods.length});setError("");}}><Plus size={17}/>{text("Add neighbourhood")}</button>}</div>{error&&workspaceReady&&<div className="form-error admin-error" role="alert">{text(error)}<button onClick={()=>setError("")} aria-label={text("Dismiss error")}><X size={15}/></button></div>}
   {!workspaceReady ? (
     sessionPhase!=="ready" ? null : workspaceLoadFailed ? <>
       <div className="form-error" role="alert">{site.t("Couldn’t load the staff workspace. Check your connection and try again.", "Chưa thể tải không gian làm việc của nhân viên. Hãy kiểm tra kết nối rồi thử lại.")}</div>
@@ -382,6 +484,21 @@ export function AdminPage() {
   {(tab==="properties"||tab==="media")&&<div className="activity-tabs listing-workspace-tabs" role="group" aria-label={text("Listing workspace")}><button type="button" aria-pressed={tab==="properties"} onClick={()=>setTab("properties")}><Building2 size={16}/>{text("Listings")}</button><button type="button" aria-pressed={tab==="media"} onClick={()=>setTab("media")}><ImageIcon size={16}/>{text("Media library")}</button></div>}
   {tab==="properties"&&!demo&&site.staffRole==="owner"&&<StorageMediaManagement key={user?.id} latest={latestDeletion}
     onListingRestored={()=>{void refresh().catch(()=>{});}}/>}
+  {tab==="properties"&&!demo&&gallery.entries.length>0&&<section className="admin-panel listing-deletion-queue" aria-label={site.t("Unsaved photo galleries","Bộ ảnh chưa lưu")}>
+    <h3>{site.t("Unsaved photo galleries","Bộ ảnh chưa lưu")}</h3>
+    {gallery.entries.map(checkpoint=><div key={checkpoint.key} className="storage-media-actions">
+      <button type="button" className="button button-outline button-small" disabled={openingProperty!==null||busy}
+        onClick={()=>void resumeGallery(checkpoint)}>{site.t("Resume gallery","Tiếp tục bộ ảnh")} · {checkpoint.title||site.t("New listing","Tin đăng mới")}</button>
+      <span>{checkpoint.gallery.images.length} {site.t("photos","ảnh")}{checkpoint.pending.length>0&&` · ${checkpoint.pending.length} ${site.t("unconfirmed","chưa xác nhận")}`}</span>
+      <button type="button" className="text-link" onClick={()=>void navigator.clipboard.writeText(JSON.stringify(checkpoint,null,2)).then(
+        ()=>notice(site.t("Recovery data copied.","Đã sao chép dữ liệu khôi phục.")),
+        ()=>setError(site.t("Couldn’t copy the recovery data. The local gallery is still available.","Không thể sao chép dữ liệu khôi phục. Bộ ảnh trên thiết bị vẫn còn.")))}>
+        {site.t("Copy recovery data","Sao chép dữ liệu khôi phục")}</button>
+      <button type="button" className="text-link" disabled={openingProperty!==null||busy} onClick={()=>{
+        if(window.confirm(site.t("Discard this device’s recovery copy? Uploaded files and saved listings are kept.","Bỏ bản khôi phục trên thiết bị này? Tệp đã tải lên và tin đã lưu vẫn được giữ.")))gallery.discard(checkpoint);
+      }}>{site.t("Discard local copy","Bỏ bản trên thiết bị")}</button>
+    </div>)}
+  </section>}
   {tab==="properties"&&<section className="admin-panel"><div className="admin-table-tools listing-search-tools"><label><Search size={17}/><input placeholder={text("Search an ID, title or address…")} value={query} onChange={e=>setQuery(e.target.value)}/></label></div><div className="admin-table-scroll"><table className="admin-table admin-table--listings"><thead><tr><th>{text("Property")}</th><th>{text("Neighbourhood")}</th><th aria-sort={priceSort==="low"?"ascending":priceSort==="high"?"descending":"none"}><span className="listing-column-label">{text("Price")}<ListingPriceFilter sort={priceSort} min={priceMin} max={priceMax} currency={site.currency} onSort={setPriceSort} onMin={setPriceMin} onMax={setPriceMax} onReset={()=>{setPriceSort("");setPriceMin("");setPriceMax("");}} text={text}/></span></th><th><span className="listing-column-label">{text("Status")}<ListingStatusFilter status={status} onStatus={setStatus} text={text}/></span></th><th>{text("Created")}</th><th>{text("Posted by")}</th><th>{text("Actions")}</th></tr></thead><tbody>{filtered.map(p=>{
     const created=listingCreationTime(posting.records[p.id]?.created_at||p.created_at,language);
     const title=language==="vi"?p.title_vi||p.title_en:p.title_en;
@@ -408,7 +525,7 @@ export function AdminPage() {
   </>}
   </div></div>
   <AnimatePresence initial={false}>{pendingDelete&&canDeleteContent(site.staffRole)&&<DeleteConfirmation title={pendingDelete.kind==="property"?site.t("Permanently delete listing?","Xóa vĩnh viễn tin đăng?"):text("Delete enquiry?")} target={pendingDelete.label} description={pendingDelete.kind==="property"?site.t("This permanently removes the listing and its exclusive media. Direct links to removed files can stop working. Archive it in the editor to hide it while keeping its files. Enquiries and assistance records are preserved.","Thao tác này xóa vĩnh viễn tin đăng và các tệp chỉ thuộc về tin này. Liên kết trực tiếp đến tệp đã xóa có thể ngừng hoạt động. Chuyển sang Lưu trữ trong trình chỉnh sửa để ẩn tin mà vẫn giữ các tệp. Các yêu cầu và hồ sơ hỗ trợ vẫn được giữ.") :text("This permanently deletes the enquiry and its internal notes.")} busy={busy} error={deleteError} onCancel={()=>setPendingDelete(null)} onConfirm={()=>void removeRecord()}/>}</AnimatePresence>
-  <AnimatePresence initial={false}>{editing&&<EditorModal closeDisabled={busy} workspaceKey="property" resizable title={(language==="vi"?editing.title_vi||editing.title_en:editing.title_en)||text("A new beginning")} subtitle={text("PROPERTY EDITOR")} close={()=>{if(!busy)setEditing(null);}}><PropertyEditor key={editing.id} property={editing} isNew={newPropertyId===editing.id} setProperty={next=>setEditing(previous=>previous?.id===editing.id?(typeof next==="function"?next(previous):next):previous)} neighbourhoods={content.neighbourhoods} onSave={saveProperty} onCancel={()=>{if(!busy)setEditing(null);}} upload={upload} busy={busy} error={error} renamePhotos={photoRenameControls(editing)}/></EditorModal>}</AnimatePresence>
+  <AnimatePresence initial={false}>{editing&&<EditorModal closeDisabled={busy||photoTransfer} workspaceKey="property" resizable title={(language==="vi"?editing.title_vi||editing.title_en:editing.title_en)||text("A new beginning")} subtitle={text("PROPERTY EDITOR")} close={closeListing}><PropertyEditor key={editing.id} property={editing} isNew={newPropertyId===editing.id} setProperty={next=>setEditing(previous=>previous?.id===editing.id?(typeof next==="function"?next(previous):next):previous)} neighbourhoods={content.neighbourhoods} onSave={saveProperty} onCancel={closeListing} upload={upload} onPlanned={photo=>gallery.plan(editing.id,photo)} onPhotoTransfer={setPhotoTransfer} galleryChanged={gallery.hasChanges(editing)} galleryUnavailable={gallery.unavailable} busy={busy} error={error} renamePhotos={photoRenameControls(editing)}/></EditorModal>}</AnimatePresence>
   <AnimatePresence initial={false}>{area&&<EditorModal closeDisabled={busy} workspaceKey="neighbourhood" title={area.name} subtitle={text("NEIGHBOURHOOD EDITOR")} close={()=>{if(!busy)setArea(null);}}><form className="editor-form" onSubmit={e=>{e.preventDefault();void saveArea(area);}}><PublicUrlField kind="neighbourhood" value={area.slug} disabled={!newArea} onChange={value=>setArea({...area,slug:value})}/><label>{text("Neighbourhood name")}<input value={area.name} onChange={e=>setArea({...area,name:e.target.value})} required/></label><div className="form-row"><label>{text("Tagline · English")}<input value={area.tagline_en} onChange={e=>setArea({...area,tagline_en:e.target.value})}/></label><label>{text("Tagline · Vietnamese")}<input value={area.tagline_vi} onChange={e=>setArea({...area,tagline_vi:e.target.value})}/></label></div><label>{text("Description · English")}<textarea rows={4} value={area.description_en} onChange={e=>setArea({...area,description_en:e.target.value})} required/></label><label>{text("Description · Vietnamese")}<textarea rows={4} value={area.description_vi} onChange={e=>setArea({...area,description_vi:e.target.value})} required/></label><ImageUpload value={area.image} onChange={image=>setArea(previous=>previous?{...previous,image}:previous)} upload={upload}/>{error&&<div className="form-error" role="alert">{text(error)}</div>}<footer className="gw-editor-actions"><button data-button-variant="cancel" type="button" className="button button-outline" disabled={busy} onClick={()=>setArea(null)}>{text("Cancel")}</button><button data-button-variant="save" className="button" disabled={busy}><Save size={17}/>{busy?text("Saving…"):text("Save neighbourhood")}</button></footer></form></EditorModal>}</AnimatePresence>
   <AnimatePresence initial={false}>{lead&&<EditorModal closeDisabled={busy} workspaceKey="enquiry" title={lead.name} subtitle={text(lead.kind)} close={()=>{if(!busy)setLead(null);}}><form className="editor-form" onSubmit={e=>{e.preventDefault();void saveLead(lead);}}><div className="lead-contact"><a href={`mailto:${lead.email}`}><Mail size={16}/>{lead.email}</a>{lead.phone&&<a href={`tel:${lead.phone}`}><Phone size={16}/>{lead.phone}</a>}</div><div className="lead-message">{lead.message}</div><p className="lead-read-state">{text(lead.read_at?"Read":"Unread")}{lead.read_at?" · "+new Date(lead.read_at).toLocaleString(language==="vi"?"vi-VN":"en-GB",{timeZone:"Asia/Ho_Chi_Minh"}):""}</p>{!lead.property_id&&lead.property_code&&<p><strong>{text("Property:")} </strong>{lead.property_code} · {lead.property_address}</p>}{lead.property_id&&<p><strong>{text("Property:")} </strong>{(language==="vi"?content.properties.find(p=>p.id===lead.property_id)?.title_vi:content.properties.find(p=>p.id===lead.property_id)?.title_en)||content.properties.find(p=>p.id===lead.property_id)?.title_en||text("Property no longer listed")}</p>}{lead.preferred_date&&<p><strong>{text("Requested date:")} </strong>{new Date(lead.preferred_date+"T12:00:00").toLocaleDateString(language==="vi"?"vi-VN":"en-US")} <span className="muted">{text("(not yet confirmed)")}</span></p>}<label>{text("Conversation status")}<SelectField value={lead.status} onValueChange={value=>setLead({...lead,status:value as Enquiry["status"]})}><option value="new">{text("New")}</option><option value="contacted">{text("Contacted")}</option><option value="scheduled" disabled={lead.kind!=="viewing"}>{text("Viewing scheduled")}</option><option value="closed">{text("Closed")}</option></SelectField></label>{lead.cancelled_at&&<div className="form-info">{text("The customer cancelled this viewing request.")}</div>}{(lead.kind==="viewing"||lead.status==="scheduled")&&<label>{text("Confirmed viewing time · Hanoi (GMT+7)")}<input type="datetime-local" value={hanoiInput(lead.appointment_at)} onChange={e=>setLead({...lead,appointment_at:e.target.value?new Date(e.target.value+"+07:00").toISOString():null})}/></label>}<label>{text("Update for the customer")}<textarea rows={3} value={lead.customer_update||""} onChange={e=>setLead({...lead,customer_update:e.target.value})} maxLength={2000}/><small>{text("Visible in the customer’s account. Keep internal details in the notes below.")}</small></label><label>{text("Internal notes")}<textarea rows={5} value={lead.notes} onChange={e=>setLead({...lead,notes:e.target.value})} maxLength={8000} placeholder={text("Next steps, viewing details, a note for the team…")}/></label><p className="small muted">{text("Agree on a time with the customer before scheduling. Confirmed times and customer updates appear in their account. No email is sent; contact guests directly.")}</p>{error&&<div className="form-error" role="alert">{text(error)}</div>}<footer className="gw-editor-actions"><button data-button-variant="cancel" type="button" className="button button-outline" disabled={busy} onClick={()=>setLead(null)}>{text("Cancel")}</button><button data-button-variant="save" className="button" disabled={busy}><Save size={17}/>{busy?text("Saving…"):text("Save conversation")}</button>{canDeleteContent(site.staffRole)&&<button data-button-variant="danger" type="button" className="button button-outline button-danger-outline" disabled={busy} onClick={()=>{setDeleteError("");setPendingDelete({kind:"enquiry",id:lead.id,label:lead.name+" · "+lead.email});}}><Trash2 size={16}/>{text("Delete enquiry")}</button>}</footer></form></EditorModal>}</AnimatePresence>
   </StudioShell>;
@@ -421,7 +538,7 @@ function ImageUpload({value,onChange,upload}:{value:string;onChange:(url:string)
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");
   return <div className="single-image-upload">{value&&<img src={value} alt={text("Current image")}/>}<label className="upload-label"><Upload size={17}/>{busy?text("Uploading…"):text("Upload image")}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} onChange={async e=>{const file=e.target.files?.[0];if(!file)return;setBusy(true);setError("");try{const url=await upload(file);if(active.current)onChange(url);}catch(e){setError(e instanceof Error?e.message:"Upload failed.");}finally{setBusy(false);}}}/></label>{error&&<p className="form-error" role="alert">{text(error)}</p>}</div>;
 }
-function PropertyEditor({property:p,isNew,setProperty,onSave,onCancel,neighbourhoods,upload,busy,error,renamePhotos}:{property:Property;isNew:boolean;setProperty:(next:Property|((previous:Property)=>Property))=>void;onSave:(p:Property)=>Promise<void>;onCancel:()=>void;neighbourhoods:Neighbourhood[];upload:(file:File,options?:PropertyImageUploadOptions)=>Promise<string>;busy:boolean;error:string;renamePhotos?:PhotoRenameControls}) {
+function PropertyEditor({property:p,isNew,setProperty,onSave,onCancel,neighbourhoods,upload,onPlanned,onPhotoTransfer,galleryChanged,galleryUnavailable,busy,error,renamePhotos}:{property:Property;isNew:boolean;setProperty:(next:Property|((previous:Property)=>Property))=>void;onSave:(p:Property)=>Promise<void>;onCancel:()=>void;neighbourhoods:Neighbourhood[];upload:(file:File,options?:PropertyImageUploadOptions)=>Promise<string>;onPlanned:(photo:PlannedListingPhoto)=>void;onPhotoTransfer:(active:boolean)=>void;galleryChanged:boolean;galleryUnavailable:boolean;busy:boolean;error:string;renamePhotos?:PhotoRenameControls}) {
   const text=useStudioText();const {language,content,t}=useSite();
   const automaticUrl=isListingUrlAutomatic(isNew,content.properties.find(row=>row.id===p.id));
   const uploadsActive=useRef(true);const uploadController=useRef<AbortController|null>(null);
@@ -434,18 +551,18 @@ function PropertyEditor({property:p,isNew,setProperty,onSave,onCancel,neighbourh
     if(!files.length||busy||uploading)return;
     if(p.images.length+files.length>40){setFailedUploadFile("");setUploadError("A listing can contain up to 40 photos.");return;}
     const controller=new AbortController();uploadController.current=controller;
-    setUploading(true);setUploadError("");setFailedUploadFile("");setRetryFiles([]);
+    onPhotoTransfer(true);setUploading(true);setUploadError("");setFailedUploadFile("");setRetryFiles([]);
     let remaining=files;
     try{for(const file of files){
       if(!uploadsActive.current||controller.signal.aborted)break;
       const filename=imageOriginalFilename(file.name);setCurrentUploadFile(filename);setFailedUploadFile(filename);
       setUploadProgress({bytes:0,total:file.size,percent:0,startedAt:Date.now(),lastActivityAt:Date.now(),retrying:false});
-      const url=await upload(file,{listingId:p.id,signal:controller.signal,onProgress:progress=>{if(uploadsActive.current&&!controller.signal.aborted)setUploadProgress(progress);}});
+      const url=await upload(file,{listingId:p.id,onPlanned,signal:controller.signal,onProgress:progress=>{if(uploadsActive.current&&!controller.signal.aborted)setUploadProgress(progress);}});
       if(!uploadsActive.current||controller.signal.aborted)break;
-      setProperty(previous=>({...previous,images:[...previous.images,url],image_filenames:addImageFilename(pruneImageFilenames(previous.images,previous.image_filenames),url,file.name)}));
+      setProperty(previous=>previous.images.includes(url)?previous:({...previous,images:[...previous.images,url],image_filenames:addImageFilename(pruneImageFilenames(previous.images,previous.image_filenames),url,file.name)}));
       remaining=remaining.slice(1);setFailedUploadFile("");
     }}catch(error){if(uploadsActive.current&&!controller.signal.aborted){setUploadError(error instanceof Error?error.message:"Upload failed.");setRetryFiles(remaining);}}
-    finally{if(uploadsActive.current){setUploading(false);setCurrentUploadFile("");setUploadProgress(null);}}
+    finally{if(uploadsActive.current){onPhotoTransfer(false);setUploading(false);setCurrentUploadFile("");setUploadProgress(null);}}
   }
   function patch(key:keyof Property,value:unknown){setProperty(previous=>({...previous,[key]:value}));}
   return <form className="editor-form" onSubmit={e=>{e.preventDefault();if(!busy&&!uploading&&!videoUploading)void onSave(p);}}><div className="editor-section-title">{text("The introduction")}</div><label>{text("Property title · English")}<input value={p.title_en} onChange={e=>patch("title_en",e.target.value)} required maxLength={200}/></label><label>{text("Property title · Vietnamese")}<input value={p.title_vi} onChange={e=>patch("title_vi",e.target.value)} required maxLength={200}/></label><ListingUrlField property={p} automatic={automaticUrl}/><label>{text("Overview · English")}<textarea rows={4} value={p.overview_en||p.description_en} onChange={e=>patch("overview_en",e.target.value)} maxLength={12000}/></label><label>{text("Overview · Vietnamese")}<textarea rows={4} value={p.overview_vi||p.description_vi} onChange={e=>patch("overview_vi",e.target.value)} maxLength={12000}/></label><div className="editor-section-title">{text("The practical details")}</div><div className="form-row"><label>{text("Neighbourhood")}<SelectField value={p.district_slug} onValueChange={value=>patch("district_slug",value)}>{neighbourhoods.map(n=><option value={n.slug} key={n.slug}>{n.name}</option>)}</SelectField></label><label>{text("Property type")}<SelectField value={p.property_type} onValueChange={value=>patch("property_type",value)}>{[...RENTAL_TYPES,...(p.property_type==="Studio"?["Studio"]:[]),...(p.property_type==="House & Villa"?["House & Villa"]:[])].map(a=><option value={a} key={a}>{typeLabel(a,language)}</option>)}</SelectField></label></div><label>{text("Public location / street")}<input value={p.address} onChange={e=>patch("address",e.target.value)} required maxLength={300}/></label><label>{text("Exact map location (optional)")}<input value={p.map_address||""} onChange={e=>patch("map_address",e.target.value)} maxLength={300} placeholder={text("Full address or latitude,longitude")}/><small>{text("This location is public. Enter a full address or latitude,longitude for the exact map. Leave blank to show an approximate view of the public street / area.")}</small></label><PropertyPriceFields property={p} patch={patch}/><div className="form-row three"><label>{text("Bedrooms")}<input type="number" min="0" max="50" value={p.bedrooms} onChange={e=>patch("bedrooms",Number(e.target.value))} required/></label><label>{text("Bathrooms")}<input type="number" min="0" max="50" value={p.bathrooms??""} onChange={e=>patch("bathrooms",e.target.value===""?null:Number(e.target.value))} placeholder={text("Unconfirmed")}/></label><label>{text("Area · m²")}<input type="number" min="1" step="0.1" value={p.area_sqm??""} onChange={e=>patch("area_sqm",e.target.value===""?null:Number(e.target.value))} placeholder={text("Unconfirmed")}/></label></div><fieldset className="amenity-options"><legend>{text("Amenities")}</legend>{amenityOptions.map(a=><label key={a}><input type="checkbox" checked={p.amenities.includes(a)} onChange={()=>patch("amenities",p.amenities.includes(a)?p.amenities.filter(x=>x!==a):[...p.amenities,a])}/>{text(a)}</label>)}</fieldset><RentalPropertyFields property={p} patch={patch} isNew={isNew}/><div className="editor-section-title">{text("The real picture")}</div><PropertyPhotoGrid images={p.images} title={(language==="vi"?p.title_vi || p.title_en:p.title_en || p.title_vi)} filenames={p.image_filenames} metadata={p.image_metadata} rename={renamePhotos} disabled={busy}
@@ -455,6 +572,8 @@ function PropertyEditor({property:p,isNew,setProperty,onSave,onCancel,neighbourh
       const images=[...previous.images];const [image]=images.splice(from,1);images.splice(to,0,image);return {...previous,images};})}
     remove={index=>setProperty(previous=>{const images=previous.images.filter((_,i)=>i!==index);return {...previous,images,image_filenames:pruneImageFilenames(images,previous.image_filenames),
       ...(previous.image_metadata?{image_metadata:pruneImageMetadata(images,previous.image_metadata)}:{})};})}/>
+  {galleryChanged&&<p className="form-info" role="status">{galleryUnavailable?t("This device couldn’t keep a recovery copy. Leave the editor open until you confirm the save.","Thiết bị này không giữ được bản khôi phục. Hãy giữ trình chỉnh sửa mở đến khi xác nhận đã lưu."):
+    t("Save the listing to attach these changes. The unsaved gallery is available for recovery on this device.","Lưu tin đăng để đính kèm thay đổi. Bộ ảnh chưa lưu có thể được khôi phục trên thiết bị này.")}</p>}
   <label className="upload-label"><Upload size={18}/>{uploading?text("Uploading photos…"):text("Upload original photos")}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple disabled={busy||uploading} onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";return uploadPhotos(files);}}/></label>{uploading&&currentUploadFile&&<p className="image-upload-filename" role="status">{text("Uploading {filename}",{filename:currentUploadFile})}</p>}{uploading&&uploadProgress&&<ListingUploadStatus progress={uploadProgress} filename={currentUploadFile} cancel={()=>{uploadController.current?.abort();setUploadError("");setFailedUploadFile("");}}/>}{!uploading&&retryFiles.length>0&&<button type="button" className="button button-outline button-small" disabled={busy} onClick={()=>void uploadPhotos(retryFiles)}>{text("Retry upload")}</button>}<div className="image-url-input"><input type="url" aria-label={text("External photo URL")} value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder={text("Or add a photo URL (https://…)")}/><button className="button button-outline button-small" type="button" disabled={busy||uploading} onClick={()=>{if(busy||uploading)return;if(p.images.length>=40){setFailedUploadFile("");setUploadError("A listing can contain up to 40 photos.");return;}try{const url=new URL(imageUrl);if(url.protocol!=="https:")throw new Error();patch("images",[...p.images,url.href]);setImageUrl("");setUploadError("");setFailedUploadFile("");}catch{setFailedUploadFile("");setUploadError("Enter a valid HTTPS image URL.");}}}>{text("Add")}</button></div>{uploadError&&<div className="form-error image-upload-error" role="alert">{failedUploadFile&&<strong>{failedUploadFile}</strong>}<span>{text(uploadError)}</span></div>}<PropertyVideoField property={p} disabled={busy} onChange={url=>patch("video_url",url)} onUploadingChange={setVideoUploading}/><div className="editor-section-title">{text("Ready for its next chapter?")}</div><div className="form-row"><label>{text("Publication status")}<SelectField value={p.status} onValueChange={value=>patch("status",value)}><option value="draft">{text("Draft")}</option><option value="published">{text("Published")}</option><option value="archived">{text("Archived")}</option></SelectField></label><label>{text("Availability")}<SelectField value={p.availability} onValueChange={value=>patch("availability",value)}><option value="on_request">{text("Confirm with team")}</option><option value="available">{text("Available")}</option><option value="rented">{text("Rented")}</option></SelectField></label></div><label className="consent-label"><input type="checkbox" checked={p.featured} onChange={e=>patch("featured",e.target.checked)}/>{text("Feature as a Gary’s pick")}</label><p className="small muted">{text("Drafts and archived listings stay out of search. Rented homes are also hidden from results. No photo is deleted from storage when removed from a listing.")}</p>{error&&<div className="form-error" role="alert">{text(error)}</div>}<PropertySeoPanel property={p}/><div className="editor-actions gw-editor-actions listing-editor-actions">
     <button data-button-variant={p.status==="draft"?"save-draft":p.status==="archived"?"archive":"save"} type="submit" className="button listing-save" disabled={busy||uploading||videoUploading} aria-busy={busy||undefined}><Save size={17} aria-hidden="true"/>{busy?text("Saving…"):t("Save Listing","Lưu tin đăng")}</button>
     <button data-button-variant="cancel" type="button" className="button button-outline listing-cancel" disabled={busy||uploading||videoUploading} onClick={onCancel}>{t("Cancel","Hủy")}</button>

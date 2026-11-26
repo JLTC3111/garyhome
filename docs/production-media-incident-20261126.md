@@ -18,6 +18,32 @@ The per-listing audit is `work/property-media-audit-20261125.1T3KYQ/production-l
 
 For GH-643 and GH-01, first fetch fresh listing pages and check that the rendered cover and gallery use the current WebP keys. A HEAD of the replacement URLs checks HTTP status and `Content-Type` without transferring images. Compare any reported failing URL with the failed keys and retirement times in the audit. If a current page still emits an old key, capture its URL, response cache headers and the exact old key before changing any reference. Those two current galleries already contain their replacements.
 
+## Upload and save incident
+
+GH-645's 14 files completed between 01:53:29 and 01:54:12 UTC on November 26. The properties POST returned 201 in the 01:55:12 UTC window, and the creation receipt identifies the same staff account as the uploads. The original insert has an empty gallery. GH-56's two uploads preceded its later update at 05:45 UTC and belong to a different staff account than its recorded creator. There were zero application upload-lease records for these 11 drafts. For the other nine, the catalogue had zero matching objects, leases, multipart entries or unscoped filename-code hints.
+
+The uploader saves the object through resumable Storage and the editor receives the URL on success. The previous editor held that URL, ordering and photo fields in memory until the explicit listing save. There was no listing autosave. Drafts could be saved with a blank gallery, and closing the editor lost its in-memory changes. The API evidence shows the completed uploads and subsequent empty save. It does not record the editor interaction or POST body that led to that state.
+
+The current lease RPC protects resumable uploads for 24 hours and renews during long sessions. The upload watchdog allows continued progress and stops after 120 seconds of inactivity. Listing JSON calls have a 20-second application deadline and a 15-second transport deadline. When a listing response is interrupted, the new editor does one version-aware read to check the submitted record. It keeps the edits open if the write cannot be confirmed. The user can resume gallery order, names, captions, alt text and pending upload paths on the same device. Pending files are checked through Storage metadata before entering the recovered gallery. Files remain staged until a normal listing save confirms their references. The checkpoint covers the gallery. It cannot follow a user to another device or survive clearing this site's browser storage.
+
+The [orphan reconciliation](../work/property-media-audit-20261125.1T3KYQ/orphan-reconciliation-20261126.json) matches all 617 original candidates by Storage ID and version. They total 424,989,619 bytes and remain held. The 17 additional photos total 3,767,853 bytes and include 14 for GH-645, two held for GH-56 and one unscoped object. The five additional video candidates total 47,831,068 bytes. Four have published listing-scoped paths. The live reference index flags candidates for review, and permanent cleanup stays paused.
+
+## Apply the GH-645 gallery recovery
+
+Use the existing authenticated Home Owner session and publishable key from the approved media operation. From the Home checkout, use the private `gallery-recovery-packet-20261126.json` in the existing audit directory. The command checks 14 Storage identities and the saved listing version through metadata requests. It attaches in upload completion order, matching the sequential uploader. The first photo becomes the cover. The original gallery had no recorded caption, alt text or order to restore.
+
+```sh
+GARY_GALLERY_PACKET=work/property-media-audit-20261125.1T3KYQ/gallery-recovery-packet-20261126.json
+# Use the existing GARY_MEDIA_PUBLISHABLE_KEY and active GARY_MEDIA_OWNER_TOKEN.
+node scripts/recover-listing-gallery.mjs "$GARY_GALLERY_PACKET" --verify
+node scripts/recover-listing-gallery.mjs "$GARY_GALLERY_PACKET" --apply
+node scripts/recover-listing-gallery.mjs "$GARY_GALLERY_PACKET" --verify
+```
+
+In zsh, `read -rs 'GARY_MEDIA_OWNER_TOKEN?Home Owner session token: '` accepts the existing user token without echo. Export it only for the command and unset it afterward. The tool checks the protected Owner RPC before contacting the write path. It keeps a mode 0600 copy of the pre-update gallery fields next to the manifest. `--apply` updates the known GUID, Draft state and exact version conditionally through the authorized Data API. The last `--verify` should report `already-attached` and 14 photos. Preserve GH-56's record and objects until the creator and uploader confirm custody. The packet includes both identities for that review.
+
+Release the reviewed Home frontend through the existing Vercel project. Gallery checkpoints use the deployed upload lease and normal listing save, so this workflow needs no additional Home SQL. In an approved test listing, interrupt an upload, reload, resume the gallery, and save. Confirm that the preserved order and metadata match the saved row. Simulate a failed save response and a newer conflicting gallery in the test environment. An ambiguous response must leave the editable gallery available. Verify the deployed revision and read GH-645's status, creation date and gallery after the authorized repair. Keep the bulk cleanup gate off during this verification.
+
 ## Reference-only recovery
 
 1. Locate the exact existing UUID in the audit. Before editing, export that record's current fields and check its current `updated_at`, status, creation date and recorded creator. The file path is evidence of custody only after the uploader and intended listing have been confirmed.

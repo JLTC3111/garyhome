@@ -31,7 +31,9 @@ export async function uploadListingFile({ client, file, resumeKey = file, bucket
   async function renewLease() {
     const reservation=client.rpc("home_media_upload_lease",{p_bucket:bucket,p_name:path});
     const {error:leaseError}=await (signal?reservation.abortSignal(signal):reservation);
-    if(leaseError)throw Object.assign(new Error("The upload could not be reserved. Refresh and try again."),{status:leaseError.code==="42501"?403:409});
+    if(leaseError)throw Object.assign(new Error("The upload could not be reserved. Refresh and try again."),{
+      name:"ListingUploadLeaseError",code:leaseError.code,status:leaseError.code==="42501"?403:409,
+    });
   }
   await renewLease();
   let leaseRenewal=Date.now()+60*60*1000;

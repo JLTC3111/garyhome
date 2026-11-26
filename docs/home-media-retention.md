@@ -2,6 +2,76 @@
 
 The protected Gary Home Owner can open **Properties → Storage & Media Management**. The inventory covers the listing photo and video buckets, saved listing states, editorial links and the existing media ledgers. A potential orphan is an audit finding. The queue records the evidence that makes a file eligible for cleanup.
 
+## Production panel rollout, 27 November 2026
+
+Production has `20261126100000_home_media_retention.sql` and `20261126114500_home_media_inventory_diagnostics.sql`. The Owner RPC and its diagnostics wrapper are installed. At inspection, `last_scan_at` was empty, the queue and execution ledger were empty, and permanent removal was paused. The project had no `media-orphan-cleanup` deployment, `pg_cron` or `pg_net`.
+
+The inventory contained **1,815 objects and 776.93 MB**. The reference index flagged **639 potential orphans and 476.59 MB**. These figures include files under saved listing paths. The removal ledgers contained **519 distinct receipts**, comprising 510 photo retirements including the 509 migration originals and nine listing file removals. The paged panel puts those receipts in Cleanup History. File Trash represents currently reserved files with a restore deadline.
+
+The legacy RPC rebuilt the normalized reference inventory and assembled a file history in one response. A read-only production plan measured 1.27 seconds for the reference inventory and 2.88 seconds for a single full negative reference check. The authenticated database statement limit is eight seconds. A recent gateway sample contained three HTTP 200 responses and one HTTP 400 for the RPC. Those logs do not establish a statement timeout or identify the failed action. The new route distinguishes actual timeouts, scan contention, missing schema, and worker failures.
+
+### Install the panel with removal paused
+
+1. From the Home repository, apply just the outstanding panel migration with the existing approved operator database service. Check that the protected Owner RPC and the private diagnostics function exist before running it.
+
+   ```sql
+   select to_regprocedure('public.home_media_management(text,uuid,integer)') as owner_rpc,
+          to_regprocedure('private.home_media_management(text,uuid,integer)') as installed_diagnostics;
+   select permanent_enabled,last_scan_at from private.home_media_control where singleton;
+   ```
+
+   ```sh
+   psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+     -f supabase/migrations/20261126170756_home_media_panel_pagination.sql
+   ```
+
+2. Release the reviewed Home application to the existing Vercel project serving `staff.garyhome.vn` and `garyhome.vn`. Sign in as the protected Owner and run a storage scan. It records a completion timestamp and an inventory snapshot, and performs full verification for one tracked file per scan. Further scans advance through the guarded queue. An authenticated Admin or Editor request must receive 403.
+3. Open Inventory files, File Trash and Cleanup History separately. Each request carries up to 30 rows. Verify that a missing or failed page read leaves the scan time visible. Confirm that the migration originals appear in Cleanup History and there are no permanent receipts in File Trash. If there are zero verified files, the disabled Move action should explain that the potential files still need review. The 617 historical candidates still require the enrollment procedure below. When a file is ready, moving it to Trash rechecks its current identity, dependencies and lease and uses its existing restore window.
+
+   ```sql
+   select to_regprocedure('private.home_media_panel_page(text,integer)') as panel_page_helper,
+          last_scan_at, inventory_sample is not null as snapshot_recorded, permanent_enabled
+   from private.home_media_control where singleton;
+   ```
+
+4. Separately, deploy the worker while removal remains paused. The worker authenticates Owner requests itself and also accepts a dedicated Cron credential for scheduled runs. Use **Check cleanup worker** in the Owner panel to verify the deployment and report whether its Cron credential is configured. The check cannot claim or remove files. [Deploying Edge Functions](https://supabase.com/docs/guides/functions/deploy)
+
+   ```sh
+   supabase functions deploy media-orphan-cleanup --project-ref duyiihsmaqfgwezmsnjs --no-verify-jwt
+   ```
+
+### Activate permanent cleanup only after recovery review
+
+Keep `permanent_enabled=false` and leave Cron unscheduled while the affected draft galleries are recovered and verified. At inspection GH-645 and GH-56 still had empty galleries. Review the unresolved drafts and current public gallery delivery before approving any activation. [Gallery recovery instructions](production-media-incident-20261126.md)
+
+After approval, enable the `pg_cron` and `pg_net` extensions in the existing project. Set `HOME_MEDIA_CRON_SECRET` for the Edge Function using a protected local env file and put the identical value in Vault as `gary_home_media_cron_secret`. Keep the secret out of checked-in files, command arguments and logs. Use the Owner health check before enabling the gate. [Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions)
+
+```sh
+supabase secrets set --project-ref duyiihsmaqfgwezmsnjs --env-file "$GARY_HOME_MEDIA_SECRET_FILE"
+```
+
+Then run the following manual activation SQL and the existing hourly schedule script. The schedule script verifies the gate and the Vault credential before it installs the job for minute 7 of each hour.
+
+```sql
+update private.home_media_control set permanent_enabled=true where singleton;
+```
+
+```sh
+psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -f supabase/ops/schedule-home-media-cleanup.sql
+```
+
+With the Cron extension installed, verify the referenced job and its recent status without selecting its command or Vault values.
+
+```sql
+select jobname,schedule,active from cron.job where jobname='gary-home-media-expiry';
+select r.start_time,r.end_time,r.status
+from cron.job_run_details r join cron.job j using(jobid)
+where j.jobname='gary-home-media-expiry' order by r.start_time desc limit 10;
+```
+
+A successful Cron invocation confirms dispatch. Check the worker logs and Cleanup runs for the actual outcome.
+
 ## Restore and permanent removal
 
 - A saved photo or video removal captures its actual listing media fields. Restore puts the original link and captured filename, caption and alt text back on that listing. It uses the saved gallery neighbours to place the photo and preserves other current links.

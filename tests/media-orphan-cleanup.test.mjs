@@ -58,6 +58,20 @@ test('scheduled removal is gated, validates the target, and reconciles an interr
  assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
 });
 
+test('worker health checks require a verified Owner and never claim a cleanup run',async()=>{
+ const calls=[];
+ const handler=createMediaCleanup({...configuration,fetcher:async (url,init)=>{
+  const path=new URL(url).pathname;calls.push(path);
+  if(path==='/auth/v1/user')return Response.json({id:owner});
+  assert.match(path,/_management$/);assert.deepEqual(JSON.parse(init.body),{p_action:'authorize'});
+  return init.headers.Authorization==='Bearer owner-fixture'?Response.json({actor:owner}):Response.json({}, {status:403});
+ }});
+ assert.equal((await invoke(handler,cron,'health')).status,403);
+ assert.equal((await invoke(handler,{Authorization:'Bearer staff-fixture'},'health')).status,403);
+ assert.deepEqual(await (await invoke(handler,{Authorization:'Bearer owner-fixture'},'health')).json(),{status:'ok',cronConfigured:true});
+ assert.equal(calls.length,4);
+});
+
 test('early purge requires an explicit exact-item confirmation from a signed Owner',async()=>{
  const expiresAt='2099-11-26T12:00:00.000Z';
  const calls=[];

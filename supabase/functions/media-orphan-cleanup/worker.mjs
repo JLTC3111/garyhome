@@ -1,5 +1,5 @@
 const mediaBuckets = new Set(['property-media','listing-videos']);
-const actions = new Set(['status','scan','trash','restore','run','purge']);
+const actions = new Set(['status','scan','trash','restore','run','purge','health']);
 const json = (body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const encode=new TextEncoder();
 const sha=async data=>new Uint8Array(await crypto.subtle.digest('SHA-256',data));
@@ -104,9 +104,10 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       if(!user.ok) return json({error:user.status===401||user.status===403?'session_expired':'unavailable'},user.status===401||user.status===403?401:503);
       const {id}=await user.json();
       if(!uuid.test(id||''))return json({error:'session_expired'},401);
-      if(body.action==='run'||early) {
+      if(body.action==='run'||early||body.action==='health') {
         const owner=await rpc('management',token,{p_action:'authorize'});
         if(owner?.actor!==id) return json({error:'forbidden'},403);
+        if(body.action==='health')return json({status:'ok',cronConfigured:Boolean(cronSecret)});
         const result=await run(id,req.signal,early);
         if(early&&result.status==='ok'&&result.removed!==1) return json({error:'purge_unconfirmed'},409);
         return json(result);

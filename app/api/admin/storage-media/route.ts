@@ -1,7 +1,7 @@
 import { backendConfig } from "@/lib/server";
 import { PROPERTY_IMAGE_ORIGIN } from "@/lib/property-photo-files";
 import { staffRequest, StaffRequestError } from "@/lib/staff-server";
-import { request } from "@/lib/requests";
+import { request, RequestTimeoutError } from "@/lib/requests";
 import { executeStorageMedia, storageMediaActions } from "@/lib/home-media-request";
 
 export const maxDuration = 60;
@@ -22,12 +22,13 @@ export async function POST(req:Request) {
       const response=await executeStorageMedia(db,{...input,action:input.action},signal,()=>fetch(PROPERTY_IMAGE_ORIGIN+"/functions/v1/media-orphan-cleanup",{
         method:"POST",signal,redirect:"error",cache:"no-store",headers:{
           Authorization:req.headers.get("authorization")!,apikey:key,"Content-Type":"application/json",
-        },body:JSON.stringify({action:input.action,id:input.id,offset:input.offset,expiresAt:input.expiresAt,confirm:input.confirm}),
+        },body:JSON.stringify({action:input.action==="worker_status"?"health":input.action,id:input.id,offset:input.offset,expiresAt:input.expiresAt,confirm:input.confirm}),
       }));
       return json(response.data,response.status);
     },55000);
   } catch(error) {
     if(error instanceof StaffRequestError)return json({error:error.status===401?"session_expired":error.status===403?"forbidden":"owner_check_unavailable"},error.status);
+    if(error instanceof RequestTimeoutError)return json({error:"inventory_timeout"},504);
     return json({error:"inventory_unavailable"},503);
   }
 }

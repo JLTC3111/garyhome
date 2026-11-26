@@ -826,6 +826,66 @@ test('inventory diagnostics preserve the Owner boundary and distinguish the sche
  assert.equal(changed.heldCandidates,staged.heldCandidates+1);
 });
 
+test('paged media panel separates permanent receipts, records scans and stages only a verified live identity',async t=>{
+ const h=await setup(t,true);
+ for(const name of ['20261126114500_home_media_inventory_diagnostics.sql','20261126170756_home_media_panel_pagination.sql']){
+  await h.pg.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
+ const panel=(action,offset=0,actor=owner,role='authenticated')=>h.role(role,actor,()=>
+  h.pg.query('select public.home_media_management($1,null,$2) value',[action,offset])).then(result=>result.rows[0].value);
+ for(const action of ['overview','inventory_scan','inventory_page','trash_page','removed_page','run_page','trash']){
+  await assert.rejects(panel(action,0,admin),error=>error.code==='42501');
+  await assert.rejects(panel(action,0,null,'anon'),error=>error.code==='42501');
+ }
+ await h.pg.query(`insert into private.property_photo_renames(property_id,origin,old_key,new_key,started_by,removed_at)
+  select $1,$2,'properties/old-'||n||'.jpg','properties/replacement-'||n||'.webp',$3,now()-n*interval '1 second'
+  from generate_series(1,509) n`,[first,origin,owner]);
+ await h.pg.exec("insert into storage.objects(bucket_id,name) select 'property-media','properties/inventory-'||n||'.webp' from generate_series(1,32) n");
+ const empty=await panel('overview');
+ assert.equal(empty.panelVersion,2);assert.equal(empty.lastScanAt,null);assert.equal(empty.enabled,false);
+ assert.equal(empty.items,undefined);assert.equal((await panel('inventory_page')).available,false);
+ await assert.rejects(panel('trash'),error=>error.message==='listing_cleanup.scan_required');
+ const removed=await panel('removed_page'),removedNext=await panel('removed_page',30);
+ assert.equal(removed.items.length,30);assert.equal(removed.hasMore,true);
+ assert.notEqual(removed.items.at(-1).name,removedNext.items[0].name);
+ assert.equal(removed.items[0].name,'properties/old-1.jpg');
+ assert.equal((await panel('removed_page',480)).items.length,29);
+ assert.deepEqual((await panel('trash_page')).items,[]);
+
+ const attached=`properties/listings/${first}/${first}/owner-panel.webp`,unreviewed=`properties/listings/${second}/${second}/protected.webp`;
+ const link=propertyPhotoUrl(origin,attached);
+ await h.pg.query("insert into storage.objects(bucket_id,name) values('property-media',$1),('property-media',$2)",[attached,unreviewed]);
+ await h.pg.query('update public.properties set images=$1 where id=$2',[[link],first]);
+ await h.pg.query('update public.properties set images=$1 where id=$2',[[another],first]);
+ const scan=await panel('inventory_scan');
+ assert.ok(scan.lastScanAt);assert.equal(scan.checkedQueue,1);assert.equal(scan.readyToTrash,1);
+ assert.equal(scan.protectedCandidates,1);assert.equal(scan.items,undefined);assert.equal(scan.entries,undefined);
+ const firstPage=await panel('inventory_page');
+ assert.equal(firstPage.items.length,30);assert.equal(firstPage.hasMore,true);
+ const remaining=await panel('inventory_page',30);
+ assert.ok([...firstPage.items,...remaining.items].some(item=>item.name===unreviewed&&item.reason==='listing'));
+ assert.equal((await panel('overview')).lastScanAt,scan.lastScanAt);
+ const original=(await h.pg.query('select version from storage.objects where name=$1',[attached])).rows[0].version;
+ await h.pg.query("update storage.objects set version='changed' where name=$1",[attached]);
+ assert.equal((await panel('trash')).newlyTrashed,0);
+ await h.pg.query('update storage.objects set version=$1 where name=$2',[original,attached]);
+ const staged=await panel('trash');
+ assert.equal(staged.newlyTrashed,1);assert.equal(staged.readyToTrash,0);
+ assert.equal(staged.enabled,false);assert.equal(staged.lastScanAt,scan.lastScanAt);
+ const trash=await panel('trash_page');
+ assert.equal(trash.items.length,1);assert.equal(trash.items[0].name,attached);assert.equal(trash.items[0].restore_mode,'listing');
+ assert.ok(Date.parse(trash.items[0].expires_at)-Date.now()>47*60*60*1000);
+ const restored=await h.role('authenticated',owner,()=>h.pg.query("select public.home_media_management('restore',$1) as result",[trash.items[0].id]));
+ assert.equal(restored.rows[0].result.restored,true);
+ assert.ok((await h.pg.query('select images from public.properties where id=$1',[first])).rows[0].images.includes(link));
+ await h.pg.exec(`create or replace function private.home_media_take_inventory(p_scan boolean,p_after uuid default null) returns jsonb
+   language plpgsql stable set search_path='' as $$begin raise exception 'unexpected inventory rebuild';end;$$;`);
+ assert.equal((await panel('overview')).lastScanAt,scan.lastScanAt);
+ assert.deepEqual(await panel('inventory_page'),firstPage);
+ assert.deepEqual(await panel('removed_page'),removed);
+ assert.deepEqual((await panel('run_page')).items,[]);
+});
+
 test('confirmed early purge scopes the job to one file and reconciles a lost final acknowledgement',async t=>{
  const h=await setup(t,true);
  const query=(as,user,sql,args=[])=>h.role(as,user,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);

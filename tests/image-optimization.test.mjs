@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
 import sharp from 'sharp';
 import {avatarPhoto,imageDetails,optimizeImage,propertyPhoto} from '../lib/image-optimization.mjs';
 
 // Exercise the actual encoded and decoded pixels in Node without launching a browser.
-function rasterEnvironment({webp=true, damage=false, onEncode}={}) {
+function rasterEnvironment({webp=true, damage=false, onEncode, onDraw}={}) {
   let released = 0;
   return {
     Blob,
@@ -16,13 +18,33 @@ function rasterEnvironment({webp=true, damage=false, onEncode}={}) {
     document:{createElement(){
       let pixels;
       const canvas={
+        get pixels(){return pixels;},
+        toDataURL:()=>webp?'data:image/webp;base64,':'data:image/png;base64,',
         getContext:()=>({
           clearRect(){},
           drawImage(image,x,y,width,height){
+            onDraw?.(image.width,width);
+            if (width===image.width && height===image.height) {
+              pixels=Buffer.from(image.pixels);
+              return;
+            }
             pixels=Buffer.alloc(width*height*4);
+            // Model the difference between point and area sampling for fine textures.
+            const samples=(from,to)=>this.imageSmoothingQuality==='high'?Math.min(8,Math.max(1,Math.floor(from/to))):1;
+            const xs=samples(image.width,width),ys=samples(image.height,height),count=xs*ys;
+            const input=image.pixels;
             for(let row=0;row<height;row++) for(let column=0;column<width;column++){
-              const source=4*(Math.floor((row+.5)*image.height/height)*image.width+Math.floor((column+.5)*image.width/width));
-              image.pixels.copy(pixels,4*(row*width+column),source,source+4);
+              let r=0,g=0,b=0,a=0;
+              for(let dy=0;dy<ys;dy++){
+                const base=Math.floor((row+(dy+.5)/ys)*image.height/height)*image.width;
+                for(let dx=0;dx<xs;dx++){
+                  const i=4*(base+Math.floor((column+(dx+.5)/xs)*image.width/width));
+                  r+=input[i];g+=input[i+1];b+=input[i+2];a+=input[i+3];
+                }
+              }
+              const i=4*(row*width+column);
+              pixels[i]=Math.round(r/count);pixels[i+1]=Math.round(g/count);
+              pixels[i+2]=Math.round(b/count);pixels[i+3]=Math.round(a/count);
             }
           },
           getImageData:()=>({data:pixels}),
@@ -64,8 +86,48 @@ test('large property photos are delivered as WebP with verified dimensions and u
   assert.equal(result.extension,'webp');
   assert.ok(result.width>=1280&&result.width<=1920);
   assert.equal(result.width/result.height,16/9);
-  assert.ok(result.body.size>0&&result.body.size<=propertyPhoto.targetBytes);
+  assert.ok(result.body.size>0&&result.body.size<=propertyPhoto.maxBytes);
   assert.ok(win.released>=2);
+});
+
+test('property optimization stops on the first acceptable finished file',async()=>{
+  const attempts=[];
+  const bytes=await sharp({create:{width:2560,height:1440,channels:3,background:'#63788d'}}).jpeg().toBuffer();
+  const result=await optimizeImage(new File([bytes],'solid.jpg'),{...propertyPhoto,targetBytes:1},{
+    win:rasterEnvironment({onEncode:attempt=>attempts.push(attempt)})
+  });
+  assert.deepEqual(attempts,[{width:1920,height:1080,quality:.86}]);
+  assert.ok(result.body.size>1&&result.body.size<=500_000);
+});
+
+test('browsers without WebP encoding use a staged resize and try JPEG directly',async()=>{
+  const draws=[],attempts=[];
+  const bytes=await sharp({create:{width:4000,height:2000,channels:3,background:'#63788d'}}).jpeg().toBuffer();
+  const result=await optimizeImage(new File([bytes],'wide.jpg'),propertyPhoto,{
+    win:rasterEnvironment({webp:false,onEncode:attempt=>attempts.push(attempt),onDraw:(from,to)=>draws.push([from,to])})
+  });
+  assert.equal(result.contentType,'image/jpeg');
+  assert.deepEqual(attempts,[{width:1920,height:960,quality:.86}]);
+  assert.ok(draws.some(([from,to])=>from===4000&&to===2000));
+  assert.ok(draws.some(([from,to])=>from===2000&&to===1920));
+});
+
+const stressPhoto=process.env.GARY_HOME_STRESS_JPEG;
+test('the exact 28.15 MB Gary Home stress JPEG passes separate resize and encoding validation',{
+  skip: !stressPhoto && 'Set GARY_HOME_STRESS_JPEG to the original gary-home-large-test.jpg'
+},async()=>{
+  const source=await readFile(stressPhoto);
+  assert.equal(createHash('sha256').update(source).digest('hex'),
+    '23d95079d564f990e5e3eb5b1653d43f1d5b487d82a7a2ffa2b0f29cdacec958');
+  const attempts=[];
+  const result=await optimizeImage(new File([source],'gary-home-large-test.jpg'),propertyPhoto,{
+    inputMax:32*1024*1024,win:rasterEnvironment({onEncode:attempt=>attempts.push(attempt)})
+  });
+  assert.equal(result.contentType,'image/webp');
+  assert.ok(result.body.size<=500_000);
+  assert.ok(Math.abs(result.width*2/3-result.height)<=.5);
+  assert.deepEqual([result.width,result.height],[attempts.at(-1).width,attempts.at(-1).height]);
+  assert.ok(attempts.length>1&&attempts.length<35);
 });
 
 test('small sources retain their actual MIME, bytes, and dimensions',async()=>{

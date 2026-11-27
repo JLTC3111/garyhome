@@ -4,7 +4,7 @@
 
 | Application | Upload policy | Delivery |
 | --- | --- | --- |
-| Home property-media | Browser source up to 32 MiB, with a 50 megapixel JPEG limit. The finished file aims for 240 KB and must fit within 500,000 bytes. The long edge starts at up to 1,920 px and steps down as needed. | Serve covers, thumbnails, and full-size views directly from the stored public object. Resolve old Supabase transformation URLs at display and SEO boundaries. |
+| Home property-media | Browser source up to 32 MiB, with a 50 megapixel JPEG limit. The first rendition that meets the quality checks and 500,000-byte finished-file cap is used. The long edge starts at up to 1,920 px and steps down as needed. | Serve covers, thumbnails, and full-size views directly from the stored public object. Resolve old Supabase transformation URLs at display and SEO boundaries. |
 | Home staff avatars | Source up to 2 MiB. Aim for 45 KB, with a 100 KB cap and a long edge up to 384 px. | Retain the immutable per-upload URL and the current avatar visibility. |
 | Visa editorial media | Source up to 5 MiB. Aim for 300 KB, with a 650 KB cap and a long edge up to 2400 px. | Keep lazy article cards and the five-minute public Storage browser TTL. |
 | Visa avatars | Keep the 384 px square crop and zoom controls. Encode toward 45 KB, with a 100 KB cap. | Keep the existing private bucket and short-lived signed previews. Use lazy images in the staff roster. |
@@ -16,13 +16,15 @@ The browser keeps efficient originals and can transfer standard PNG physical den
 
 ### New Home listing JPEGs
 
-The browser uses WebP for resized JPEGs. It reduces quality and tries long edges of 1,920, 1,600 and 1,280 px, with 1,024 and 768 px available if none fit the hard cap. It accounts for the final container, encoder colour profile, metadata chunk headers and padding. Upload progress identifies optimization, reservation and network transfer separately. Next.js provides display sizes from the single stored image.
+The browser uses WebP for resized JPEGs where available. Browsers without WebP encoding use the JPEG fallback and resize large reductions in stages to reduce aliasing. The optimizer reduces quality and tries long edges of 1,920, 1,600 and 1,280 px, with 1,024 and 768 px available if no rendition passes. High-quality 64 × 64 samples check the resize once per resolution. The decoded encode is compared pixel-for-pixel with the uncompressed canvas at its output resolution. Both checks use the existing RMS ceiling of 15. The first rendition that passes stops the search. The byte cap includes the final container, encoder colour profile, metadata chunk headers and padding. Upload progress identifies optimization, reservation and network transfer separately. Next.js provides display sizes from the single stored image.
 
 The browser bakes in EXIF orientation and updates embedded dimensions. It retains the primary EXIF and standard XMP packet, including embedded creator, copyright and capture information. It uses the encoder's profile for the rendered colours, with Display P3 when supported for profiled images and sRGB otherwise. JPEG remains available when the browser cannot encode WebP or a photo carries standard IPTC-IIM records that need their native JPEG container. Raster watermarks are resized with the photograph.
 
 When re-encoding, the browser omits JPEG-only optional data such as extended XMP packets, Photoshop previews and edit history, duplicate metadata, JPEG comments and vendor application segments. It removes references to omitted extended XMP and obsolete EXIF previews. Standard IPTC-IIM records are kept independently of Photoshop previews. If the remaining required metadata and photo cannot fit at an accepted quality, the upload reports an error. Efficient originals within the preferred size and resolution pass through byte for byte. The original chosen file is never modified.
 
 The local Sharp tool for existing property photos retains its original limits and preservation policy.
+
+The exact stress-photo regression checks the original file by SHA-256. Run it with `GARY_HOME_STRESS_JPEG=/path/to/gary-home-large-test.jpg node --test tests/image-optimization.test.mjs`.
 
 ## Proposed Storage limits
 

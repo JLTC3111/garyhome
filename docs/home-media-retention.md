@@ -2,24 +2,100 @@
 
 The protected Gary Home Owner can open **Properties → Storage & Media Management**. The inventory covers the listing photo and video buckets, saved listing states, editorial links and the existing media ledgers. A potential orphan is an audit finding. The queue records the evidence that makes a file eligible for cleanup.
 
-## Listing-scoped retention preview
+## Roll out listing-scoped retention
 
-Apply [the listing inactivity migration](../supabase/migrations/20261127141812_home_listing_media_inactivity.sql) after the File Trash bulk reads migration. The existing hourly worker records the first verified unused observation for each Storage identity. This also starts the clock for historical files because upload dates cannot establish continuous non-use. The worker clears the clock when a file is used again. The scheduled removal deadline is 96 hours from the start of the current unused period. Explicit detaches keep their existing 48-hour File Trash deadline.
+### Apply the SQL in preview mode
 
-Open **Properties → Storage & Media Management → Retention preview** to search by listing code or filename. The preview shows reference and hold reasons, time remaining, and eligibility for scheduled cleanup. Completed uploads checked into a recovery draft stay protected until that draft is saved or discarded. Staff should reopen the Home workspace on devices with older browser-only checkpoints so those sessions can sync before scheduled removal is enabled.
+From the Gary Home repository, run the two incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds the Owner-only removal controls. Use the existing operator database service.
 
-The migration starts the 96-hour policy in preview mode. Before enabling removal, confirm the preview shows recovery holds for 14 GH-645 photos and test holds for the two audited GH-56 File Trash objects. The migration matches each hold to the audited Storage key, ID and version. Confirm the two test receipts are still present with their original deadlines.
-
-```sql
-select reason, count(*) from private.home_media_review_holds
-where reason in ('recovery_hold','file_trash_test') group by reason;
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/20261127141812_home_listing_media_inactivity.sql \
+  -f supabase/migrations/20261127153844_home_listing_media_manual_removal.sql
 ```
 
-To enable scheduled removal under the new policy after reviewing the preview, use the existing operator database connection and set the listing inactivity control. The existing permanent-removal gate and hourly schedule also apply.
+The first migration sets `listing_inactivity_enabled` to `false`. To return to preview later, run the following command.
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -c "update private.home_media_control set listing_inactivity_enabled=false where singleton;"
+```
+
+Preview mode pauses scheduled removals under the 96-hour policy only. The worker still observes listing-scoped files each hour and processes the existing 48-hour File Trash workflow according to `permanent_enabled`. That gate was enabled and the existing `gary-home-media-expiry` job was active at minute 7 UTC on November 27. The updated Edge worker and staff interface are required for manual removal of unused media. Manual removal uses the existing permanent-removal gate and Owner confirmation during both preview and automatic operation.
+
+### Inspect counts and verify the exclusions
+
+Sign in as the protected Home Owner and open **Properties → Storage & Media Management → Retention preview**. After the next hourly observation, reopen the preview to see the remaining time and cleanup date. Historical files start their 96 hours at the first verified unused observation. A new saved reference or recovery checkpoint resets that clock. The **Select all eligible files** action uses the current search. An eligible file can be removed individually or with the batch toolbar. A final live check applies before each permanent removal, and successful removals appear in **Cleanup History**.
+
+The read-only production estimate at **15:39 UTC on November 27, 2026** covered **816 listing-scoped files**. The expected split at rollout was **807 protected** and **9 unused candidates awaiting their first observation**.
+
+| Reason | Expected files |
+| --- | ---: |
+| Saved reference | 730 |
+| Saved filename match | 26 |
+| Active upload | 37 |
+| GH-645 recovery hold | 14 |
+| Awaiting first observation | 9 |
+| Eligible for scheduled 96-hour removal during initial preview | 0 |
+
+The 14 holds are included in the 807 protected files. Up to 9 files from that snapshot become manually selectable after the worker observes them unused. Upload completion, edits, newly synced recovery sessions and storage changes can move files between counts. Use this read-only check after applying the SQL to refresh the expected totals.
 
 ```sql
-update private.home_media_control set listing_inactivity_enabled=true where singleton;
+select permanent_enabled, listing_inactivity_enabled
+from private.home_media_control where singleton;
+
+select reason, count(*) as files
+from private.home_media_inactivity_inventory()
+group by reason order by reason;
+
+select count(*) as gh645_holds
+from private.home_media_review_holds
+where reason = 'recovery_hold';
+
+select regexp_replace(i.name,'^.*/','') as file, i.state, i.expires_at,
+       i.expires_at - i.unreferenced_since as original_window,
+       exists (select 1 from storage.objects o where o.bucket_id=i.bucket and o.name=i.name
+         and o.id=i.object_id and o.version is not distinct from i.object_version) as identity_matches
+from private.home_media_items i
+where i.id in ('94a9b011-5542-40f8-a722-4e1b725345a4','0e2a63b8-17e1-45ea-b182-3a7afc53d529')
+order by i.expires_at;
 ```
+
+The November 27 read-only verification found all 14 GH-645 Storage identities protected by the existing historical guard, with zero GH-645 files queued. The 96-hour migration was pending, so the explicit holds are expected after it runs. Search **GH-645** after rollout and confirm 14 recovery holds. The earlier pair of GH-56 test uploads had already been removed and remains in Cleanup History. The two current File Trash tests are unscoped 48-hour records and are excluded from Retention Preview removal.
+
+| Current File Trash test | Original expiry in UTC |
+| --- | --- |
+| `a495e9ae-891d-4ab4-a76c-ae5856f7434e.png` | 2026-11-29 06:05:24.033672 |
+| `5368b942-026c-4d86-b470-7cc5494b7eb4.png` | 2026-11-29 06:05:30.697672 |
+
+### Sync older browser recovery sessions
+
+Each editor with older recovery copies should open the updated **Properties** workspace on the original device, browser profile and staff account while connected. The workspace uploads its local recovery copies when it loads and retries when the browser reconnects. Keep the local copies until they appear under **Resume gallery** and the server readback confirms the applicable listing IDs. Staff can resume, save, or discard a copy from that list. Saving attaches the media to the listing. Discarding releases the session's protection.
+
+```sql
+select coalesce(p.listing_code, c.checkpoint->>'listingId') as listing,
+       count(*) as synced_recovery_copies
+from private.home_media_edit_checkpoints c
+left join public.properties p on p.id=(c.checkpoint->>'listingId')::uuid
+where c.checkpoint is not null
+group by 1 order by 1;
+```
+
+Review any device that remains offline before starting manual deletion or enabling scheduled removal. Existing browser copies on an offline device become visible to the worker when that device syncs.
+
+### Enable scheduled 96-hour removal
+
+After reviewing the preview and the recovery copies, enable the 96-hour scheduler gate. The existing hourly job handles verified files at or after their 96-hour deadline directly.
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -c "update private.home_media_control set listing_inactivity_enabled=true where singleton;"
+```
+
+### Separate database fixture findings
+
+- `tests/staff-database.test.mjs` builds a mock `auth.users` without `deleted_at`, `banned_until`, or `is_anonymous`. The fresh-setup case first fails while creating an earlier function that checks `deleted_at`. A complete fresh-setup fixture also needs `auth.jwt()` and the Storage identity and metadata fields used by the existing media migrations.
+- `tests/property-video-database.test.mjs` has the same Auth fixture gap. Its final assertion also expects an authenticated Owner to delete an object directly after detaching the video. The existing retention migration routes detached videos through File Trash and denies direct authenticated Storage deletion, so that assertion needs to exercise the retained receipt and worker path instead.
 
 ## Production panel rollout, 27 November 2026
 

@@ -128,6 +128,10 @@
 .storage-media-rows li > :first-child { min-width:0; overflow-wrap:anywhere; }
 .storage-media-rows li small { display:block; }
 .storage-media-rows li > span { flex-shrink:0; }
+.storage-media-rows .storage-retention-row { flex-wrap:wrap; align-items:flex-start; }
+.storage-retention-file { display:flex; align-items:flex-start; gap:10px; flex:1 1 260px; }
+.storage-retention-file > a { flex:none; }
+.storage-retention-thumbnail { display:block; inline-size:72px; block-size:54px; object-fit:cover; border-radius:4px; background:var(--paper); }
 .storage-removal-progress {
   display:grid; gap:14px; min-width:0; padding:18px;
   border:1px solid var(--line); border-radius:8px;

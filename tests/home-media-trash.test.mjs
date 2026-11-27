@@ -8,6 +8,19 @@ const expires=new Date(Date.now()+60*60*1000).toISOString();
 const file=id=>({id,name:`properties/${id}.webp`,bucket:'property-media',expires_at:expires,bytes:120});
 const defaults={stopped:()=>false,save:()=>{},wait:async()=>{}};
 
+test('unused-media selections resume through the scoped action on either side of the automatic deadline',async()=>{
+  const photo={...file('photo'),source:'unused_listing'};
+  const video={...file('video'),source:'unused_listing',bucket:'listing-videos',expires_at:'2026-01-01T00:00:00Z'};
+  assert.throws(()=>makeTrashRun([photo,file('trash')]),/invalid_request/);
+  const calls=[];
+  const result=await processTrashRun(readTrashRun(JSON.stringify(makeTrashRun([photo,video]))),{...defaults,
+    async purge(payload,beforeSend){beforeSend();calls.push(payload);return {status:'ok',removed:1};},
+    receipt:()=>assert.fail('No readback is required for confirmed deletion'),
+  });
+  assert.deepEqual(calls,[photo,video].map(item=>({action:'purge_unused',id:item.id,expiresAt:item.expires_at,confirm:true})));
+  assert.equal(trashRunTotals(result).reclaimedBytes,240);
+});
+
 test('selections over eight are confirmed once and processed sequentially in bounded batches',async()=>{
   const files=Array.from({length:13},(_,index)=>file(String(index)));
   const calls=[];const batches=[];

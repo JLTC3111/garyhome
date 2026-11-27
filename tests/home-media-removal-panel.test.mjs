@@ -437,3 +437,78 @@ test('Orphan Review resets applied search and selects eligible files across page
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }
 });
+
+test('Retention Preview supports single and batch removal with refreshed counts while scheduled removal is paused',async()=>{
+  const source='unused_listing',expires_at=new Date(Date.now()+3600000).toISOString();
+  const files=[
+    {id:'first',bucket:'property-media',name:'fixtures/first.webp',bytes:100_000},
+    {id:'second',bucket:'property-media',name:'fixtures/second.webp',bytes:200_000},
+    {id:'tour',bucket:'listing-videos',name:'fixtures/tour.mp4',bytes:300_000},
+  ].map(file=>({...file,expires_at,source}));
+  const live=new Map(files.map(file=>[file.id,file]));
+  const held={name:'fixtures/recovery.webp',bucket:'property-media',reason:'recovery_hold',listing_code:'GH-645',object_id:'held',bytes:120};
+  const calls=[],confirmations=[],store=new Map();
+  const context=vm.createContext({
+    Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
+    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)},
+    window:{addEventListener(){},removeEventListener(){},confirm:message=>{confirmations.push(message);return true;}},
+    async fetch(_, {body}){
+      const args=JSON.parse(body);
+      calls.push(args);
+      const items=[...live.values()];
+      switch(args.action){
+        case 'worker_status': return Response.json({status:'ok',cronConfigured:true,manualUnused:true});
+        case 'overview': return Response.json({panelVersion:2,objects:items.length+3,bytes:items.reduce((sum,item)=>sum+item.bytes,120),
+          candidates:0,candidateBytes:0,abandoned:0,activeUploads:0,broken:0,enabled:true,crossAppProtection:true,earlyEligible:0,
+          overdue:0,trashed:2,checkedAt:new Date().toISOString()});
+        case 'retention_page': return Response.json({items:[held,...items.map(item=>({
+          ...item,manual_target:item,reason:'waiting',eligible_at:item.expires_at,listing_code:'GH-FIXTURE',object_id:item.id,
+        }))],hasMore:false,available:true,manualCount:items.length,automatic:false});
+        case 'retention_receipt':return Response.json({status:live.has(args.id)?'eligible':'already_removed',bytes:live.get(args.id)?.bytes});
+        case 'retention_manifest':return Response.json({items});
+        case 'purge_unused':
+          assert.equal(args.confirm,true);
+          assert.equal(live.get(args.id)?.expires_at,args.expiresAt);
+          live.delete(args.id);
+          return Response.json({status:'ok',attempted:1,removed:1});
+        case 'removed_page':return Response.json({items:[],hasMore:false,available:true});
+        default:assert.fail('Unexpected action '+args.action);
+      }
+    },
+  });
+  const site={t:en=>en,language:'en',user:{id:'owner'},notice:()=>{},
+    editorTask:operation=>operation({auth:{getSession:async()=>({data:{session:{access_token:'fixture'}}})}},new AbortController().signal)};
+  const mocks={'@/lib/home-media-trash':trash,'./site-context':{useSite:()=>site},'./ui/dropdown-menu':dropdown,
+    '@/lib/property-photo-files':{PROPERTY_IMAGE_ORIGIN:'https://fixture.example'},'./storage-orphan-review':{StorageOrphanReview:()=>null}};
+  mocks['./media-selection']=load('media-selection',mocks,context);
+  mocks['./media-removal-progress']=load('media-removal-progress',mocks,context);
+  const {StorageMediaManagement}=load('listing-deletion-queue',mocks,context);
+  let view;
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+  try {
+    await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
+    await act(async()=>view.root.findByType('details').props.onToggle({currentTarget:{open:true}}));
+    const button=label=>view.root.findAllByType('button').find(node=>node.children.join('')===label);
+    await act(async()=>button('Retention preview').props.onClick());
+    assert.equal(view.root.findByProps({'aria-label':'Select recovery.webp'}).props.disabled,true);
+    assert.match(view.root.findByType('video').props.src,/listing-videos\/fixtures\/tour\.mp4#t=/);
+    await act(async()=>view.root.findByProps({'aria-label':'Permanently delete first.webp'}).props.onClick());
+    assert.equal(live.size,2);
+    await act(async()=>view.root.findByProps({'aria-label':'Select eligible files on this page'}).props.onChange());
+    await act(async()=>button('Permanently delete selected').props.onClick());
+    assert.equal(live.size,0);
+    const sent=calls.filter(call=>call.action==='purge_unused');
+    assert.deepEqual(sent.map(call=>call.id),files.map(file=>file.id));
+    assert.equal(confirmations.length,2);
+    assert.ok(confirmations[1].includes('2 verified unused files'));
+    const firstBatchRemoval=calls.findIndex(call=>call.id==='second'&&call.action==='purge_unused');
+    assert.equal(calls[firstBatchRemoval+1].action,'overview');
+    const counters=view.root.findByProps({className:'storage-media-stats'}).findAllByType('dd');
+    assert.equal(counters[0].children.join(''),'3');
+    const journal=trash.readTrashRun(store.get('gary-home:media:owner:trash-run'));
+    assert.equal(trash.trashRunTotals(journal).reclaimedBytes,500_000);
+  } finally {
+    if(view)await act(async()=>view.unmount());
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});

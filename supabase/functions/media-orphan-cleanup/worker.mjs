@@ -1,5 +1,5 @@
 const mediaBuckets = new Set(['property-media','listing-videos']);
-const actions = new Set(['status','scan','trash','restore','run','purge','health']);
+const actions = new Set(['status','scan','trash','restore','run','purge','purge_unused','health']);
 const json = (body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const encode=new TextEncoder();
 const sha=async data=>new Uint8Array(await crypto.subtle.digest('SHA-256',data));
@@ -25,6 +25,8 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
     const result=await res.json().catch(()=>null);
     if(!res.ok) {
       const code=result?.message?.match(/^(?:listing_cleanup)\.([a-z_]+)$/)?.[1];
+      if(action==='claim_unused' && (result?.code==='PGRST202'||result?.code==='42883'))
+        throw Object.assign(new Error('retention_cleanup_setup'),{status:503});
       throw Object.assign(new Error(res.status===401?'session_expired':res.status===403?'forbidden':
         result?.code==='55P03'?'media_busy':code||'unavailable'),{status:[400,401,403,409].includes(res.status)?res.status:503});
     }
@@ -53,7 +55,8 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
   }
 
   async function run(actor,signal,early) {
-    const claim=await internal('claim',{p_actor:actor,...(early?{p_item:early.id,p_expiry:early.expiresAt}:{})});
+    const claim=await internal(early?.action==='purge_unused'?'claim_unused':'claim',
+      {p_actor:actor,...(early?{p_item:early.id,p_expiry:early.expiresAt}:{})});
     if(claim?.status!=='ok')return claim;
     let attempted=0,removed=0,overdue=0;
     const start=Date.now();
@@ -88,9 +91,9 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
     if(!url||!publishable||!service) return json({error:'unavailable'},503);
     try {
       const body=await req.json().catch(()=>null);
-      if(!body||!actions.has(body.action)||(['restore','purge'].includes(body.action)&&!uuid.test(body.id||'')))
+      if(!body||!actions.has(body.action)||(['restore','purge','purge_unused'].includes(body.action)&&!uuid.test(body.id||'')))
         return json({error:'invalid_request'},400);
-      const early=body.action==='purge'?body:null;
+      const early=body.action==='purge'||body.action==='purge_unused'?body:null;
       if(early&&(early.confirm!==true||typeof early.expiresAt!=='string'||early.expiresAt.length>48||!Number.isFinite(Date.parse(early.expiresAt))))
         return json({error:'invalid_request'},400);
       const cron=req.headers.get('x-gary-home-cleanup');
@@ -107,7 +110,7 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       if(body.action==='run'||early||body.action==='health') {
         const owner=await rpc('management',token,{p_action:'authorize'});
         if(owner?.actor!==id) return json({error:'forbidden'},403);
-        if(body.action==='health')return json({status:'ok',cronConfigured:Boolean(cronSecret)});
+        if(body.action==='health')return json({status:'ok',cronConfigured:Boolean(cronSecret),manualUnused:true});
         const result=await run(id,req.signal,early);
         if(early&&result.status==='ok'&&result.removed!==1) return json({error:'purge_unconfirmed'},409);
         return json(result);

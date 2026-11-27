@@ -68,8 +68,42 @@ test('worker health checks require a verified Owner and never claim a cleanup ru
  }});
  assert.equal((await invoke(handler,cron,'health')).status,403);
  assert.equal((await invoke(handler,{Authorization:'Bearer staff-fixture'},'health')).status,403);
- assert.deepEqual(await (await invoke(handler,{Authorization:'Bearer owner-fixture'},'health')).json(),{status:'ok',cronConfigured:true});
+ assert.deepEqual(await (await invoke(handler,{Authorization:'Bearer owner-fixture'},'health')).json(),{status:'ok',cronConfigured:true,manualUnused:true});
  assert.equal(calls.length,4);
+});
+
+test('Owner unused-media removal uses a separate claim and honours the final target check',async()=>{
+ const expiresAt='2099-11-26T12:00:00.000Z',video='staff/listing/fixture.mp4',calls=[];
+ let protectedNow=true;
+ const handler=createMediaCleanup({...configuration,warn:()=>{},fetcher:async(url,init)=>{
+  const path=new URL(url).pathname,args=init.body&&JSON.parse(init.body);
+  calls.push({path,method:init.method});
+  if(path.endsWith('/auth/v1/user'))return Response.json({id:owner});
+  if(path.endsWith('_management'))return Response.json({actor:owner});
+  if(path.endsWith('_claim_unused')){
+   assert.deepEqual(args,{p_actor:owner,p_item:id,p_expiry:expiresAt});
+   return Response.json({status:'ok',id:run,items:[{id}]});
+  }
+  if(path.endsWith('_target'))return Response.json(protectedNow?null:{bucket:'listing-videos',name:video,present:true});
+  if(path.endsWith('/object/listing-videos')){
+   assert.equal(init.method,'DELETE');assert.deepEqual(args,{prefixes:[video]});
+   return Response.json([{name:video}]);
+  }
+  if(path.endsWith('_settle'))return Response.json(true);
+  if(path.endsWith('_finish'))return Response.json(0);
+  throw new Error('Unexpected request');
+ }});
+ const request=headers=>handler(new Request('https://edge.example/cleanup',{
+  method:'POST',headers,body:JSON.stringify({action:'purge_unused',id,expiresAt,confirm:true}),
+ }));
+ assert.equal((await request(cron)).status,403);
+ assert.deepEqual(calls,[]);
+ const signed={Authorization:'Bearer owner-fixture'};
+ assert.equal((await request(signed)).status,409);
+ assert.equal(calls.some(call=>call.method==='DELETE'),false);
+ protectedNow=false;
+ assert.equal((await (await request(signed)).json()).removed,1);
+ assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
 });
 
 test('early purge requires an explicit exact-item confirmation from a signed Owner',async()=>{

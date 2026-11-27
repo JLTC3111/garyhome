@@ -1,5 +1,5 @@
 export const mediaBatchSize = 8;
-export type TrashTarget = { id: string; bucket: string; name: string; expires_at: string; bytes: number | null };
+export type TrashTarget = { id: string; bucket: string; name: string; expires_at: string; bytes: number | null; source?: "unused_listing" };
 export type CleanupResult = { status: string; removed?: number; attempted?: number; overdue?: number };
 export type TrashReceipt = { status: string; bytes?: number | null };
 export type TrashOperationState = "idle" | "running" | "stopping" | "paused" | "completed" | "cancelled" | "failed";
@@ -29,6 +29,7 @@ export function isTrashTarget(row:unknown): row is TrashTarget {
   const item=row as TrashTarget;
   return typeof item.id==="string" && typeof item.name==="string" && typeof item.bucket==="string" &&
     typeof item.expires_at==="string" && Number.isFinite(Date.parse(item.expires_at)) &&
+    (item.source===undefined || item.source==="unused_listing") &&
     (item.bytes===null || Number.isSafeInteger(item.bytes) && item.bytes>=0);
 }
 
@@ -36,12 +37,13 @@ export function matchingTrashTargets(selected:TrashTarget[],live:TrashTarget[]) 
   const byId=new Map(live.map(item=>[item.id,item]));
   return selected.filter(item=>{
     const current=byId.get(item.id);
-    return current?.expires_at===item.expires_at && current.bucket===item.bucket && current.name===item.name && current.bytes===item.bytes;
+    return current?.expires_at===item.expires_at && current.bucket===item.bucket && current.name===item.name && current.bytes===item.bytes && current.source===item.source;
   });
 }
 
 export function makeTrashRun(items:TrashTarget[]):TrashRun {
-  if(!items.length || new Set(items.map(item=>item.id)).size!==items.length || !items.every(isTrashTarget)) throw new Error("invalid_request");
+  if(!items.length || new Set(items.map(item=>item.id)).size!==items.length ||
+    !items.every(item=>isTrashTarget(item) && item.source===items[0].source)) throw new Error("invalid_request");
   return {version:1,confirmedAt:new Date().toISOString(),state:"running",entries:items.map(item=>({...item,outcome:"pending",retryCount:0})),
     timing:{elapsedMs:0,measuredFiles:0}};
 }
@@ -52,7 +54,8 @@ export function readTrashRun(source:string|null):TrashRun|null {
   try{run=JSON.parse(source) as TrashRun;}
   catch{throw new Error("trash_checkpoint_invalid");}
   if(run?.version!==1 || !Number.isFinite(Date.parse(run.confirmedAt)) || !Array.isArray(run.entries) || !run.entries.length ||
-    !run.entries.every(item=>isTrashTarget(item) && ["pending","sent","removed","skipped","failed","cancelled"].includes(item.outcome)) ||
+    !run.entries.every(item=>isTrashTarget(item) && item.source===run.entries[0].source &&
+      ["pending","sent","removed","skipped","failed","cancelled"].includes(item.outcome)) ||
     new Set(run.entries.map(item=>item.id)).size!==run.entries.length||
     run.individualRequest!==undefined&&(!isTrashTarget(run.individualRequest)||run.individualRequest.outcome!=="sent"))
     throw new Error("trash_checkpoint_invalid");
@@ -94,10 +97,10 @@ export function trashRunTotals(run:TrashRun) {
   return totals;
 }
 
-type TrashIdentity = Pick<TrashTarget,"id"|"bucket"|"name"> & {expires_at:string|null};
+type TrashIdentity = Pick<TrashTarget,"id"|"bucket"|"name"|"source"> & {expires_at:string|null};
 export function settlePausedTrashItem(run:TrashRun,item:TrashIdentity,outcome:"removed"|"restored",bytes?:number|null):TrashRun {
   const index=run.entries.findIndex(row=>row.outcome==="pending"&&row.id===item.id&&row.bucket===item.bucket&&
-    row.name===item.name&&row.expires_at===item.expires_at);
+    row.name===item.name&&row.expires_at===item.expires_at&&row.source===item.source);
   if(index<0)return run;
   const entries=run.entries.slice();
   const row=entries[index];
@@ -119,18 +122,18 @@ export function trashRunEta(remaining:number,timing:TrashRunTiming|null|undefine
   return timing.elapsedMs/timing.measuredFiles*remaining;
 }
 
-type PurgePayload = { action:"purge"; id:string; expiresAt:string; confirm:true };
+type PurgePayload = { action:"purge"|"purge_unused"; id:string; expiresAt:string; confirm:true };
 const preflightRefusals=new Set(["cleanup_disabled","cleanup_worker_busy","session_expired","cross_app_protection_required",
   "cross_app_protection_unconfirmed","cleanup_worker_missing","owner_check_unavailable","backend_config"]);
 const publicIssueCodes=new Set([...preflightRefusals,"stopped","media_busy","forbidden","invalid_request","cleanup_unconfirmed",
   "purge_unavailable","purge_unconfirmed","purge_timeout","removal_in_progress","removal_unconfirmed","removal_verification_wait",
-  "inventory_timeout","inventory_unavailable","trash_bulk_setup","trash_checkpoint_storage","trash_run_interrupted"]);
+  "inventory_timeout","inventory_unavailable","trash_bulk_setup","retention_cleanup_setup","trash_checkpoint_storage","trash_run_interrupted"]);
 export function trashRunIssueCode(code:unknown) {
   return typeof code==="string"&&publicIssueCodes.has(code)?code:"cleanup_unconfirmed";
 }
 
 const skippedCodes=new Set(["selection_changed","already_removed","no_longer_eligible","protected","identity_changed",
-  "expired","owner_hold","active_upload","retry_wait","attempt_limit","missing_expiry"]);
+  "expired","owner_hold","recovery_hold","file_trash_test","editing_session","active_upload","retry_wait","attempt_limit","missing_expiry"]);
 
 type ReceiptReader = (item:TrashTarget)=>Promise<TrashReceipt>;
 type Readback = "eligible" | "removal_in_progress" | "removal_unconfirmed" | TrashEntry;
@@ -222,12 +225,12 @@ export async function processTrashRun(run:TrashRun, options:{
         await (options.wait??waitForRetry)(delay);
       }
       if(options.stopped())return "stopped";
-      if(Date.parse(item.expires_at)<=Date.now()){
+      if(!item.source&&Date.parse(item.expires_at)<=Date.now()){
         record(index,{...item,outcome:"skipped",reason:"expired",retryAfter:undefined});return;
       }
       let issue="";
       try{
-        const result=await options.purge({action:"purge",id:item.id,expiresAt:item.expires_at,confirm:true},()=>{
+        const result=await options.purge({action:item.source==="unused_listing"?"purge_unused":"purge",id:item.id,expiresAt:item.expires_at,confirm:true},()=>{
           if(options.stopped())throw new Error("stopped");
           // Count only retries that reach dispatch, so a reload during a delay does not spend the budget.
           record(index,{...item,outcome:"sent",sentAt:Date.now(),reason:undefined,retryAfter:undefined,

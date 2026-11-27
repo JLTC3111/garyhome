@@ -90,3 +90,17 @@ test('retention preview reads an Owner page without calling the cleanup worker',
  const missing={rpc(){return {abortSignal:async()=>({error:{code:'PGRST202'}})};}};
  assert.deepEqual(await executeStorageMedia(missing,{action:'retention_page'},signal,worker),{status:503,data:{error:'retention_setup'}});
 });
+
+test('unused-media manifests and receipts use their own Owner reads',async()=>{
+ const calls=[];
+ const db={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:{status:'eligible'}})};}};
+ const noWorker=()=>assert.fail('Eligibility and receipts are read-only');
+ await executeStorageMedia(db,{action:'retention_manifest',query:'GH-645'},signal,noWorker);
+ await executeStorageMedia(db,{action:'retention_receipt',id:'id',expiresAt:'expiry'},signal,noWorker);
+ assert.deepEqual(calls,[
+  {name:'home_media_retention_manifest',args:{p_query:'GH-645'}},
+  {name:'home_media_unused_receipt',args:{p_id:'id',p_expiry:'expiry'}},
+ ]);
+ const denied={rpc(){return {abortSignal:async()=>({error:{code:'42501'}})};}};
+ assert.equal((await executeStorageMedia(denied,{action:'purge_unused'},signal,noWorker)).status,403);
+});

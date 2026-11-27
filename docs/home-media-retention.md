@@ -132,7 +132,17 @@ Apply the shared reference guard and live dashboard migration before deploying t
 /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 -f supabase/migrations/20261127062248_home_media_permanent_controls.sql
 ```
 
-Open **Storage & Media Management** as the active Home Owner. The panel checks the worker on open and shows when the next restore window ends if the expiry queue is empty. **Run expired-file cleanup** processes eligible files at expiry. To authorize early removal, select up to eight files in **File Trash** and confirm once, or use **Permanently delete now** for one file. Each file uses its own authenticated, expiry-bound claim and dependency check. The panel refreshes current Storage totals and the open list after the operation. Candidate counts retain their last completed scan timestamp.
+For the expanded bulk controls, also apply the read-only manifest and receipt migration. It adds live eligibility counts and per-file sizes to the existing dashboard. It leaves removal on the existing expiry-bound worker calls.
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 -f supabase/migrations/20261127064432_home_media_bulk_trash_reads.sql
+```
+
+Open **Storage & Media Management** as the active Home Owner. The panel checks the worker on open. The main buttons show eligible counts for moving files to Trash, expired cleanup and bulk removal before expiry. Disabled actions show the blocking reason. **Bulk deletion from File Trash** opens selection directly. Select all eligible files across pages, select the current page, or clear the selection. Selection is saved for this Owner in the browser and survives pagination, filtering and reloads. The count and storage size include selected files on other pages.
+
+Confirm once for the selected files that still match the live manifest. The panel sends their existing per-file removal requests sequentially in groups of eight and records confirmed outcomes in the browser. **Stop after the current file** lets the active request settle. **Resume permanent removal** uses the saved selection and checks the exact receipt for an interrupted request. The progress section reports removals, skips, failures and known reclaimed bytes. Inventory and eligibility refresh after each batch, and Cleanup History refreshes when the run ends or pauses. Enrollment, restoration and scans refresh the counts as well. Candidate counts retain their last completed scan timestamp.
+
+Orphan Review supports the same persistent selection controls. Select all eligible files selects matching results across pages of the current search. Verification uses the selected identities. Moving files to Trash still uses the existing custody and backup checks.
 
 Jobs and Visa CMS entries, public snapshots, media catalogues and revisions are included in the removal check. A CMS operation that adds a Home media URL or key shares the removal lock and rejects a reserved file. The November 27 read-only check found zero matching references or filename aliases across 231 CMS records for all 500 queued files, including `jobs-staff-portal-header.webp`.
 

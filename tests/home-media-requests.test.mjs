@@ -51,6 +51,20 @@ test('permanent requests require authenticated cross-application readiness befor
  assert.deepEqual(await executeStorageMedia(legacy,{action:'overview'},signal,unavailable),{status:200,data:{objects:3}});
 });
 
+test('bulk manifest and exact receipt use the Owner-only read routes',async()=>{
+ const calls=[];
+ const db={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:{items:[]}})};}};
+ const worker=()=>assert.fail('Selection and receipt reads cannot run cleanup');
+ await executeStorageMedia(db,{action:'trash_manifest',offset:150},signal,worker);
+ await executeStorageMedia(db,{action:'trash_receipt',id:'selected-id',expiresAt:'saved expiry'},signal,worker);
+ assert.deepEqual(calls,[
+  {name:'home_media_dashboard',args:{p_action:'trash_manifest',p_offset:0}},
+  {name:'home_media_trash_receipt',args:{p_id:'selected-id',p_expiry:'saved expiry'}},
+ ]);
+ const denied={rpc(){return {abortSignal:async()=>({error:{code:'42501'}})};}};
+ assert.equal((await executeStorageMedia(denied,{action:'trash_manifest'},signal,worker)).status,403);
+});
+
 test('Owner orphan actions use the guarded review RPC and report missing review setup separately',async()=>{
  const calls=[];
  const db={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:{result:'fixture'}})};}};

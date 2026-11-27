@@ -1090,6 +1090,66 @@ test('permanent controls protect cross-app documents and refresh live inventory 
  assert.equal(after.checkedAt,before.checkedAt);
 });
 
+test('File Trash counts and whole-manifest reads follow enrollment, restore, scan and confirmed removal',async t=>{
+ const h=await setup(t,true);
+ for(const name of ['20261126114500_home_media_inventory_diagnostics.sql','20261126170756_home_media_panel_pagination.sql',
+   '20261126175956_home_media_orphan_review.sql','20261126200632_home_media_historical_bulk_enrollment.sql',
+   '20261127062248_home_media_permanent_controls.sql','20261127064432_home_media_bulk_trash_reads.sql']){
+  await h.pg.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
+ const as=(role,actor,sql,args=[])=>h.role(role,actor,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);
+ const dashboard=(action,actor=owner)=>as('authenticated',actor,'select public.home_media_dashboard($1,0) value',[action]);
+ const receipt=(item,actor=owner,expiry=item.expires_at)=>as('authenticated',actor,'select public.home_media_trash_receipt($1,$2) value',[item.id,expiry]);
+ const worker=(sql,...args)=>as('service_role',null,sql,args);
+ const {rows}=await h.pg.query(`with files as (
+   insert into storage.objects(bucket_id,name,metadata)
+   select 'property-media','properties/bulk-'||n||'.webp','{"size":16,"eTag":"fixture"}' from generate_series(1,42) n
+   returning *
+ ) insert into private.home_media_items(bucket,name,source,object_id,object_version,bytes,state,expires_at,historical_review)
+   select 'property-media',name,'historical',id,version,16,'trashed',now()+interval '1 hour','{"etag":"fixture"}' from files
+   returning id,name,expires_at`);
+ const find=n=>rows.find(row=>row.name===`properties/bulk-${n}.webp`);
+ await h.pg.query("insert into private.home_media_review_holds(bucket,name,actor) values('property-media',$1,$2)",[find(1).name,owner]);
+ await h.pg.query("update private.home_media_items set expires_at=now()-interval '1 hour' where id=$1",[find(2).id]);
+ await h.pg.query("update private.home_media_items set upload_until=now()+interval '1 day' where id=$1",[find(3).id]);
+ await h.pg.query("update storage.objects set version='changed' where name=$1",[find(4).name]);
+ await assert.rejects(dashboard('trash_manifest',admin),error=>error.code==='42501');
+ await assert.rejects(receipt(find(5),admin),error=>error.code==='42501');
+ assert.equal((await dashboard('overview')).earlyEligible,38);
+ assert.equal((await dashboard('overview')).overdue,1);
+ const page=await dashboard('trash_page');
+ assert.equal(page.items.length,30);
+ assert.ok(page.items.every(item=>item.bytes===16));
+ const manifest=await dashboard('trash_manifest');
+ assert.equal(manifest.items.length,38);
+ assert.ok([1,2,3,4].every(n=>!manifest.items.some(item=>item.id===find(n).id)));
+ assert.equal((await receipt(find(4))).status,'identity_changed');
+ await as('authenticated',owner,"select public.home_media_management('inventory_scan') value");
+ assert.equal((await dashboard('overview')).earlyEligible,38);
+ assert.equal((await as('authenticated',owner,"select public.home_media_management('restore',$1) value",[find(6).id])).restored,true);
+ assert.equal((await dashboard('overview')).earlyEligible,37);
+ const key='properties/new-enrollment.webp',tag='known';
+ const {rows:[object]}=await h.pg.query("insert into storage.objects(bucket_id,name,metadata) values('property-media',$1,$2) returning id,version",
+   [key,{size:32,eTag:tag}]);
+ await as('authenticated',owner,'select public.home_media_enroll_historical($1,true) value',[
+   {key,etag:tag,bytes:32,objectId:object.id,version:object.version,backupSha256:'a'.repeat(64),evidenceRef:'different verified file'},
+ ]);
+ const before=await dashboard('overview');
+ assert.equal(before.earlyEligible,38);
+ const target=find(5);
+ await h.pg.exec('update private.home_media_control set permanent_enabled=true where singleton');
+ const job=await worker('select public.home_media_claim($1,$2,$3) value',owner,target.id,target.expires_at);
+ assert.equal((await receipt(target)).status,'removal_in_progress');
+ assert.equal((await worker('select public.home_media_target($1,$2,true) value',job.id,target.id)).present,true);
+ await h.pg.query("delete from storage.objects where bucket_id='property-media' and name=$1",[target.name]);
+ assert.equal(await worker('select public.home_media_settle($1,$2,true) value',job.id,target.id),true);
+ assert.deepEqual(await receipt(target),{status:'removed',bytes:16});
+ assert.equal((await receipt(target,owner,'2001-01-01')).status,'selection_changed');
+ const after=await dashboard('overview');
+ assert.equal(after.earlyEligible,37);
+ assert.equal(after.bytes,before.bytes-16);
+});
+
 test('confirmed early purge scopes the job to one file and reconciles a lost final acknowledgement',async t=>{
  const h=await setup(t,true);
  const query=(as,user,sql,args=[])=>h.role(as,user,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);

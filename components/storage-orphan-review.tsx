@@ -1,7 +1,9 @@
 "use client";
 
 import {useEffect,useRef,useState} from "react";
+import {mediaBatchSize} from "@/lib/home-media-trash";
 import {useSite} from "./site-context";
+import {MediaSelectionControls,useMediaSelection} from "./media-selection";
 
 type ReviewRequest = <T>(payload:Record<string,unknown>)=>Promise<T>;
 type Row = {
@@ -9,16 +11,25 @@ type Row = {
   listingCode:string|null;listingStatus:string|null;held:boolean;reason:string;
 };
 type Page = {items:Row[];available:boolean;hasMore:boolean;holds:number};
-const pageSize=30, batchSize=8;
+const pageSize=30;
 const rowKey=(row:Row)=>row.bucket+"/"+row.key;
 const hasIdentity=(row:Row)=>Boolean(row.objectId&&row.version&&row.etag&&row.bytes!==null);
 const identity=(row:Row)=>({bucket:row.bucket,key:row.key,objectId:row.objectId,version:row.version,etag:row.etag,bytes:row.bytes});
+const verificationKey=(row:Row)=>JSON.stringify(identity(row));
+const canBulkVerify=(row:Row)=>hasIdentity(row)&&(row.reason==="potential"||row.reason==="verified");
+function validSelection(value:unknown):value is Row {
+  if(!value||typeof value!=="object")return false;
+  const row=value as Row;
+  return typeof row.bucket==="string"&&typeof row.key==="string"&&typeof row.objectId==="string"&&typeof row.version==="string"&&
+    typeof row.etag==="string"&&Number.isSafeInteger(row.bytes)&&(row.bytes??-1)>=0;
+}
 
 export function StorageOrphanReview({request,disabled,onStaged}: {request:ReviewRequest;disabled:boolean;onStaged:()=>void}) {
-  const {t,language,notice}=useSite();
+  const {t,language,notice,user}=useSite();
   const [query,setQuery]=useState(""),[search,setSearch]=useState(""),[offset,setOffset]=useState(0),[revision,setRevision]=useState(0);
   const [page,setPage]=useState<Page|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
-  const [selected,setSelected]=useState<Set<string>>(new Set()),[verified,setVerified]=useState<Record<string,string>>({});
+  const selection=useMediaSelection(`gary-home:media:${user?.id??""}:orphan-selection`,rowKey,validSelection);
+  const [verified,setVerified]=useState<Record<string,string>>({}),[selecting,setSelecting]=useState(false);
   const [working,setWorking]=useState(false),[progress,setProgress]=useState({done:0,total:0});
   const active=useRef(true),flight=useRef(false);
   const busy=disabled||loading||working;
@@ -42,6 +53,7 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
       case "inventory_timeout":return t("The check timed out. Verify this file again when storage is responsive.","Kiểm tra đã quá hạn. Hãy thử lại khi kho lưu trữ phản hồi.");
       case "media_busy":return t("Media is being updated. Refresh before trying again.","Tệp đang được cập nhật. Làm mới trước khi thử lại.");
       case "invalid_manifest":return t("Check the exact file identity and backup receipt details.","Kiểm tra định danh tệp và thông tin bản sao lưu.");
+      case "scan_required":return t("Run a storage scan to load review candidates.","Hãy quét kho để tải tệp cần kiểm tra.");
       case "orphan_review_setup":return t("Apply the Home orphan review migration to open this list.","Áp dụng bản cập nhật rà soát tệp thừa Home để mở danh sách.");
       case "forbidden":return t("This review requires the protected Gary Home Owner.","Cần quyền Chủ sở hữu Gary Home được bảo vệ để kiểm tra.");
       case "session_expired":return t("Sign in again before continuing the review.","Đăng nhập lại trước khi tiếp tục kiểm tra.");
@@ -53,23 +65,44 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
   useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
   useEffect(()=>{
     let current=true;
-    setLoading(true);setError("");setSelected(new Set());setVerified({});
+    setLoading(true);setError("");
     void request<Page>({action:"orphan_page",offset,query:search}).then(result=>{
       if(current)setPage(result);
     }).catch(issue=>{if(current){setPage(null);setError(issueCode(issue));}}).finally(()=>{if(current)setLoading(false);});
     return()=>{current=false;};
   },[request,offset,search,revision]);
 
+  async function selectAll() {
+    if(busy||flight.current||!selection.ready)return;
+    flight.current=true;setWorking(true);setSelecting(true);setError("");setProgress({done:0,total:0});
+    const checked:Row[]=[];
+    try{
+      for(let at=0;active.current;at+=pageSize){
+        const result=await request<Page>({action:"orphan_page",offset:at,query:search});
+        if(!result.available)throw new Error("scan_required");
+        checked.push(...result.items.filter(canBulkVerify));
+        if(!result.hasMore||!result.items.length)break;
+      }
+      if(active.current)selection.add(checked);
+    }catch(issue){if(active.current)setError(issueCode(issue));}
+    finally{flight.current=false;if(active.current){setWorking(false);setSelecting(false);}}
+  }
+
   async function verify(rows:Row[]) {
     if(busy||flight.current||!rows.length)return;
     flight.current=true;setWorking(true);setError("");setProgress({done:0,total:rows.length});
     try{
-      for(const [index,row] of rows.entries()){
-        if(!active.current)break;
-        let result:string;
-        try{result=(await request<{result:string}>({action:"orphan_verify",...identity(row)})).result;}
-        catch(issue){result=issueCode(issue);}
-        if(active.current){setVerified(previous=>({...previous,[rowKey(row)]:result}));setProgress({done:index+1,total:rows.length});}
+      let done=0,continueChecking=true;
+      for(let start=0;start<rows.length&&active.current&&continueChecking;start+=mediaBatchSize){
+        for(const row of rows.slice(start,start+mediaBatchSize)){
+          if(!active.current)break;
+          let result:string;
+          try{result=(await request<{result:string}>({action:"orphan_verify",...identity(row)})).result;}
+          catch(issue){result=issueCode(issue);}
+          done++;
+          if(active.current){setVerified(previous=>({...previous,[verificationKey(row)]:result}));setProgress({done,total:rows.length});}
+          if(result==="forbidden"||result==="session_expired"){continueChecking=false;setError(result);break;}
+        }
       }
     }finally{flight.current=false;if(active.current)setWorking(false);}
   }
@@ -84,13 +117,24 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
     try{
       await request({action:`orphan_${action}`,...identity(row),...evidence,confirm:true});
       if(!active.current)return;
+      setVerified(previous=>{const next={...previous};delete next[verificationKey(row)];return next;});
       notice(action==="enroll"?t("File moved to Trash. Its 48-hour restore window has started.","Đã chuyển tệp vào Thùng rác. Thời hạn khôi phục 48 giờ đã bắt đầu."):
         action==="hold"?t("File protected from cleanup.","Đã bảo vệ tệp khỏi dọn dẹp."):t("Review hold released.","Đã bỏ giữ tệp để kiểm tra."));
       setRevision(value=>value+1);
-      if(action==="enroll")onStaged();
+      if(action==="enroll")selection.remove([rowKey(row)]);
+      onStaged();
     }catch(issue){if(active.current)setError(issueCode(issue));}
     finally{flight.current=false;if(active.current)setWorking(false);}
   }
+
+  const formatBytes=(bytes:number)=>size.format(bytes/1_000_000);
+  const pageEligible=page?.items.filter(canBulkVerify)??[];
+  const selectionReason=!selection.ready?t("Loading saved selection…","Đang tải lựa chọn đã lưu…"):
+    busy?t("Wait for the current review request.","Hãy chờ yêu cầu rà soát hiện tại."):"";
+  const noneSelected=t("Select files to verify.","Chọn tệp để xác minh.");
+  const verifyReason=selectionReason||(!selection.rows.length?noneSelected:"");
+  const allReason=selectionReason||(!page?.available?reason("scan_required"):offset===0&&!page.hasMore&&!pageEligible.length?
+    t("No eligible files match this search.","Không có tệp đủ điều kiện khớp tìm kiếm."):"");
 
   return <section aria-label={t("Orphan review","Rà soát tệp thừa")}>
     <h3>{t("Orphan review","Rà soát tệp thừa")}</h3>
@@ -101,11 +145,17 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
       setOffset(0);setSearch(query.trim());setRevision(value=>value+1);
     }}>
       <label>{t("Filename or listing code","Tên tệp hoặc mã tin đăng")} <input type="search" value={query} maxLength={120} onChange={event=>setQuery(event.target.value)}/></label>
-      <button type="submit" className="button button-outline button-small" disabled={busy}>{t("Search","Tìm")}</button>
-      <button type="button" className="button button-outline button-small" disabled={busy||!selected.size}
-        onClick={()=>void verify(page?.items.filter(row=>selected.has(rowKey(row)))??[])}>{t(`Verify selected (${selected.size}/${batchSize})`,`Xác minh đã chọn (${selected.size}/${batchSize})`)}</button>
+      <button type="submit" className="button button-outline button-small" disabled={busy} title={busy?selectionReason:undefined}>{t("Search","Tìm")}</button>
     </form>
+    <MediaSelectionControls count={selection.rows.length} bytes={selection.rows.reduce((sum,row)=>sum+(row.bytes??0),0)} unknownSizes={0}
+      formatBytes={formatBytes} allReason={allReason} pageReason={selectionReason||(!pageEligible.length?t("No eligible files on this page.","Trang này chưa có tệp đủ điều kiện."):"")}
+      clearReason={selectionReason||(!selection.rows.length?noneSelected:"")} selectAll={()=>void selectAll()}
+      selectPage={()=>selection.add(pageEligible)} clear={selection.clear}/>
+    <button type="button" className="button button-outline button-small" disabled={!!verifyReason} title={verifyReason||undefined}
+      onClick={()=>void verify(selection.rows)}>{t(`Verify selected (${selection.rows.length})`,`Xác minh đã chọn (${selection.rows.length})`)}</button>
+    {verifyReason&&<small>{verifyReason}</small>}
     {loading&&<p role="status">{t("Loading review candidates…","Đang tải tệp cần kiểm tra…")}</p>}
+    {selecting&&<p role="status">{t("Selecting eligible review files across pages…","Đang chọn tệp đủ điều kiện qua các trang…")}</p>}
     {working&&progress.total>0&&<p role="status">{t(`Checked ${progress.done} of ${progress.total} selected files…`,`Đã kiểm tra ${progress.done}/${progress.total} tệp đã chọn…`)}</p>}
     {!!error&&<p role="alert">{reason(error)}</p>}
     {!loading&&page&&!page.available&&<p>{t("Run a storage scan to load review candidates.","Hãy quét kho để tải tệp cần kiểm tra.")}</p>}
@@ -113,11 +163,12 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
       <p>{t(`${page.holds} individual Owner holds.`,`Chủ sở hữu đang giữ riêng ${page.holds} tệp.`)}</p>
       {!page.items.length&&<p>{t("No review candidates match this search.","Không có tệp cần kiểm tra khớp tìm kiếm.")}</p>}
       <ul className="storage-media-rows">{page.items.map(row=>{
-        const key=rowKey(row),checked=selected.has(key),canCheck=hasIdentity(row),outcome=verified[key];
+        const key=rowKey(row),checked=selection.has(key),canCheck=hasIdentity(row),outcome=verified[verificationKey(row)];
+        const pickReason=selectionReason||(!checked&&!canCheck?reason("identity"):"");
         return <li key={key}>
           <div>
-            <label><input type="checkbox" checked={checked} disabled={busy||!canCheck||!checked&&selected.size>=batchSize}
-              onChange={event=>{const next=event.target.checked;setSelected(previous=>{const copy=new Set(previous);if(next)copy.add(key);else copy.delete(key);return copy;});}}/> <strong>{row.key.split("/").at(-1)}</strong></label>
+            <label title={pickReason||undefined}><input type="checkbox" checked={checked} disabled={!!pickReason}
+              onChange={event=>{if(event.target.checked)selection.add([row]);else selection.remove([key]);}}/> <strong>{row.key.split("/").at(-1)}</strong></label>
             <small>{row.bucket} · {row.bytes===null?"—":size.format(row.bytes/1_000_000)}{row.listingCode&&` · ${row.listingCode} · ${listingStatus(row.listingStatus)}`}</small>
             <small>{reason(outcome??(canCheck?row.reason:"identity"))}</small>
             <details><summary>{t("Storage identity","Định danh kho")}</summary><small>{row.key} · {row.objectId} · {row.version} · {row.etag}</small></details>

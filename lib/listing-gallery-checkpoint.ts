@@ -1,6 +1,6 @@
 import type { Property } from "./types";
 
-export type ListingGallery = Pick<Property, "images" | "image_filenames" | "image_metadata">;
+export type ListingGallery = Pick<Property, "images" | "image_filenames" | "image_metadata" | "video_url">;
 export type PlannedListingPhoto = { path: string; url: string; filename: string; bytes: number; mime: string };
 export type GalleryCheckpoint = {
   key: string;
@@ -17,7 +17,8 @@ const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const prefix = (actor: string) => `gary-home:gallery:${actor}:`;
 
 export function listingGallery(property: ListingGallery): ListingGallery {
-  return { images: property.images, image_filenames: property.image_filenames ?? {}, image_metadata: property.image_metadata ?? {} };
+  return { images: property.images, image_filenames: property.image_filenames ?? {}, image_metadata: property.image_metadata ?? {},
+    ...(property.video_url===undefined?{}:{video_url:property.video_url}) };
 }
 
 export function sameJson(a: unknown, b: unknown): boolean {
@@ -67,9 +68,22 @@ export function pendingListingPhotos(checkpoint: GalleryCheckpoint, gallery: Lis
 
 export function canResumeGallery(checkpoint: GalleryCheckpoint, saved: Property | null): boolean {
   if (!saved) return checkpoint.baseVersion === null;
+  const matches = (planned: ListingGallery) => sameJson(planned, listingGallery({ ...saved,
+    video_url: planned.video_url===undefined?undefined:saved.video_url }));
   return (checkpoint.baseVersion !== null && sameListingVersion(checkpoint.baseVersion, saved.updated_at)) ||
-    sameJson(checkpoint.baseGallery, listingGallery(saved)) ||
-    sameJson(checkpoint.gallery, listingGallery(saved));
+    matches(checkpoint.baseGallery) || matches(checkpoint.gallery);
+}
+
+export function isGalleryCheckpoint(candidate: unknown): candidate is GalleryCheckpoint {
+  const value=candidate as GalleryCheckpoint|null;
+  return !!value && uuid.test(value.key) && uuid.test(value.listingId) &&
+    (value.baseVersion === null || typeof value.baseVersion === "string") && typeof value.title === "string" &&
+    Number.isSafeInteger(value.savedAt) && Array.isArray(value.baseGallery?.images) && Array.isArray(value.gallery?.images) &&
+    value.gallery.images.length <= 40 && value.gallery.images.every(image => typeof image === "string") &&
+    [value.baseGallery.video_url,value.gallery.video_url].every(video => video==null || typeof video === "string") &&
+    Array.isArray(value.pending) && value.pending.every(photo => typeof photo?.path === "string" &&
+      photo.path.startsWith(`properties/listings/${value.listingId}/`) && typeof photo.url === "string" &&
+      typeof photo.filename === "string" && Number.isSafeInteger(photo.bytes) && typeof photo.mime === "string");
 }
 
 export function getGalleryCheckpoints(storage: Storage, actor: string): GalleryCheckpoint[] {
@@ -79,15 +93,8 @@ export function getGalleryCheckpoints(storage: Storage, actor: string): GalleryC
     const key = storage.key(index);
     if (!key?.startsWith(start)) continue;
     try {
-      const value = JSON.parse(storage.getItem(key) ?? "null") as GalleryCheckpoint | null;
-      if (!value || key !== start + value.key || !uuid.test(value.key) || !uuid.test(value.listingId) ||
-          (value.baseVersion !== null && typeof value.baseVersion !== "string") || typeof value.title !== "string" ||
-          !Number.isFinite(value.savedAt) || !Array.isArray(value.baseGallery?.images) || !Array.isArray(value.gallery?.images) || value.gallery.images.length > 40 ||
-          !value.gallery.images.every(image => typeof image === "string") || !Array.isArray(value.pending) ||
-          !value.pending.every(photo => typeof photo?.path === "string" &&
-            photo.path.startsWith(`properties/listings/${value.listingId}/`) && typeof photo.url === "string" &&
-            typeof photo.filename === "string" && Number.isSafeInteger(photo.bytes) && typeof photo.mime === "string")) continue;
-      entries.push(value);
+      const value:unknown = JSON.parse(storage.getItem(key) ?? "null");
+      if (isGalleryCheckpoint(value) && key === start + value.key) entries.push(value);
     } catch { /* A damaged checkpoint is preserved for manual recovery. */ }
   }
   return entries.sort((a, b) => b.savedAt - a.savedAt);

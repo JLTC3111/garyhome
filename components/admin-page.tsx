@@ -102,7 +102,7 @@ export function AdminPage() {
   const lastAccount=useRef<string|null>(null);const currentAccount=useRef(user?.id);useLayoutEffect(()=>{currentAccount.current=user?.id;},[user?.id]);
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [authBusy,setAuthBusy]=useState(false);const [resetMode,setResetMode]=useState(false);
   const accountId=user?.id;
-  const gallery=useListingGalleryCheckpoint(!demo&&editor?accountId:undefined,editing);
+  const gallery=useListingGalleryCheckpoint(!demo&&editor?accountId:undefined,editing,editorTask);
   const [photoTransfer,setPhotoTransfer]=useState(false);
   const propertySaveFlight=useRef(false);
   const detailFlight=useRef<AbortController|null>(null);
@@ -129,7 +129,7 @@ export function AdminPage() {
   function closeListing() {
     if(busy||photoTransfer)return;
     if(editing&&gallery.hasChanges(editing)&&gallery.unavailable&&!window.confirm(site.t(
-      "This device couldn’t keep the unsaved gallery. Close the editor anyway?","Thiết bị này không lưu được bộ ảnh chưa lưu. Vẫn đóng trình chỉnh sửa?")))return;
+      "Recovery protection couldn’t be confirmed. Close the editor anyway?","Chưa xác nhận được bảo vệ phiên khôi phục. Vẫn đóng trình chỉnh sửa?")))return;
     setEditing(null);
   }
   async function resumeGallery(checkpoint:GalleryCheckpoint) {
@@ -161,7 +161,7 @@ export function AdminPage() {
       });
       if(actor!==currentAccount.current||controller.signal.aborted)return;
       if(!recovered){
-        setError(site.t("The saved listing changed. Your earlier gallery is still available for review on this device.","Tin đăng đã thay đổi. Bộ ảnh trước vẫn còn trên thiết bị này để kiểm tra."));
+        setError(site.t("The saved listing changed. Your earlier media edits are still available for review.","Tin đăng đã thay đổi. Các chỉnh sửa tệp trước vẫn còn để kiểm tra."));
         return;
       }
       const base=recovered.saved??{...emptyProperty(),id:checkpoint.listingId,title_en:checkpoint.title,
@@ -494,7 +494,8 @@ export function AdminPage() {
         ()=>setError(site.t("Couldn’t copy the recovery data. The local gallery is still available.","Không thể sao chép dữ liệu khôi phục. Bộ ảnh trên thiết bị vẫn còn.")))}>
         {site.t("Copy recovery data","Sao chép dữ liệu khôi phục")}</button>
       <button type="button" className="text-link" disabled={openingProperty!==null||busy} onClick={()=>{
-        if(window.confirm(site.t("Discard this device’s recovery copy? Uploaded files and saved listings are kept.","Bỏ bản khôi phục trên thiết bị này? Tệp đã tải lên và tin đã lưu vẫn được giữ.")))gallery.discard(checkpoint);
+        if(window.confirm(site.t("Discard this recovery copy and release its media protection?","Bỏ bản khôi phục này và ngừng bảo vệ tệp trong phiên?")))
+          void gallery.discard(checkpoint)?.then(confirmed=>{if(!confirmed)setError(site.t("Couldn’t discard the recovery copy. Reconnect and try again.","Chưa bỏ được bản khôi phục. Hãy kết nối lại rồi thử lại."));});
       }}>{site.t("Discard local copy","Bỏ bản trên thiết bị")}</button>
     </div>)}
   </section>}
@@ -537,7 +538,7 @@ function ImageUpload({value,onChange,upload}:{value:string;onChange:(url:string)
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");
   return <div className="single-image-upload">{value&&<img src={value} alt={text("Current image")}/>}<label className="upload-label"><Upload size={17}/>{busy?text("Uploading…"):text("Upload image")}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} onChange={async e=>{const file=e.target.files?.[0];if(!file)return;setBusy(true);setError("");try{const url=await upload(file);if(active.current)onChange(url);}catch(e){setError(e instanceof Error?e.message:"Upload failed.");}finally{setBusy(false);}}}/></label>{error&&<p className="form-error" role="alert">{text(error)}</p>}</div>;
 }
-function PropertyEditor({property:p,isNew,setProperty,onSave,onCancel,neighbourhoods,upload,onPlanned,onPhotoTransfer,galleryChanged,galleryUnavailable,busy,error,renamePhotos}:{property:Property;isNew:boolean;setProperty:(next:Property|((previous:Property)=>Property))=>void;onSave:(p:Property)=>Promise<void>;onCancel:()=>void;neighbourhoods:Neighbourhood[];upload:(file:File,options?:PropertyImageUploadOptions)=>Promise<string>;onPlanned:(photo:PlannedListingPhoto)=>void;onPhotoTransfer:(active:boolean)=>void;galleryChanged:boolean;galleryUnavailable:boolean;busy:boolean;error:string;renamePhotos?:PhotoRenameControls}) {
+function PropertyEditor({property:p,isNew,setProperty,onSave,onCancel,neighbourhoods,upload,onPlanned,onPhotoTransfer,galleryChanged,galleryUnavailable,busy,error,renamePhotos}:{property:Property;isNew:boolean;setProperty:(next:Property|((previous:Property)=>Property))=>void;onSave:(p:Property)=>Promise<void>;onCancel:()=>void;neighbourhoods:Neighbourhood[];upload:(file:File,options?:PropertyImageUploadOptions)=>Promise<string>;onPlanned:(photo:PlannedListingPhoto)=>void|Promise<void>;onPhotoTransfer:(active:boolean)=>void;galleryChanged:boolean;galleryUnavailable:boolean;busy:boolean;error:string;renamePhotos?:PhotoRenameControls}) {
   const text=useStudioText();const {language,content,t}=useSite();
   const automaticUrl=isListingUrlAutomatic(isNew,content.properties.find(row=>row.id===p.id));
   const uploadsActive=useRef(true);const uploadController=useRef<AbortController|null>(null);
@@ -577,8 +578,8 @@ function PropertyEditor({property:p,isNew,setProperty,onSave,onCancel,neighbourh
       const images=[...previous.images];const [image]=images.splice(from,1);images.splice(to,0,image);return {...previous,images};})}
     remove={index=>setProperty(previous=>{const images=previous.images.filter((_,i)=>i!==index);return {...previous,images,image_filenames:pruneImageFilenames(images,previous.image_filenames),
       ...(previous.image_metadata?{image_metadata:pruneImageMetadata(images,previous.image_metadata)}:{})};})}/>
-  {galleryChanged&&<p className="form-info" role="status">{galleryUnavailable?t("This device couldn’t keep a recovery copy. Leave the editor open until you confirm the save.","Thiết bị này không giữ được bản khôi phục. Hãy giữ trình chỉnh sửa mở đến khi xác nhận đã lưu."):
-    t("Save the listing to attach these changes. The unsaved gallery is available for recovery on this device.","Lưu tin đăng để đính kèm thay đổi. Bộ ảnh chưa lưu có thể được khôi phục trên thiết bị này.")}</p>}
+  {galleryChanged&&<p className="form-info" role="status">{galleryUnavailable?t("Recovery protection couldn’t be confirmed. Leave the editor open until you confirm the save.","Chưa xác nhận được bảo vệ phiên khôi phục. Hãy giữ trình chỉnh sửa mở đến khi xác nhận đã lưu."):
+    t("Save the listing to attach these changes. Unsaved media edits are available for recovery.","Lưu tin đăng để đính kèm thay đổi. Các chỉnh sửa tệp chưa lưu có thể được khôi phục.")}</p>}
   <label className="upload-label"><Upload size={18}/>{uploading?t("Processing photos…","Đang xử lý ảnh…"):text("Upload original photos")}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple disabled={busy||uploading} onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";return uploadPhotos(files);}}/></label>
     {uploading&&currentUploadFile&&<>
       <p className="image-upload-filename" role="status">{photoUploadLabel}</p>

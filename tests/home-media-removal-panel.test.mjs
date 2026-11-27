@@ -123,6 +123,11 @@ for (const theme of ['light', 'dark']) {
           case 'trash_receipt': return Response.json(live.has(args.id)?{status:'eligible',bytes:120}:{status:'removed',bytes:120});
           case 'trash_page': return Response.json({items:[...live.values()].map(item=>({...item,state:'trashed',restore_mode:'file'})),
             hasMore:false, available:true});
+          case 'retention_page': return Response.json({items:[
+            {name:'fixtures/recovery.webp',bucket:'property-media',listing_code:'GH-645',object_id:'photo',reason:'recovery_hold',bytes:120},
+            {name:'fixtures/tour.mp4',bucket:'listing-videos',object_id:'tour',reason:'waiting',eligible_at:expires_at,bytes:200},
+            {name:'fixtures/unused.webp',bucket:'property-media',object_id:'unused',reason:'eligible',eligible_at:'2026-01-01T00:00:00Z',scheduled_eligible:true,bytes:300},
+          ],hasMore:false,available:true,automatic:true});
           case 'removed_page': return Response.json({items:[], hasMore:false, available:true});
           case 'restore':
             live.delete(args.id);
@@ -159,6 +164,12 @@ for (const theme of ['light', 'dark']) {
     try {
       await act(async()=>{view = TestRenderer.create(page(true));});
       await act(async()=>{view.root.findByType('details').props.onToggle({currentTarget:{open:true}});});
+      await click('Retention preview');
+      const retentionLabels=view.root.findAllByType('small').map(node=>node.children.join(''));
+      assert.ok(retentionLabels.some(label=>label.includes('Protected for GH-645 recovery.')));
+      assert.ok(retentionLabels.some(label=>label.includes('remaining')&&label.includes('Eligible from')));
+      assert.ok(retentionLabels.includes('Eligible for scheduled cleanup'));
+      assert.equal(button('Retention preview').props['aria-pressed'],true);
       await click('File Trash');
       assert.equal(state(),'paused');
       assert.equal(view.root.findByProps({className:'storage-removal-progress'}).findByType('h3').children.join(''),'Removal paused by the system');

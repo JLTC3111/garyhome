@@ -40,11 +40,13 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
 
   function reason(code:string) {
     switch(code){
-      case "listing":return t("Protected · saved listing path","Được bảo vệ · thuộc đường dẫn tin đã lưu");
+      case "listing": case "scope_retention":return t("Listing-scoped file · see Retention preview","Tệp theo tin đăng · xem Dự kiến lưu giữ");
       case "owner_hold":return t("Protected · Owner hold","Được bảo vệ · Chủ sở hữu đang giữ");
+      case "recovery_hold":return t("Protected · pending GH-645 recovery","Được bảo vệ · chờ khôi phục GH-645");
+      case "file_trash_test":return t("Protected · File Trash test","Được bảo vệ · tệp thử trong Thùng rác");
       case "upload":return t("Protected · upload in progress","Được bảo vệ · đang tải lên");
       case "rename":return t("Protected · rename record","Được bảo vệ · có hồ sơ đổi tên");
-      case "reference":return t("Protected · saved link or filename match","Được bảo vệ · khớp liên kết hoặc tên tệp đã lưu");
+      case "reference": case "filename_match":return t("Protected · saved link or filename match","Được bảo vệ · khớp liên kết hoặc tên tệp đã lưu");
       case "tracked":return t("Protected · existing media ledger entry","Được bảo vệ · đã có mục trong sổ theo dõi tệp");
       case "video_review":return t("Protected · untracked video needs separate custody review","Được bảo vệ · video ngoài sổ cần kiểm tra nguồn riêng");
       case "identity": case "manifest_changed":return t("Protected · Storage identity changed or incomplete. Scan again.","Được bảo vệ · định danh kho đã thay đổi hoặc chưa đủ. Hãy quét lại.");

@@ -2,6 +2,25 @@
 
 The protected Gary Home Owner can open **Properties → Storage & Media Management**. The inventory covers the listing photo and video buckets, saved listing states, editorial links and the existing media ledgers. A potential orphan is an audit finding. The queue records the evidence that makes a file eligible for cleanup.
 
+## Listing-scoped retention preview
+
+Apply [the listing inactivity migration](../supabase/migrations/20261127141812_home_listing_media_inactivity.sql) after the File Trash bulk reads migration. The existing hourly worker records the first verified unused observation for each Storage identity. This also starts the clock for historical files because upload dates cannot establish continuous non-use. The worker clears the clock when a file is used again. The scheduled removal deadline is 96 hours from the start of the current unused period. Explicit detaches keep their existing 48-hour File Trash deadline.
+
+Open **Properties → Storage & Media Management → Retention preview** to search by listing code or filename. The preview shows reference and hold reasons, time remaining, and eligibility for scheduled cleanup. Completed uploads checked into a recovery draft stay protected until that draft is saved or discarded. Staff should reopen the Home workspace on devices with older browser-only checkpoints so those sessions can sync before scheduled removal is enabled.
+
+The migration starts the 96-hour policy in preview mode. Before enabling removal, confirm the preview shows recovery holds for 14 GH-645 photos and test holds for the two audited GH-56 File Trash objects. The migration matches each hold to the audited Storage key, ID and version. Confirm the two test receipts are still present with their original deadlines.
+
+```sql
+select reason, count(*) from private.home_media_review_holds
+where reason in ('recovery_hold','file_trash_test') group by reason;
+```
+
+To enable scheduled removal under the new policy after reviewing the preview, use the existing operator database connection and set the listing inactivity control. The existing permanent-removal gate and hourly schedule also apply.
+
+```sql
+update private.home_media_control set listing_inactivity_enabled=true where singleton;
+```
+
 ## Production panel rollout, 27 November 2026
 
 Production has `20261126100000_home_media_retention.sql` and `20261126114500_home_media_inventory_diagnostics.sql`. The Owner RPC and its diagnostics wrapper are installed. At inspection, `last_scan_at` was empty, the queue and execution ledger were empty, and permanent removal was paused. The project had no `media-orphan-cleanup` deployment, `pg_cron` or `pg_net`.

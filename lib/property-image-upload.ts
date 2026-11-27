@@ -43,6 +43,9 @@ export function imageUploadError(error: unknown, language = "en"): string {
   if (message === sourceTooLarge) return language === "vi" ? "Ảnh gốc phải có dung lượng từ 32 MB trở xuống." : sourceTooLarge;
   if (knownMessages.has(message)) return message;
   const code = String(issue.code || "").toLowerCase(), status = Number(issue.status || issue.statusCode);
+  if (issue.name === "ListingRecoveryError") return language === "vi"
+    ? "Chưa thể bảo vệ ảnh tải lên để khôi phục. Hãy kết nối lại rồi thử lại."
+    : "Couldn’t protect this upload for recovery. Reconnect and try again.";
   if (issue.name === "ListingUploadLeaseError") {
     if (code === "pgrst202" || code === "42883") return language === "vi"
       ? "Chưa có chức năng bảo vệ ảnh tải lên. Hãy báo người vận hành kiểm tra bản cập nhật kho Home."
@@ -72,7 +75,7 @@ export type PropertyImageUploadOptions = {
   onProgress?: (progress: PropertyImageUploadProgress) => void;
   listingId?: string;
   expectedUserId?: string;
-  onPlanned?: (photo: PlannedListingPhoto) => void;
+  onPlanned?: (photo: PlannedListingPhoto) => void | Promise<void>;
 };
 
 export async function uploadPropertyImage(db: SupabaseClient, file: File, signal?: AbortSignal, options: PropertyImageUploadOptions = {}): Promise<string> {
@@ -95,7 +98,7 @@ export async function uploadPropertyImage(db: SupabaseClient, file: File, signal
     attempt={scope,path:propertyPhotoStorageKey(originalFilename,prepared.extension,crypto.randomUUID(),listingId)};
     uploadPaths.set(file, attempt);
   }
-  onPlanned?.({path:attempt.path,url:db.storage.from(PROPERTY_IMAGE_BUCKET).getPublicUrl(attempt.path).data.publicUrl,
+  await onPlanned?.({path:attempt.path,url:db.storage.from(PROPERTY_IMAGE_BUCKET).getPublicUrl(attempt.path).data.publicUrl,
     filename:originalFilename,bytes:prepared.body.size,mime:prepared.contentType});
   try {
     const url = await uploadListingFile({ client: db, file: prepared.body, resumeKey: file, bucket: PROPERTY_IMAGE_BUCKET,

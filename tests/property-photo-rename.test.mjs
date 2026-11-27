@@ -1194,3 +1194,135 @@ test('confirmed early purge scopes the job to one file and reconciles a lost fin
  assert.equal(final.attempts,4);
  assert.ok(Date.parse(final.expires_at)>Date.now());
 });
+
+test('listing inactivity previews history, resets on use and goes directly to hourly cleanup after 96 hours',async t=>{
+ const h=await setup(t,true);
+ await h.pg.exec('create table public.jobs_cms_revisions(body jsonb); create table public.gary_cms_public(body jsonb);');
+ for(const name of ['20261126114500_home_media_inventory_diagnostics.sql','20261126170756_home_media_panel_pagination.sql',
+   '20261126175956_home_media_orphan_review.sql','20261126200632_home_media_historical_bulk_enrollment.sql',
+   '20261127062248_home_media_permanent_controls.sql','20261127064432_home_media_bulk_trash_reads.sql']){
+  await h.pg.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
+ const migration=await readFile(new URL('../supabase/migrations/20261127141812_home_listing_media_inactivity.sql',import.meta.url),'utf8');
+ const audited=[...migration.matchAll(/\('([^']+)',\s*'([^']+)'::uuid,'([^']+)','(recovery_hold|file_trash_test)'\)/g)];
+ assert.equal(audited.filter(match=>match[4]==='recovery_hold').length,14);
+ assert.equal(audited.filter(match=>match[4]==='file_trash_test').length,2);
+ for(const [,name,id,version] of audited)
+  await h.pg.query("insert into storage.objects(bucket_id,name,id,version) values('property-media',$1,$2,$3)",[name,id,version]);
+ await h.pg.exec(`insert into private.home_media_items(bucket,name,source,object_id,object_version,state,expires_at)
+   select bucket_id,name,'historical',id,version,'trashed',now()-interval '1 hour' from storage.objects
+   where name like 'properties/listings/198b8547-%'`);
+ const testsBefore=(await h.pg.query("select * from private.home_media_items where state='trashed' order by name")).rows;
+ await h.pg.exec(migration);
+ const paths=Object.fromEntries(['available','detached','gallery','cover','editorial','jobs','visa','editor','provider','upload','reference-reset','reference-race']
+   .map(key=>[key,`properties/listings/${first}/historical/${key} listing.webp`]));
+ for(const [key,path] of Object.entries(paths))
+  await h.pg.query("insert into storage.objects(bucket_id,name,owner_id,user_metadata) values('property-media',$1,$2,$3)",
+    [path,editor,key==='visa'?{original_filename:'A Legacy Visa Cover.JPG'}:{}]);
+ const video=`${owner}/${first}/historical-listing.mp4`;
+ const unusedVideo=`${owner}/${second}/unlinked-tour.mp4`;
+ await h.pg.query("insert into storage.objects(bucket_id,name) values('listing-videos',$1)",[video]);
+ await h.pg.query("insert into storage.objects(bucket_id,name) values('listing-videos',$1)",[unusedVideo]);
+ const videoUrl=origin+'/storage/v1/object/public/listing-videos/'+video;
+ await h.pg.query('update properties set images=images||$1::text[],video_url=$2 where id=$3',
+   [[propertyPhotoUrl(origin,paths.gallery),propertyPhotoUrl(origin,paths.detached)],videoUrl,first]);
+ await h.pg.query('insert into site_settings values($1)',[propertyPhotoUrl(origin,paths.cover)]);
+ await h.pg.query('insert into editorial_articles values($1,$2)',[null,[{url:propertyPhotoUrl(origin,paths.editorial)}]]);
+ await h.pg.query('insert into jobs_cms_revisions values($1)',[{image:paths.jobs.replaceAll(' ','%20')}]);
+ await h.pg.query('insert into gary_cms_public values($1)',[{cover:' a legacy visa cover.jpg '}]);
+ await h.pg.query("insert into storage.s3_multipart_uploads values('property-media',$1)",[paths.provider]);
+ await h.pg.query(`insert into private.home_media_items(bucket,name,source,state,upload_owner,upload_until)
+   values('property-media',$1,'upload','uploading',$2,now()+interval '1 day')`,[paths.upload,editor]);
+ const rpc=(role,actor,sql,args=[])=>h.role(role,actor,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);
+ const worker=(sql,...args)=>rpc('service_role',null,sql,args);
+ const preview=(query='',actor=owner)=>rpc('authenticated',actor,'select public.home_media_retention_preview(0,$1) value',[query]);
+ const checkpoint={
+  key:crypto.randomUUID(),listingId:first,baseVersion:version,baseGallery:{images:[]},
+  gallery:{images:[]},pending:[{path:paths.editor,url:propertyPhotoUrl(origin,paths.editor),filename:'recovery.webp',bytes:8,mime:'image/webp'}],
+  title:'Local recovery fixture',savedAt:1,
+ };
+ const editing=(actor,draft=null,discard=false)=>rpc('authenticated',actor,'select public.home_media_gallery_checkpoints($1,$2,$3) value',[actor,draft,discard]);
+ await assert.rejects(preview('',admin),error=>error.code==='42501');
+ await assert.rejects(rpc('authenticated',owner,'select public.home_media_gallery_checkpoints($1) value',[editor]),error=>error.code==='42501');
+ assert.equal(await editing(editor,checkpoint),'saved');
+ assert.deepEqual(await editing(editor),[checkpoint]);
+ assert.deepEqual(await editing(owner),[]);
+ const before=await preview(first);
+ const status=Object.fromEntries(before.items.map(row=>[row.name,row.reason]));
+ assert.equal(before.automatic,false);
+ assert.equal(status[paths.available],'awaiting_observation');
+ assert.equal(status[video],'reference');
+ for(const name of ['gallery','cover','editorial','jobs'])assert.equal(status[paths[name]],'reference',name);
+ assert.equal(status[paths.visa],'filename_match');
+ assert.equal(status[paths.editor],'editing_session');
+ assert.equal(status[paths.provider],'active_upload');
+ assert.equal(status[paths.upload],'active_upload');
+ assert.equal((await preview('jobs-staff-portal-header')).items[0].reason,'file_trash_test');
+
+ const claim=()=>worker('select public.home_media_claim() value');
+ const finish=job=>worker('select public.home_media_finish($1) value',job.id);
+ assert.equal((await claim()).status,'disabled'); // observations also run while permanent cleanup is paused
+ const observed=(await preview('available listing')).items[0];
+ assert.equal(observed.reason,'waiting');
+ const clock=(await h.pg.query(`select extract(epoch from expires_at-unreferenced_since)/3600 hours
+   from private.home_media_items where name=$1`,[paths.available])).rows[0];
+ assert.equal(Number(clock.hours),96);
+ await h.pg.query(`update properties set images=array_remove(images,$1) where id=$2`,[propertyPhotoUrl(origin,paths.detached),first]);
+ const item=(await h.pg.query(`select source,extract(epoch from expires_at-unreferenced_since)/3600 hours
+   from private.home_media_items where name=$1`,[paths.detached])).rows[0];
+ assert.deepEqual([item.source,Number(item.hours)],['detached',48]);
+ await h.pg.query(`update private.home_media_items
+   set unreferenced_since=now()-interval '96 hours',expires_at=now() where name=any($1::text[])`,
+   [[paths.available,paths['reference-reset'],paths['reference-race'],unusedVideo]]);
+ await h.pg.query("update private.home_media_items set upload_until=now()-interval '1 minute' where name=$1",[paths.upload]);
+ await h.pg.query('insert into jobs_cms_revisions values($1)',[{url:propertyPhotoUrl(origin,paths['reference-reset'])}]);
+ await h.pg.query('delete from jobs_cms_revisions where body=$1',[{url:propertyPhotoUrl(origin,paths['reference-reset'])}]);
+ assert.equal((await preview('reference-reset')).items[0].reason,'awaiting_observation');
+ assert.equal(await editing(editor,checkpoint,true),'discarded');
+ assert.equal(await editing(editor,{...checkpoint,savedAt:2}),'discarded');
+ assert.deepEqual(await editing(editor),[]);
+
+ await h.pg.exec('update private.home_media_control set permanent_enabled=true');
+ const paused=await claim();
+ assert.equal(paused.items.length,0);
+ await finish(paused);
+ const mature=(await preview('available listing')).items[0];
+ assert.equal(mature.reason,'eligible');
+ assert.equal(mature.scheduled_eligible,false);
+ assert.equal((await preview('upload listing')).items[0].reason,'waiting');
+ await assert.rejects(worker('select public.home_media_claim($1,$2,$3) value',owner,testsBefore[0].id,testsBefore[0].expires_at),error=>error.code==='PT409');
+ await h.pg.exec('update private.home_media_control set listing_inactivity_enabled=true');
+ assert.equal((await preview('available listing')).items[0].scheduled_eligible,true);
+ assert.equal((await preview('reference-reset')).items[0].reason,'waiting');
+ const job=await claim();
+ assert.equal(job.items.length,3);
+ await h.pg.query('insert into gary_cms_public values($1)',[{cover:paths['reference-race']}]);
+ const removed=[];
+ for(const {id} of job.items){
+  const target=await worker('select public.home_media_target($1,$2,true) value',job.id,id);
+  if(!target)continue;
+  if(target.bucket==='property-media'){
+   assert.equal(target.name,paths.available);
+   await assert.rejects(h.pg.query('insert into gary_cms_public values($1)',[{cover:paths.available}]),error=>error.code==='PT409');
+  }
+  await h.pg.query('delete from storage.objects where name=$1',[target.name]);
+  assert.equal(await worker('select public.home_media_settle($1,$2,true) value',job.id,id),true);
+  removed.push(target.name);
+ }
+ assert.deepEqual(removed.sort(),[paths.available,unusedVideo].sort());
+ assert.equal((await preview('reference-race')).items[0].reason,'reference');
+ assert.equal(await finish(job),0);
+ const testsAfter=(await h.pg.query("select * from private.home_media_items where source='historical' order by name")).rows;
+ assert.deepEqual(testsAfter,testsBefore);
+ for(const [,name] of audited)
+  assert.equal((await h.pg.query('select count(*) n from storage.objects where name=$1',[name])).rows[0].n,1);
+
+ const deletedListingPhoto=`properties/listings/${second}/${crypto.randomUUID()}/listing-delete.webp`;
+ await h.pg.query("insert into storage.objects(bucket_id,name) values('property-media',$1)",[deletedListingPhoto]);
+ await finish(await claim());
+ assert.equal((await preview('listing-delete')).items[0].reason,'waiting');
+ await rpc('authenticated',owner,'select public.home_listing_delete_prepare($1,$2) value',[second,version]);
+ const receipt=(await h.pg.query(`select source,state,extract(epoch from expires_at-unreferenced_since)/3600 hours
+   from private.home_media_items where name=$1`,[deletedListingPhoto])).rows[0];
+ assert.deepEqual([receipt.source,receipt.state,Number(receipt.hours)],['listing','trashed',48]);
+});

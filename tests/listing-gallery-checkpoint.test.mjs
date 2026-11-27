@@ -38,6 +38,16 @@ test('resuming across newer edits uses the latest listing and rejects a diverged
   assert.equal(canResumeGallery(checkpoint,{...saved,updated_at:updated,...gallery}),true);
 });
 
+test('media checkpoints include video changes and preserve compatibility with earlier photo checkpoints',()=>{
+  const video='https://example.test/listing-videos/tour.mp4';
+  const withVideo={...saved,video_url:video,updated_at:updated};
+  assert.equal(listingGallery(withVideo).video_url,video);
+  assert.equal(canResumeGallery(checkpoint,withVideo),true);
+  const videoEdit={...checkpoint,baseGallery:{...checkpoint.baseGallery,video_url:video},gallery:{...checkpoint.gallery,video_url:null}};
+  assert.equal(canResumeGallery(videoEdit,withVideo),true);
+  assert.equal(canResumeGallery(videoEdit,{...withVideo,video_url:'https://example.test/replacement.mp4'}),false);
+});
+
 test('an uncertain save is confirmed only by the intended data and an advanced server version',()=>{
   const submitted={...saved,...gallery,updated_at:'2026-11-26T01:56:00.001Z'};
   assert.equal(sameListingVersion(version,updated),false);

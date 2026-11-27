@@ -77,3 +77,16 @@ test('Owner orphan actions use the guarded review RPC and report missing review 
  const missing={rpc(){return {abortSignal:async()=>({error:{code:'PGRST202',message:'discarded provider detail'}})};}};
  assert.deepEqual(await executeStorageMedia(missing,{action:'orphan_page'},signal,worker),{status:503,data:{error:'orphan_review_setup'}});
 });
+
+test('retention preview reads an Owner page without calling the cleanup worker',async()=>{
+ const db={rpc(name,args){
+  assert.equal(name,'home_media_retention_preview');
+  assert.deepEqual(args,{p_offset:30,p_query:'GH-645'});
+  return {abortSignal:async supplied=>{assert.equal(supplied,signal);return {data:{items:[],automatic:false}};}};
+ }};
+ const worker=()=>assert.fail('Retention preview must stay on the read-only database path');
+ assert.deepEqual(await executeStorageMedia(db,{action:'retention_page',query:'GH-645',offset:30},signal,worker),
+  {status:200,data:{items:[],automatic:false}});
+ const missing={rpc(){return {abortSignal:async()=>({error:{code:'PGRST202'}})};}};
+ assert.deepEqual(await executeStorageMedia(missing,{action:'retention_page'},signal,worker),{status:503,data:{error:'retention_setup'}});
+});

@@ -8,12 +8,16 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import ts from 'typescript';
 import * as trash from '../lib/home-media-trash.ts';
+import * as storageMedia from '../lib/home-media-request.ts';
+import * as requests from '../lib/requests.ts';
+import { createMediaCleanup } from '../supabase/functions/media-orphan-cleanup/worker.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const require = createRequire(import.meta.url);
 const names = ['media-removal-progress', 'media-selection', 'listing-deletion-queue', 'storage-orphan-review'];
-const components = new Map(names.map(name => [name, new vm.Script('(function(exports,require,module){' +
-  ts.transpileModule(read(`components/${name}.tsx`), { compilerOptions: {
+const sources = [...names.map(name => [name,`components/${name}.tsx`]), ['storage-media-route','app/api/admin/storage-media/route.ts']];
+const components = new Map(sources.map(([name,path]) => [name, new vm.Script('(function(exports,require,module){' +
+  ts.transpileModule(read(path), { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX,
   }}).outputText + '\n})')]));
 function load(name, mocks, context) {
@@ -226,6 +230,164 @@ for (const theme of ['light', 'dark']) {
     }
   });
 }
+
+test('selected deletion confirms the live manifest and dispatches each eligible file through the API and worker while paused', async () => {
+  const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+  const owner=id(100), origin='https://storage-fixture.example';
+  const expires_at=new Date(Date.now()+3_600_000).toISOString();
+  const file=(n,bytes,bucket='property-media')=>({id:id(n),bucket,name:`fixtures/${n}.${bucket==='listing-videos'?'mp4':'webp'}`,expires_at,bytes});
+  const [prior,first,second,protectedFile,remaining,outside,stale]=[
+    file(1,100_000),file(2,200_000),file(3,300_000),file(4,400_000),file(5,500_000),file(6,600_000,'listing-videos'),file(7,700_000),
+  ];
+  const prefix=`gary-home:media:${owner}`,key=`${prefix}:trash-run`,selectionKey=`${prefix}:trash-selection`;
+  const initial=trash.makeTrashRun([prior,first,second,protectedFile,remaining]);
+  initial.state='paused';
+  initial.entries[0].outcome='removed';
+  initial.timing={elapsedMs:8000,measuredFiles:1};
+  const selected=[first,second,protectedFile,outside,stale];
+  const store=new Map([[key,JSON.stringify(initial)],[selectionKey,JSON.stringify(selected)]]);
+  const live=new Map([first,second,protectedFile,remaining,outside].map(item=>[item.id,item]));
+  const removed=new Map([[prior.id,prior]]);
+  const calls=[],events=[],storageDeletes=[],workerClaims=[],purgeResponses=[],receiptReads=[],notices=[];
+  let claimed=null,held=false,readinessChecks=0;
+  const worker=createMediaCleanup({url:origin,publishable:'fixture-public',service:'fixture-service',cronSecret:'fixture-cron',warn:()=>{},
+    async fetcher(url,init){
+      const path=new URL(url).pathname,args=init.body&&JSON.parse(init.body);
+      if(path.endsWith('/auth/v1/user')){
+        assert.equal(init.headers.Authorization,'Bearer owner-fixture');
+        return Response.json({id:owner});
+      }
+      if(path.endsWith('_management')){
+        assert.deepEqual(args,{p_action:'authorize'});
+        return Response.json({actor:owner});
+      }
+      if(path.endsWith('_claim')){
+        assert.equal(claimed,null);
+        claimed=live.get(args.p_item);
+        assert.ok(claimed);
+        assert.deepEqual(args,{p_actor:owner,p_item:claimed.id,p_expiry:claimed.expires_at});
+        workerClaims.push(claimed.id);
+        return Response.json({status:'ok',id:id(99),items:[{id:claimed.id}]});
+      }
+      if(path.endsWith('_target')){
+        assert.equal(args.p_id,claimed.id);
+        if(claimed.id===protectedFile.id){held=true;return Response.json(null);}
+        return Response.json({bucket:claimed.bucket,name:claimed.name,present:true});
+      }
+      if(init.method==='DELETE'){
+        assert.equal(path,'/storage/v1/object/'+claimed.bucket);
+        assert.deepEqual(args,{prefixes:[claimed.name]});
+        storageDeletes.push(claimed.id);
+        return Response.json([{name:claimed.name}]);
+      }
+      if(path.endsWith('_settle')){
+        assert.equal(args.p_id,claimed.id);
+        assert.equal(args.p_ok,true);
+        removed.set(claimed.id,claimed);
+        live.delete(claimed.id);
+        return Response.json(true);
+      }
+      if(path.endsWith('_finish')){claimed=null;return Response.json(0);}
+      throw new Error('Unexpected worker fixture request');
+    },
+  });
+  const db={rpc(name,args){return {abortSignal:async()=>{
+    if(name==='home_media_trash_receipt'){
+      receiptReads.push(args.p_id);
+      assert.equal(args.p_expiry,expires_at);
+      return {data:{status:held&&args.p_id===protectedFile.id?'protected':'eligible'}};
+    }
+    if(args.p_action==='trash_manifest')return {data:{items:[...live.values()]}};
+    if(args.p_action==='readiness'){readinessChecks++;return {data:{crossAppProtection:true}};}
+    if(args.p_action==='overview')return {data:{panelVersion:2,objects:live.size,bytes:0,candidates:0,candidateBytes:0,
+      abandoned:0,activeUploads:0,broken:0,enabled:true,crossAppProtection:true,earlyEligible:live.size,overdue:0,
+      trashed:live.size,checkedAt:new Date().toISOString()}};
+    const items=args.p_action==='trash_page'?[...live.values()].map(item=>({...item,state:'trashed',restore_mode:'file',
+      purge_block:held&&item.id===protectedFile.id?'owner_hold':null})):
+      args.p_action==='removed_page'?[...removed.values()].map(item=>({...item,removed_at:new Date().toISOString()})):null;
+    assert.ok(items);
+    return {data:{items,hasMore:false,available:true}};
+  }};}};
+  const {POST}=load('storage-media-route',{
+    '@/lib/server':{backendConfig:()=>({url:origin,key:'fixture-public'})},
+    '@/lib/property-photo-files':{PROPERTY_IMAGE_ORIGIN:origin},
+    '@/lib/staff-server':{StaffRequestError:class extends Error{},staffRequest:async req=>{
+      assert.equal(req.headers.get('authorization'),'Bearer owner-fixture');
+      return {db,role:'owner'};
+    }},
+    '@/lib/home-media-request':storageMedia,'@/lib/requests':requests,
+  },vm.createContext({URL,Response,fetch:(url,init)=>worker(new Request(url,init))}));
+  const context=vm.createContext({
+    Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,
+    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,value)=>store.set(k,value)},
+    navigator:{locks:{request:async(_name,_options,callback)=>callback({})}},
+    window:{addEventListener(){},removeEventListener(){},confirm(message){events.push('confirm');assert.match(message,/4 selected files.*1 changed/);return true;}},
+    async fetch(path,init){
+      assert.equal(path,'/api/admin/storage-media');
+      const args=JSON.parse(init.body);
+      calls.push(args);events.push(args.action);
+      if(args.action==='purge'){
+        const checkpoint=trash.readTrashRun(store.get(key));
+        assert.equal(trash.pendingTrashRequest(checkpoint).id,args.id);
+        if(args.id===second.id){
+          assert.equal(checkpoint.entries[1].outcome,'removed');
+          assert.ok(!JSON.parse(store.get(selectionKey)).some(item=>item.id===first.id));
+        }
+      }
+      const response=await POST(new Request(origin+path,init));
+      if(args.action==='purge')purgeResponses.push([response.status,await response.clone().json()]);
+      return response;
+    },
+  });
+  const site={t:en=>en,language:'en',user:{id:owner},notice:message=>notices.push(message),
+    editorTask:operation=>operation({auth:{getSession:async()=>({data:{session:{access_token:'owner-fixture'}}})}},new AbortController().signal)};
+  const mocks={'@/lib/home-media-trash':trash,'./site-context':{useSite:()=>site},'./ui/dropdown-menu':dropdown,
+    '@/lib/property-photo-files':{PROPERTY_IMAGE_ORIGIN:origin},'./storage-orphan-review':{StorageOrphanReview:()=>null}};
+  mocks['./media-selection']=load('media-selection',mocks,context);
+  mocks['./media-removal-progress']=load('media-removal-progress',mocks,context);
+  const {StorageMediaManagement}=load('listing-deletion-queue',mocks,context);
+  let view;
+  const button=label=>view.root.findAllByType('button').find(node=>node.children.join('')===label);
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+  try{
+    await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
+    await act(async()=>view.root.findByType('details').props.onToggle({currentTarget:{open:true}}));
+    await act(async()=>button('File Trash').props.onClick());
+    assert.equal(button('Permanently delete selected').props.disabled,false);
+    await act(async()=>button('Permanently delete selected').props.onClick());
+    const attempted=[first,second,protectedFile,outside];
+    assert.deepEqual(calls.filter(call=>call.action==='purge'),attempted.map(item=>({
+      action:'purge',id:item.id,expiresAt:expires_at,confirm:true,
+    })));
+    assert.deepEqual(events.slice(events.indexOf('trash_manifest'),events.indexOf('purge')),['trash_manifest','confirm']);
+    assert.equal(events.filter(event=>event==='confirm').length,1);
+    assert.equal(events.filter(event=>event==='trash_manifest').length,1);
+    assert.equal(readinessChecks,4);
+    assert.deepEqual(workerClaims,attempted.map(item=>item.id));
+    assert.deepEqual(storageDeletes,[first.id,second.id,outside.id]);
+    assert.deepEqual(receiptReads,[protectedFile.id]);
+    assert.deepEqual(purgeResponses.map(([status])=>status),[200,200,409,200]);
+    assert.deepEqual(purgeResponses[2][1],{error:'purge_unconfirmed'});
+    assert.equal(purgeResponses[3][1].removed,1);
+    const checkpoint=trash.readTrashRun(store.get(key));
+    assert.equal(checkpoint.confirmedAt,initial.confirmedAt);
+    assert.deepEqual(checkpoint.timing,initial.timing);
+    assert.equal(checkpoint.state,'paused');
+    assert.equal(trash.pendingTrashRequest(checkpoint),undefined);
+    assert.deepEqual(checkpoint.entries.map(item=>[item.id,item.outcome]),[
+      [prior.id,'removed'],[first.id,'removed'],[second.id,'removed'],[protectedFile.id,'pending'],[remaining.id,'pending'],
+    ]);
+    assert.equal(trash.trashRunTotals(checkpoint).reclaimedBytes,600_000);
+    assert.deepEqual(JSON.parse(store.get(selectionKey)),[]);
+    assert.deepEqual(notices,['Permanently deleted 3 of 5 selected files (1.1 MB).']);
+    assert.ok(calls.some(call=>call.action==='removed_page'));
+    assert.ok(live.has(protectedFile.id));
+    assert.ok(live.has(remaining.id));
+  }finally{
+    if(view)await act(async()=>view.unmount());
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});
 
 test('Orphan Review resets applied search and selects eligible files across pages',async()=>{
   const storage=new Map();

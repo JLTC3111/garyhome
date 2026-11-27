@@ -45,6 +45,8 @@
 .storage-media-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; }
 .storage-media-stats dd { margin:3px 0 0; font-size:clamp(1.15rem,4vw,1.65rem); font-weight:650; }
 .storage-media-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.storage-media-observation { margin-block:12px; display:grid; justify-items:start; gap:6px; }
+.storage-media-observation progress { width:min(100%, 260px); accent-color:var(--studio-action,var(--olive)); }
 .storage-media-search-form { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .storage-media-search {
   display:flex; align-items:center; gap:9px; width:min(100%,380px); min-height:40px;

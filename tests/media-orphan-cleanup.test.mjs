@@ -26,12 +26,13 @@ test('direct requests cannot select the service path without the dedicated sched
 });
 
 test('scheduled removal is gated, validates the target, and reconciles an interrupted acknowledgement without another delete',async()=>{
- let enabled=false,present=true,interrupted=true;
+ let enabled=false,present=true,interrupted=true,verificationTimeout=false;
  const calls=[];
  const handler=createMediaCleanup({...configuration,warn:()=>{},fetcher:async(url,init)=>{
   const path=new URL(url).pathname, body=init.body&&JSON.parse(init.body);
   calls.push({path,body,method:init.method});
   if(path.endsWith('_claim'))return Response.json(enabled?{status:'ok',id:run,items:[{id}]}:{status:'disabled'});
+  if(path.endsWith('_observe_hourly'))return verificationTimeout?Response.json({code:'57014'},{status:500}):Response.json({status:'complete'});
   if(path.endsWith('_target')) {
    assert.equal(body.p_replacement_verified,true);
    return Response.json({bucket:'property-media',name:key,present});
@@ -51,11 +52,26 @@ test('scheduled removal is gated, validates the target, and reconciles an interr
   throw new Error('Unexpected request');
  }});
  assert.equal((await (await invoke(handler,cron)).json()).status,'disabled');
- assert.equal(calls.length,1);
+ assert.deepEqual(calls.map(call=>call.path.split('/').at(-1)),['home_media_claim','home_media_observe_hourly']);
  enabled=true;
  assert.equal((await invoke(handler,cron)).status,503);
- assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'ok',attempted:1,removed:1,overdue:0});
+ assert.match(calls.at(-1).path,/_observe_hourly$/,'cleanup failure still permits observation');
+ verificationTimeout=true;
+ assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'ok',attempted:1,removed:1,overdue:0,
+  observation:{status:'failed',error:'observation_timeout'}});
  assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
+});
+
+test('the scheduler caps the number of pending observation batches per run',async()=>{
+ const calls=[];
+ const handler=createMediaCleanup({...configuration,fetcher:async url=>{
+  const action=new URL(url).pathname.split('/').at(-1);calls.push(action);
+  if(action==='home_media_claim')return Response.json({status:'disabled'});
+  assert.equal(action,'home_media_observe_hourly');
+  return Response.json({status:'running',checked:1000*(calls.length-1)});
+ }});
+ assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'disabled',observation:{status:'running',checked:2000}});
+ assert.deepEqual(calls,['home_media_claim','home_media_observe_hourly','home_media_observe_hourly']);
 });
 
 test('worker health checks require a verified Owner and never claim a cleanup run',async()=>{

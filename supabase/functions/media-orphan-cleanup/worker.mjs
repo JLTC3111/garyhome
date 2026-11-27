@@ -27,6 +27,11 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       const code=result?.message?.match(/^(?:listing_cleanup)\.([a-z_]+)$/)?.[1];
       if(action==='claim_unused' && (result?.code==='PGRST202'||result?.code==='42883'))
         throw Object.assign(new Error('retention_cleanup_setup'),{status:503});
+      if(action==='observe_hourly') {
+        const reason=result?.code==='57014'?'observation_timeout':
+          ['PGRST202','42883'].includes(result?.code)?'observation_setup':'observation_failed';
+        throw Object.assign(new Error(reason),{status:503});
+      }
       throw Object.assign(new Error(res.status===401?'session_expired':res.status===403?'forbidden':
         result?.code==='55P03'?'media_busy':code||'unavailable'),{status:[400,401,403,409].includes(res.status)?res.status:503});
     }
@@ -86,6 +91,21 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
     return {status:'ok',attempted,removed,overdue};
   }
 
+  async function observeHourly(signal) {
+    let progress;
+    try {
+      for(let batch=0;batch<2&&!signal.aborted;batch++) {
+        progress=await internal('observe_hourly',{});
+        if(progress?.status!=='running')break;
+      }
+    } catch(error) {
+      progress={status:'failed',error:error.name==='TimeoutError'?'observation_timeout':
+        error.status===503?error.message:'observation_failed'};
+    }
+    if(progress?.status==='failed')warn('Home unused media observation failed',{error:progress.error});
+    return progress;
+  }
+
   return async req=>{
     if(req.method!=='POST')return json({error:'invalid_request'},405);
     if(!url||!publishable||!service) return json({error:'unavailable'},503);
@@ -99,7 +119,10 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       const cron=req.headers.get('x-gary-home-cleanup');
       if(cron!==null) {
         if(body.action!=='run'||!await matchesSecret(cron,cronSecret))return json({error:'forbidden'},403);
-        return json(await run(null,req.signal));
+        let cleanup;
+        try { cleanup=await run(null,req.signal); }
+        catch(error) { await observeHourly(req.signal); throw error; }
+        return json({...cleanup,observation:await observeHourly(req.signal)});
       }
       const token=req.headers.get('authorization')?.match(/^Bearer (\S+)$/i)?.[1];
       if(!token)return json({error:'session_expired'},401);

@@ -69,6 +69,20 @@ async function loadPageFirstFunctions(db) {
   ]);
 }
 
+const verificationMigration='20261127203648_home_media_verify_unused.sql';
+async function loadVerificationFunctions(db) {
+  const source=await readFile(new URL('../supabase/migrations/'+verificationMigration,import.meta.url),'utf8');
+  await db.exec(`alter table private.home_media_control add column lease_until timestamptz;
+    create function private.lock_home_listing_media_snapshot() returns void language sql as $$ select $$;
+    create function private.home_media_lock_listing_inactivity() returns void language sql as $$ select $$;`);
+  // Load the state table and isolated RPC definitions into the disposable fixture.
+  await db.exec(source.slice(source.indexOf('create table'),source.indexOf('create function')));
+  await loadFunctions(db,verificationMigration,[
+    'private.home_media_observation_progress','private.home_media_observe_batch','public.home_media_observation','public.home_media_observe_hourly',
+  ]);
+  await db.exec(source.slice(source.indexOf('revoke all on function private.home_media_observation_progress'),source.indexOf('notify pgrst')));
+}
+
 test('both Owner inventory views share exact references and unused tickets, and preserve video detachment',async t=>{
   const db=await inventoryFixture(t);
   const listingPath='properties/listings/11111111-1111-4111-8111-000000000001/revision/';
@@ -142,8 +156,7 @@ test('both Owner inventory views share exact references and unused tickets, and 
   }
 });
 
-test('production-scale inventory preserves search, pagination and live eligibility after limiting the detail work',async t=>{
-  const db=await inventoryFixture(t);
+async function populateInventory(db) {
   await db.exec(`
     insert into storage.buckets(id) values('property-media'),('listing-videos');
     create temp table fixture_files(seq int,bucket text,name text,listing int);
@@ -184,6 +197,11 @@ test('production-scale inventory preserves search, pagination and live eligibili
     insert into private.home_media_review_holds(bucket,name,reason)
       select bucket,name,'recovery_hold' from fixture_files where seq between 722 and 735;
   `);
+}
+
+test('production-scale inventory preserves search, pagination and live eligibility after limiting the detail work',async t=>{
+  const db=await inventoryFixture(t);
+  await populateInventory(db);
   const stats=(await db.query(`select (select count(*) from storage.objects)::int objects,
     (select count(*) from public.properties)::int listings,(select count(*) from private.home_media_reference_documents())::int documents,
     (select sum(pg_column_size(d))::int from private.home_media_reference_documents() d) json_bytes`)).rows[0];
@@ -255,4 +273,124 @@ test('production-scale inventory preserves search, pagination and live eligibili
   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);
   const manifest=(await db.query("select public.home_media_retention_manifest('') value")).rows[0].value;
   assert.deepEqual(manifest.items,[candidatePage.items[0].manual_target]);
+});
+
+test('production-scale unused observation uses the optimized classifier and unlocks Owner selection in preview',async t=>{
+  const db=await inventoryFixture(t);
+  await populateInventory(db);
+  await loadFunctions(db,'20261127141812_home_listing_media_inactivity.sql',['private.home_media_observe_listing_inactivity']);
+  await db.exec(`
+    insert into private.home_media_items(bucket,name,source,state,object_id,object_version,expires_at)
+    select bucket_id,name,'detached','trashed',id,version,now()+interval '40 hours' from storage.objects
+    where name in ('properties/renamed/fixture-1341.webp','properties/renamed/fixture-1342.webp');
+    create function pg_temp.measure_observation(p_manual boolean) returns double precision language plpgsql as $$
+    declare started timestamptz:=clock_timestamp();
+    begin
+      if p_manual then perform public.home_media_observation(true);
+      else perform private.home_media_observe_listing_inactivity(); end if;
+      return extract(epoch from clock_timestamp()-started)*1000;
+    end;
+    $$;
+  `);
+  const query=async(sql,args=[]) => (await db.query(sql,args)).rows[0].value;
+  const actor=crypto.randomUUID();
+  await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'owner@example.invalid',now())",[actor]);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);
+  const measure=manual=>query('select pg_temp.measure_observation($1) value',[manual]);
+  const retained=()=>db.query("select bucket,name,object_id,object_version from private.home_media_items where source='unused_listing' order by bucket,name").then(value=>value.rows);
+  const legacy=()=>db.query("select * from private.home_media_items where source='detached' order by name").then(value=>value.rows);
+  const clear=()=>db.exec("delete from private.home_media_items where source='unused_listing'");
+  const beforeLegacy=await legacy(),baselineMs=await measure(false),expected=await retained();
+  assert.ok(expected.length>0);
+  await clear();
+  await loadPageFirstFunctions(db);
+  const optimizedMs=await measure(false);
+  assert.deepEqual(await retained(),expected);
+  await clear();
+  await loadVerificationFunctions(db);
+  assert.equal((await query('select public.home_media_inventory_files() value')).manualCount,0);
+  const manualMs=await measure(true);
+  t.diagnostic(`Observation for 816 scoped objects and 401 reference documents: ${baselineMs.toFixed(1)} ms before inventory optimization, ${optimizedMs.toFixed(1)} ms with it, ${manualMs.toFixed(1)} ms through the bounded Owner action`);
+  assert.deepEqual(await retained(),expected);
+  const progress=await query('select public.home_media_observation() value');
+  assert.equal(progress.status,'complete');
+  assert.equal(progress.checked,816);
+  assert.equal(progress.total,816);
+  assert.equal(progress.recorded,expected.length);
+  assert.ok(Date.parse(progress.lastSuccessfulAt));
+  assert.equal(await query("select count(*)::int value from private.home_media_items where source='unused_listing' and expires_at-unreferenced_since=interval '96 hours'"),expected.length);
+  const inventory=await query('select public.home_media_inventory_files() value');
+  assert.equal(inventory.manualCount,expected.length);
+  assert.equal(inventory.automatic,false);
+  assert.equal((await query('select public.home_media_retention_preview() value')).manualCount,expected.length);
+  assert.deepEqual(await legacy(),beforeLegacy);
+  assert.equal(await query('select count(*)::int value from storage.objects'),1354);
+  assert.equal(await query("select count(*)::int value from private.home_media_review_holds where reason='recovery_hold'"),14);
+});
+
+test('observation has an Owner guard, resumes after a failed batch and preserves the last completion time',async t=>{
+  const db=await inventoryFixture(t);
+  await loadPageFirstFunctions(db);
+  await loadVerificationFunctions(db);
+  const base='properties/listings/11111111-1111-4111-8111-000000000001/fixture/';
+  await db.exec("insert into storage.buckets(id) values('property-media')");
+  await db.query("insert into storage.objects(bucket_id,name) select 'property-media',$1||g||'.jpg' from generate_series(1,3) g",[base]);
+  const query=async(sql,args=[]) => (await db.query(sql,args)).rows[0].value;
+  const batch=n=>query('select private.home_media_observe_batch($1) value',[n]);
+  const status=()=>query('select private.home_media_observation_progress() value');
+  assert.equal((await status()).status,'idle');
+  await db.exec('set role authenticated');
+  await assert.rejects(query('select public.home_media_observation(true) value'),error=>error.code==='42501');
+  await assert.rejects(query('select public.home_media_observe_hourly() value'),error=>error.code==='42501');
+  await db.exec('reset role; set role anon');
+  await assert.rejects(query('select public.home_media_observation() value'),error=>error.code==='42501');
+  await db.exec('reset role; update private.home_media_control set lease_until=now()+interval \'1 minute\'');
+  assert.equal((await batch(1)).status,'busy');
+  assert.equal((await status()).status,'idle');
+  await db.exec('update private.home_media_control set lease_until=null');
+
+  const first=await batch(1);
+  assert.equal(first.status,'running');
+  assert.equal(first.checked,1);
+  assert.equal(first.total,3);
+  assert.equal(first.recorded,1);
+  assert.equal(first.lastSuccessfulAt,null);
+  const deadline=await query('select expires_at value from private.home_media_items where name=$1',[base+'1.jpg']);
+  await db.exec(`
+    alter function private.home_media_reference_documents() rename to fixture_reference_documents;
+    create function private.home_media_reference_documents() returns setof jsonb language plpgsql stable as $$
+    begin raise exception 'fixture canceled' using errcode='57014'; end;
+    $$;
+  `);
+  const failed=await batch(1);
+  assert.equal(failed.status,'failed');
+  assert.equal(failed.error,'observation_timeout');
+  assert.equal(failed.checked,1);
+  assert.deepEqual(await status(),failed);
+  await db.exec(`drop function private.home_media_reference_documents();
+    alter function private.fixture_reference_documents() rename to home_media_reference_documents;`);
+  await db.query("insert into private.fixture_documents values (jsonb_build_object('cover',$1::text))",[base+'2.jpg']);
+  await db.exec('set role service_role');
+  const resumed=await query('select public.home_media_observe_hourly() value');
+  await db.exec('reset role');
+  assert.equal(resumed.status,'complete');
+  assert.equal(resumed.checked,3);
+  assert.equal(resumed.recorded,2);
+  assert.equal(resumed.error,null);
+  assert.ok(Date.parse(resumed.lastSuccessfulAt));
+  assert.deepEqual(await query('select expires_at value from private.home_media_items where name=$1',[base+'1.jpg']),deadline);
+  assert.equal(await query('select count(*)::int value from private.home_media_items where name=$1',[base+'2.jpg']),0);
+  const next=await batch(1);
+  assert.equal(next.status,'running');
+  assert.equal(next.lastSuccessfulAt,resumed.lastSuccessfulAt);
+  await db.query("insert into private.home_media_review_holds values('property-media',$1,'recovery_hold')",[base+'3.jpg']);
+  assert.equal((await batch(3)).reset,1);
+  assert.equal(await query('select count(*)::int value from private.home_media_items where name=$1',[base+'3.jpg']),0);
+  const owner=crypto.randomUUID();
+  await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'resumed-owner@example.invalid',now())",[owner]);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]);
+  await db.exec('set role authenticated');
+  const repeat=await query('select public.home_media_observation(true) value');
+  assert.equal(repeat.status,'complete');
+  assert.equal(repeat.recorded,0);
 });

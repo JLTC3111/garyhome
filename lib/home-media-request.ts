@@ -4,7 +4,7 @@ const panelActions = new Set(["overview", "inventory_scan", "inventory_page", "t
 const inventoryActions = new Set(["status", "scan", "trash", "restore", ...panelActions]);
 const reviewActions = new Map<string, string>(["page", "verify", "hold", "release", "enroll"].map(action => [`orphan_${action}`, action]));
 export const storageMediaActions = new Set([...inventoryActions, ...reviewActions.keys(), "worker_status", "run", "purge", "purge_unused",
-  "trash_manifest", "trash_receipt", "retention_page", "retention_manifest", "retention_receipt"]);
+  "trash_manifest", "trash_receipt", "retention_page", "retention_manifest", "retention_receipt", "observation_status", "verify_unused"]);
 const rpcMissing = (code?: string) => code === "PGRST202" || code === "42883";
 
 export async function executeStorageMedia(
@@ -15,6 +15,14 @@ export async function executeStorageMedia(
 ) {
   const review = reviewActions.get(input.action);
   const offset = Number.isInteger(input.offset) ? input.offset : 0;
+  if (input.action === "observation_status" || input.action === "verify_unused") {
+    const {data,error}=await db.rpc("home_media_observation",{p_verify:input.action==="verify_unused"}).abortSignal(signal);
+    if (!error && data) return {status:200,data};
+    if (error?.code==="42501") return {status:403,data:{error:"forbidden"}};
+    if (rpcMissing(error?.code)) return {status:503,data:{error:"observation_setup"}};
+    if (error?.code==="57014") return {status:504,data:{error:"observation_timeout"}};
+    return {status:503,data:{error:"observation_unavailable"}};
+  }
   if (input.action === "inventory_page" || input.action === "retention_page" || input.action === "retention_manifest" || input.action === "retention_receipt") {
     const p_query=typeof input.query==="string"?input.query.slice(0,120):"";
     const call=input.action==="inventory_page"?db.rpc("home_media_inventory_files",{p_offset:offset,p_query}):

@@ -455,6 +455,8 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     listing_title_en:'Published courtyard',saved_reference:false,object_id:'alias',bytes:80};
   const calls=[],confirmations=[],store=new Map();
   let inventoryTimeout=true;
+  let observation={status:'idle',checked:0,total:0,recorded:0,reset:0,lastSuccessfulAt:null,error:null};
+  let verificationRequests=0;
   const context=vm.createContext({
     Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
     localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)},
@@ -465,6 +467,14 @@ test('Inventory Files loads exact previews on demand and shares single and batch
       const items=[...live.values()];
       switch(args.action){
         case 'worker_status': return Response.json({status:'ok',cronConfigured:true,manualUnused:true});
+        case 'observation_status': return Response.json(observation);
+        case 'verify_unused': {
+          verificationRequests++;
+          if(verificationRequests===2)return Response.json({error:'observation_timeout'},{status:504});
+          observation=verificationRequests===1?{...observation,status:'running',checked:1,total:items.length+2}:
+            {...observation,status:'complete',checked:items.length+2,recorded:items.length,lastSuccessfulAt:'2026-11-27T17:00:00Z'};
+          return Response.json(observation);
+        }
         case 'overview': return Response.json({panelVersion:2,objects:items.length+3,bytes:items.reduce((sum,item)=>sum+item.bytes,120),
           candidates:0,candidateBytes:0,abandoned:0,activeUploads:0,broken:0,enabled:true,crossAppProtection:true,earlyEligible:0,
           overdue:0,trashed:2,checkedAt:new Date().toISOString()});
@@ -472,9 +482,10 @@ test('Inventory Files loads exact previews on demand and shares single and batch
         case 'retention_page':
           if(args.action==='inventory_page'&&inventoryTimeout)return Response.json({error:'inventory_timeout'},{status:504});
           return Response.json({items:[held,alias,...items.map(item=>({
-          ...item,manual_target:item,reason:'waiting',eligible_at:item.expires_at,listing_code:'GH-FIXTURE',
+          ...item,manual_target:observation.status==='complete'?item:null,reason:observation.status==='complete'?'waiting':'awaiting_observation',
+          eligible_at:observation.status==='complete'?item.expires_at:null,listing_code:'GH-FIXTURE',
           listing_title_en:'Lake view fixture',saved_reference:false,object_id:item.id,
-        }))],hasMore:false,available:true,manualCount:items.length,automatic:false});
+        }))],hasMore:false,available:true,manualCount:observation.status==='complete'?items.length:0,automatic:false});
         case 'retention_receipt':return Response.json({status:live.has(args.id)?'eligible':'already_removed',bytes:live.get(args.id)?.bytes});
         case 'retention_manifest':return Response.json({items});
         case 'purge_unused':
@@ -506,6 +517,22 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     inventoryTimeout=false;
     await act(async()=>button('Refresh this list').props.onClick());
     assert.equal(view.root.findAllByProps({role:'alert'}).length,0);
+    const observationPanel=()=>view.root.findByProps({className:'storage-media-observation'});
+    assert.equal(view.root.findByProps({'aria-label':'Select first photo #1.webp'}).props.disabled,true);
+    await act(async()=>button('Verify unused files').props.onClick());
+    assert.match(observationPanel().findByProps({role:'alert'}).children.join(''),/verification timed out/);
+    assert.equal(observationPanel().findByType('progress').props.value,1);
+    assert.equal(observationPanel().findByType('progress').props.max,5);
+    assert.match(observationPanel().findByProps({role:'status'}).children.join(''),/1 of 5 checked/);
+    await act(async()=>button('Verify unused files').props.onClick());
+    assert.equal(observationPanel().findAllByProps({role:'alert'}).length,0);
+    assert.match(observationPanel().findByProps({role:'status'}).children.join(''),/5 of 5 checked.*3 newly verified/);
+    assert.equal(observationPanel().findByType('strong').children.join(''),
+      new Intl.DateTimeFormat('en',{dateStyle:'medium',timeStyle:'short'}).format(new Date(observation.lastSuccessfulAt)));
+    assert.equal(view.root.findByProps({'aria-label':'Select first photo #1.webp'}).props.disabled,false);
+    assert.equal(calls.filter(call=>call.action==='verify_unused').length,3);
+    assert.ok(!calls.some(call=>['run','purge_unused','purge','trash'].includes(call.action)));
+    assert.equal(confirmations.length,0);
     inventoryTimeout=true;
     await act(async()=>button('Refresh inventory').props.onClick());
     assert.match(view.root.findByProps({role:'alert'}).children.join(''),/timed out.*Showing the last loaded files/);

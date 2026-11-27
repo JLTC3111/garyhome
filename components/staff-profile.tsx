@@ -3,7 +3,8 @@ import { AnimatePresence } from "motion/react";
 import { EditorModal } from "./editor-modal";
 import { HeaderAccountMenu } from "./header-account-menu";
 import { PasswordInput } from "./password-input";
-import { useEffect,useRef,useState,type FormEvent } from "react";
+import { useEffect,useLayoutEffect,useRef,useState,type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Camera,KeyRound,LoaderCircle,Save } from "lucide-react";
 import { useSite } from "./site-context";
 import { setAccountPassword } from "@/lib/password-actions";
@@ -27,7 +28,9 @@ const photoCopy: Record<string, [string,string]> = {
  avatarSaveError: ["Couldn’t confirm the photo update. Reconnect and try again.", "Chưa xác nhận được ảnh mới. Hãy kết nối lại rồi thử lại."],
 };
 
-export function StaffAccountMenu({ onDashboard, onSignedOut }: { onDashboard: () => void; onSignedOut: () => void }){
+export function StaffAccountMenu({ onDashboard, onSignedOut, profileHost }: {
+ onDashboard: () => void; onSignedOut: () => void; profileHost: HTMLDivElement | null;
+}){
  const {editor,sessionResolved,sessionPhase,user}=useSite(),[open,setOpen]=useState(false);
  const button=useRef<HTMLButtonElement>(null);
  const canOpenProfile = editor && sessionResolved && sessionPhase === "ready";
@@ -36,9 +39,11 @@ export function StaffAccountMenu({ onDashboard, onSignedOut }: { onDashboard: ()
   window.addEventListener("gary-open-staff-profile",show);
   return()=>window.removeEventListener("gary-open-staff-profile",show);
  },[canOpenProfile]);
+ // A closed drawer is inert, including when the top bar opens a profile.
+ const profile=<AnimatePresence initial={false} onExitComplete={()=>button.current?.focus({preventScroll:true})}>{open&&editor&&<StaffProfileDialog key={user?.id} close={()=>setOpen(false)}/>}</AnimatePresence>;
  return <>
   <HeaderAccountMenu staffActions={{ dashboard: onDashboard, profile: () => { if(canOpenProfile)setOpen(true); }, signedOut: onSignedOut, trigger: button }}/>
-  <AnimatePresence initial={false} onExitComplete={()=>button.current?.focus({preventScroll:true})}>{open&&editor&&<StaffProfileDialog key={user?.id} close={()=>setOpen(false)}/>}</AnimatePresence>
+  {profileHost ? createPortal(profile,profileHost) : profile}
  </>;
 }
 export function StaffPasswordReminder(){
@@ -51,7 +56,7 @@ function StaffProfileDialog({close}:{close:()=>void}){
  const active=useRef(true),controls=useRef<HTMLDivElement>(null);
  const photoEditor=useRef<ReturnType<typeof mountProfilePhoto>|null>(null);
  const text=useRef(t);
- text.current=t;
+ useLayoutEffect(()=>{text.current=t;},[t]);
  const [busy,setBusy]=useState(""),[error,setError]=useState("");
  const [password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[photoChanged,setPhotoChanged]=useState(false);
  const [preview,setPreview]=useState<{url:string;ref:{path:string|null}|null}>({url:"",ref:null});

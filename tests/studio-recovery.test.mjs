@@ -30,8 +30,11 @@ async function harness(t, options={}){
  // Headless controls inspect DOM constructors even when test-renderer refs are null.
  class TestElement {} class TestHTMLElement extends TestElement {}
  const requestFrame=callback=>setTimeout(()=>callback(performance.now()),16);
- Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement,innerWidth:1440,requestAnimationFrame:requestFrame,cancelAnimationFrame:clearTimeout,
-  matchMedia:media=>Object.assign(new EventTarget(),{media,matches:false})});
+ Object.assign(browser,{Element:TestElement,HTMLElement:TestHTMLElement,innerWidth:options.width??1440,requestAnimationFrame:requestFrame,cancelAnimationFrame:clearTimeout,
+  matchMedia:media=>{
+   const max=/^\(max-width: (\d+)px\)$/.exec(media),query=new EventTarget();
+   return Object.defineProperties(query,{media:{value:media},matches:{get:()=>!!max&&browser.innerWidth<=Number(max[1])}});
+  }});
  setGlobal('Element',TestElement);setGlobal('HTMLElement',TestHTMLElement);
  setGlobal('requestAnimationFrame',requestFrame);setGlobal('cancelAnimationFrame',clearTimeout);
  setGlobal('IS_REACT_ACT_ENVIRONMENT',true);setGlobal('window',browser);setGlobal('document',page);setGlobal('navigator',network);
@@ -908,21 +911,111 @@ test('slow uploads preserve concurrent text edits and cannot attach photos to a 
  assert.equal(title().props.value,'');assert.equal(h.renderer.root.findByProps({className:'editor-photo-grid'}).children.length,0);
 });
 
+test('staff phone navigation overlays the page and keeps the saved desktop sidebar controls',async t=>{
+ const key='gary-home-studio-sidebar',saved=JSON.stringify({width:316,collapsed:true});
+ const focus=[];
+ const h=await harness(t,{page:'staff',role:'admin',path:'/admin',width:320,storage:{[key]:saved},createNodeMock:node=>
+  ['admin-navigation-toggle','admin-navigation-close'].includes(node.props.className)?{focus(){focus.push(node.props.className);}}:null});
+ const root=h.renderer.root,sidebar=()=>root.findByProps({id:'staff-sidebar',className:'admin-sidebar'});
+ const shell=()=>root.findByProps({className:'admin-shell'}),main=()=>root.findByProps({className:'admin-main'});
+ const toggle=()=>root.findByProps({className:'admin-navigation-toggle'});
+ const resize=width=>act(async()=>{h.browser.innerWidth=width;h.browser.dispatchEvent(new Event('resize'));});
+ for(const width of [320,375,390,430]){
+  await resize(width);
+  assert.equal(sidebar().props.inert,true,width);
+  assert.equal(sidebar().props.role,'dialog');
+  assert.equal(shell().props['data-sidebar'],undefined);
+  assert.equal(sidebar().findAllByProps({role:'separator'}).length,0);
+  await act(async()=>toggle().props.onClick());
+  assert.equal(sidebar().props.inert,false);
+  assert.equal(sidebar().props['aria-modal'],true);
+  assert.equal(main().props.inert,true);
+  assert.equal(toggle().props['aria-expanded'],true);
+  assert.equal(focus.at(-1),'admin-navigation-close');
+  await act(async()=>sidebar().findByProps({'aria-label':'Listings'}).props.onClick());
+  assert.equal(toggle().props['aria-expanded'],false);
+  assert.equal(main().props.inert,false);
+  assert.equal(focus.at(-1),'admin-navigation-toggle');
+ }
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(toggle().props['aria-label'],'Mở điều hướng nhân viên');
+ await act(async()=>toggle().props.onClick());
+ assert.equal(sidebar().props['aria-label'],'Điều hướng nhân viên');
+ await act(async()=>sidebar().props.onKeyDown({key:'Escape',preventDefault(){},stopPropagation(){},currentTarget:{contains:()=>true}}));
+ assert.equal(sidebar().props.inert,true);
+ await act(async()=>toggle().props.onClick());
+ await act(async()=>root.findByProps({className:'admin-navigation-scrim'}).props.onClick());
+ assert.equal(sidebar().props.inert,true);
+ assert.equal(h.stored.get(key),saved);
+ await resize(768);
+ assert.equal(sidebar().props.role,undefined);
+ assert.equal(shell().props['data-sidebar'],'collapsed');
+ assert.equal(sidebar().findByType('img').props.src,'/favicon.svg');
+ assert.equal(sidebar().findAllByProps({className:'brand-tagline'}).length,0);
+ await act(async()=>sidebar().findByProps({className:'admin-sidebar-collapse'}).props.onClick());
+ assert.equal(shell().props.style['--studio-sidebar-width'],'288px');
+ await resize(1440);
+ assert.equal(shell().props.style['--studio-sidebar-width'],'316px');
+ await act(async()=>sidebar().findByProps({role:'separator'}).props.onKeyDown({key:'ArrowRight',preventDefault(){}}));
+ assert.equal(shell().props.style['--studio-sidebar-width'],'332px');
+ assert.equal(JSON.parse(h.stored.get(key)).width,332);
+});
+
+test('listing header shows the saved code and exposes both full titles without altering the draft',async t=>{
+ const h=await harness(t,{role:'admin',width:390});
+ const original=fixture.properties.find(row=>row.status==='published'&&row.listing_code&&row.title_en&&row.title_vi);
+ const row=h.renderer.root.findAllByType('tr').find(node=>node.findAllByType('a').some(link=>link.children.includes(original.title_en)));
+ await act(async()=>row.findAllByType('button').find(node=>node.children.includes('Edit')).props.onClick());
+ const root=h.renderer.root,form=root.findByProps({className:'editor-form'}),copy=[];
+ h.network.clipboard={writeText:async value=>copy.push(value)};
+ const trigger=()=>root.findByProps({className:'icon-button listing-editor-tools-toggle'});
+ assert.equal(root.findByProps({className:'listing-editor-code'}).findByType('b').children.join(''),original.listing_code);
+ await act(async()=>trigger().props.onClick());
+ assert.equal(trigger().props['aria-expanded'],true);
+ const tools=()=>root.findByProps({className:'listing-title-inspector'});
+ assert.equal(tools().findByType('textarea').props.value,original.title_en);
+ await act(async()=>tools().findByProps({className:'listing-copy-button'}).props.onClick());
+ await act(async()=>h.site.setLanguage('vi'));
+ assert.equal(tools().findByType('textarea').props.value,original.title_vi);
+ await act(async()=>tools().findByProps({className:'listing-copy-button'}).props.onClick());
+ assert.deepEqual(copy,[original.title_en,original.title_vi]);
+ assert.equal(trigger().props['aria-label'],'Thao tác khác');
+ const draft=form.findAllByType('input').find(node=>node.props.value===original.title_en);
+ const pendingTitle='Lake view · '.repeat(14)+'Unpublished changes';
+ await act(async()=>draft.props.onChange({target:{value:pendingTitle}}));
+ await act(async()=>h.site.setLanguage('en'));
+ assert.equal(tools().findByType('textarea').props.value,pendingTitle);
+ await act(async()=>trigger().props.onClick());
+ assert.equal(trigger().props['aria-expanded'],false);
+ assert.equal(root.findByProps({className:'editor-form'}),form);
+ assert.equal(draft.props.value,pendingTitle);
+ assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,0);
+});
+
 test('new listing URLs follow the final title, remain stable through translation and save without URL entry',async t=>{
- const h=await harness(t);await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
+ let selected=0;
+ const h=await harness(t,{createNodeMock:node=>node.props.name==='listing_url'?{focus(){},select(){selected++;}}:null});
+ await act(async()=>h.renderer.root.findByProps({'aria-label':'Listings'}).props.onClick());
  await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
  const form=()=>h.renderer.root.findByProps({className:'editor-form'}),url=()=>form().findByProps({name:'listing_url'});
  const field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
  assert.equal(url().props.readOnly,true);assert.notEqual(url().props.required,true);assert.equal(url().props.onChange,undefined);
  assert.equal(form().findAllByProps({name:'slug'}).length,0);assert.equal(form().findAllByProps({role:'alert'}).length,0);
  await act(async()=>field('Property title · English').props.onChange({target:{value:'3 Bedroom Apartment — PETS ALLOWED / LAKE VIEW'}}));
- assert.equal(url().props.value,'https://garyhome.vn/homes/3-bedroom-apartment-pets-allowed-lake-view');
+ assert.equal(url().props.value,'https://www.garyhome.vn/homes/3-bedroom-apartment-pets-allowed-lake-view');
  await act(async()=>field('Property title · English').props.onChange({target:{value:'3 Bedroom Apartment in Tay Ho — PETS ALLOWED / LAKE VIEW'}}));
  await act(async()=>field('Property title · Vietnamese').props.onChange({target:{value:'Căn hộ 3 phòng ngủ Tây Hồ — Cho phép thú cưng'}}));
  await act(async()=>field('Public location / street').props.onChange({target:{value:'Tây Hồ'}}));
- const finalUrl='https://garyhome.vn/homes/3-bedroom-apartment-in-tay-ho-pets-allowed-lake-view',sameInput=url();
+ const finalUrl='https://www.garyhome.vn/homes/3-bedroom-apartment-in-tay-ho-pets-allowed-lake-view',sameInput=url();
+ const copies=[];h.network.clipboard={writeText:async value=>copies.push(value)};
+ await act(async()=>{form().findByProps({className:'listing-copy-button'}).props.onClick();});
+ assert.deepEqual(copies,[finalUrl]);
  assert.equal(url().props.value,finalUrl);await act(async()=>h.site.setLanguage('vi'));
  assert.equal(url(),sameInput);assert.equal(url().props.value,finalUrl);assert.match(JSON.stringify(h.renderer.toJSON()),/Căn hộ 3 phòng ngủ Tây Hồ/);
+ h.network.clipboard.writeText=async()=>{throw Error('Clipboard unavailable');};
+ await act(async()=>{form().findByProps({className:'listing-copy-button'}).props.onClick();});
+ assert.equal(selected,1);
+ assert.match(form().findByProps({className:'listing-copy-feedback'}).children.join(''),/Đã chọn/);
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
  const saved=h.backend.calls.find(call=>call.table==='properties');assert.equal(saved.method,'insert');
  assert.equal(saved.payload.slug,'3-bedroom-apartment-in-tay-ho-pets-allowed-lake-view');assert.equal(saved.payload.title_en,'3 Bedroom Apartment in Tay Ho — PETS ALLOWED / LAKE VIEW');
@@ -936,10 +1029,10 @@ test('automatic listing URLs use Vietnamese when English is blank and choose an 
  const form=()=>h.renderer.root.findByProps({className:'editor-form'}),url=()=>form().findByProps({name:'listing_url'});
  const field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
  await act(async()=>field('Property title · Vietnamese').props.onChange({target:{value:'Căn hộ đẹp ở Tây Hồ'}}));
- assert.equal(url().props.value,'https://garyhome.vn/homes/can-ho-dep-o-tay-ho-2');
+ assert.equal(url().props.value,'https://www.garyhome.vn/homes/can-ho-dep-o-tay-ho-2');
  await act(async()=>field('Property title · English').props.onChange({target:{value:'Can ho dep o Tay Ho'}}));
  await act(async()=>field('Public location / street').props.onChange({target:{value:'Tây Hồ'}}));
- assert.equal(url().props.value,'https://garyhome.vn/homes/can-ho-dep-o-tay-ho-2');
+ assert.equal(url().props.value,'https://www.garyhome.vn/homes/can-ho-dep-o-tay-ho-2');
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
  assert.equal(h.backend.calls.find(call=>call.table==='properties').payload.slug,'can-ho-dep-o-tay-ho-2');
 });
@@ -975,7 +1068,7 @@ test('automatic listing URL saving avoids a database title collision absent from
  await act(async()=>h.renderer.root.findAllByType('button').find(node=>node.children.includes('Add a property')).props.onClick());
  const form=()=>h.renderer.root.findByProps({className:'editor-form'}),field=label=>form().findAllByType('label').find(node=>node.children.includes(label)).findByType('input');
  for(const [label,value] of [['Property title · English','Stale database title'],['Property title · Vietnamese','Tiêu đề mới'],['Public location / street','Tây Hồ']])await act(async()=>field(label).props.onChange({target:{value}}));
- assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://garyhome.vn/homes/stale-database-title');
+ assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://www.garyhome.vn/homes/stale-database-title');
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
  assert.equal(h.backend.calls.find(call=>call.table==='properties').payload.slug,'stale-database-title-2');
 });
@@ -1001,7 +1094,7 @@ test('a new automatic listing URL does not retry a listing ID uniqueness failure
  await act(async()=>{form().props.onSubmit({preventDefault(){}});await delay(10);});
  assert.equal(h.backend.calls.filter(call=>call.table==='properties').length,1);assert.equal(field('Property title · English').props.value,'Listing ID conflict home');
  assert.match(JSON.stringify(form().findAllByProps({role:'alert'}).map(node=>node.children)),/already in use/);
- assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://garyhome.vn/homes/listing-id-conflict-home');
+ assert.equal(form().findByProps({name:'listing_url'}).props.value,'https://www.garyhome.vn/homes/listing-id-conflict-home');
 });
 
 test('a title edited during first publication keeps its draft and the URL assigned by the completed save',async t=>{
@@ -2256,10 +2349,10 @@ test('listing editor puts Save Listing first and waits for a confirmed write',as
  const toast=()=>JSON.stringify(h.renderer.toJSON());
  assert.deepEqual(actions().map(button=>button.props.type),['submit','button']);
  assert.deepEqual(actions().map(button=>button.props['data-button-variant']),['save-draft','cancel']);
- assert.ok(actions()[0].children.includes('Save Listing'));
+ assert.deepEqual(actions()[0].findAllByType('span').map(node=>node.children.join('')),['Save Listing','Save']);
  assert.match(actions()[1].props.className,/\bbutton-outline\b/);
  await act(async()=>h.site.setLanguage('vi'));
- assert.ok(actions()[0].children.includes('Lưu tin đăng'));
+ assert.deepEqual(actions()[0].findAllByType('span').map(node=>node.children.join('')),['Lưu tin đăng','Lưu']);
  assert.ok(actions()[1].children.includes('Hủy'));
  await act(async()=>h.site.setLanguage('en'));
  await submit();

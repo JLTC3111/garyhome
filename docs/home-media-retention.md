@@ -6,14 +6,15 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
 
 ### Apply the SQL in preview mode
 
-From the Gary Home repository, apply the pending incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds Owner-only removal. The third brings those controls into Inventory Files. The fourth corrects the Inventory Files timeout. Use the existing operator database service.
+From the Gary Home repository, apply the pending incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds Owner-only removal. The third brings those controls into Inventory Files. The fourth corrects the Inventory Files timeout. The fifth adds on-demand verification and separates scheduled observation from the cleanup claim. Use the existing operator database service.
 
 ```sh
 /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
   -f supabase/migrations/20261127141812_home_listing_media_inactivity.sql \
   -f supabase/migrations/20261127153844_home_listing_media_manual_removal.sql \
   -f supabase/migrations/20261127165022_home_media_inventory_controls.sql \
-  -f supabase/migrations/20261127173831_home_media_page_first_inventory.sql
+  -f supabase/migrations/20261127173831_home_media_page_first_inventory.sql \
+  -f supabase/migrations/20261127203648_home_media_verify_unused.sql
 ```
 
 The first migration sets `listing_inactivity_enabled` to `false`. To return to preview later, run the following command.
@@ -37,6 +38,17 @@ When the first three migrations are already installed, apply only [the correctiv
 The query uses catalogue fields for search and pagination, rechecks existing retention observations for selection, and classifies other files only on the displayed page. The worker still rechecks live protections before removal. The existing hourly schedule and statement limits apply.
 
 Open **Inventory Files**, search for a listing title, and check a subsequent page. The updated staff interface shows retrieval errors with a retry action. If the same page was already loaded, the panel retains those rows with deletion disabled until the next successful read.
+
+### Verify unused files on demand
+
+With the previous four migrations installed, apply the verification migration from the repository root. The updated staff app provides the Owner action, and the updated `media-orphan-cleanup` Edge Function runs observation separately on the existing hourly schedule.
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/20261127203648_home_media_verify_unused.sql
+```
+
+Open **Inventory Files** or **Retention preview** and select **Verify unused files**. The panel reports checked files, newly verified files, cleared timers, and the last completed observation. Retry a failed or incomplete pass to continue from its saved position. The action uses the existing saved-reference, upload, editing-session and hold checks. It records the 96-hour window and refreshes manual selection. Storage removal still requires the existing cleanup workflow and its final live check. The action leaves the automatic policy gate and 48-hour Trash schedules as configured.
 
 ### Inspect counts and verify the exclusions
 

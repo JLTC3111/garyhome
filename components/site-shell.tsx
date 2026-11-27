@@ -15,7 +15,9 @@ import { HeaderAccountMenu } from "./header-account-menu";
 import { FloatingContact } from "./listing-author";
 import { ServiceAppsMenu } from "./service-apps";
 
-export function Brand({light=false,href="/"}:{light?:boolean;href?:string}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href={href} aria-label={t("Gary Home homepage","Trang chủ Gary Home")}><ContentImage src="/images/brand/gary-home-logo.png" alt="Gary Home" width={220} height={64} sizes="(max-width: 640px) 193px, 220px" loading="eager"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></Link>;}
+export function Brand({light=false,href="/",compact=false}:{light?:boolean;href?:string;compact?:boolean}){const {t,language}=useSite();return <Link className={`brand rental-brand ${light?"brand-light":""}`} href={href} aria-label={t("Gary Home homepage","Trang chủ Gary Home")}>{compact
+  ? <ContentImage className="studio-brand-mark" src="/favicon.svg" alt="" width={36} height={36}/>
+  : <><ContentImage src="/images/brand/gary-home-logo.png" alt="Gary Home" width={220} height={64} sizes="(max-width: 640px) 193px, 220px" loading="eager"/><small className="brand-tagline" lang={language}>{t("HANOI RENTALS","NHÀ CHO THUÊ HÀ NỘI")}</small></>}</Link>;}
 export function Header(){
  const {t,content}=useSite(),pathname=usePathname(),path=unlocalizedPath(pathname);
  const [open,setOpen]=useState(false),[dropdown,setDropdown]=useState<"districts"|"about"|null>(null);

@@ -28,7 +28,8 @@ test('unused-media claim and target preserve live protections and both scheduled
         raise exception 'forbidden' using errcode='42501'; end if; end $$;
     create function private.lock_home_listing_media_snapshot() returns void language sql as $$ select $$;
     create function private.home_media_lock_listing_inactivity() returns void language sql as $$ select $$;
-    create function private.home_media_observe_listing_inactivity() returns void language sql as $$ select $$;
+    create function private.home_media_observe_listing_inactivity() returns void language plpgsql as $$
+      begin raise exception 'observation cannot run in a cleanup claim' using errcode='57014'; end $$;
     create function private.home_media_stage_candidates() returns void language sql as $$ select $$;
     create function private.home_photo_key(text,text) returns text language sql as $$ select $1 $$;
     create function private.home_media_referenced(text,text,boolean) returns boolean language sql stable as $$ select false $$;
@@ -59,6 +60,10 @@ test('unused-media claim and target preserve live protections and both scheduled
     definitions++;
   }
   assert.equal(definitions,7);
+  const correction=await readFile(new URL('../supabase/migrations/20261127203648_home_media_verify_unused.sql',import.meta.url),'utf8');
+  const claimDefinition=correction.match(/^create or replace function public\.home_media_claim\([\s\S]*?\n\$\$;/m);
+  assert.ok(claimDefinition);
+  await db.exec(claimDefinition[0]);
 
   const owner='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002';
   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]);

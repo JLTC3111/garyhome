@@ -9,7 +9,7 @@ import { useSite } from "./site-context";
 import { CurrencySwitcher } from "./currency-switcher";
 import RubberSegment from "./react-bits/rubber-segment";
 
-export function SitePreferences({ onOpen, studio = false }: { onOpen?: () => void; studio?: boolean }) {
+export function SitePreferences({ onOpen, studio = false, triggerText }: { onOpen?: () => void; studio?: boolean; triggerText?: string }) {
   const { language, setLanguage, currency, t } = useSite();
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
@@ -43,7 +43,7 @@ export function SitePreferences({ onOpen, studio = false }: { onOpen?: () => voi
       if (!open) onOpen?.();
       setOpen(!open);
     }}>
-      <Globe2 size={21} aria-hidden="true"/>
+      <Globe2 size={21} aria-hidden="true"/>{triggerText && <span className="listing-tool-label">{triggerText}</span>}
     </button>
     <div id={id} ref={panel} hidden={!open} inert={!open} className="site-preferences-panel" role={open ? "dialog" : undefined} aria-modal={open ? false : undefined} aria-label={label}>
       <div className="site-preferences-heading"><strong>{heading}</strong><button type="button" className="icon-button" aria-label={t("Close preferences", "Đóng tùy chọn")} onClick={close}><X size={17}/></button></div>

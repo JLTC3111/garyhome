@@ -40,6 +40,19 @@ test('Inventory Files returns a query timeout as an error with no empty-page fal
  assert.deepEqual(calls,['home_media_inventory_files']);
 });
 
+test('Owner verification reads and writes only the observation RPC and reports its timeout',async()=>{
+ const calls=[];
+ const progress={status:'complete',checked:4,recorded:1};
+ const db={rpc(name,args){calls.push([name,args]);return {abortSignal:async supplied=>{
+  assert.equal(supplied,signal);return calls.length<3?{data:progress}:{error:{code:'57014'}};
+ }};}};
+ const noWorker=()=>assert.fail('Observation cannot dispatch the deletion worker');
+ for(const action of ['observation_status','verify_unused'])
+  assert.deepEqual(await executeStorageMedia(db,{action,id:'ignored',confirm:true},signal,noWorker),{status:200,data:progress});
+ assert.deepEqual(await executeStorageMedia(db,{action:'verify_unused'},signal,noWorker),{status:504,data:{error:'observation_timeout'}});
+ assert.deepEqual(calls,[['home_media_observation',{p_verify:false}],['home_media_observation',{p_verify:true}],['home_media_observation',{p_verify:true}]]);
+});
+
 test('database and worker failures have separate actionable codes without provider details',async()=>{
  const unavailable=()=>assert.fail('Inventory must not call a worker');
  const db=code=>({rpc(){return {abortSignal:async()=>({error:{code,message:'Private fixture details'}})};}});

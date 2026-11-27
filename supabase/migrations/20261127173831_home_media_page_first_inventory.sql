@@ -1,5 +1,3 @@
--- Read catalogue/search fields first. Resolve live protection for the visible
--- rows and for observed candidates that could appear in the removal manifest.
 begin;
 
 create type private.home_media_reference_key as (bucket text,name text);

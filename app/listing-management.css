@@ -74,6 +74,12 @@
 .storage-removal-progress__current { display:flex; flex-wrap:wrap; gap:4px 10px; color:var(--muted); }
 .storage-removal-progress__current strong { min-width:0; color:var(--ink); overflow-wrap:anywhere; }
 .storage-removal-progress :is(.storage-removal-progress__current,.storage-removal-progress__detail) { font-size:.8125rem; }
+.storage-removal-progress__detail { display:grid; gap:5px; }
+.storage-removal-progress .storage-removal-progress__detail p { font-size:inherit; }
+.storage-removal-progress__diagnostic { display:flex; flex-wrap:wrap; gap:3px 16px; }
+.storage-removal-progress__diagnostic > div { display:flex; flex-wrap:wrap; gap:4px 6px; min-width:0; }
+.storage-removal-progress__diagnostic dt { color:var(--muted); }
+.storage-removal-progress__diagnostic dd { min-width:0; margin:0; overflow-wrap:anywhere; }
 .storage-removal-progress__metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,104px),1fr)); gap:12px 16px; }
 .storage-removal-progress__metrics dt { font-size:.75rem; color:var(--muted); }
 .storage-removal-progress__metrics dd { margin:3px 0 0; font-size:.875rem; font-weight:650; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }

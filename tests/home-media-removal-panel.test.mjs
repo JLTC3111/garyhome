@@ -57,6 +57,7 @@ for (const theme of ['light', 'dark']) {
     }
     verify('Text', panel.color, panel.background, 4.5);
     verify('Secondary text', label.color, panel.background, 4.5);
+    verify('Diagnostic labels', styles(panelCss, '.storage-removal-progress__diagnostic dt').color, panel.background, 4.5);
     const outlineText = styles(globals, '.button-outline').color;
     verify('Outline button text', outlineText, panel.background, 4.5);
     verify('Outline button hover', outlineText, 'var(--studio-quiet-hover)', 4.5);
@@ -69,7 +70,7 @@ for (const theme of ['light', 'dark']) {
     verify('Progress fill and track', fill.background, track.background, 3);
   });
 
-  test(`${theme} panel resumes, stops after the current file, then cancels and unlocks File Trash`, async () => {
+  test(`${theme} panel explains the system pause, resumes, cancels and runs an individual deletion`, async () => {
     const owner = 'owner';
     const prefix = `gary-home:media:${owner}`;
     const key = `${prefix}:trash-run`;
@@ -79,7 +80,9 @@ for (const theme of ['light', 'dark']) {
     }));
     const initial = trash.makeTrashRun(files);
     initial.state = 'paused';
-    initial.issue = 'stopped';
+    initial.issue = 'media_busy';
+    initial.entries[1].reason = 'media_busy';
+    initial.entries[1].retryCount = 1;
     initial.entries[0].outcome = 'removed';
     initial.timing = {elapsedMs:5000, measuredFiles:1};
     const store = new Map([[key, JSON.stringify(initial)], [`${prefix}:trash-selection`, JSON.stringify(files.slice(1))]]);
@@ -104,6 +107,7 @@ for (const theme of ['light', 'dark']) {
             candidates:0, candidateBytes:0, abandoned:0, activeUploads:0, broken:0, enabled:true, crossAppProtection:true,
             earlyEligible:live.size, overdue:0, trashed:live.size, checkedAt:new Date().toISOString()});
           case 'trash_manifest': return Response.json({items:[...live.values()]});
+          case 'trash_receipt': return Response.json(live.has(args.id)?{status:'eligible',bytes:120}:{status:'removed',bytes:120});
           case 'trash_page': return Response.json({items:[...live.values()].map(item=>({...item,state:'trashed',restore_mode:'file'})),
             hasMore:false, available:true});
           case 'removed_page': return Response.json({items:[], hasMore:false, available:true});
@@ -136,6 +140,10 @@ for (const theme of ['light', 'dark']) {
       await act(async()=>{view.root.findByType('details').props.onToggle({currentTarget:{open:true}});});
       await click('File Trash');
       assert.equal(state(),'paused');
+      assert.equal(view.root.findByProps({className:'storage-removal-progress'}).findByType('h3').children.join(''),'Removal paused by the system');
+      const diagnostic=view.root.findByProps({className:'storage-removal-progress__diagnostic'});
+      assert.equal(diagnostic.findByType('code').children.join(''),'media_busy');
+      assert.deepEqual(diagnostic.findAllByType('dd').filter(node=>typeof node.children[0]==='string').map(node=>node.children.join('')),['two.webp','1']);
       assert.equal(button('Resume').props.disabled,false);
       assert.equal(button('Permanently delete now').props.disabled,true);
       await click('Resume');
@@ -151,7 +159,9 @@ for (const theme of ['light', 'dark']) {
       assert.equal(state(),'paused');
       assert.ok(saved().timing.elapsedMs>=5000);
       assert.equal(trash.trashRunTotals(saved()).removed,2);
+      const requestsBeforeCancel=calls.length;
       await click('Cancel remaining');
+      assert.equal(calls.length,requestsBeforeCancel,'cancelling without a sent item needs no inventory request');
       assert.equal(state(),'cancelled');
       assert.equal(view.root.findByProps({className:'storage-media-controls'}).props.hidden,false);
       assert.equal(button('Permanently delete now').props.disabled,false);
@@ -161,6 +171,11 @@ for (const theme of ['light', 'dark']) {
       await act(async()=>view.root.findByProps({'aria-label':'Select three.webp'}).props.onChange({target:{checked:true}}));
       assert.equal(button('Permanently delete selected (1)').props.disabled,false);
       assert.deepEqual(calls.filter(call=>call.action==='purge').map(call=>call.id),['two']);
+      await click('Permanently delete now');
+      await act(async()=>finishDeletion());
+      assert.equal(state(),'completed');
+      assert.deepEqual(calls.filter(call=>call.action==='trash_receipt').map(call=>call.id),['three']);
+      assert.deepEqual(calls.filter(call=>call.action==='purge').map(call=>call.id),['two','three']);
       assert.ok(calls.some(call=>call.action==='removed_page'));
     } finally {
       if (view) await act(async()=>view.unmount());

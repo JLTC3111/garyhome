@@ -121,6 +121,7 @@ test('cancellation waits for an in-flight receipt, keeps successes and releases 
   const save=next=>{checkpoint=JSON.stringify(next);};
   const stillWorking=await cancelTrashRun(saved,{receipt:async()=>({status:'removal_in_progress'}),save});
   assert.equal(stillWorking.state,'paused');
+  assert.equal(stillWorking.issueItemId,'49');
   assert.equal(trashRunUnfinished(stillWorking),true);
   const notYetClaimed=await cancelTrashRun(readTrashRun(checkpoint),{receipt:async()=>({status:'eligible'}),save});
   assert.equal(notYetClaimed.issue,'removal_verification_wait');
@@ -147,18 +148,131 @@ test('resuming checks previously sent items and excludes restored, removed and c
   assert.equal(run.state,'completed');
 });
 
-test('persistent locks pause after bounded attempts and can be cancelled without resending',async()=>{
-  let writes=0,reads=0;
-  const paused=await processTrashRun(makeTrashRun([file('one'),file('two')]),{...defaults,
-    async purge(_,beforeSend){beforeSend();writes++;throw new Error('media_busy');},
-    async receipt(){reads++;return {status:'eligible'};},
-  });
+test('the 48/448 legacy checkpoint defers a persistently locked file and finishes the other 399',async()=>{
+  const files=Array.from({length:448},(_,index)=>file(String(index+1)));
+  const legacy={
+    version:1,confirmedAt:new Date().toISOString(),
+    entries:files.map((item,index)=>({...item,outcome:index<48?'removed':'pending',reason:index===48?'media_busy':undefined})),
+    timing:{elapsedMs:401000,measuredFiles:48,pauseReason:'media_busy'},
+  };
+  const paused=readTrashRun(JSON.stringify(legacy));
   assert.equal(paused.state,'paused');
   assert.equal(paused.issue,'media_busy');
-  assert.equal(writes,3);
-  assert.equal(reads,3);
-  const cancelled=await cancelTrashRun(paused,{...defaults,receipt:()=>assert.fail('no request is in flight')});
-  assert.equal(trashRunTotals(cancelled).cancelled,2);
+  assert.equal(paused.issueItemId,'49');
+  assert.equal(paused.entries[48].retryCount,undefined);
+  assert.equal(trashRunTotals(paused).removed,48);
+  assert.equal(trashRunTotals(paused).pending,400);
+  const cancelled=await cancelTrashRun(paused,{...defaults,receipt:()=>assert.fail('legacy lock refusal has no sent item')});
+  assert.equal(readTrashRun(JSON.stringify(cancelled)).issue,undefined);
+  assert.equal(trashRunTotals(cancelled).removed,48);
+  assert.equal(trashRunTotals(cancelled).cancelled,400);
+  const requested=[],reads=[],waits=[],retries=[];
+  let saved,manifestReads=0;
+  const completed=await processTrashRun(paused,{...defaults,
+    save:run=>{saved=run;},
+    eligible:async()=>{manifestReads++;return files.slice(48);},
+    async purge({id},beforeSend){
+      if(id==='50')assert.equal(saved.entries[48].outcome,'skipped');
+      beforeSend();requested.push(id);
+      if(id==='49'){
+        retries.push(saved.entries[48].retryCount);
+        throw new Error('media_busy');
+      }
+      return {status:'ok',removed:1};
+    },
+    async receipt({id}){reads.push(id);return {status:'eligible'};},
+    async wait(delay){
+      assert.equal(saved.issue,'media_busy');
+      assert.equal(saved.issueItemId,'49');
+      waits.push(delay);
+    },
+  });
+  assert.deepEqual(requested,['49','49',...files.slice(48).map(item=>item.id)]);
+  assert.deepEqual(reads,['49','49','49']);
+  assert.deepEqual(retries,[0,1,2]);
+  assert.equal(waits.length,2);
+  assert.ok(0<waits[0]&&waits[0]<=2000);
+  assert.ok(waits[0]<waits[1]&&waits[1]<=5000);
+  assert.equal(manifestReads,1);
+  assert.equal(completed.state,'completed');
+  assert.equal(completed.entries[48].reason,'media_lock_deferred');
+  assert.equal(completed.entries[48].retryCount,2);
+  assert.equal(trashRunTotals(completed).removed,447);
+  assert.equal(trashRunTotals(completed).skipped,1);
+});
+
+test('an unresolved receipt after both lock retries pauses with file and retry details',async()=>{
+  const requested=[];
+  let reads=0;
+  const paused=await processTrashRun(makeTrashRun([file('one'),file('two')]),{...defaults,
+    async purge({id},beforeSend){beforeSend();requested.push(id);throw new Error('media_busy');},
+    async receipt(){return {status:++reads===3?'removal_in_progress':'eligible'};},
+  });
+  assert.equal(paused.state,'paused');
+  assert.equal(paused.issue,'removal_in_progress');
+  assert.equal(paused.issueItemId,'one');
+  assert.equal(paused.entries[0].outcome,'sent');
+  assert.equal(paused.entries[0].retryCount,2);
+  assert.deepEqual(requested,['one','one','one']);
+  const cancelled=await cancelTrashRun(readTrashRun(JSON.stringify(paused)),{...defaults,
+    receipt:async({id})=>{assert.equal(id,'one');return {status:'removed'};},
+  });
+  assert.equal(trashRunTotals(cancelled).removed,1);
+  assert.equal(trashRunTotals(cancelled).cancelled,1);
+});
+
+test('interrupting a lock delay preserves the retry budget and remaining delay on resume',async()=>{
+  let stopped=false,checkpoint;
+  const retries=[],waits=[];
+  const options={...defaults,
+    save:run=>{checkpoint=JSON.stringify(run);},
+    stopped:()=>stopped,
+    async purge({id},beforeSend){
+      beforeSend();
+      if(id==='two')return {status:'ok',removed:1};
+      retries.push(JSON.parse(checkpoint).entries[0].retryCount);
+      throw new Error('media_busy');
+    },
+    receipt:async()=>({status:'eligible'}),
+  };
+  await processTrashRun(makeTrashRun(['one','two'].map(file)),{...options,
+    async wait(){stopped=true;},
+  });
+  const saved=readTrashRun(checkpoint);
+  assert.equal(saved.state,'paused');
+  assert.equal(saved.entries[0].retryCount,0);
+  assert.ok(saved.entries[0].retryAfter>Date.now());
+  stopped=false;
+  const completed=await processTrashRun(saved,{...options,wait:async delay=>{waits.push(delay);}});
+  assert.deepEqual(retries,[0,1,2]);
+  assert.equal(waits.length,2);
+  assert.equal(trashRunTotals(completed).skipped,1);
+  assert.equal(trashRunTotals(completed).removed,1);
+});
+
+test('an occupied worker pauses the run without attempting the other files',async()=>{
+  const requested=[];
+  const paused=await processTrashRun(makeTrashRun(['one','two'].map(file)),{...defaults,
+    async purge({id},beforeSend){beforeSend();requested.push(id);return {status:'busy'};},
+    receipt:()=>assert.fail('the worker refused the claim'),
+  });
+  assert.deepEqual(requested,['one']);
+  assert.equal(paused.issue,'cleanup_worker_busy');
+  assert.equal(paused.issueItemId,'one');
+  assert.equal(paused.entries[0].retryCount,0);
+  assert.equal(paused.entries[0].outcome,'pending');
+});
+
+test('unexpected request and saved error messages are reduced to a public code',async()=>{
+  const original=makeTrashRun([file('one')]);
+  const paused=await processTrashRun(original,{...defaults,
+    async purge(){throw new Error('backend error with private details');},
+    receipt:()=>assert.fail('the request was never dispatched'),
+  });
+  assert.equal(paused.issue,'cleanup_unconfirmed');
+  assert.equal(paused.issueItemId,'one');
+  assert.equal(paused.entries[0].retryCount,0);
+  assert.equal(readTrashRun(JSON.stringify({...paused,issue:'private details'})).issue,'cleanup_unconfirmed');
 });
 
 test('an unreadable checkpoint write prevents dispatching the deletion',async()=>{

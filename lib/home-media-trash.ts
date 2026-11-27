@@ -4,11 +4,16 @@ export type CleanupResult = { status: string; removed?: number; attempted?: numb
 export type TrashReceipt = { status: string; bytes?: number | null };
 export type TrashOperationState = "idle" | "running" | "stopping" | "paused" | "completed" | "cancelled" | "failed";
 type Outcome = "pending" | "sent" | "removed" | "skipped" | "failed" | "cancelled";
-type TrashEntry = TrashTarget & { outcome: Outcome; reason?: string; sentAt?: number };
+type TrashEntry = TrashTarget & { outcome: Outcome; reason?: string; sentAt?: number; retryCount?: number; retryAfter?: number };
 type TrashRunTiming = { elapsedMs: number; measuredFiles: number; pauseReason?: string };
-export type TrashRun = { version: 1; confirmedAt: string; state: Exclude<TrashOperationState, "idle">; issue?: string; entries: TrashEntry[]; timing?: TrashRunTiming };
+export type TrashRun = {
+  version: 1; confirmedAt: string; state: Exclude<TrashOperationState, "idle">; issue?: string; issueItemId?: string;
+  entries: TrashEntry[]; timing?: TrashRunTiming;
+};
 export type TrashRunClock = { startedAt: number; elapsedBefore: number; measuredBefore: number; processedBefore: number };
 export const mediaRequestTimeoutMs = 59_000;
+const lockRetryDelays=[1500,4500];
+const lockRetryJitterMs=500;
 
 export function trashRunUnfinished(run:TrashRun|null) {
   return !!run?.entries.some(item=>item.outcome==="pending"||item.outcome==="sent");
@@ -32,7 +37,7 @@ export function matchingTrashTargets(selected:TrashTarget[],live:TrashTarget[]) 
 
 export function makeTrashRun(items:TrashTarget[]):TrashRun {
   if(!items.length || new Set(items.map(item=>item.id)).size!==items.length || !items.every(isTrashTarget)) throw new Error("invalid_request");
-  return {version:1,confirmedAt:new Date().toISOString(),state:"running",entries:items.map(item=>({...item,outcome:"pending"})),
+  return {version:1,confirmedAt:new Date().toISOString(),state:"running",entries:items.map(item=>({...item,outcome:"pending",retryCount:0})),
     timing:{elapsedMs:0,measuredFiles:0}};
 }
 
@@ -50,13 +55,24 @@ export function readTrashRun(source:string|null):TrashRun|null {
     (timing.pauseReason!==undefined&&typeof timing.pauseReason!=="string")))delete run.timing;
   // A persisted running state cannot establish that a browser still owns the lock.
   // Open it as resumable until the operator takes the lock and checks any sent item.
-  if(typeof run.issue!=="string")run.issue=run.timing?.pauseReason;
+  const issue=run.issue??run.timing?.pauseReason;
+  if(issue!==undefined)run.issue=trashRunIssueCode(issue);
+  for(const item of run.entries){
+    if(!Number.isSafeInteger(item.retryCount)||(item.retryCount??0)<0||(item.retryCount??0)>lockRetryDelays.length)delete item.retryCount;
+    if(item.outcome!=="pending"||item.reason!=="media_busy"||!Number.isSafeInteger(item.retryAfter)||
+      (item.retryCount??0)>=lockRetryDelays.length)delete item.retryAfter;
+  }
   if(trashRunUnfinished(run)){
     if(run.state!=="failed")run.state="paused";
     run.issue??="trash_run_interrupted";
-  }else if(run.state!=="cancelled"&&run.state!=="failed"){
-    run.state="completed";
+    if(!run.entries.some(item=>item.id===run.issueItemId)){
+      run.issueItemId=(run.entries.find(item=>item.outcome==="sent")??
+        run.entries.find(item=>item.outcome==="pending"&&item.reason===run.issue))?.id;
+    }
+  }else if(run.state!=="failed"){
+    if(run.state!=="cancelled")run.state="completed";
     delete run.issue;
+    delete run.issueItemId;
   }
   return run;
 }
@@ -83,8 +99,15 @@ export function trashRunEta(remaining:number,timing:TrashRunTiming|null|undefine
 }
 
 type PurgePayload = { action:"purge"; id:string; expiresAt:string; confirm:true };
-const preflightRefusals=new Set(["cleanup_disabled","session_expired","cross_app_protection_required",
+const preflightRefusals=new Set(["cleanup_disabled","cleanup_worker_busy","session_expired","cross_app_protection_required",
   "cross_app_protection_unconfirmed","cleanup_worker_missing","owner_check_unavailable","backend_config"]);
+const publicIssueCodes=new Set([...preflightRefusals,"stopped","media_busy","forbidden","invalid_request","cleanup_unconfirmed",
+  "purge_unavailable","purge_unconfirmed","purge_timeout","removal_in_progress","removal_unconfirmed","removal_verification_wait",
+  "inventory_timeout","inventory_unavailable","trash_bulk_setup","trash_checkpoint_storage","trash_run_interrupted"]);
+export function trashRunIssueCode(code:unknown) {
+  return typeof code==="string"&&publicIssueCodes.has(code)?code:"cleanup_unconfirmed";
+}
+
 const skippedCodes=new Set(["selection_changed","already_removed","no_longer_eligible","protected","identity_changed",
   "expired","owner_hold","active_upload","retry_wait","attempt_limit","missing_expiry"]);
 
@@ -113,8 +136,8 @@ async function reconcileSent(run:TrashRun,receipt:ReceiptReader,save:(run:TrashR
   for(const [index,item] of run.entries.entries()){
     if(item.outcome!=="sent")continue;
     const result=await readOutcome(item,receipt);
-    if(result==="removal_in_progress"||result==="removal_unconfirmed")return {run:current,issue:result};
-    if(result==="eligible"&&mayStillBeDispatched(item))return {run:current,issue:"removal_verification_wait"};
+    if(result==="removal_in_progress"||result==="removal_unconfirmed")return {run:current,issue:result,itemId:item.id};
+    if(result==="eligible"&&mayStillBeDispatched(item))return {run:current,issue:"removal_verification_wait",itemId:item.id};
     const entries=current.entries.slice();
     entries[index]=result==="eligible"?{...item,outcome:"pending",sentAt:undefined,reason:undefined}:result;
     current={...current,entries};
@@ -125,14 +148,13 @@ async function reconcileSent(run:TrashRun,receipt:ReceiptReader,save:(run:TrashR
 
 export async function cancelTrashRun(run:TrashRun,options:{receipt:ReceiptReader;save:(run:TrashRun)=>void}) {
   const reconciled=await reconcileSent(run,options.receipt,options.save);
-  const next:TrashRun=reconciled.issue?{...reconciled.run,state:"paused",issue:reconciled.issue}:
-    {...reconciled.run,state:"cancelled",issue:undefined,
-      entries:reconciled.run.entries.map(item=>item.outcome==="pending"?{...item,outcome:"cancelled",reason:undefined}:item)};
+  const next:TrashRun=reconciled.issue?{...reconciled.run,state:"paused",issue:reconciled.issue,issueItemId:reconciled.itemId}:
+    {...reconciled.run,state:"cancelled",issue:undefined,issueItemId:undefined,
+      entries:reconciled.run.entries.map(item=>item.outcome==="pending"?{...item,outcome:"cancelled",reason:undefined,retryAfter:undefined}:item)};
   options.save(next);
   return next;
 }
 
-const lockRetryDelays=[750,2000];
 const waitForRetry=(delay:number)=>new Promise<void>(resolve=>setTimeout(resolve,delay));
 
 export async function processTrashRun(run:TrashRun, options:{
@@ -140,61 +162,73 @@ export async function processTrashRun(run:TrashRun, options:{
   save:(run:TrashRun)=>void; stopped:()=>boolean; afterBatch?:(run:TrashRun)=>void;
   eligible?:()=>Promise<TrashTarget[]>; wait?:(delay:number)=>Promise<void>;
 }) {
-  let current:TrashRun={...run,state:"running",issue:undefined};
+  let current:TrashRun={...run,state:"running",issue:undefined,issueItemId:undefined};
   function save(next:TrashRun) {
     options.save(next);
     current=next;
   }
-  function finish(issue?:string) {
-    save({...current,state:issue?"paused":"completed",issue});
+  function finish(issue?:string, itemId?:string) {
+    save({...current,state:issue?"paused":"completed",issue,issueItemId:issue&&issue!=="stopped"?itemId:undefined});
     return current;
   }
-  function record(index:number,item:TrashEntry) {
+  function record(index:number,item:TrashEntry,issue?:string) {
     const entries=current.entries.slice();
     entries[index]=item;
-    save({...current,entries});
+    save({...current,entries,issue,issueItemId:issue?item.id:undefined});
   }
   async function removeOne(index:number) {
-    for(let attempt=0;;attempt++){
+    for(;;){
       if(options.stopped())return "stopped";
       const item=current.entries[index];
+      const retryAfter=item.retryAfter;
+      const delay=retryAfter===undefined?0:Math.min(Math.max(...lockRetryDelays)+lockRetryJitterMs,retryAfter-Date.now());
+      if(delay>0){
+        if(current.issueItemId!==item.id)save({...current,issue:"media_busy",issueItemId:item.id});
+        await (options.wait??waitForRetry)(delay);
+      }
+      if(options.stopped())return "stopped";
       if(Date.parse(item.expires_at)<=Date.now()){
-        record(index,{...item,outcome:"skipped",reason:"expired"});return;
+        record(index,{...item,outcome:"skipped",reason:"expired",retryAfter:undefined});return;
       }
       let issue="";
       try{
         const result=await options.purge({action:"purge",id:item.id,expiresAt:item.expires_at,confirm:true},()=>{
           if(options.stopped())throw new Error("stopped");
-          record(index,{...item,outcome:"sent",sentAt:Date.now(),reason:undefined});
+          // Count only retries that reach dispatch, so a reload during a delay does not spend the budget.
+          record(index,{...item,outcome:"sent",sentAt:Date.now(),reason:undefined,retryAfter:undefined,
+            retryCount:(item.retryCount??0)+(retryAfter===undefined?0:1)});
         });
         if(result.status==="ok"&&result.removed===1){
-          record(index,{...item,outcome:"removed",reason:undefined});return;
+          record(index,{...current.entries[index],outcome:"removed",sentAt:undefined});return;
         }
-        issue=result.status==="busy"?"media_busy":result.status==="disabled"?"cleanup_disabled":"purge_unconfirmed";
+        issue=result.status==="busy"?"cleanup_worker_busy":result.status==="disabled"?"cleanup_disabled":"purge_unconfirmed";
       }catch(error){
         if(error instanceof Error&&error.message==="trash_checkpoint_storage")throw error;
-        issue=error instanceof Error?(error.name==="RequestTimeoutError"?"inventory_timeout":error.message):"cleanup_unconfirmed";
+        issue=error instanceof Error&&error.name==="RequestTimeoutError"?"inventory_timeout":trashRunIssueCode(error instanceof Error?error.message:undefined);
         if(current.entries[index].outcome!=="sent")return issue;
       }
+      const sent=current.entries[index];
       if(preflightRefusals.has(issue)){
-        record(index,{...item,outcome:"pending",reason:issue});return issue;
+        record(index,{...sent,outcome:"pending",reason:issue,sentAt:undefined});return issue;
       }
       const knownRefusal=issue==="purge_unavailable";
-      const result=await readOutcome(current.entries[index],options.receipt,knownRefusal);
+      const result=await readOutcome(sent,options.receipt,knownRefusal);
       if(typeof result!=="string"){record(index,result);return;}
       if(result==="removal_in_progress")return result;
       if(result==="removal_unconfirmed")return issue==="inventory_timeout"?"purge_timeout":issue==="forbidden"?issue:result;
       if(issue==="media_busy"){
-        // A definite contention response and a fresh eligible receipt establish
-        // that the file can be attempted again under the unchanged server guard.
-        record(index,{...item,outcome:"pending",reason:issue});
-        if(attempt>=lockRetryDelays.length)return issue;
-        if(options.stopped())return "stopped";
-        await (options.wait??waitForRetry)(lockRetryDelays[attempt]);
+        // Only the definitive lock refusal and an eligible receipt allow deferral.
+        // A missing receipt or one showing an in-flight deletion pauses above.
+        const retries=sent.retryCount??0;
+        if(retries>=lockRetryDelays.length){
+          record(index,{...sent,outcome:"skipped",reason:"media_lock_deferred",sentAt:undefined});return;
+        }
+        const nextAttemptAt=Date.now()+lockRetryDelays[retries]+Math.floor(Math.random()*lockRetryJitterMs);
+        record(index,{...sent,outcome:"pending",reason:issue,sentAt:undefined,retryAfter:nextAttemptAt},issue);
         continue;
       }
       if(knownRefusal||issue==="purge_unconfirmed"){
-        record(index,{...item,outcome:knownRefusal?"skipped":"failed",reason:issue});return;
+        record(index,{...sent,outcome:knownRefusal?"skipped":"failed",reason:issue,sentAt:undefined});return;
       }
       return issue==="inventory_timeout"?"purge_timeout":issue==="forbidden"?issue:"removal_unconfirmed";
     }
@@ -202,7 +236,7 @@ export async function processTrashRun(run:TrashRun, options:{
 
   save(current);
   const reconciled=await reconcileSent(current,options.receipt,save);
-  if(reconciled.issue)return finish(reconciled.issue);
+  if(reconciled.issue)return finish(reconciled.issue,reconciled.itemId);
   if(options.stopped()&&trashRunUnfinished(current))return finish("stopped");
   if(options.eligible&&trashRunUnfinished(current)){
     const pending=current.entries.filter(item=>item.outcome==="pending");
@@ -214,7 +248,7 @@ export async function processTrashRun(run:TrashRun, options:{
   for(let start=0;start<pending.length;start+=mediaBatchSize){
     for(const index of pending.slice(start,start+mediaBatchSize)){
       const issue=await removeOne(index);
-      if(issue)return finish(issue);
+      if(issue)return finish(issue,current.entries[index].id);
     }
     options.afterBatch?.(current);
   }

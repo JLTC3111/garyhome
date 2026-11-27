@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { PROPERTY_IMAGE_ORIGIN } from "@/lib/property-photo-files";
 import { cancelTrashRun, isTrashTarget, makeTrashRun, matchingTrashTargets, mediaRequestTimeoutMs, processTrashRun, readTrashRun,
-  trashRunTiming, trashRunTotals, trashRunUnfinished, type CleanupResult, type TrashOperationState, type TrashReceipt,
+  trashRunIssueCode, trashRunTiming, trashRunTotals, trashRunUnfinished, type CleanupResult, type TrashOperationState, type TrashReceipt,
   type TrashRun, type TrashRunClock, type TrashTarget } from "@/lib/home-media-trash";
 import type { ListingDeletion } from "@/lib/property-deletion-server";
 import { useSite } from "./site-context";
@@ -90,6 +90,7 @@ function mediaMessage(issue:unknown,t:ReturnType<typeof useSite>["t"]) {
     case "restore_snapshot_missing": return t("The original listing details needed for restore are unavailable.","Thiếu dữ liệu của tin đăng gốc cần thiết để khôi phục.");
     case "restore_conflict": return t("The listing media changed. Review the current listing before restoring this file.","Tệp tin đăng đã thay đổi. Kiểm tra tin hiện tại trước khi khôi phục.");
     case "cleanup_disabled": return t("Permanent cleanup is paused.","Đang tạm dừng xóa vĩnh viễn.");
+    case "cleanup_worker_busy": return t("Another cleanup run has the worker. Resume when it finishes.","Tác vụ đang chạy một lượt dọn khác. Hãy tiếp tục sau khi lượt đó hoàn tất.");
     case "cleanup_worker_missing": return t("The cleanup worker is missing. Ask the operator to deploy media-orphan-cleanup.","Thiếu tác vụ dọn tệp. Nhờ người vận hành triển khai media-orphan-cleanup.");
     case "cleanup_worker_unavailable": return t("The cleanup worker did not confirm its configuration. Ask the operator to check its deployment and credentials.","Tác vụ dọn tệp chưa xác nhận cấu hình. Nhờ người vận hành kiểm tra bản triển khai và thông tin xác thực.");
     case "cross_app_protection_required": return t("Apply the Home cross-application media protection migration before permanent removal.","Áp dụng bản cập nhật bảo vệ tệp giữa các ứng dụng trước khi xóa vĩnh viễn.");
@@ -117,6 +118,7 @@ function mediaMessage(issue:unknown,t:ReturnType<typeof useSite>["t"]) {
     case "attempt_limit": return t("The cleanup retry limit was reached.","Đã đạt giới hạn thử lại khi dọn tệp.");
     case "missing_expiry": return t("The restore deadline is unavailable.","Không có hạn khôi phục.");
     case "media_busy": return t("A listing edit or cleanup holds a media lock. Try again after it finishes.","Một thao tác chỉnh tin hoặc dọn tệp đang giữ khóa. Hãy thử lại sau khi hoàn tất.");
+    case "media_lock_deferred": return t("The lock persisted after retries. The file remains in File Trash.","Tệp vẫn bị khóa sau khi thử lại. Tệp vẫn nằm trong Thùng rác.");
     case "session_expired": return t("Sign in again to verify the Owner session.","Đăng nhập lại để xác minh phiên Chủ sở hữu.");
     case "cleanup_unconfirmed": case "purge_unavailable": case "purge_unconfirmed": return t("Permanent removal could not be confirmed. Check File Trash and Cleanup History before retrying.","Chưa xác nhận xóa vĩnh viễn. Kiểm tra Thùng rác và Lịch sử dọn tệp trước khi thử lại.");
     case "backend_config": return t("Check the staff deployment’s Home Supabase URL and publishable key.","Kiểm tra URL Supabase và khóa công khai của Home trong bản triển khai nhân viên.");
@@ -332,7 +334,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
         eligible:revalidate?eligibleTrash:undefined,
       });
     }catch(issue){
-      const code=issue instanceof Error?(issue.name==="RequestTimeoutError"?"inventory_timeout":issue.message):"cleanup_unconfirmed";
+      const code=issue instanceof Error&&issue.name==="RequestTimeoutError"?"inventory_timeout":trashRunIssueCode(issue instanceof Error?issue.message:undefined);
       const failed:TrashRun={...latestRun,state:"failed",issue:code};
       try{saveProgress(failed);}
       catch{if(active.current)setTrashRun(failed);}
@@ -383,10 +385,11 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     await work("cancel_purge",()=>withCheckpointLock(async()=>{
       const saved=readSavedRun();
       if(!saved||!trashRunUnfinished(saved)){setTrashRun(saved);return;}
+      const checkingReceipt=saved.entries.some(item=>item.outcome==="sent");
       const cancelled=await cancelTrashRun(saved,{receipt:getReceipt,save:saveRun});
       if(!active.current||cancelled.state!=="cancelled")return;
       trashSelection.remove(cancelled.entries.map(item=>item.id));
-      await refreshAfterChange(true);
+      if(checkingReceipt)await refreshAfterChange(true);
     }));
   }
   async function selectAllTrash() {

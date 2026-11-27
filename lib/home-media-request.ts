@@ -4,6 +4,7 @@ const panelActions = new Set(["overview", "inventory_scan", "inventory_page", "t
 const inventoryActions = new Set(["status", "scan", "trash", "restore", ...panelActions]);
 const reviewActions = new Map<string, string>(["page", "verify", "hold", "release", "enroll"].map(action => [`orphan_${action}`, action]));
 export const storageMediaActions = new Set([...inventoryActions, ...reviewActions.keys(), "worker_status", "run", "purge"]);
+const rpcMissing = (code?: string) => code === "PGRST202" || code === "42883";
 
 export async function executeStorageMedia(
   db: SupabaseClient,
@@ -12,17 +13,21 @@ export async function executeStorageMedia(
   worker: () => Promise<Response>,
 ) {
   const review = reviewActions.get(input.action);
+  const offset = Number.isInteger(input.offset) ? input.offset : 0;
   if (review || inventoryActions.has(input.action)) {
     const args = review ? { p_action: review, p_payload: input } : {
       p_action: input.action,
       p_id: input.action === "restore" ? input.id : null,
-      p_offset: Number.isInteger(input.offset) ? input.offset : 0,
+      p_offset: offset,
     };
-    const { data, error } = await db.rpc(review ? "home_media_review" : "home_media_management", args).abortSignal(signal);
+    const dashboard = input.action === "overview" || input.action === "trash_page"
+      ? await db.rpc("home_media_dashboard", { p_action: input.action, p_offset: offset }).abortSignal(signal) : null;
+    const { data, error } = dashboard && !rpcMissing(dashboard.error?.code) ? dashboard :
+      await db.rpc(review ? "home_media_review" : "home_media_management", args).abortSignal(signal);
     if (!error && data) return { status: 200, data };
     const code = error?.code;
     if (code === "42501") return { status: 403, data: { error: "forbidden" } };
-    if (code === "PGRST202" || code === "42883") return { status: 503, data: { error: review ? "orphan_review_setup" : "inventory_rpc_missing" } };
+    if (rpcMissing(code)) return { status: 503, data: { error: review ? "orphan_review_setup" : "inventory_rpc_missing" } };
     if (code === "57014") return { status: 504, data: { error: "inventory_timeout" } };
     if (code === "22023" && panelActions.has(input.action) && error?.message === "listing_cleanup.invalid_manifest") {
       return { status: 503, data: { error: "inventory_panel_upgrade" } };
@@ -34,6 +39,13 @@ export async function executeStorageMedia(
       return { status: 409, data: { error: issue || "conflict" } };
     }
     return { status: 503, data: { error: "inventory_unavailable" } };
+  }
+
+  if (input.action === "run" || input.action === "purge") {
+    const guard = await db.rpc("home_media_dashboard", { p_action: "readiness", p_offset: 0 }).abortSignal(signal);
+    if (guard.error?.code === "42501") return { status: 403, data: { error: "forbidden" } };
+    if (rpcMissing(guard.error?.code)) return { status: 503, data: { error: "cross_app_protection_required" } };
+    if (guard.error || guard.data?.crossAppProtection !== true) return { status: 503, data: { error: "cross_app_protection_unconfirmed" } };
   }
 
   try {

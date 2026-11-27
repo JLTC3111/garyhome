@@ -17,7 +17,7 @@ test('Home storage inventory, scan, soft staging and restore work independently 
   assert.deepEqual(result,{status:200,data:report});
  }
  assert.deepEqual(calls.map(c=>c.args.p_action),actions);
- assert.equal(calls[0].args.p_id,null);
+ assert.deepEqual(calls[0],{name:'home_media_dashboard',args:{p_action:'overview',p_offset:30}});
  assert.equal(calls.at(-1).args.p_id,'test-id');
 });
 
@@ -30,10 +30,25 @@ test('database and worker failures have separate actionable codes without provid
  assert.deepEqual(await executeStorageMedia(db('57014'),{action:'inventory_scan'},signal,unavailable),{status:504,data:{error:'inventory_timeout'}});
  const old={rpc(){return {abortSignal:async()=>({error:{code:'22023',message:'listing_cleanup.invalid_manifest'}})};}};
  assert.deepEqual(await executeStorageMedia(old,{action:'overview'},signal,unavailable),{status:503,data:{error:'inventory_panel_upgrade'}});
- const res=await executeStorageMedia(db('unknown'),{action:'run'},signal,async()=>new Response('Provider details',{status:404}));
+ const ready={rpc(){return {abortSignal:async()=>({data:{crossAppProtection:true}})};}};
+ const res=await executeStorageMedia(ready,{action:'run'},signal,async()=>new Response('Provider details',{status:404}));
  assert.deepEqual(res,{status:503,data:{error:'cleanup_worker_missing'}});
  const missing=await executeStorageMedia(db('unknown'),{action:'worker_status'},signal,async()=>new Response('Provider details',{status:404}));
  assert.deepEqual(missing,{status:503,data:{error:'cleanup_worker_missing'}});
+});
+
+test('permanent requests require authenticated cross-application readiness before calling the worker',async()=>{
+ const unavailable=()=>assert.fail('No permanent operation should reach the worker');
+ const db=code=>({rpc(name,args){
+   assert.equal(name,'home_media_dashboard');assert.equal(args.p_action,'readiness');
+   return {abortSignal:async()=>({error:{code}})};
+ }});
+ assert.deepEqual(await executeStorageMedia(db('PGRST202'),{action:'purge'},signal,unavailable),
+   {status:503,data:{error:'cross_app_protection_required'}});
+ assert.equal((await executeStorageMedia(db('42501'),{action:'run'},signal,unavailable)).status,403);
+ assert.equal((await executeStorageMedia(db('57014'),{action:'purge'},signal,unavailable)).data.error,'cross_app_protection_unconfirmed');
+ const legacy={rpc(name){return {abortSignal:async()=>name==='home_media_dashboard'?{error:{code:'PGRST202'}}:{data:{objects:3}}};}};
+ assert.deepEqual(await executeStorageMedia(legacy,{action:'overview'},signal,unavailable),{status:200,data:{objects:3}});
 });
 
 test('Owner orphan actions use the guarded review RPC and report missing review setup separately',async()=>{

@@ -1042,6 +1042,54 @@ test('bulk authorization seals the audited manifest and records only one authent
  await assert.rejects(authorize(true,differentOwner),error=>error.code==='42501');
 });
 
+test('permanent controls protect cross-app documents and refresh live inventory after confirmed removal',async t=>{
+ const h=await setup(t,true);
+ for(const name of ['20261126114500_home_media_inventory_diagnostics.sql','20261126170756_home_media_panel_pagination.sql',
+   '20261126175956_home_media_orphan_review.sql','20261126200632_home_media_historical_bulk_enrollment.sql']) {
+  await h.pg.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
+ await h.pg.exec(`create table public.jobs_cms_revisions(body jsonb); create table public.gary_cms_public(body jsonb);`);
+ const shared='properties/linked job photo.webp',alias='properties/visa-legacy.webp',clean='properties/clear.webp',held='properties/on-hold.webp';
+ await h.pg.query('insert into public.jobs_cms_revisions values($1)',[{content:`<img src="${origin}/storage/v1/object/public/property-media/properties/linked%20job%20photo.webp">`}]);
+ await h.pg.query('insert into public.gary_cms_public values($1)',[{original:' Porto Header.JPG '}]);
+ const {rows:items}=await h.pg.query(`with files as (
+   insert into storage.objects(bucket_id,name,metadata,user_metadata)
+   select 'property-media',name,'{"size":12,"eTag":"fixture"}',case when name=$2 then '{"original_filename":"Porto Header.jpg"}'::jsonb else '{}'::jsonb end
+   from unnest($1::text[]) name returning *
+ ) insert into private.home_media_items(bucket,name,source,object_id,object_version,bytes,state,unreferenced_since,expires_at,historical_review)
+   select 'property-media',name,'historical',id,version,12,'trashed',now()-interval '3 days',
+     case when name in ($3,$4) then now()+interval '1 hour' else now()-interval '1 day' end,'{"etag":"fixture"}' from files
+   returning id,name,expires_at`,[[shared,alias,clean,held],alias,shared,held]);
+ const byKey=Object.fromEntries(items.map(item=>[item.name,item]));
+ await h.pg.query("insert into private.home_media_review_holds(bucket,name,actor) values('property-media',$1,$2)",[held,owner]);
+ await h.pg.exec(await readFile(new URL('../supabase/migrations/20261127062248_home_media_permanent_controls.sql',import.meta.url),'utf8'));
+ const as=(role,actor,sql,args=[])=>h.role(role,actor,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);
+ const dashboard=(action,actor=owner)=>as('authenticated',actor,'select public.home_media_dashboard($1,0) value',[action]);
+ const worker=(sql,...args)=>as('service_role',null,sql,args);
+ await assert.rejects(dashboard('readiness',admin),error=>error.code==='42501');
+ await assert.rejects(h.pg.query('insert into public.jobs_cms_revisions values($1)',[{url:propertyPhotoUrl(origin,clean)}]),/retired_reference/);
+ await h.pg.query('insert into public.jobs_cms_revisions values($1)',[{url:'https://jobs.example.test/header.webp'}]);
+ assert.equal((await dashboard('trash_page')).items.find(row=>row.id===byKey[held].id).purge_block,'owner_hold');
+ await as('authenticated',owner,"select public.home_media_management('inventory_scan') value");
+ const before=await dashboard('overview');
+ assert.equal(before.crossAppProtection,true);
+ assert.equal(before.overdue,2);
+ assert.ok(Date.parse(before.nextExpiry)>Date.now());
+ await h.pg.exec('update private.home_media_control set permanent_enabled=true where singleton');
+ const early=await worker('select public.home_media_claim($1,$2,$3) value',owner,byKey[shared].id,byKey[shared].expires_at);
+ assert.equal(await worker('select public.home_media_target($1,$2,true) value',early.id,byKey[shared].id),null);
+ await worker('select public.home_media_finish($1) value',early.id);
+ const expired=await worker('select public.home_media_claim() value');
+ assert.equal(await worker('select public.home_media_target($1,$2,true) value',expired.id,byKey[alias].id),null);
+ assert.equal((await worker('select public.home_media_target($1,$2,true) value',expired.id,byKey[clean].id)).present,true);
+ await h.pg.query("delete from storage.objects where bucket_id='property-media' and name=$1",[clean]);
+ assert.equal(await worker('select public.home_media_settle($1,$2,true) value',expired.id,byKey[clean].id),true);
+ const after=await dashboard('overview');
+ assert.equal(after.objects,before.objects-1);
+ assert.equal(after.bytes,before.bytes-12);
+ assert.equal(after.checkedAt,before.checkedAt);
+});
+
 test('confirmed early purge scopes the job to one file and reconciles a lost final acknowledgement',async t=>{
  const h=await setup(t,true);
  const query=(as,user,sql,args=[])=>h.role(as,user,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);

@@ -124,12 +124,24 @@ Check that an approved historical receipt gets 48 hours from its enrollment and 
 
 ## Restore and permanent removal
 
+### Release the File Trash permanent controls
+
+Apply the shared reference guard and live dashboard migration before deploying the updated Gary Home staff app. The manual routes require this migration. The scheduled worker uses the same reference check through its existing removal RPC.
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 -f supabase/migrations/20261127062248_home_media_permanent_controls.sql
+```
+
+Open **Storage & Media Management** as the active Home Owner. The panel checks the worker on open and shows when the next restore window ends if the expiry queue is empty. **Run expired-file cleanup** processes eligible files at expiry. To authorize early removal, select up to eight files in **File Trash** and confirm once, or use **Permanently delete now** for one file. Each file uses its own authenticated, expiry-bound claim and dependency check. The panel refreshes current Storage totals and the open list after the operation. Candidate counts retain their last completed scan timestamp.
+
+Jobs and Visa CMS entries, public snapshots, media catalogues and revisions are included in the removal check. A CMS operation that adds a Home media URL or key shares the removal lock and rejects a reserved file. The November 27 read-only check found zero matching references or filename aliases across 231 CMS records for all 500 queued files, including `jobs-staff-portal-header.webp`.
+
 - A saved photo or video removal captures its actual listing media fields. Restore puts the original link and captured filename, caption and alt text back on that listing. It uses the saved gallery neighbours to place the photo and preserves other current links.
 - Restoring media from a deleted listing creates a recovered **draft** with a new listing ID. Later restores reuse that draft. Each recovery puts back the chosen file and the metadata captured for it. This keeps the original deletion receipt and its CRM history intact.
 - A recoverable rename records the affected listing media before and after the switch. Restore reapplies the saved listing fields only while the captured after-state still matches each affected listing. A newer media edit produces a conflict for review. Other records can keep their valid replacement links.
 - Entries without a historical listing link, such as verified abandoned uploads, offer **Keep file**. An older deletion or rename whose original listing fields were never captured shows why Restore is unavailable.
 
-Files remain at their original Storage paths during the 48-hour recovery window. An Owner can explicitly confirm **Permanently delete now** for a single eligible file. The server binds the confirmation to that queue entry and expiry, verifies the current Owner, and checks leases, references and object identity again. Both manual removal and the separately authenticated hourly worker use the same gate and Removal API. Hourly cleanup attempts an eligible batch at the first run after its deadline. If a previously attempted removal loses its acknowledgement, the worker confirms catalogue absence using its recorded intent, including after the last allowed delete attempt.
+Files remain at their original Storage paths during the 48-hour recovery window. The server binds early removal to the queue entry and expiry, verifies the current Owner, and checks leases, references and object identity again. Both manual removal and the separately authenticated hourly worker use the same gate and Removal API. Hourly cleanup attempts an eligible batch at the first run after its deadline. If a previously attempted removal loses its acknowledgement, the worker confirms catalogue absence using its recorded intent, including after the last allowed delete attempt.
 
 ## Historical orphan enrollment
 

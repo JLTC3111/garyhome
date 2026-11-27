@@ -6,12 +6,13 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
 
 ### Apply the SQL in preview mode
 
-From the Gary Home repository, run the two incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds the Owner-only removal controls. Use the existing operator database service.
+From the Gary Home repository, apply the pending incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds Owner-only removal. The third brings those same controls into Inventory Files. Use the existing operator database service.
 
 ```sh
 /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
   -f supabase/migrations/20261127141812_home_listing_media_inactivity.sql \
-  -f supabase/migrations/20261127153844_home_listing_media_manual_removal.sql
+  -f supabase/migrations/20261127153844_home_listing_media_manual_removal.sql \
+  -f supabase/migrations/20261127165022_home_media_inventory_controls.sql
 ```
 
 The first migration sets `listing_inactivity_enabled` to `false`. To return to preview later, run the following command.
@@ -26,6 +27,8 @@ Preview mode pauses scheduled removals under the 96-hour policy only. The worker
 ### Inspect counts and verify the exclusions
 
 Sign in as the protected Home Owner and open **Properties → Storage & Media Management → Retention preview**. After the next hourly observation, reopen the preview to see the remaining time and cleanup date. Historical files start their 96 hours at the first verified unused observation. A new saved reference or recovery checkpoint resets that clock. The **Select all eligible files** action uses the current search. An eligible file can be removed individually or with the batch toolbar. A final live check applies before each permanent removal, and successful removals appear in **Cleanup History**.
+
+**Inventory Files** shows live Storage rows, saved listing codes and titles, and the result of the exact saved-reference check. Verified unused files appear first. Search by listing code, title, or filename and use the same single-file or batch deletion controls. Open **Preview file** to fetch the exact image or video from Storage. Closing the preview releases the media element.
 
 The read-only production estimate at **15:39 UTC on November 27, 2026** covered **816 listing-scoped files**. The expected split at rollout was **807 protected** and **9 unused candidates awaiting their first observation**.
 
@@ -68,6 +71,44 @@ The November 27 read-only verification found all 14 GH-645 Storage identities pr
 | `a495e9ae-891d-4ab4-a76c-ae5856f7434e.png` | 2026-11-29 06:05:24.033672 |
 | `5368b942-026c-4d86-b470-7cc5494b7eb4.png` | 2026-11-29 06:05:30.697672 |
 
+### Reconciliation of the earlier published-listing audit
+
+At **16:46 UTC on November 27, 2026**, the 29 photos and four videos in the earlier published-listing audit all matched their recorded Storage bucket, key, object ID and version. Every associated listing was still published. The current policy found no exact saved reference, upload lease, provider upload, or editing session for these objects.
+
+| Earlier cohort | Awaiting first unused observation | Protected by saved filename match |
+| --- | ---: | ---: |
+| 29 photos | 3 | 26 |
+| 4 videos | 4 | 0 |
+
+Those seven files plus two paths without a saved listing account for all nine candidates. At the time of the check the rollout was in preview, and all nine were awaiting their first unused observation. An observed file becomes available for Owner review and manual removal while the automatic clock is still running.
+
+| Listing | Filename |
+| --- | --- |
+| GH-601 | `gary-home-gh601-1-bedroom-apartment-for-rent-in-dang-thai-mai-tay-ho-60m-lake-view-1-logo.jpg` |
+| GH-601 | `gary-home-gh601-1-bedroom-apartment-for-rent-in-dang-thai-mai-tay-ho-60m-lake-view-logo.jpg` |
+| GH-628 | `gary-home-gh628-brand-new-1-bedroom-apartments-for-rent-in-au-co-tay-ho-furnished-12.jpg` |
+| GH-34 | `64879c18-2593-4ab5-ac0b-52a1950ea7a8.mp4` |
+| GH-541 | `a544390a-c3ba-4395-9c2a-ce95580f99e3.mp4` |
+| GH-581 | `eb12b1bf-bcfc-43ef-abfe-63206bccfd00.mp4` |
+| GH-11601 | `e0e67797-5387-498e-b718-123013958215.mp4` |
+| No saved listing | `gary-home-2-xoa-nen.png` |
+| No saved listing | `c9ca6a35-0a18-4e5d-a63f-e530e15e3780.mp4` |
+
+All 26 protected photos have a matching value in a saved listing’s `image_filenames`. Each value is saved against a different exact key that appears in the listing’s gallery. Those gallery keys include 15 JPEGs and 11 WebPs. Two photos also have a matching `image_metadata.public_filename` value. The filename safeguard keeps the exact object under review while that saved metadata matches. Folder association alone has no effect on eligibility.
+
+| Associated listing | Filename matches | Matching filename suffixes |
+| --- | ---: | --- |
+| GH-35 | 13 | `balcony-1`, `bathroom-1`, `bedroom-1`, `bedroom-interior-4`, `kitchen-1`, `kitchen-interior-3`, `living-room-1`, `modern-bathroom-2`, `modern-bedroom-3`, `modern-kitchen-2`, `modern-living-room-2`, `spacious-bedroom-2`, `spacious-living-room-3` |
+| GH-40 | 1 | `pet-friendly-26` |
+| GH-41 | 1 | `long-balcony-14` |
+| GH-46 | 1 | `pet-friendly-19` |
+| GH-49 | 1 | `large-balcony-3` |
+| GH-601 | 1 | `lake-view-2-logo` |
+| GH-628 | 5 | `furnished-4`, `furnished-5` (two different keys), `furnished-6`, `furnished-10` |
+| GH-644 | 3 | `lake-view-1`, `lake-view-7`, `lake-view-8` |
+
+The [original photo classification](../work/property-media-audit-20261125.1T3KYQ/production-orphan-classification-20261126.json) records the exact identities. Filter the original `retentionReasons` for both `saved_listing_scope` and `filename_only_match` to see the 26 protected keys.
+
 ### Sync older browser recovery sessions
 
 Each editor with older recovery copies should open the updated **Properties** workspace on the original device, browser profile and staff account while connected. The workspace uploads its local recovery copies when it loads and retries when the browser reconnects. Keep the local copies until they appear under **Resume gallery** and the server readback confirms the applicable listing IDs. Staff can resume, save, or discard a copy from that list. Saving attaches the media to the listing. Discarding releases the session's protection.
@@ -92,10 +133,10 @@ After reviewing the preview and the recovery copies, enable the 96-hour schedule
   -c "update private.home_media_control set listing_inactivity_enabled=true where singleton;"
 ```
 
-### Separate database fixture findings
+### Database test fixtures
 
-- `tests/staff-database.test.mjs` builds a mock `auth.users` without `deleted_at`, `banned_until`, or `is_anonymous`. The fresh-setup case first fails while creating an earlier function that checks `deleted_at`. A complete fresh-setup fixture also needs `auth.jwt()` and the Storage identity and metadata fields used by the existing media migrations.
-- `tests/property-video-database.test.mjs` has the same Auth fixture gap. Its final assertion also expects an authenticated Owner to delete an object directly after detaching the video. The existing retention migration routes detached videos through File Trash and denies direct authenticated Storage deletion, so that assertion needs to exercise the retained receipt and worker path instead.
+- The staff and video tests share a Supabase fixture with the current Auth status fields, JWT helper, and Storage identity and metadata fields.
+- The video test checks the 48-hour detached receipt, blocks direct authenticated Storage removal, and checks that the worker receives the target after expiry. It leaves the fixture Storage object present.
 
 ## Production panel rollout, 27 November 2026
 

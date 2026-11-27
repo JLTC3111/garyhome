@@ -14,6 +14,10 @@ import { createMediaCleanup } from '../supabase/functions/media-orphan-cleanup/w
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const require = createRequire(import.meta.url);
+const openedDetails = () => {
+  const details={open:true};
+  return {target:details,currentTarget:details};
+};
 const names = ['media-removal-progress', 'media-selection', 'listing-deletion-queue', 'storage-orphan-review'];
 const sources = [...names.map(name => [name,`components/${name}.tsx`]), ['storage-media-route','app/api/admin/storage-media/route.ts']];
 const components = new Map(sources.map(([name,path]) => [name, new vm.Script('(function(exports,require,module){' +
@@ -125,7 +129,7 @@ for (const theme of ['light', 'dark']) {
             hasMore:false, available:true});
           case 'retention_page': return Response.json({items:[
             {name:'fixtures/recovery.webp',bucket:'property-media',listing_code:'GH-645',object_id:'photo',reason:'recovery_hold',bytes:120},
-            {name:'fixtures/tour.mp4',bucket:'listing-videos',object_id:'tour',reason:'waiting',eligible_at:expires_at,bytes:200},
+            {name:'fixtures/tour % clip.mp4',bucket:'listing-videos',object_id:'tour',reason:'waiting',eligible_at:expires_at,bytes:200},
             {name:'fixtures/unused.webp',bucket:'property-media',object_id:'unused',reason:'eligible',eligible_at:'2026-01-01T00:00:00Z',scheduled_eligible:true,bytes:300},
           ],hasMore:false,available:true,automatic:true});
           case 'removed_page': return Response.json({items:[], hasMore:false, available:true});
@@ -163,7 +167,7 @@ for (const theme of ['light', 'dark']) {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     try {
       await act(async()=>{view = TestRenderer.create(page(true));});
-      await act(async()=>{view.root.findByType('details').props.onToggle({currentTarget:{open:true}});});
+      await act(async()=>{view.root.findByType('details').props.onToggle(openedDetails());});
       await click('Retention preview');
       const retentionLabels=view.root.findAllByType('small').map(node=>node.children.join(''));
       assert.ok(retentionLabels.some(label=>label.includes('Protected for GH-645 recovery.')));
@@ -362,7 +366,7 @@ test('selected deletion confirms the live manifest and dispatches each eligible 
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   try{
     await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
-    await act(async()=>view.root.findByType('details').props.onToggle({currentTarget:{open:true}}));
+    await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
     await act(async()=>button('File Trash').props.onClick());
     assert.equal(button('Permanently delete selected').props.disabled,false);
     await act(async()=>button('Permanently delete selected').props.onClick());
@@ -438,15 +442,17 @@ test('Orphan Review resets applied search and selects eligible files across page
   }
 });
 
-test('Retention Preview supports single and batch removal with refreshed counts while scheduled removal is paused',async()=>{
+test('Inventory Files loads exact previews on demand and shares single and batch removal with Retention Preview',async()=>{
   const source='unused_listing',expires_at=new Date(Date.now()+3600000).toISOString();
   const files=[
-    {id:'first',bucket:'property-media',name:'fixtures/first.webp',bytes:100_000},
+    {id:'first',bucket:'property-media',name:'fixtures/first photo #1.webp',bytes:100_000},
     {id:'second',bucket:'property-media',name:'fixtures/second.webp',bytes:200_000},
-    {id:'tour',bucket:'listing-videos',name:'fixtures/tour.mp4',bytes:300_000},
+    {id:'tour',bucket:'listing-videos',name:'fixtures/tour % clip.mp4',bytes:300_000},
   ].map(file=>({...file,expires_at,source}));
   const live=new Map(files.map(file=>[file.id,file]));
-  const held={name:'fixtures/recovery.webp',bucket:'property-media',reason:'recovery_hold',listing_code:'GH-645',object_id:'held',bytes:120};
+  const held={name:'fixtures/recovery.webp',bucket:'property-media',reason:'recovery_hold',listing_code:'GH-645',listing_title_en:'Recovery draft',saved_reference:false,object_id:'held',bytes:120};
+  const alias={name:'fixtures/alias.jpg',bucket:'property-media',reason:'filename_match',listing_code:'GH-ALIAS',
+    listing_title_en:'Published courtyard',saved_reference:false,object_id:'alias',bytes:80};
   const calls=[],confirmations=[],store=new Map();
   const context=vm.createContext({
     Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
@@ -461,8 +467,10 @@ test('Retention Preview supports single and batch removal with refreshed counts 
         case 'overview': return Response.json({panelVersion:2,objects:items.length+3,bytes:items.reduce((sum,item)=>sum+item.bytes,120),
           candidates:0,candidateBytes:0,abandoned:0,activeUploads:0,broken:0,enabled:true,crossAppProtection:true,earlyEligible:0,
           overdue:0,trashed:2,checkedAt:new Date().toISOString()});
-        case 'retention_page': return Response.json({items:[held,...items.map(item=>({
-          ...item,manual_target:item,reason:'waiting',eligible_at:item.expires_at,listing_code:'GH-FIXTURE',object_id:item.id,
+        case 'inventory_page':
+        case 'retention_page': return Response.json({items:[held,alias,...items.map(item=>({
+          ...item,manual_target:item,reason:'waiting',eligible_at:item.expires_at,listing_code:'GH-FIXTURE',
+          listing_title_en:'Lake view fixture',saved_reference:false,object_id:item.id,
         }))],hasMore:false,available:true,manualCount:items.length,automatic:false});
         case 'retention_receipt':return Response.json({status:live.has(args.id)?'eligible':'already_removed',bytes:live.get(args.id)?.bytes});
         case 'retention_manifest':return Response.json({items});
@@ -487,12 +495,25 @@ test('Retention Preview supports single and batch removal with refreshed counts 
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   try {
     await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
-    await act(async()=>view.root.findByType('details').props.onToggle({currentTarget:{open:true}}));
+    await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
     const button=label=>view.root.findAllByType('button').find(node=>node.children.join('')===label);
-    await act(async()=>button('Retention preview').props.onClick());
+    await act(async()=>button('Inventory files').props.onClick());
     assert.equal(view.root.findByProps({'aria-label':'Select recovery.webp'}).props.disabled,true);
-    assert.match(view.root.findByType('video').props.src,/listing-videos\/fixtures\/tour\.mp4#t=/);
-    await act(async()=>view.root.findByProps({'aria-label':'Permanently delete first.webp'}).props.onClick());
+    const cannotDelete=view.root.findByProps({'aria-label':'Permanently delete alias.jpg'});
+    assert.equal(cannotDelete.props.disabled,true);
+    assert.match(cannotDelete.props.title,/filename matches/);
+    const smallLabels=view.root.findAllByType('small').map(node=>node.children.join(''));
+    assert.ok(smallLabels.includes('GH-ALIAS · Published courtyard'));
+    assert.ok(smallLabels.includes('Exact saved references · none'));
+    assert.equal(view.root.findAllByType('video').length,0);
+    assert.equal(view.root.findAllByType('img').length,0);
+    const preview=filename=>view.root.findByProps({'aria-label':'Preview '+filename}).parent;
+    await act(async()=>preview('tour % clip.mp4').props.onToggle(openedDetails()));
+    assert.equal(view.root.findByType('video').props.src,'https://fixture.example/storage/v1/object/public/listing-videos/fixtures/tour%20%25%20clip.mp4');
+    assert.equal(view.root.findAllByType('img').length,0);
+    await act(async()=>preview('first photo #1.webp').props.onToggle(openedDetails()));
+    assert.equal(view.root.findByType('img').props.src,'https://fixture.example/storage/v1/object/public/property-media/fixtures/first%20photo%20%231.webp');
+    await act(async()=>view.root.findByProps({'aria-label':'Permanently delete first photo #1.webp'}).props.onClick());
     assert.equal(live.size,2);
     await act(async()=>view.root.findByProps({'aria-label':'Select eligible files on this page'}).props.onChange());
     await act(async()=>button('Permanently delete selected').props.onClick());
@@ -505,6 +526,10 @@ test('Retention Preview supports single and batch removal with refreshed counts 
     assert.equal(calls[firstBatchRemoval+1].action,'overview');
     const counters=view.root.findByProps({className:'storage-media-stats'}).findAllByType('dd');
     assert.equal(counters[0].children.join(''),'3');
+    assert.ok(calls.filter(call=>call.action==='inventory_page').length>=3);
+    assert.ok(calls.some(call=>call.action==='removed_page'));
+    await act(async()=>button('Retention preview').props.onClick());
+    assert.equal(view.root.findByProps({'aria-label':'Permanently delete recovery.webp'}).props.disabled,true);
     const journal=trash.readTrashRun(store.get('gary-home:media:owner:trash-run'));
     assert.equal(trash.trashRunTotals(journal).reclaimedBytes,500_000);
   } finally {

@@ -3,13 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 
-const platform=`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create schema storage;
-  create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}');
-  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-  create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,created_at timestamptz default now());
-  alter table storage.objects enable row level security;grant usage on schema auth,public,storage to anon,authenticated;
-  alter default privileges in schema public grant all on tables to anon,authenticated;`;
+import { supabasePlatform } from './supabase-platform.fixture.mjs';
 
 test('company staff accounts enforce assignment, verification, hierarchy and immediate revocation',async t=>{
  const db=new PGlite();t.after(()=>db.close());
@@ -20,7 +14,7 @@ test('company staff accounts enforce assignment, verification, hierarchy and imm
  const editor=async()=> (await db.query('select private.is_editor() as value')).rows[0].value;
  const assign=(email,name,role='editor')=>db.query('select public.assign_staff_account($1,$2,$3) as id',[email,name,role]);
  const access=(id,role,active)=>db.query('select public.set_staff_access($1,$2,$3)',[id,role,active]);
- await db.exec(platform);
+ await db.exec(supabasePlatform);
  for(const name of ['20261021152453_gary_home_cms.sql','20261021201948_customer_portal.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.exec(`insert into auth.users(id,email,email_confirmed_at) values
   ('${owner}','owner@protonmail.com',now()),('${admin}','admin@garyhome.com',now()),('${staff}','staff@icue.vn',now()),
@@ -98,7 +92,7 @@ test('company staff accounts enforce assignment, verification, hierarchy and imm
 
 
 test('fresh setup and owner bootstrap establish the same company staff security model',async t=>{
- const db=new PGlite();t.after(()=>db.close());await db.exec(platform);
+ const db=new PGlite();t.after(()=>db.close());await db.exec(supabasePlatform);
  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
  await db.exec("insert into auth.users(id,email,email_confirmed_at) values ('00000000-0000-4000-8000-000000000001','skycastle3@protonmail.com',now())");
  const ownerSetup=await readFile(new URL('../supabase/owner.sql',import.meta.url),'utf8');await db.exec(ownerSetup);await db.exec(ownerSetup);

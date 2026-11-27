@@ -16,9 +16,20 @@ test('Home storage inventory, scan, soft staging and restore work independently 
   const result=await executeStorageMedia(db,{action,id:'test-id',offset:30},signal,unavailable);
   assert.deepEqual(result,{status:200,data:report});
  }
- assert.deepEqual(calls.map(c=>c.args.p_action),actions);
+ assert.deepEqual(calls.map(c=>c.name==="home_media_inventory_files"?"inventory_page":c.args.p_action),actions);
  assert.deepEqual(calls[0],{name:'home_media_dashboard',args:{p_action:'overview',p_offset:30}});
+ assert.deepEqual(calls[2],{name:'home_media_inventory_files',args:{p_offset:30,p_query:''}});
  assert.equal(calls.at(-1).args.p_id,'test-id');
+});
+
+test('Inventory Files only falls back to the old scan page when the live inventory RPC is missing',async()=>{
+ const calls=[];
+ const db={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>name==='home_media_inventory_files'?
+  {error:{code:'PGRST202'}}:{data:{items:[],available:false}}};}};
+ const result=await executeStorageMedia(db,{action:'inventory_page',query:'GH-601',offset:30},signal,()=>assert.fail('Read cannot dispatch worker'));
+ assert.equal(result.status,200);
+ assert.deepEqual(calls,[{name:'home_media_inventory_files',args:{p_offset:30,p_query:'GH-601'}},
+  {name:'home_media_management',args:{p_action:'inventory_page',p_id:null,p_offset:30}}]);
 });
 
 test('database and worker failures have separate actionable codes without provider details',async()=>{

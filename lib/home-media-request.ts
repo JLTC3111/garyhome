@@ -15,18 +15,21 @@ export async function executeStorageMedia(
 ) {
   const review = reviewActions.get(input.action);
   const offset = Number.isInteger(input.offset) ? input.offset : 0;
-  if (input.action === "retention_page" || input.action === "retention_manifest" || input.action === "retention_receipt") {
+  if (input.action === "inventory_page" || input.action === "retention_page" || input.action === "retention_manifest" || input.action === "retention_receipt") {
     const p_query=typeof input.query==="string"?input.query.slice(0,120):"";
-    const call=input.action==="retention_page"?db.rpc("home_media_retention_preview",{p_offset:offset,p_query}):
+    const call=input.action==="inventory_page"?db.rpc("home_media_inventory_files",{p_offset:offset,p_query}):
+      input.action==="retention_page"?db.rpc("home_media_retention_preview",{p_offset:offset,p_query}):
       input.action==="retention_manifest"?db.rpc("home_media_retention_manifest",{p_query}):
         db.rpc("home_media_unused_receipt",{p_id:input.id,p_expiry:input.expiresAt});
     const {data,error}=await call.abortSignal(signal);
     if (!error && data) return {status:200,data};
-    if (error?.code==="42501") return {status:403,data:{error:"forbidden"}};
-    if (rpcMissing(error?.code)) return {status:503,data:{error:input.action==="retention_page"?"retention_setup":"retention_cleanup_setup"}};
-    if (error?.code==="57014") return {status:504,data:{error:"inventory_timeout"}};
-    if (error?.code==="22P02" || error?.code==="22007") return {status:400,data:{error:"invalid_request"}};
-    return {status:503,data:{error:"inventory_unavailable"}};
+    if (input.action!=="inventory_page" || !rpcMissing(error?.code)) {
+      if (error?.code==="42501") return {status:403,data:{error:"forbidden"}};
+      if (rpcMissing(error?.code)) return {status:503,data:{error:input.action==="retention_page"?"retention_setup":"retention_cleanup_setup"}};
+      if (error?.code==="57014") return {status:504,data:{error:"inventory_timeout"}};
+      if (error?.code==="22P02" || error?.code==="22007") return {status:400,data:{error:"invalid_request"}};
+      return {status:503,data:{error:"inventory_unavailable"}};
+    }
   }
   if (input.action === "trash_manifest" || input.action === "trash_receipt") {
     const {data,error}=input.action==="trash_manifest"

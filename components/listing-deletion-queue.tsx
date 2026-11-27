@@ -45,8 +45,9 @@ type MediaItem = {
   bytes?:number|null; purge_block?:string|null; retry_after?:string|null;
 };
 type InventoryItem = {bucket:string; name:string; bytes:number|null; reason:string};
-type RetentionItem = InventoryItem & {listing_id:string; listing_code:string|null; object_id:string; object_version:string|null;
-  eligible_at:string|null; legacy_expiry:string|null; scheduled_eligible:boolean; manual_target?:TrashTarget|null};
+type MediaFile = InventoryItem & {listing_code?:string|null; object_id?:string; object_version?:string|null;
+  listing_title_en?:string|null; listing_title_vi?:string|null; saved_reference?:boolean;
+  eligible_at?:string|null; legacy_expiry?:string|null; scheduled_eligible?:boolean; manual_target?:TrashTarget|null};
 type RemovedItem = {id:string; bucket:string; name:string; removed_at:string|null; source:string};
 type MediaRun = {id:string; started_at:string; finished_at:string|null; attempted:number; removed:number; failed:number};
 type MediaReport = {
@@ -59,13 +60,30 @@ type MediaReport = {
   earlyEligible?:number;
 };
 type PageKind = "inventory_page"|"trash_page"|"removed_page"|"run_page"|"retention_page";
-type MediaPage = {items:(InventoryItem|RetentionItem|MediaItem|RemovedItem|MediaRun)[]; hasMore:boolean; available:boolean; automatic?:boolean; manualCount?:number};
+type MediaPage = {items:(MediaFile|MediaItem|RemovedItem|MediaRun)[]; hasMore:boolean; available:boolean; automatic?:boolean; manualCount?:number};
 type MediaAction = "overview"|"inventory_scan"|"trash"|"restore"|"run";
 type PanelAction = MediaAction|PageKind|"purge"|"cancel_purge"|"check_receipt";
 const pageSize=30;
 const trashId=(item:TrashTarget)=>item.id;
 const unusedTarget=(item:unknown):item is TrashTarget=>isTrashTarget(item)&&item.source==="unused_listing";
 const trashTarget=(item:unknown):item is TrashTarget=>isTrashTarget(item)&&item.source===undefined;
+const isMediaFilePage=(page:PageKind|null)=>page==="inventory_page"||page==="retention_page";
+
+function MediaFilePreview({bucket,path,filename}:{bucket:string;path:string;filename:string}) {
+  const {t}=useSite();
+  const [open,setOpen]=useState(false),[failed,setFailed]=useState(false);
+  const parts=path.split("/");
+  if(!["property-media","listing-videos"].includes(bucket)||parts.some(part=>!part||part==="."||part===".."))return null;
+  const url=`${PROPERTY_IMAGE_ORIGIN}/storage/v1/object/public/${bucket}/${parts.map(encodeURIComponent).join("/")}`;
+  const label=t(`Preview ${filename}`,`Xem trước ${filename}`);
+  return <details onToggle={event=>{setOpen(event.currentTarget.open);setFailed(false);}}>
+    <summary aria-label={label}>{t("Preview file","Xem trước tệp")}</summary>
+    {open&&(failed?<small role="status">{t("The preview couldn’t load.","Không tải được bản xem trước.")}</small>:
+      bucket==="listing-videos"?<video src={url} controls playsInline preload="metadata" className="storage-file-preview"
+        aria-label={label} onError={()=>setFailed(true)}/>:
+        <img src={url} alt={filename} decoding="async" className="storage-file-preview" onError={()=>setFailed(true)}/>)}
+  </details>;
+}
 
 function mediaRequest<T>(editorTask: ReturnType<typeof useSite>["editorTask"], payload:Record<string,unknown>, beforeSend?:()=>void) {
   return editorTask(async(db,signal)=>{
@@ -123,6 +141,7 @@ function mediaMessage(issue:unknown,t:ReturnType<typeof useSite>["t"]) {
     case "editing_session": return t("A recoverable edit protects this file.","Tệp này còn trong phiên chỉnh sửa có thể khôi phục.");
     case "retention_setup": return t("Apply the Home media retention migration to open the preview.","Áp dụng bản cập nhật lưu giữ tệp Home để mở bản xem trước.");
     case "retention_cleanup_setup": return t("Apply the unused-media removal migration to enable these controls.","Áp dụng bản cập nhật xóa tệp không sử dụng để bật các thao tác này.");
+    case "inventory_controls_setup": return t("Apply the Inventory Files migration to verify and remove files here.","Áp dụng bản cập nhật danh sách tệp để xác minh và xóa tệp tại đây.");
     case "retention_worker_setup": return t("Update the cleanup worker to enable unused-media removal.","Cập nhật tác vụ dọn tệp để bật chức năng xóa tệp không sử dụng.");
     case "active_upload": return t("An upload lease still protects this file.","Quyền tải lên vẫn đang bảo vệ tệp này.");
     case "retry_wait": return t("The worker is waiting for its next retry window.","Tác vụ đang chờ đến thời điểm thử lại.");
@@ -199,7 +218,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   },[open,requestMedia,workerAttempt]);
 
   useEffect(()=>{
-    if(!visible||!open||!page?.items.length||(selected!=="trash_page"&&selected!=="retention_page"))return;
+    if(!visible||!open||!page?.items.length||(selected!=="trash_page"&&!isMediaFilePage(selected)))return;
     const expire=page.items.map(row=>Date.parse(("eligible_at" in row?row.eligible_at??row.legacy_expiry:
       "expires_at" in row?row.expires_at:null)||"")).filter(time=>time>Date.now());
     if(!expire.length)return;
@@ -227,17 +246,17 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       flight.current=false;setBusy(null);
     }
   }
-  const pageRequest=(kind:PageKind,next:number,query=retentionQuery)=>requestMedia<MediaPage>({action:kind,offset:next,...(kind==="retention_page"?{query}:{})});
+  const pageRequest=(kind:PageKind,next:number,query=retentionQuery)=>requestMedia<MediaPage>({action:kind,offset:next,...(isMediaFilePage(kind)?{query}:{})});
   async function loadPage(kind:PageKind,next=0,query=retentionQuery) {
     if(flight.current||!upgraded)return;
-    if(kind==="retention_page")setRetentionQuery(query);
+    if(isMediaFilePage(kind))setRetentionQuery(query);
     setReviewOpen(false);setSelected(kind);setPage(kind==="removed_page"&&next===0?historyPreview:null);setOffset(next);
     await work(kind,async()=>{applyPage(kind,await pageRequest(kind,next,query));});
   }
   function applyPage(kind:PageKind,fresh:MediaPage) {
     setPage(fresh);setNow(Date.now());
-    if(kind==="retention_page"&&unusedSelection.rows.length){
-      const rows=fresh.items as RetentionItem[];
+    if(isMediaFilePage(kind)&&fresh.manualCount!==undefined&&unusedSelection.rows.length){
+      const rows=fresh.items as MediaFile[];
       const visibleNames=new Set(rows.map(row=>row.bucket+"/"+row.name));
       const live=rows.map(row=>row.manual_target).filter(unusedTarget);
       const matches=new Set(matchingTrashTargets(unusedSelection.rows,live).map(row=>row.id));
@@ -276,7 +295,11 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     if(action==="run"&&!window.confirm(t("Permanently remove eligible files whose restore window has ended?","Xóa vĩnh viễn các tệp đủ điều kiện đã hết thời gian khôi phục?")))return;
     if(action==="restore"&&item?.restore_mode==="draft"&&!window.confirm(t("Restore this file to a new draft of the deleted listing?","Khôi phục tệp vào bản nháp mới của tin đăng đã xóa?")))return;
     async function perform() {
-      if(action==="overview"){reportResult(await overview());return;}
+      if(action==="overview"){
+        if(isMediaFilePage(selected))await refreshAfterChange();
+        else reportResult(await overview());
+        return;
+      }
       let confirmed:string;
       if(action==="inventory_scan"||action==="trash"){
         const fresh=await mediaRequest<MediaReport>(editorTask,{action});
@@ -530,9 +553,10 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     t("Loading the saved cleanup checkpoint…","Đang tải tiến độ dọn đã lưu…"):"";
   const unusedSetup=worker?.status==="ready"&&!worker.manualUnused?mediaMessage(new Error("retention_worker_setup"),t):
     selected==="retention_page"&&page&&page.manualCount===undefined?mediaMessage(new Error("retention_cleanup_setup"),t):"";
+  const inventoryControls=selected==="inventory_page"&&page&&page.manualCount===undefined?mediaMessage(new Error("inventory_controls_setup"),t):"";
   const resumeReason=removalReason||checkpointReason||(trashRun?.entries[0]?.source?unusedSetup:bulkSetup);
   const manualRemovalReason=removalReason||checkpointReason||bulkSetup||pendingRequestReason||(!report?.earlyEligible?noEarly:"");
-  const unusedRemovalReason=removalReason||checkpointReason||unusedSetup||pendingRequestReason;
+  const unusedRemovalReason=removalReason||checkpointReason||unusedSetup||inventoryControls||pendingRequestReason;
   const bulkEntryReason=removalReason||bulkSetup||(!report?.earlyEligible?noEarly:"");
   const controlReasons=[...new Set([trashReason,runReason,bulkEntryReason].filter(reason=>reason&&reason!==pendingRequestReason))];
   const controlHint=(reason:string)=>!reason?undefined:reason===pendingRequestReason?removalDetailsId:`${id}-operation-${controlReasons.indexOf(reason)}`;
@@ -543,14 +567,15 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     switch(reason){
       case "reference":return t("Protected · saved reference","Được bảo vệ · có tham chiếu đã lưu");
       case "upload":return t("Protected · active upload","Được bảo vệ · đang tải lên");
-      case "listing": case "scope_retention":return t("Listing-scoped file · see Retention preview","Tệp theo tin đăng · xem Dự kiến lưu giữ");
+      case "listing": case "scope_retention":return t("Listing folder · verification required","Thư mục tin đăng · cần xác minh");
+      case "outside_listing_scope":return t("Outside the listing-scoped cleanup policy","Ngoài phạm vi dọn tệp theo tin đăng");
       case "owner_hold": case "recovery_hold": case "file_trash_test": case "editing_session":return mediaMessage(new Error(reason),t);
       case "active_upload":return t("Protected · active upload","Được bảo vệ · đang tải lên");
-      case "filename_match":return t("Protected · filename matches saved content","Được bảo vệ · tên tệp khớp nội dung đã lưu");
+      case "filename_match":return t("Protected · saved filename matches, exact object unverified","Được bảo vệ · tên tệp khớp nội dung đã lưu, chưa xác minh đúng đối tượng");
       case "identity":return t("Protected · Storage identity needs verification","Được bảo vệ · cần xác minh định danh kho");
-      case "legacy_lifecycle":return t("Existing media lifecycle","Đang theo quy trình lưu giữ hiện có");
+      case "legacy_lifecycle":return t("Existing cleanup or recovery record","Đã có hồ sơ dọn tệp hoặc khôi phục");
       case "awaiting_observation":return t("Awaiting first unused observation","Chờ lần đầu xác nhận chưa sử dụng");
-      case "waiting":return t("96-hour inactivity window","Thời hạn 96 giờ không sử dụng");
+      case "waiting":return t("Verified unused · 96-hour inactivity window","Đã xác minh chưa sử dụng · thời hạn 96 giờ");
       case "eligible":return t("96 hours of inactivity verified","Đã xác minh 96 giờ không sử dụng");
       case "removing":return t("Cleanup in progress","Đang dọn tệp");
       case "rename":return t("Protected · rename reservation","Được bảo vệ · giữ chỗ đổi tên");
@@ -590,8 +615,8 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     t("No eligible files on this page.","Trang này chưa có tệp đủ điều kiện."):"");
   const noSelection=t("Select files with open restore windows.","Chọn các tệp còn thời gian khôi phục.");
   const bulkReason=manualRemovalReason||selectionReason||(!trashSelection.rows.length?noSelection:"");
-  const retentionRows=selected==="retention_page"?(page?.items as RetentionItem[]|undefined)??[]:[];
-  const unusedPageEligible=retentionRows.map(row=>row.manual_target).filter(unusedTarget);
+  const fileRows=isMediaFilePage(selected)?(page?.items as MediaFile[]|undefined)??[]:[];
+  const unusedPageEligible=fileRows.map(row=>row.manual_target).filter(unusedTarget);
   const unusedSelectionReason=!unusedSelection.ready?t("Loading saved selection…","Đang tải lựa chọn đã lưu…"):busy?progress:"";
   const allUnusedReason=unusedSelectionReason||unusedRemovalReason||(!page?.manualCount?
     t("No verified unused files match this search.","Không có tệp chưa sử dụng đã xác minh khớp tìm kiếm."):"");
@@ -617,6 +642,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   }
 
   return <details className="admin-panel listing-deletion-queue storage-media" hidden={!visible} onToggle={event=>{
+    if(event.target!==event.currentTarget)return;
     const isOpen=event.currentTarget.open;setOpen(isOpen);
     if(visible&&isOpen&&!flight.current)void manage("overview");
   }}>
@@ -676,14 +702,14 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       {upgraded&&reviewOpen&&<StorageOrphanReview request={requestMedia} disabled={!!busy} onStaged={()=>void refreshAfterChange()}/>}
       {selected&&<section id={`${id}-media-list`}>
         <h3>{tabs.find(([kind])=>kind===selected)?.[1]}</h3>
-        {selected==="retention_page"&&<>
-          <form className="storage-media-actions" onSubmit={event=>{event.preventDefault();void loadPage("retention_page",0,retentionInput.trim());}}>
-            <MediaSearchField label={t("Listing code or filename","Mã tin đăng hoặc tên tệp")} placeholder={t("Listing code or filename","Mã tin đăng hoặc tên tệp")}
+        {isMediaFilePage(selected)&&<>
+          {!inventoryControls&&<form className="storage-media-actions" onSubmit={event=>{event.preventDefault();void loadPage(selected,0,retentionInput.trim());}}>
+            <MediaSearchField label={t("Listing code, title or filename","Mã, tiêu đề tin đăng hoặc tên tệp")} placeholder={t("Listing code, title or filename","Mã, tiêu đề tin đăng hoặc tên tệp")}
               value={retentionInput} maxLength={120} disabled={!!busy}
-              onChange={setRetentionInput} onClear={()=>{setRetentionInput("");void loadPage("retention_page",0,"");}}/>
+              onChange={setRetentionInput} onClear={()=>{setRetentionInput("");void loadPage(selected,0,"");}}/>
             <button type="submit" className="button button-outline button-small" disabled={!!busy}>{t("Search","Tìm")}</button>
-          </form>
-          {page&&<p>{page.automatic?t("Eligible unused files can be picked up by the next hourly cleanup.","Tệp chưa sử dụng đã đủ điều kiện có thể được dọn trong lượt hằng giờ kế tiếp."):
+          </form>}
+          {page?.automatic!==undefined&&<p>{page.automatic?t("Eligible unused files can be picked up by the next hourly cleanup.","Tệp chưa sử dụng đã đủ điều kiện có thể được dọn trong lượt hằng giờ kế tiếp."):
             t("The 96-hour policy is in preview. Scheduled removal under this policy is paused.","Chính sách 96 giờ đang ở chế độ xem trước. Lịch xóa theo chính sách này đang tạm dừng.")}</p>}
           {page?.available&&<MediaSelectionControls count={unusedSelection.rows.length} bytes={unusedSelection.rows.reduce((sum,item)=>sum+(item.bytes??0),0)}
             unknownSizes={unusedSelection.rows.filter(item=>item.bytes===null).length} formatBytes={formatBytes}
@@ -718,44 +744,44 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
         {page?.available&&!page.items.length&&<p>{selected==="trash_page"?t("No files in Trash.","Thùng rác chưa có tệp."):
           selected==="run_page"?t("No cleanup runs recorded.","Chưa ghi nhận lượt dọn tệp."):t("No records on this page.","Trang này không có mục nào.")}</p>}
         {page?.available&&<ul className="storage-media-rows">
-          {retentionRows.map(row=>{
+          {fileRows.map((row,index)=>{
             const target=unusedTarget(row.manual_target)?row.manual_target:null;
             const checked=!!target&&unusedSelection.has(target.id);
-            const parts=row.name.split("/"),name=parts.at(-1)||row.name;
-            const preview=parts.every(part=>part&&part!=="."&&part!=="..")?
-              `${PROPERTY_IMAGE_ORIGIN}/storage/v1/object/public/${row.bucket}/${parts.map(encodeURIComponent).join("/")}`:null;
-            const pickReason=unusedSelectionReason||(!target?reasonLabel(row.reason):checked?"":unusedRemovalReason);
-            const hint=`${id}-${row.object_id}-retention`;
-            return <li key={row.bucket+"/"+row.name} className="storage-retention-row">
-              <div className="storage-retention-file">
-                {preview&&<a href={preview} target="_blank" rel="noopener noreferrer" aria-label={t(`Preview ${name}`,`Xem trước ${name}`)}>
-                  {row.bucket==="listing-videos"?<video className="storage-retention-thumbnail" src={`${preview}#t=0.1`} preload="metadata" muted playsInline aria-hidden="true"/>:
-                    <img className="storage-retention-thumbnail" src={preview} alt="" loading="lazy" decoding="async" width={72} height={54}/>}
-                </a>}
-                <div><strong>{name}</strong><small>{row.listing_code||row.listing_id} · {row.bytes===null?"—":formatBytes(row.bytes)}</small>
-                  <small id={hint}>{reasonLabel(row.reason)}</small>
-                  {row.eligible_at&&row.reason!=="removing"&&<small>{retentionTime(row.eligible_at)} · {t("Eligible from","Đủ điều kiện từ")} {formatTime(row.eligible_at)}</small>}
-                  {row.legacy_expiry&&<small>{countdown(row.legacy_expiry)} · {formatTime(row.legacy_expiry)}</small>}
-                  <small>{row.scheduled_eligible?t("Eligible for scheduled cleanup","Đủ điều kiện dọn theo lịch"):
-                    row.eligible_at&&page.automatic&&row.reason==="waiting"?t("Scheduled eligibility follows the deadline","Đủ điều kiện dọn theo lịch khi hết hạn"):
-                    t("Currently ineligible for scheduled cleanup under the 96-hour policy","Hiện chưa đủ điều kiện dọn theo lịch 96 giờ")}</small>
-                  <details><summary>{t("Storage identity","Định danh kho")}</summary><small>{row.name} · {row.object_id} · {row.object_version??"—"}</small></details>
-                </div>
+            const name=row.name.split("/").at(-1)||row.name;
+            const title=language==="vi"?row.listing_title_vi||row.listing_title_en:row.listing_title_en||row.listing_title_vi;
+            const listing=[row.listing_code,title].filter(Boolean).join(" · ");
+            const protection=row.reason==="legacy_lifecycle"&&row.legacy_expiry?
+              t("Managed by the File Trash lifecycle","Đang theo quy trình Thùng rác tệp"):reasonLabel(row.reason);
+            const removalBlock=target?unusedRemovalReason:inventoryControls||protection;
+            const pickReason=unusedSelectionReason||(checked?"":removalBlock);
+            const hint=`${id}-${row.object_id??index}-file`;
+            return <li key={row.bucket+"/"+row.name} className="storage-file-row">
+              <div><strong>{name}</strong>
+                <small>{row.bucket} · {row.bytes===null?"—":formatBytes(row.bytes)}</small>
+                {listing?<small>{listing}</small>:row.saved_reference!==undefined&&<small>{t("No associated saved listing","Chưa có tin đăng đã lưu liên quan")}</small>}
+                <small>{row.saved_reference===true?t("Exact saved reference found","Có tham chiếu chính xác đã lưu"):
+                  row.saved_reference===false?t("Exact saved references · none","Tham chiếu chính xác đã lưu · không có"):
+                    t("Saved reference status unverified","Chưa xác minh tham chiếu đã lưu")}</small>
+                <small id={hint}>{protection}</small>
+                {removalBlock&&removalBlock!==protection&&<small id={`${hint}-block`}>{removalBlock}</small>}
+                {row.eligible_at&&row.reason!=="removing"&&<small>{retentionTime(row.eligible_at)} · {t("Eligible from","Đủ điều kiện từ")} {formatTime(row.eligible_at)}</small>}
+                {row.legacy_expiry&&<small>{countdown(row.legacy_expiry)} · {formatTime(row.legacy_expiry)}</small>}
+                {row.scheduled_eligible&&<small>{t("Eligible for scheduled cleanup","Đủ điều kiện dọn theo lịch")}</small>}
+                <MediaFilePreview key={row.object_id+":"+row.object_version} bucket={row.bucket} path={row.name} filename={name}/>
+                <details><summary>{t("Storage identity","Định danh kho")}</summary><small>{[row.name,row.object_id,row.object_version].filter(Boolean).join(" · ")}</small></details>
               </div>
               <div className="storage-media-actions">
                 <label title={pickReason||undefined}><input type="checkbox" checked={checked} disabled={!!pickReason} aria-describedby={hint}
                   aria-label={t(`Select ${name}`,`Chọn ${name}`)} onChange={event=>{if(target){
                     if(event.target.checked)unusedSelection.add([target]);else unusedSelection.remove([target.id]);
                   }}}/>{t("Select","Chọn")}</label>
-                {target&&<button type="button" className="button button-outline button-small" data-button-variant="danger"
-                  aria-label={t(`Permanently delete ${name}`,`Xóa vĩnh viễn ${name}`)} disabled={!!unusedRemovalReason} title={unusedRemovalReason||undefined}
-                  onClick={()=>void purgeFiles([target])}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</button>}
+                <button type="button" className="button button-outline button-small" data-button-variant="danger"
+                  aria-label={t(`Permanently delete ${name}`,`Xóa vĩnh viễn ${name}`)} disabled={!!removalBlock} title={removalBlock||undefined}
+                  aria-describedby={removalBlock&&removalBlock!==protection?`${hint}-block`:hint}
+                  onClick={()=>{if(target)void purgeFiles([target]);}}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</button>
               </div>
             </li>;
           })}
-          {selected==="inventory_page"&&(page.items as InventoryItem[]).map(row=><li key={row.bucket+"/"+row.name}>
-            <div><strong>{row.name.split("/").at(-1)}</strong><small>{row.bucket} · {reasonLabel(row.reason)}</small></div><span>{row.bytes===null?"—":formatBytes(row.bytes)}</span>
-          </li>)}
           {selected==="removed_page"&&(page.items as RemovedItem[]).map(row=><li key={row.id}>
             <div><strong>{row.name.split("/").at(-1)}</strong><small>{row.bucket} · {row.source==="rename"?t("Photo retirement","Ảnh đã ngừng sử dụng"):t("Permanent removal","Đã xóa vĩnh viễn")}</small></div>
             <span>{formatTime(row.removed_at)}</span>

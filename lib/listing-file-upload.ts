@@ -4,7 +4,7 @@ import { browserBackendConfig } from "./browser-client";
 
 // This measures silence, not the total time allowed to upload a file.
 export const LISTING_UPLOAD_IDLE_MS = 120000;
-export type ListingUploadProgress = { bytes: number; total: number; percent: number; startedAt: number; lastActivityAt: number; retrying: boolean };
+export type ListingUploadProgress = { phase: "uploading"; bytes: number; total: number; percent: number; startedAt: number; lastActivityAt: number; retrying: boolean };
 export type ListingUploadOptions = { signal?: AbortSignal; onProgress?: (progress: ListingUploadProgress) => void };
 
 const resumes = new WeakMap<Blob, Map<string, { url: string; at: number }>>();
@@ -41,7 +41,7 @@ export async function uploadListingFile({ client, file, resumeKey = file, bucket
   signal?.throwIfAborted();
   const key = `${config.url}/${userId}/${bucket}/${path}`;
   const previous = resumes.get(resumeKey)?.get(key);
-  const state: ListingUploadProgress = { bytes: 0, total: file.size, percent: 0, startedAt: Date.now(), lastActivityAt: Date.now(), retrying: false };
+  const state: ListingUploadProgress = { phase: "uploading", bytes: 0, total: file.size, percent: 0, startedAt: Date.now(), lastActivityAt: Date.now(), retrying: false };
   return new Promise<string>((resolve, reject) => {
     let settled = false, timer: ReturnType<typeof setTimeout>;
     const publish = () => { if (!settled) onProgress?.({ ...state }); };

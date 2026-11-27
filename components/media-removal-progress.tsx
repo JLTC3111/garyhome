@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { trashRunEta, trashRunIssueCode, trashRunTiming, trashRunTotals, type TrashOperationState, type TrashRun, type TrashRunClock } from "@/lib/home-media-trash";
+import { pendingTrashRequest, trashRunEta, trashRunIssueCode, trashRunTiming, trashRunTotals, type TrashOperationState, type TrashRun, type TrashRunClock } from "@/lib/home-media-trash";
 import { useSite } from "./site-context";
 
 function duration(seconds:number) {
@@ -12,11 +12,11 @@ function duration(seconds:number) {
 }
 
 export function MediaRemovalProgress({
-  run,state,clock,preparing,visible,reconciling,refreshing,actionsBusy,detailsId,resumeReason,message,formatBytes,describeReason,onStop,onResume,onCancel,
+  run,state,clock,preparing,visible,reconciling,refreshing,actionsBusy,detailsId,resumeReason,message,formatBytes,describeReason,onStop,onResume,onCancel,onCheckReceipt,
 }: {
   run:TrashRun|null;state:TrashOperationState;clock:TrashRunClock|null;preparing:boolean;visible:boolean;
   reconciling:boolean;refreshing:boolean;actionsBusy:boolean;detailsId:string;resumeReason:string;message:string;
-  formatBytes:(bytes:number)=>string;describeReason:(code?:string)=>string;onStop:()=>void;onResume:()=>void;onCancel:()=>void;
+  formatBytes:(bytes:number)=>string;describeReason:(code?:string)=>string;onStop:()=>void;onResume:()=>void;onCancel:()=>void;onCheckReceipt:()=>void;
 }) {
   const {t,language}=useSite();
   const id=useId();
@@ -38,10 +38,10 @@ export function MediaRemovalProgress({
   const total=currentRun?.entries.length??0;
   const remaining=totals?.pending??0;
   const processed=total-remaining-(totals?.cancelled??0);
-  const resumable=remaining>0&&(state==="paused"||state==="failed");
+  const current=pendingTrashRequest(currentRun);
+  const resumable=(remaining>0||!!current)&&(state==="paused"||state==="failed");
   const timing=clock?trashRunTiming(clock,processed,now):currentRun?.timing;
   const eta=state==="cancelled"?null:trashRunEta(remaining,timing);
-  const current=currentRun?.entries.find(item=>item.outcome==="sent");
   const issueCode=currentRun?.issue&&currentRun.issue!=="stopped"?trashRunIssueCode(currentRun.issue):null;
   const waitingForLock=state==="running"&&issueCode==="media_busy";
   const systemPause=!!issueCode&&(state==="paused"||state==="failed");
@@ -62,7 +62,7 @@ export function MediaRemovalProgress({
   const issue=waitingForLock?t("The system will retry after a short delay.","Hệ thống sẽ thử lại sau giây lát."):
     systemPause?describeReason(issueCode??undefined):"";
   const blocked=resumable?resumeReason:"";
-  const details=reconciling?t("Checking the last deletion receipt before releasing the remaining files…","Đang kiểm tra biên nhận xóa cuối trước khi giải phóng các tệp còn lại…"):
+  const details=reconciling?t("Checking the last deletion receipt…","Đang kiểm tra biên nhận xóa cuối…"):
     message||issue||(refreshing?t("Refreshing inventory and Cleanup History…","Đang làm mới kho và Lịch sử dọn tệp…"):
       blocked||(resumable?t("Resume this run or cancel the remaining files to start another removal.",
         "Tiếp tục lượt này hoặc hủy các tệp còn lại để bắt đầu lượt xóa khác."):""));
@@ -76,6 +76,9 @@ export function MediaRemovalProgress({
         {t("Stop after the current file","Dừng sau tệp hiện tại")}
       </button>}
       {resumable&&!reconciling&&!refreshing&&<div className="storage-media-actions">
+        {current&&<button type="button" className="button button-outline button-small" disabled={actionsBusy} onClick={onCheckReceipt}>
+          {t("Check last request","Kiểm tra yêu cầu cuối")}
+        </button>}
         <button type="button" className="button button-small" disabled={actionsBusy||!!blocked}
           aria-describedby={blocked?(blocked===details?detailsId:`${id}-blocked`):undefined} onClick={onResume}>{t("Resume","Tiếp tục")}</button>
         <button type="button" className="button button-outline button-small" disabled={actionsBusy} onClick={onCancel}>

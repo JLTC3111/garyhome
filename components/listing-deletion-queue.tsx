@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { PROPERTY_IMAGE_ORIGIN } from "@/lib/property-photo-files";
-import { cancelTrashRun, isTrashTarget, makeTrashRun, matchingTrashTargets, mediaRequestTimeoutMs, processTrashRun, readTrashRun,
+import { cancelTrashRun, isTrashTarget, makeTrashRun, matchingTrashTargets, mediaRequestTimeoutMs, pendingTrashRequest, processTrashRun,
+  readTrashRun, reconcilePausedTrashRun, settlePausedTrashItem,
   trashRunIssueCode, trashRunTiming, trashRunTotals, trashRunUnfinished, type CleanupResult, type TrashOperationState, type TrashReceipt,
   type TrashRun, type TrashRunClock, type TrashTarget } from "@/lib/home-media-trash";
 import type { ListingDeletion } from "@/lib/property-deletion-server";
 import { useSite } from "./site-context";
 import { StorageOrphanReview } from "./storage-orphan-review";
-import { MediaSelectionControls, useMediaSelection } from "./media-selection";
+import { MediaSearchField, MediaSelectionControls, useMediaSelection } from "./media-selection";
 import { MediaRemovalProgress } from "./media-removal-progress";
 
 export function listingDeletionRequest<T>(editorTask: ReturnType<typeof useSite>["editorTask"], payload: Record<string, unknown>) {
@@ -58,7 +59,7 @@ type MediaReport = {
 type PageKind = "inventory_page"|"trash_page"|"removed_page"|"run_page";
 type MediaPage = {items:(InventoryItem|MediaItem|RemovedItem|MediaRun)[]; hasMore:boolean; available:boolean};
 type MediaAction = "overview"|"inventory_scan"|"trash"|"restore"|"run";
-type PanelAction = MediaAction|PageKind|"purge"|"cancel_purge";
+type PanelAction = MediaAction|PageKind|"purge"|"purge_individual"|"cancel_purge"|"check_receipt";
 const pageSize=30;
 const trashId=(item:TrashTarget)=>item.id;
 
@@ -106,6 +107,7 @@ function mediaMessage(issue:unknown,t:ReturnType<typeof useSite>["t"]) {
     case "removal_in_progress": return t("The worker is still resolving the last file. Try again after it finishes.","Tác vụ vẫn đang xử lý tệp cuối. Hãy thử lại sau khi hoàn tất.");
     case "removal_verification_wait": return t("The last request may still reach the worker. Try again in up to a minute.","Yêu cầu cuối vẫn có thể tới tác vụ. Hãy thử lại trong vòng một phút.");
     case "selection_changed": return t("The file or its restore deadline changed after selection.","Tệp hoặc hạn khôi phục đã thay đổi sau khi chọn.");
+    case "restored": return t("The file was restored while the batch was paused.","Tệp đã được khôi phục khi lượt xóa tạm dừng.");
     case "already_removed": return t("The file was removed by another cleanup.","Tệp đã được xóa bởi một lượt dọn khác.");
     case "no_longer_eligible": return t("The file is out of File Trash or otherwise ineligible.","Tệp đã rời Thùng rác hoặc không còn đủ điều kiện.");
     case "protected": return t("The live dependency or identity check kept this file.","Kiểm tra tham chiếu hoặc định danh hiện tại đã giữ lại tệp này.");
@@ -202,12 +204,12 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   async function work(action:PanelAction,operation:()=>Promise<void>) {
     if(flight.current)return;
     flight.current=true;setBusy(action);setError("");
-    const removal=action==="purge"||action==="cancel_purge";
-    if(removal)setRemovalError("");
+    const removal=action==="purge"||action==="cancel_purge"||action==="check_receipt";
+    if(removal||action==="purge_individual")setRemovalError("");
     try{await operation();}
     catch(issue){(removal?setRemovalError:setError)(mediaMessage(issue,t));}
     finally{
-      if(action==="purge"){setRunClock(null);setStopping(false);}
+      if(action==="purge"||action==="purge_individual"){setRunClock(null);setStopping(false);}
       flight.current=false;setBusy(null);
     }
   }
@@ -263,6 +265,13 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
         if(savedPendingFile()?.id===item.id)throw new Error("removal_unconfirmed");
         const result=await mediaRequest<{id:string;restored:boolean;listingId:string|null}>(editorTask,{action,id:item.id});
         if(result.id!==item.id||!result.restored)throw new Error("restore_unavailable");
+        try{
+          const saved=readSavedRun();
+          if(saved){
+            const settled=settlePausedTrashItem(saved,item,"restored");
+            if(settled!==saved)saveRun(settled);
+          }
+        }catch{/* Resume revalidates the live manifest if this browser cannot update its checkpoint. */}
         if(result.listingId)onListingRestored();
         trashSelection.remove([item.id]);
         setRestoredHref(PROPERTY_IMAGE_ORIGIN+"/storage/v1/object/public/"+item.bucket+"/"+item.name.split("/").map(encodeURIComponent).join("/"));
@@ -290,7 +299,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     let run=trashRun;
     try{run=readSavedRun();}
     catch{/* Use the last known checkpoint when browser storage is unavailable. */}
-    return run?.entries.find(row=>row.outcome==="sent");
+    return pendingTrashRequest(run);
   }
   function saveRun(run:TrashRun) {
     try{localStorage.setItem(checkpointKey,JSON.stringify(run));}
@@ -344,12 +353,41 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       await refreshAfterChange(true);
     }
   }
-  async function purgeFiles(items:TrashTarget[]) {
-    if(flight.current||!items.length||newRunReason)return;
-    await work("purge",async()=>{
+  async function purgeWhilePaused(bulk:TrashRun,run:TrashRun) {
+    let saved=bulk;
+    const result=await processTrashRun(run,{
+      purge:(payload,beforeSend)=>requestMedia<CleanupResult>(payload,beforeSend),receipt:getReceipt,
+      stopped:()=>!active.current,
+      save(next){
+        const file=next.entries[0];
+        const individualRequest=file.outcome==="sent"?file:undefined;
+        let updated=saved;
+        if(individualRequest!==saved.individualRequest)updated={...saved,individualRequest};
+        if(individualRequest&&next.issue)updated={...updated,issue:next.issue,issueItemId:file.id};
+        if(file.outcome==="removed")updated=settlePausedTrashItem(updated,file,"removed",file.bytes);
+        if(updated!==saved){saveRun(updated);saved=updated;}
+      },
+    });
+    if(!active.current)return;
+    const file=result.entries[0];
+    if(file.outcome==="removed"){
+      trashSelection.remove([file.id]);
+      const confirmed=t("File permanently deleted.","Đã xóa tệp vĩnh viễn.");
+      setResultText(confirmed);setRestoredHref("");notice(confirmed);
+    }else{
+      setError(mediaMessage(new Error(result.issue??file.reason??"purge_unconfirmed"),t));
+    }
+    await refreshAfterChange(true);
+  }
+  async function purgeFiles(items:TrashTarget[],individual=false) {
+    if(flight.current||!items.length||(individual?individualRunReason:newRunReason))return;
+    await work(individual&&unfinished?"purge_individual":"purge",async()=>{
       await withCheckpointLock(async()=>{
         const existing=readSavedRun();
-        if(trashRunUnfinished(existing)){setTrashRun(existing);throw new Error("trash_run_pending");}
+        if(pendingTrashRequest(existing)){setTrashRun(existing);throw new Error("removal_unconfirmed");}
+        const separate=individual&&existing&&trashRunUnfinished(existing)?existing:null;
+        if(trashRunUnfinished(existing)&&!separate){setTrashRun(existing);throw new Error("trash_run_pending");}
+        setBusy(separate?"purge_individual":"purge");
         const single=items.length===1?await getReceipt(items[0]):null;
         const live=single?(single.status==="eligible"?[{...items[0],bytes:single.bytes??items[0].bytes}]:[]):
           await eligibleTrash();
@@ -367,8 +405,11 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
           `Xóa vĩnh viễn ${eligible.length} tệp đã chọn (${size}) trước khi hết hạn khôi phục?${excluded?` Sẽ bỏ qua ${excluded} tệp thay đổi hoặc không đủ điều kiện.`:""}`)))return;
         const run=makeTrashRun(items);
         for(const item of run.entries)if(!eligibleIds.has(item.id)){item.outcome="skipped";item.reason="selection_changed";}
-        saveRun(run);
-        await continueRun(run);
+        if(separate)await purgeWhilePaused(separate,run);
+        else{
+          saveRun(run);
+          await continueRun(run);
+        }
       });
     });
   }
@@ -385,11 +426,23 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     await work("cancel_purge",()=>withCheckpointLock(async()=>{
       const saved=readSavedRun();
       if(!saved||!trashRunUnfinished(saved)){setTrashRun(saved);return;}
-      const checkingReceipt=saved.entries.some(item=>item.outcome==="sent");
+      const checkingReceipt=!!pendingTrashRequest(saved);
       const cancelled=await cancelTrashRun(saved,{receipt:getReceipt,save:saveRun});
       if(!active.current||cancelled.state!=="cancelled")return;
       trashSelection.remove(cancelled.entries.map(item=>item.id));
       if(checkingReceipt)await refreshAfterChange(true);
+    }));
+  }
+  async function checkPendingReceipt() {
+    if(flight.current)return;
+    await work("check_receipt",()=>withCheckpointLock(async()=>{
+      const saved=readSavedRun();
+      if(!saved||!pendingTrashRequest(saved)){setTrashRun(saved);return;}
+      const reconciled=await reconcilePausedTrashRun(saved,{receipt:getReceipt,save:saveRun});
+      if(active.current&&!pendingTrashRequest(reconciled)){
+        trashSelection.remove(reconciled.entries.filter(item=>item.outcome==="removed").map(item=>item.id));
+        await refreshAfterChange(true);
+      }
     }));
   }
   async function selectAllTrash() {
@@ -406,11 +459,12 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const unfinished=trashRunUnfinished(trashRun);
   const preparing=busy==="purge"&&!runClock;
   const processing=busy==="purge"&&(preparing||trashRun?.state==="running");
-  const pendingFile=trashRun?.entries.find(item=>item.outcome==="sent");
+  const pendingFile=pendingTrashRequest(trashRun);
   const removalState:TrashOperationState=processing?(stopping?"stopping":"running"):
     removalError&&!unfinished?"failed":trashRun?.state??"idle";
   const removalDetailsId=`${id}-removal-details`;
   const progress=busy==="inventory_scan"?t("Scanning storage and checking queued files…","Đang quét kho và kiểm tra tệp trong hàng đợi…"):
+    busy==="purge_individual"?t("Processing the individual deletion…","Đang xử lý yêu cầu xóa tệp…"):
     busy==="run"?t("Checking expired files for cleanup…","Đang kiểm tra tệp hết hạn để dọn…"):
     busy?t("Checking storage…","Đang kiểm tra kho lưu trữ…"):"";
   const inventoryReason=busy?progress:!report?t("Load the storage inventory first.","Hãy tải dữ liệu kho trước."):!upgraded?upgrade:"";
@@ -431,6 +485,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const resumeReason=removalReason||bulkSetup||checkpointReason;
   const unfinishedReason=unfinished?mediaMessage(new Error("trash_run_pending"),t):"";
   const newRunReason=unfinishedReason||resumeReason||(!report?.earlyEligible?noEarly:"");
+  const individualRunReason=resumeReason||pendingRequestReason||(!report?.earlyEligible?noEarly:"");
   const bulkEntryReason=removalReason||bulkSetup||(!report?.earlyEligible?noEarly:"");
   const controlReasons=[...new Set([trashReason,runReason,bulkEntryReason].filter(reason=>reason&&reason!==pendingRequestReason))];
   const controlHint=(reason:string)=>!reason?undefined:reason===pendingRequestReason?removalDetailsId:`${id}-operation-${controlReasons.indexOf(reason)}`;
@@ -499,11 +554,11 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     <div className="storage-media-body">
       <MediaRemovalProgress run={removalError&&!unfinished?null:trashRun} state={removalState} clock={processing?runClock:null}
         preparing={preparing&&!unfinished} visible={visible&&open}
-        reconciling={busy==="cancel_purge"&&removalState!=="cancelled"}
+        reconciling={busy==="check_receipt"||busy==="cancel_purge"&&removalState!=="cancelled"}
         refreshing={busy==="purge"&&!processing||busy==="cancel_purge"&&removalState==="cancelled"} actionsBusy={!!busy}
         detailsId={removalDetailsId} resumeReason={bulkActive?"":resumeReason} message={removalError} formatBytes={formatBytes}
         describeReason={code=>mediaMessage(new Error(code),t)} onStop={()=>{stopRequested.current=true;setStopping(true);}}
-        onResume={()=>void resumePurge()} onCancel={()=>void cancelPurge()}/>
+        onResume={()=>void resumePurge()} onCancel={()=>void cancelPurge()} onCheckReceipt={()=>void checkPendingReceipt()}/>
       <div className="storage-media-controls" hidden={bulkActive}>
       {report&&<>
         <dl className="storage-media-stats">
@@ -552,15 +607,22 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       {selected&&<section id={`${id}-media-list`}>
         <h3>{tabs.find(([kind])=>kind===selected)?.[1]}</h3>
         {selected==="trash_page"&&<>
-          <label>{t("Filter this page by filename","Lọc trang này theo tên tệp")} <input type="search" value={trashFilter} onChange={event=>setTrashFilter(event.target.value)}/></label>
+          <MediaSearchField label={t("Filter this page by filename","Lọc trang này theo tên tệp")}
+            placeholder={t("Filter this page by filename","Lọc trang này theo tên tệp")} value={trashFilter}
+            onChange={setTrashFilter} onClear={()=>setTrashFilter("")}/>
           <MediaSelectionControls count={trashSelection.rows.length} bytes={trashSelection.rows.reduce((sum,item)=>sum+(item.bytes??0),0)}
             unknownSizes={trashSelection.rows.filter(item=>item.bytes===null).length} formatBytes={formatBytes}
+            pageCount={pageEligible.length} pageSelected={pageEligible.filter(item=>trashSelection.has(item.id)).length}
             allReason={allSelectionReason} pageReason={pageSelectionReason} clearReason={selectionReason||(!trashSelection.rows.length?t("Selection is empty.","Chưa chọn tệp nào."):"")}
-            selectAll={()=>void selectAllTrash()} selectPage={()=>trashSelection.add(pageEligible)} clear={trashSelection.clear}/>
-          <button type="button" className="button button-outline button-small" data-button-variant="danger"
-            title={bulkReason||undefined} aria-describedby={bulkReason?unfinished?removalDetailsId:`${id}-bulk`:undefined} disabled={!!bulkReason}
-            onClick={()=>void purgeFiles(trashSelection.rows)}>{t(`Permanently delete selected (${trashSelection.rows.length})`,`Xóa vĩnh viễn mục đã chọn (${trashSelection.rows.length})`)}</button>
-          {bulkReason&&!unfinished&&<small id={`${id}-bulk`}>{bulkReason}</small>}
+            selectAll={()=>void selectAllTrash()} selectPage={()=>trashSelection.add(pageEligible)}
+            clearPage={()=>trashSelection.remove(pageEligible.map(trashId))} clear={trashSelection.clear}>
+            <button type="button" className="button button-outline button-small" data-button-variant="danger"
+              title={bulkReason||undefined} aria-describedby={bulkReason?`${id}-bulk`:undefined} disabled={!!bulkReason}
+              onClick={()=>void purgeFiles(trashSelection.rows)}>{t("Permanently delete selected","Xóa vĩnh viễn mục đã chọn")}</button>
+            {bulkReason&&<small id={`${id}-bulk`}>{bulkReason}</small>}
+            {individualRunReason&&individualRunReason!==pendingRequestReason&&
+              <span className="sr-only" id={`${id}-individual`}>{individualRunReason}</span>}
+          </MediaSelectionControls>
           {!!page?.items.length&&!visibleTrash.length&&<p>{t("No filenames on this page match the filter.","Không có tên tệp trên trang này khớp bộ lọc.")}</p>}
         </>}
         {!page&&!busy&&<button type="button" className="text-link" onClick={()=>void loadPage(selected,offset)}>{t("Refresh this list","Làm mới danh sách này")}</button>}
@@ -584,15 +646,15 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
             const reason=busy?progress:restoreReason(item),hint=`${id}-${item.id}`,earlyReason=purgeReason(item),earlyHint=`${hint}-early`;
             const name=item.name.split("/").at(-1),checked=trashSelection.has(item.id);
             const pickReason=selectionReason||(checked?"":removalReason||bulkSetup||earlyReason);
-            const deleteReason=newRunReason||earlyReason;
+            const deleteReason=individualRunReason||earlyReason;
             const restoreHint=busy?(controlReasons.includes(progress)?controlHint(progress):`${id}-working`):
               item.id===pendingFile?.id?removalDetailsId:hint;
-            const bulkHint=unfinished?removalDetailsId:`${id}-bulk`;
-            const deleteHint=newRunReason?bulkHint:deleteReason===reason?restoreHint:earlyHint;
+            const deleteHint=individualRunReason?(individualRunReason===pendingRequestReason?removalDetailsId:`${id}-individual`):
+              deleteReason===reason?restoreHint:earlyHint;
             return <li key={item.id}>
               <div><strong>{name}</strong><small>{item.bucket} · {item.bytes==null?"—":formatBytes(item.bytes)} · {countdown(item.expires_at)} · {formatTime(item.expires_at)}</small>
                 {reason&&restoreHint===hint&&<span className="sr-only" id={hint}>{reason}</span>}
-                {earlyReason&&!newRunReason&&earlyReason!==reason&&<span className="sr-only" id={earlyHint}>{earlyReason}</span>}
+                {earlyReason&&!individualRunReason&&earlyReason!==reason&&<span className="sr-only" id={earlyHint}>{earlyReason}</span>}
               </div>
               <div className="storage-media-actions">
                 <label title={pickReason||undefined}>
@@ -606,7 +668,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
                 </span>
                 <span title={deleteReason||undefined} tabIndex={deleteReason?0:undefined} aria-describedby={deleteReason?deleteHint:undefined}>
                   <button type="button" className="button button-outline button-small" data-button-variant="danger" disabled={!!deleteReason}
-                    onClick={()=>{if(isTrashTarget(item))void purgeFiles([item]);}}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</button>
+                    onClick={()=>{if(isTrashTarget(item))void purgeFiles([item],true);}}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</button>
                 </span>
               </div>
             </li>;

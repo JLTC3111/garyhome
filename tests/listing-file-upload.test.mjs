@@ -25,6 +25,7 @@ function harness(t){
 const turn=()=>new Promise(setImmediate);
 test('listing uploads use private in-memory resumable sessions, required chunks, original metadata and refreshed credentials',async t=>{
  const h=harness(t),pending=h.run();await turn();const {options}=h.state.uploads[0];
+ assert.equal(h.state.progress[0].phase,'uploading');
  assert.equal(options.chunkSize,6*1024*1024);assert.equal(options.storeFingerprintForResuming,false);assert.equal(options.uploadDataDuringCreation,true);
  assert.deepEqual(h.state.leases,[{name:'home_media_upload_lease',args:{p_bucket:'property-media',p_name:'properties/uuid.jpg'}}]);
  assert.match(options.endpoint,/exampleproject\.storage\.supabase\.co/);assert.deepEqual(JSON.parse(options.metadata.metadata),{original_filename:h.file.name});

@@ -1,5 +1,7 @@
 export const PROPERTY_IMAGE_BUCKET = "property-media";
+// The legacy Storage and exact-byte rename limit also covers existing photos.
 export const PROPERTY_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+export const PROPERTY_IMAGE_SOURCE_MAX_BYTES = 32 * 1024 * 1024;
 export const PROPERTY_IMAGE_ORIGIN = "https://duyiihsmaqfgwezmsnjs.supabase.co";
 export const PROPERTY_IMAGE_CACHE_SECONDS = "31536000";
 const publicPhotoRoot = "/storage/v1/object/public/property-media/";

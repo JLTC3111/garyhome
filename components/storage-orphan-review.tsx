@@ -3,7 +3,7 @@
 import {useEffect,useRef,useState} from "react";
 import {mediaBatchSize} from "@/lib/home-media-trash";
 import {useSite} from "./site-context";
-import {MediaSelectionControls,useMediaSelection} from "./media-selection";
+import {MediaSearchField,MediaSelectionControls,useMediaSelection} from "./media-selection";
 
 type ReviewRequest = <T>(payload:Record<string,unknown>)=>Promise<T>;
 type Row = {
@@ -140,20 +140,27 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
     <h3>{t("Orphan review","Rà soát tệp thừa")}</h3>
     <p>{t("Check selected files before recording custody and backup evidence. A dependency check does not move a file to Trash.",
       "Kiểm tra các tệp đã chọn trước khi ghi nhận bằng chứng nguồn và bản sao lưu. Kiểm tra tham chiếu không chuyển tệp vào Thùng rác.")}</p>
-    <form className="storage-media-actions" onSubmit={event=>{
+    <form className="storage-media-search-form" role="search" aria-label={t("Search orphan candidates","Tìm tệp thừa")} onSubmit={event=>{
       event.preventDefault();if(busy)return;
       setOffset(0);setSearch(query.trim());setRevision(value=>value+1);
     }}>
-      <label>{t("Filename or listing code","Tên tệp hoặc mã tin đăng")} <input type="search" value={query} maxLength={120} onChange={event=>setQuery(event.target.value)}/></label>
+      <MediaSearchField label={t("Filename or listing code","Tên tệp hoặc mã tin đăng")}
+        placeholder={t("Search by filename or listing code","Tìm theo tên tệp hoặc mã tin đăng")} value={query}
+        maxLength={120} disabled={busy} canClear={!!search} onChange={setQuery} onClear={()=>{
+          setQuery("");
+          if(search){setSearch("");setOffset(0);}
+        }}/>
       <button type="submit" className="button button-outline button-small" disabled={busy} title={busy?selectionReason:undefined}>{t("Search","Tìm")}</button>
     </form>
     <MediaSelectionControls count={selection.rows.length} bytes={selection.rows.reduce((sum,row)=>sum+(row.bytes??0),0)} unknownSizes={0}
+      pageCount={pageEligible.length} pageSelected={pageEligible.filter(row=>selection.has(rowKey(row))).length}
       formatBytes={formatBytes} allReason={allReason} pageReason={selectionReason||(!pageEligible.length?t("No eligible files on this page.","Trang này chưa có tệp đủ điều kiện."):"")}
       clearReason={selectionReason||(!selection.rows.length?noneSelected:"")} selectAll={()=>void selectAll()}
-      selectPage={()=>selection.add(pageEligible)} clear={selection.clear}/>
-    <button type="button" className="button button-outline button-small" disabled={!!verifyReason} title={verifyReason||undefined}
-      onClick={()=>void verify(selection.rows)}>{t(`Verify selected (${selection.rows.length})`,`Xác minh đã chọn (${selection.rows.length})`)}</button>
-    {verifyReason&&<small>{verifyReason}</small>}
+      selectPage={()=>selection.add(pageEligible)} clearPage={()=>selection.remove(pageEligible.map(rowKey))} clear={selection.clear}>
+      <button type="button" className="button button-outline button-small" disabled={!!verifyReason} title={verifyReason||undefined}
+        onClick={()=>void verify(selection.rows)}>{t("Verify selected","Xác minh đã chọn")}</button>
+      {verifyReason&&<small>{verifyReason}</small>}
+    </MediaSelectionControls>
     {loading&&<p role="status">{t("Loading review candidates…","Đang tải tệp cần kiểm tra…")}</p>}
     {selecting&&<p role="status">{t("Selecting eligible review files across pages…","Đang chọn tệp đủ điều kiện qua các trang…")}</p>}
     {working&&progress.total>0&&<p role="status">{t(`Checked ${progress.done} of ${progress.total} selected files…`,`Đã kiểm tra ${progress.done}/${progress.total} tệp đã chọn…`)}</p>}

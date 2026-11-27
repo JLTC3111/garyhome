@@ -4,7 +4,7 @@
 
 | Application | Upload policy | Delivery |
 | --- | --- | --- |
-| Home property-media | Source up to 8 MiB. Aim for 240 KB, with a 500 KB encoded cap. Use 1920, 1600 or 1280 px on the long edge and preserve aspect ratio. | Serve covers, thumbnails, and full-size views directly from the stored public object. Resolve old Supabase transformation URLs at display and SEO boundaries. |
+| Home property-media | Browser source up to 32 MiB, with a 50 megapixel JPEG limit. The finished file aims for 240 KB and must fit within 500,000 bytes. The long edge starts at up to 1,920 px and steps down as needed. | Serve covers, thumbnails, and full-size views directly from the stored public object. Resolve old Supabase transformation URLs at display and SEO boundaries. |
 | Home staff avatars | Source up to 2 MiB. Aim for 45 KB, with a 100 KB cap and a long edge up to 384 px. | Retain the immutable per-upload URL and the current avatar visibility. |
 | Visa editorial media | Source up to 5 MiB. Aim for 300 KB, with a 650 KB cap and a long edge up to 2400 px. | Keep lazy article cards and the five-minute public Storage browser TTL. |
 | Visa avatars | Keep the 384 px square crop and zoom controls. Encode toward 45 KB, with a 100 KB cap. | Keep the existing private bucket and short-lived signed previews. Use lazy images in the staff roster. |
@@ -12,9 +12,17 @@
 
 There is no browser transcoding for Visa documents, Home private submissions or videos, Jobs CVs, or private candidate portraits. Authorization and RLS continue to govern uploads. The Jobs vacancy Edge Function still validates, reserves and publishes images. Its existing JPEG and PNG fallback encoding can normalize embedded metadata. The WebP path avoids that second encode. Visa's reservation stores the actual transmitted MIME and byte size. A legacy reservation with the original MIME and size can still use its original file. For an interrupted optimized upload, use the original file in the same browser so it can reproduce the reserved rendition. If Storage already has the object, the existing registration action can verify it.
 
-The browser keeps efficient originals and prefers WebP for compatible content. It can transfer standard PNG physical density to WebP EXIF and retain transparency. Output with portable JPEG metadata can stay JPEG. The processor retains EXIF, IPTC and JPEG comments in those JPEGs and corrects the EXIF display orientation and dimensions after resizing. Files with metadata that requires their original container, such as a color profile or XMP, can pass through within Home's 1,920 px and 500 KB caps. Larger protected files need a compatible smaller source. Browser output is decoded again and checked for dimensions and sampled pixel differences. Review fine detail and transparency on real pilot images, especially floor plans, dense interiors and the Jobs 4× crop. [WebP container specification](https://developers.google.com/speed/webp/docs/riff_container)
+The browser keeps efficient originals and can transfer standard PNG physical density and transparency to WebP. Browser output is decoded again to check dimensions and sampled pixel differences. Other upload profiles retain their existing container policies. [WebP container specification](https://developers.google.com/speed/webp/docs/riff_container)
 
-Home's browser and local Sharp converter share the encoding profile and filename generator. The 1,920, 1,600 and 1,280 px choices are alternatives for a single stored image. Next.js provides display sizes from that image.
+### New Home listing JPEGs
+
+The browser uses WebP for resized JPEGs. It reduces quality and tries long edges of 1,920, 1,600 and 1,280 px, with 1,024 and 768 px available if none fit the hard cap. It accounts for the final container, encoder colour profile, metadata chunk headers and padding. Upload progress identifies optimization, reservation and network transfer separately. Next.js provides display sizes from the single stored image.
+
+The browser bakes in EXIF orientation and updates embedded dimensions. It retains the primary EXIF and standard XMP packet, including embedded creator, copyright and capture information. It uses the encoder's profile for the rendered colours, with Display P3 when supported for profiled images and sRGB otherwise. JPEG remains available when the browser cannot encode WebP or a photo carries standard IPTC-IIM records that need their native JPEG container. Raster watermarks are resized with the photograph.
+
+When re-encoding, the browser omits JPEG-only optional data such as extended XMP packets, Photoshop previews and edit history, duplicate metadata, JPEG comments and vendor application segments. It removes references to omitted extended XMP and obsolete EXIF previews. Standard IPTC-IIM records are kept independently of Photoshop previews. If the remaining required metadata and photo cannot fit at an accepted quality, the upload reports an error. Efficient originals within the preferred size and resolution pass through byte for byte. The original chosen file is never modified.
+
+The local Sharp tool for existing property photos retains its original limits and preservation policy.
 
 ## Proposed Storage limits
 

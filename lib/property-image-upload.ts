@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { imageOriginalFilename } from "./image-filenames";
 import { imageOptimizationErrorText, optimizeImage, propertyPhoto } from "./image-optimization.mjs";
-import { uploadListingFile, type ListingUploadOptions } from "./listing-file-upload";
-import { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET, propertyImageFormat, propertyPhotoStorageKey } from "./property-photo-files";
+import { uploadListingFile, type ListingUploadProgress } from "./listing-file-upload";
+import { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_SOURCE_MAX_BYTES, PROPERTY_IMAGE_BUCKET, propertyImageFormat, propertyPhotoStorageKey } from "./property-photo-files";
 import type { PlannedListingPhoto } from "./listing-gallery-checkpoint";
 
 export { PROPERTY_IMAGE_MAX_BYTES, PROPERTY_IMAGE_BUCKET };
@@ -10,7 +10,8 @@ const uploadPaths = new WeakMap<File, { scope: string; path: string }>();
 const encodedPhotos = new WeakMap<File, Awaited<ReturnType<typeof optimizeImage>>>();
 
 const unsupportedImage = "This file is not a supported image. Choose a JPG, PNG, WebP, or AVIF file.";
-const imageTooLarge = "Images must be 8 MB or smaller.";
+const sourceTooLarge = "Original photos must be 32 MB or smaller.";
+const uploadTooLarge = "Storage rejected the optimized photo size. Try again or contact the operator.";
 const unreadableImage = "Couldn’t read the image. Choose the file again.";
 const emptyImage = "Choose an image file that is not empty.";
 const expiredSignIn = "Your sign-in expired. Reconnect and try uploading the image again.";
@@ -19,13 +20,13 @@ const uploadTimeout = "The image upload timed out. Check your connection and try
 const interruptedUpload = "The image upload was interrupted. Reconnect and try again.";
 const failedConnection = "The image could not upload because the connection failed. Reconnect and try again.";
 const unknownUpload = "Couldn’t upload this image. Try again.";
-const knownMessages = new Set(["No upload progress for 120 seconds. Check your connection and retry. Your uploaded photos are still here.", "Your sign-in expired. Reconnect and try uploading again.",unsupportedImage, imageTooLarge, unreadableImage, emptyImage, expiredSignIn, uploadPermissions, uploadTimeout, interruptedUpload, failedConnection, unknownUpload, "Connect Supabase before uploading.", "Image filenames must be 512 characters or fewer.", "CMS preview uploads must be under 2 MB for browser storage.", "Couldn’t read image.", "Reconnect and verify your editor access before saving. Your edits are still here.", "Your account changed. Sign in again before continuing.", "Your account changed during this request. Check the current data before continuing."]);
+const knownMessages = new Set(["No upload progress for 120 seconds. Check your connection and retry. Your uploaded photos are still here.", "Your sign-in expired. Reconnect and try uploading again.",unsupportedImage, unreadableImage, emptyImage, expiredSignIn, uploadPermissions, uploadTimeout, interruptedUpload, failedConnection, unknownUpload, "Connect Supabase before uploading.", "Image filenames must be 512 characters or fewer.", "CMS preview uploads must be under 2 MB for browser storage.", "Couldn’t read image.", "Reconnect and verify your editor access before saving. Your edits are still here.", "Your account changed. Sign in again before continuing.", "Your account changed during this request. Check the current data before continuing."]);
 
 // Browser MIME labels can be empty or change when an image is renamed. Read
 // the format from the bytes, and give Storage a Blob with that actual MIME.
 export async function preparePropertyImage(file: File) {
   if (!Number.isSafeInteger(file.size) || file.size <= 0) throw new Error(emptyImage);
-  if (file.size > PROPERTY_IMAGE_MAX_BYTES) throw new Error(imageTooLarge);
+  if (file.size > PROPERTY_IMAGE_SOURCE_MAX_BYTES) throw new Error(sourceTooLarge);
   let bytes: Uint8Array;
   try { bytes = new Uint8Array(await file.slice(0, 4096).arrayBuffer()); }
   catch { throw new Error(unreadableImage); }
@@ -39,6 +40,7 @@ export function imageUploadError(error: unknown, language = "en"): string {
   if (optimization) return optimization;
   const issue = error && typeof error === "object" ? error as { name?: unknown; message?: unknown; code?: unknown; status?: unknown; statusCode?: unknown } : {};
   const message = typeof issue.message === "string" ? issue.message : typeof error === "string" ? error : "";
+  if (message === sourceTooLarge) return language === "vi" ? "Ảnh gốc phải có dung lượng từ 32 MB trở xuống." : sourceTooLarge;
   if (knownMessages.has(message)) return message;
   const code = String(issue.code || "").toLowerCase(), status = Number(issue.status || issue.statusCode);
   if (issue.name === "ListingUploadLeaseError") {
@@ -52,7 +54,9 @@ export function imageUploadError(error: unknown, language = "en"): string {
       ? "Chưa thể giữ chỗ tải ảnh. Kiểm tra kết nối rồi thử lại."
       : "The photo upload could not be reserved. Reconnect and try again.";
   }
-  if (status === 413 || /entitytoolarge|payloadtoolarge|invalidfilesize/.test(code) || /file too large|payload too large|entity too large|size.*exceed|exceed.*size|size limit/i.test(message)) return imageTooLarge;
+  if (message === uploadTooLarge || status === 413 || /entitytoolarge|payloadtoolarge|invalidfilesize/.test(code) || /file too large|payload too large|entity too large|size.*exceed|exceed.*size|size limit/i.test(message)) return language === "vi"
+    ? "Kho lưu trữ từ chối dung lượng ảnh đã tối ưu. Hãy thử lại hoặc liên hệ người vận hành."
+    : uploadTooLarge;
   if (status === 415 || /invalidmimetype/.test(code) || /mime.*(?:unsupported|not supported)|unsupported.*(?:mime|media|image)/i.test(message)) return unsupportedImage;
   if (status === 401 || /invalidjwt|jwtexpired|invalidtoken|expiredtoken/.test(code) || /jwt.*(?:invalid|expired)|token.*expired/i.test(message)) return expiredSignIn;
   if (status === 403 || code === "42501" || /accessdenied/.test(code) || /row.level security|permission denied|not authorized|unauthorized/i.test(message)) return uploadPermissions;
@@ -62,19 +66,28 @@ export function imageUploadError(error: unknown, language = "en"): string {
   return unknownUpload;
 }
 
-export type PropertyImageUploadOptions = ListingUploadOptions & { listingId?: string; expectedUserId?: string; onPlanned?: (photo: PlannedListingPhoto) => void };
+export type PropertyImageUploadProgress = ListingUploadProgress | { phase: "optimizing" | "preparing" };
+export type PropertyImageUploadOptions = {
+  signal?: AbortSignal;
+  onProgress?: (progress: PropertyImageUploadProgress) => void;
+  listingId?: string;
+  expectedUserId?: string;
+  onPlanned?: (photo: PlannedListingPhoto) => void;
+};
 
 export async function uploadPropertyImage(db: SupabaseClient, file: File, signal?: AbortSignal, options: PropertyImageUploadOptions = {}): Promise<string> {
   signal?.throwIfAborted();
   const originalFilename = imageOriginalFilename(file.name);
   let prepared = encodedPhotos.get(file);
   if (!prepared) {
+    options.onProgress?.({phase:"optimizing"});
     await preparePropertyImage(file);
-    prepared = await optimizeImage(file, propertyPhoto, {signal, inputMax:PROPERTY_IMAGE_MAX_BYTES});
+    prepared = await optimizeImage(file, propertyPhoto, {signal, inputMax:PROPERTY_IMAGE_SOURCE_MAX_BYTES});
     // A resumable transfer must continue with the same encoded bytes.
     encodedPhotos.set(file, prepared);
   }
   signal?.throwIfAborted();
+  options.onProgress?.({phase:"preparing"});
   const {listingId,onPlanned,...progress}=options;
   const scope=listingId ? `properties/listings/${listingId}` : "properties";
   let attempt = uploadPaths.get(file);

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, Search, X } from "lucide-react";
 import { useSite } from "./site-context";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
 export function useMediaSelection<Row>(key:string, idOf:(row:Row)=>string, valid:(row:unknown)=>row is Row) {
   const current=useRef<{key:string;items:Map<string,Row>}|null>(null);
@@ -27,25 +29,69 @@ export function useMediaSelection<Row>(key:string, idOf:(row:Row)=>string, valid
     clear:()=>update(next=>next.clear())};
 }
 
-export function MediaSelectionControls({count,bytes,unknownSizes,formatBytes,allReason,pageReason,clearReason,selectAll,selectPage,clear}: {
-  count:number;bytes:number;unknownSizes:number;formatBytes:(bytes:number)=>string;
-  allReason:string;pageReason:string;clearReason:string;selectAll:()=>void;selectPage:()=>void;clear:()=>void;
+export function MediaSearchField({label,placeholder,value,onChange,onClear,canClear,disabled,maxLength}: {
+  label:string;placeholder:string;value:string;onChange:(value:string)=>void;onClear:()=>void;canClear?:boolean;disabled?:boolean;maxLength?:number;
 }) {
   const {t}=useSite();
+  const input=useRef<HTMLInputElement>(null);
+  const clearLabel=t("Clear search","Xóa tìm kiếm");
+  return <div className="storage-media-search">
+    <Search size={16} aria-hidden="true"/>
+    <input ref={input} type="search" aria-label={label} placeholder={placeholder} value={value}
+      maxLength={maxLength} autoComplete="off" spellCheck={false} disabled={disabled} onChange={event=>onChange(event.target.value)}/>
+    {(value||canClear)&&<button type="button" className="storage-media-search__clear" aria-label={clearLabel} title={clearLabel}
+      disabled={disabled} onClick={()=>{onClear();input.current?.focus();}}><X size={16} aria-hidden="true"/></button>}
+  </div>;
+}
+
+export function MediaSelectionControls({
+  count,bytes,unknownSizes,formatBytes,pageCount,pageSelected,allReason,pageReason,clearReason,selectAll,selectPage,clearPage,clear,children,
+}: {
+  count:number;bytes:number;unknownSizes:number;formatBytes:(bytes:number)=>string;
+  pageCount:number;pageSelected:number;allReason:string;pageReason:string;clearReason:string;
+  selectAll:()=>void;selectPage:()=>void;clearPage:()=>void;clear:()=>void;children?:ReactNode;
+}) {
+  const {t,language}=useSite();
   const id=useId();
+  const number=new Intl.NumberFormat(language==="vi"?"vi-VN":"en");
+  const pageChecked=pageCount>0&&pageSelected===pageCount;
+  const mixed=pageSelected>0&&!pageChecked;
+  const pageLabel=t("Select eligible files on this page","Chọn tệp đủ điều kiện trên trang này");
+  const optionsLabel=t("Selection options","Tùy chọn lựa chọn");
   const actions=[
     {key:"all",label:t("Select all eligible files","Chọn tất cả tệp đủ điều kiện"),reason:allReason,action:selectAll},
     {key:"page",label:t("Select current page","Chọn trang hiện tại"),reason:pageReason,action:selectPage},
     {key:"clear",label:t("Clear selection","Bỏ tất cả lựa chọn"),reason:clearReason,action:clear},
   ];
   const reasons=[...new Set(actions.map(action=>action.reason).filter(Boolean))];
-  return <>
-    <div className="storage-media-actions">
-      {actions.map(({key,label,reason,action})=><button key={key} type="button" className="button button-outline button-small"
-        disabled={!!reason} title={reason||undefined} aria-describedby={reason?`${id}-${reasons.indexOf(reason)}`:undefined} onClick={action}>{label}</button>)}
-      <span role="status">{t(`${count} selected · ${formatBytes(bytes)}`,`${count} tệp đã chọn · ${formatBytes(bytes)}`)}
-        {unknownSizes>0&&t(` · ${unknownSizes} sizes unknown`,` · ${unknownSizes} tệp chưa rõ dung lượng`)}</span>
+  const reasonId=(reason:string)=>reason?`${id}-${reasons.indexOf(reason)}`:undefined;
+  const unavailable=actions.every(action=>!!action.reason);
+  return <div className="storage-media-toolbar">
+    <div className="storage-media-selection" data-selected={count>0}>
+      <div className="storage-media-selection__switch">
+        <label className="storage-media-selection__master" title={pageReason||pageLabel}>
+          <input type="checkbox" aria-label={pageLabel} aria-checked={mixed?"mixed":pageChecked} aria-describedby={reasonId(pageReason)}
+            ref={node=>{if(node)node.indeterminate=mixed;}} checked={pageChecked} disabled={!!pageReason}
+            onChange={pageChecked?clearPage:selectPage}/>
+        </label>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="storage-media-selection__trigger" aria-label={optionsLabel}
+              title={unavailable?allReason:optionsLabel} aria-describedby={unavailable?reasonId(allReason):undefined}
+              disabled={unavailable}><ChevronDown size={16} aria-hidden="true"/></button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="storage-media-selection-menu" align="start" collisionPadding={12}>
+            {actions.map(({key,label,reason,action})=><DropdownMenuItem key={key} className="storage-media-selection-menu__item"
+              disabled={!!reason} aria-describedby={reasonId(reason)} onSelect={action}>{label}</DropdownMenuItem>)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <span className="storage-media-selection__total" role="status">
+        <strong>{t(`${number.format(count)} selected`,`${number.format(count)} tệp đã chọn`)}</strong>
+        {" · "}{formatBytes(bytes)}{unknownSizes>0&&t(` · ${number.format(unknownSizes)} sizes unknown`,` · ${number.format(unknownSizes)} tệp chưa rõ dung lượng`)}
+      </span>
     </div>
-    {reasons.map((reason,index)=><small key={reason} id={`${id}-${index}`}>{reason}</small>)}
-  </>;
+    {children&&<div className="storage-media-toolbar__action">{children}</div>}
+    {reasons.map((reason,index)=><span key={reason} className="sr-only" id={`${id}-${index}`}>{reason}</span>)}
+  </div>;
 }

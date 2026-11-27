@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {cancelTrashRun,makeTrashRun,matchingTrashTargets,processTrashRun,readTrashRun,trashRunEta,trashRunTiming,trashRunTotals,trashRunUnfinished} from '../lib/home-media-trash.ts';
+import {cancelTrashRun,makeTrashRun,matchingTrashTargets,pendingTrashRequest,processTrashRun,readTrashRun,reconcilePausedTrashRun,
+  settlePausedTrashItem,trashRunEta,trashRunTiming,trashRunTotals,trashRunUnfinished} from '../lib/home-media-trash.ts';
 import {RequestTimeoutError} from '../lib/requests.ts';
 
 const expires=new Date(Date.now()+60*60*1000).toISOString();
@@ -146,6 +147,35 @@ test('resuming checks previously sent items and excludes restored, removed and c
   assert.deepEqual(requested,['eligible']);
   assert.deepEqual(run.entries.map(item=>item.outcome),['skipped','skipped','skipped','skipped','removed']);
   assert.equal(run.state,'completed');
+});
+
+test('a paused batch can reconcile an interrupted individual deletion without resuming',async()=>{
+  const [first,removed,restored,remaining]=['first','removed','restored','remaining'].map(file);
+  const run=makeTrashRun([first,removed,restored,remaining]);
+  run.state='paused';
+  run.timing={elapsedMs:6000,measuredFiles:1};
+  run.entries[0].outcome='removed';
+  assert.equal(settlePausedTrashItem(run,{...restored,name:'other.webp'},'restored'),run);
+  const afterRestore=settlePausedTrashItem(run,restored,'restored');
+  const journal=readTrashRun(JSON.stringify({...afterRestore,individualRequest:{...removed,outcome:'sent',sentAt:Date.now()}}));
+  assert.equal(pendingTrashRequest(journal).id,removed.id);
+  const awaiting=await reconcilePausedTrashRun(journal,{...defaults,receipt:async()=>({status:'removal_in_progress'})});
+  assert.equal(awaiting.issue,'removal_in_progress');
+  assert.equal(pendingTrashRequest(awaiting).id,removed.id);
+  const settled=await reconcilePausedTrashRun(awaiting,{...defaults,async receipt({id}){
+    assert.equal(id,removed.id);return {status:'removed',bytes:120};
+  }});
+  assert.equal(pendingTrashRequest(settled),undefined);
+  assert.equal(settled.state,'paused');
+  assert.deepEqual(settled.timing,run.timing);
+  assert.equal(trashRunTotals(settled).reclaimedBytes,240);
+  assert.equal(settlePausedTrashItem(settled,removed,'removed',120),settled);
+  const completed=await processTrashRun(settled,{...defaults,eligible:async()=>[remaining],
+    receipt:()=>assert.fail('settled files should never be sent again'),
+    async purge({id},beforeSend){assert.equal(id,remaining.id);beforeSend();return {status:'ok',removed:1};},
+  });
+  assert.equal(completed.entries[2].reason,'restored');
+  assert.equal(trashRunTotals(completed).removed,3);
 });
 
 test('the 48/448 legacy checkpoint defers a persistently locked file and finishes the other 399',async()=>{

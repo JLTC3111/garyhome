@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import {avatarPhoto,imageDetails,optimizeImage,propertyPhoto} from '../lib/image-optimization.mjs';
 
 // Exercise the actual encoded and decoded pixels in Node without launching a browser.
-function rasterEnvironment({webp=true, damage=false}={}) {
+function rasterEnvironment({webp=true, damage=false, onEncode}={}) {
   let released = 0;
   return {
     Blob,
@@ -30,6 +30,7 @@ function rasterEnvironment({webp=true, damage=false}={}) {
         async toBlob(resolve,type,quality){
           if(type==='image/webp'&&!webp)type='image/png';
           const width=canvas.width,height=canvas.height;
+          onEncode?.({width,height,quality});
           const buffer=damage?Buffer.alloc(pixels.length,255):pixels;
           const output=await sharp(buffer,{raw:{width,height,channels:4}}).toFormat(type.split('/')[1],{quality:Math.round(quality*100)}).toBuffer();
           resolve(new Blob([output],{type}));
@@ -75,7 +76,7 @@ test('small sources retain their actual MIME, bytes, and dimensions',async()=>{
   assert.deepEqual(await result.body.arrayBuffer(),await file.arrayBuffer());
 });
 
-test('JPEG compression carries EXIF descriptions and writes the new orientation and geometry',async()=>{
+test('WebP carries JPEG EXIF descriptions and writes the new orientation and geometry',async()=>{
   const original=await photo({metadata:image=>image.withExif({IFD0:{ImageDescription:'Lake view'}})});
   const bytes=Buffer.from(await original.arrayBuffer());
   const tiff=bytes.indexOf('Exif\0\0')+6;
@@ -87,7 +88,7 @@ test('JPEG compression carries EXIF descriptions and writes the new orientation 
   bytes[little?'writeUInt16LE':'writeUInt16BE'](6,orientation+8);
   const file=new File([bytes],original.name);
   const result=await optimizeImage(file,propertyPhoto,{win:rasterEnvironment()});
-  assert.equal(result.contentType,'image/jpeg');
+  assert.equal(result.contentType,'image/webp');
   assert.ok(result.height>=1280&&result.height<=1920);
   assert.equal(result.height/result.width,16/9);
   const metadata=await sharp(Buffer.from(await result.body.arrayBuffer())).metadata();
@@ -97,17 +98,78 @@ test('JPEG compression carries EXIF descriptions and writes the new orientation 
   assert.ok(result.body.size<=500_000);
 });
 
-test('an over-budget image with a color profile is held for review',async()=>{
-  const file=await photo({metadata:image=>image.withIccProfile('p3')});
-  assert.ok(file.size>propertyPhoto.maxBytes);
-  await assert.rejects(optimizeImage(file,propertyPhoto,{win:rasterEnvironment()}),{code:'IMAGE_METADATA'});
+const cameraSample = new URL('../public/images/neighbourhoods/hai-ba-trung.jpg',import.meta.url).pathname;
+
+function appSegment(marker,payload) {
+  const header=Buffer.alloc(4);
+  header.set([255,marker]);
+  header.writeUInt16BE(payload.length+2,2);
+  return Buffer.concat([header,payload]);
+}
+
+function photoshopResource(id,value) {
+  const header=Buffer.alloc(12);
+  header.write('8BIM');
+  header.writeUInt16BE(id,4);
+  header.writeUInt32BE(value.length,8);
+  return Buffer.concat(value.length%2?[header,value,Buffer.alloc(1)]:[header,value]);
+}
+
+test('large profiled JPEGs with substantial XMP and optional data fit the finished WebP budget',async()=>{
+  const copyright='Gary Home photo fixture';
+  const xmp=`<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:app="https://example.invalid/edit/" dc:rights="${copyright}" app:editHistory="${'edit record '.repeat(4500)}"/></rdf:RDF></x:xmpmeta>`;
+  const bytes=await sharp(cameraSample).resize(6000,4000,{fit:'cover'}).withIccProfile('p3')
+    .withExif({IFD0:{Copyright:copyright}}).withXmp(xmp).jpeg({quality:97,chromaSubsampling:'4:4:4'}).toBuffer();
+  const comment=appSegment(0xfe,Buffer.alloc(62_000,65));
+  const original=new File([bytes.subarray(0,2),...Array(9).fill(comment),bytes.subarray(2)],'high-resolution.jpg');
+  assert.ok(original.size>8*1024*1024);
+  const attempts=[];
+  const result=await optimizeImage(original,propertyPhoto,{win:rasterEnvironment({onEncode:value=>attempts.push(value)}),inputMax:32*1024*1024});
+  const metadata=await sharp(Buffer.from(await result.body.arrayBuffer())).metadata();
+  assert.equal(metadata.format,'webp');
+  assert.ok(result.body.size<=500_000);
+  assert.ok(result.width<=1920);
+  assert.ok(Math.abs(result.width*2/3-result.height)<=.5);
+  assert.match(metadata.exif.toString(),/Gary Home photo fixture/);
+  assert.match(metadata.xmp.toString(),/Gary Home photo fixture/);
+  assert.ok(attempts.length>1,'metadata and raster bytes require adaptive encoding');
+  assert.ok(attempts.some(attempt=>attempt.quality<.86));
 });
 
-test('a protected image under the byte cap cannot bypass the 1920px limit',async()=>{
+test('an ICC-tagged image under the byte cap still fits the 1920 px bound',async()=>{
   const bytes=await sharp({create:{width:2200,height:900,channels:3,background:'#745c46'}}).withIccProfile('p3').jpeg().toBuffer();
   const file=new File([bytes],'oversize.jpg',{type:'image/jpeg'});
   assert.ok(file.size<propertyPhoto.targetBytes);
-  await assert.rejects(optimizeImage(file,propertyPhoto,{win:rasterEnvironment()}),{code:'IMAGE_METADATA'});
+  const result=await optimizeImage(file,propertyPhoto,{win:rasterEnvironment()});
+  assert.equal(result.contentType,'image/webp');
+  assert.deepEqual([result.width,result.height],[1920,785]);
+});
+
+test('IPTC attribution uses JPEG compatibility and excludes optional Photoshop data',async()=>{
+  const copyright=Buffer.from('Gary Home IPTC copyright');
+  const dataset=Buffer.concat([Buffer.from([0x1c,2,116,0,copyright.length]),copyright]);
+  const iptc=appSegment(0xed,Buffer.concat([Buffer.from('Photoshop 3.0\0'),photoshopResource(0x0404,dataset),
+    photoshopResource(0x0409,Buffer.alloc(45_000,67))]));
+  const original=Buffer.from(await (await photo()).arrayBuffer());
+  const file=new File([original.subarray(0,2),iptc,original.subarray(2)],'property.jpg');
+  const result=await optimizeImage(file,propertyPhoto,{win:rasterEnvironment()});
+  const out=Buffer.from(await result.body.arrayBuffer());
+  const metadata=await sharp(out).metadata();
+  assert.equal(result.contentType,'image/jpeg');
+  assert.ok(out.length<=500_000);
+  assert.ok(metadata.iptc.includes(copyright));
+  assert.ok(!out.includes(Buffer.alloc(128,67)));
+});
+
+test('tight output budgets fall back to smaller resolutions as well as lower quality',async()=>{
+  const file=await photo(),attempts=[];
+  const result=await optimizeImage(file,{...propertyPhoto,targetBytes:55_000,maxBytes:70_000},{
+    win:rasterEnvironment({onEncode:attempt=>attempts.push(attempt)})
+  });
+  assert.ok(result.body.size<=70_000);
+  assert.ok(result.width<1920);
+  assert.ok(attempts.some(attempt=>attempt.quality<.72));
+  assert.ok(new Set(attempts.map(attempt=>attempt.width)).size>1);
 });
 
 test('JPEG fallback and avatar resize use the applicable cap without upscaling',async()=>{

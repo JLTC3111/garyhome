@@ -9,6 +9,7 @@ type TrashRunTiming = { elapsedMs: number; measuredFiles: number; pauseReason?: 
 export type TrashRun = {
   version: 1; confirmedAt: string; state: Exclude<TrashOperationState, "idle">; issue?: string; issueItemId?: string;
   entries: TrashEntry[]; timing?: TrashRunTiming;
+  individualRequest?: TrashEntry;
 };
 export type TrashRunClock = { startedAt: number; elapsedBefore: number; measuredBefore: number; processedBefore: number };
 export const mediaRequestTimeoutMs = 59_000;
@@ -16,7 +17,11 @@ const lockRetryDelays=[1500,4500];
 const lockRetryJitterMs=500;
 
 export function trashRunUnfinished(run:TrashRun|null) {
-  return !!run?.entries.some(item=>item.outcome==="pending"||item.outcome==="sent");
+  return !!run&&(!!run.individualRequest||run.entries.some(item=>item.outcome==="pending"||item.outcome==="sent"));
+}
+
+export function pendingTrashRequest(run:TrashRun|null) {
+  return run?.individualRequest??run?.entries.find(item=>item.outcome==="sent");
 }
 
 export function isTrashTarget(row:unknown): row is TrashTarget {
@@ -48,7 +53,9 @@ export function readTrashRun(source:string|null):TrashRun|null {
   catch{throw new Error("trash_checkpoint_invalid");}
   if(run?.version!==1 || !Number.isFinite(Date.parse(run.confirmedAt)) || !Array.isArray(run.entries) || !run.entries.length ||
     !run.entries.every(item=>isTrashTarget(item) && ["pending","sent","removed","skipped","failed","cancelled"].includes(item.outcome)) ||
-    new Set(run.entries.map(item=>item.id)).size!==run.entries.length)throw new Error("trash_checkpoint_invalid");
+    new Set(run.entries.map(item=>item.id)).size!==run.entries.length||
+    run.individualRequest!==undefined&&(!isTrashTarget(run.individualRequest)||run.individualRequest.outcome!=="sent"))
+    throw new Error("trash_checkpoint_invalid");
   const timing=run.timing;
   if(timing&&(!Number.isSafeInteger(timing.elapsedMs)||timing.elapsedMs<0||!Number.isSafeInteger(timing.measuredFiles)||
     timing.measuredFiles<0||timing.measuredFiles>run.entries.length||
@@ -65,8 +72,8 @@ export function readTrashRun(source:string|null):TrashRun|null {
   if(trashRunUnfinished(run)){
     if(run.state!=="failed")run.state="paused";
     run.issue??="trash_run_interrupted";
-    if(!run.entries.some(item=>item.id===run.issueItemId)){
-      run.issueItemId=(run.entries.find(item=>item.outcome==="sent")??
+    if(!run.issueItemId||(run.individualRequest?.id!==run.issueItemId&&!run.entries.some(item=>item.id===run.issueItemId))){
+      run.issueItemId=(pendingTrashRequest(run)??
         run.entries.find(item=>item.outcome==="pending"&&item.reason===run.issue))?.id;
     }
   }else if(run.state!=="failed"){
@@ -85,6 +92,20 @@ export function trashRunTotals(run:TrashRun) {
     if(item.outcome==="removed"){totals.reclaimedBytes+=item.bytes??0;if(item.bytes===null)totals.unknownSizes++;}
   }
   return totals;
+}
+
+type TrashIdentity = Pick<TrashTarget,"id"|"bucket"|"name"> & {expires_at:string|null};
+export function settlePausedTrashItem(run:TrashRun,item:TrashIdentity,outcome:"removed"|"restored",bytes?:number|null):TrashRun {
+  const index=run.entries.findIndex(row=>row.outcome==="pending"&&row.id===item.id&&row.bucket===item.bucket&&
+    row.name===item.name&&row.expires_at===item.expires_at);
+  if(index<0)return run;
+  const entries=run.entries.slice();
+  const row=entries[index];
+  entries[index]={...row,outcome:outcome==="restored"?"skipped":"removed",reason:outcome==="restored"?"restored":undefined,
+    bytes:bytes??row.bytes,retryAfter:undefined};
+  const next={...run,entries};
+  if(!trashRunUnfinished(next)&&run.state!=="running")return {...next,state:"completed",issue:undefined,issueItemId:undefined};
+  return run.issueItemId===item.id?{...next,issue:"stopped",issueItemId:undefined}:next;
 }
 
 export function trashRunTiming(clock:TrashRunClock,processed:number,now:number):TrashRunTiming {
@@ -133,17 +154,31 @@ function mayStillBeDispatched(item:TrashEntry) {
 
 async function reconcileSent(run:TrashRun,receipt:ReceiptReader,save:(run:TrashRun)=>void) {
   let current=run;
-  for(const [index,item] of run.entries.entries()){
-    if(item.outcome!=="sent")continue;
+  const sent=run.entries.filter(item=>item.outcome==="sent");
+  if(run.individualRequest)sent.unshift(run.individualRequest);
+  for(const item of sent){
     const result=await readOutcome(item,receipt);
     if(result==="removal_in_progress"||result==="removal_unconfirmed")return {run:current,issue:result,itemId:item.id};
     if(result==="eligible"&&mayStillBeDispatched(item))return {run:current,issue:"removal_verification_wait",itemId:item.id};
-    const entries=current.entries.slice();
-    entries[index]=result==="eligible"?{...item,outcome:"pending",sentAt:undefined,reason:undefined}:result;
-    current={...current,entries};
+    if(item===current.individualRequest){
+      current={...current,individualRequest:undefined};
+      if(result!=="eligible"&&result.outcome==="removed")current=settlePausedTrashItem(current,item,"removed",result.bytes);
+    }else{
+      const settled:TrashEntry=result==="eligible"?{...item,outcome:"pending",sentAt:undefined,reason:undefined}:result;
+      current={...current,entries:current.entries.map(row=>row.id===item.id?settled:row)};
+    }
     save(current);
   }
   return {run:current,issue:undefined};
+}
+
+export async function reconcilePausedTrashRun(run:TrashRun,options:{receipt:ReceiptReader;save:(run:TrashRun)=>void}) {
+  const reconciled=await reconcileSent(run,options.receipt,options.save);
+  const pending=trashRunUnfinished(reconciled.run);
+  const next:TrashRun={...reconciled.run,state:pending?"paused":"completed",
+    issue:reconciled.issue??(pending?"stopped":undefined),issueItemId:reconciled.itemId};
+  options.save(next);
+  return next;
 }
 
 export async function cancelTrashRun(run:TrashRun,options:{receipt:ReceiptReader;save:(run:TrashRun)=>void}) {

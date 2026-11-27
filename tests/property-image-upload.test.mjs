@@ -62,7 +62,7 @@ test('image bytes determine type when renamed JPEG files have empty, nonstandard
 test('empty, oversized and unsupported image contents are rejected before a storage request',async t=>{
  const h=harness(t);
  await assert.rejects(h.preparePropertyImage(new File([],'empty.jpg',{type:'image/jpeg'})),/not empty/);
- await assert.rejects(h.preparePropertyImage({size:8*1024*1024+1,slice(){throw new Error('must not read oversized file');}}),/8 MB or smaller/);
+ await assert.rejects(h.preparePropertyImage({size:32*1024*1024+1,slice(){throw new Error('must not read oversized file');}}),/32 MB or smaller/);
  for(const body of ['<svg>not a JPEG</svg>',avif('heic')])await assert.rejects(h.uploadPropertyImage(h.db,new File([body],'fake.jpg',{type:'image/jpeg'})),/not a supported image/);
  assert.equal(h.calls.length,0);
 });
@@ -108,6 +108,7 @@ test('listing uploads reserve a per-listing path and retry the same key',async t
   filename:'Living room.jpg.jpg',bytes:jpeg.length,mime:'image/jpeg'}]);
  assert.equal(h.calls[0].file,h.calls[1].file);
  assert.equal(h.encodes.length,1);
+ assert.equal(h.encodes[0].options.inputMax,32*1024*1024);
 });
 
 test('listing upload reservation failures preserve actionable localized reasons',async t=>{
@@ -133,17 +134,35 @@ test('encoded bytes, extension, and original filename travel together',async t=>
 
 test('image uploads forward cancellation and progress to the resumable transport',async t=>{
  let started;const requestStarted=new Promise(resolve=>started=resolve),progress=[];
- const h=harness(t,{transport:input=>{input.onProgress({percent:40});started();return new Promise((_,reject)=>input.signal.addEventListener('abort',()=>reject(input.signal.reason),{once:true}));}});
+ const h=harness(t,{transport:input=>{input.onProgress({phase:'uploading',percent:40});started();return new Promise((_,reject)=>input.signal.addEventListener('abort',()=>reject(input.signal.reason),{once:true}));}});
  const controller=new AbortController(),upload=h.uploadPropertyImage(h.db,new File([jpeg],'home.jpg'),controller.signal,{onProgress:value=>progress.push(value)});
  await requestStarted;controller.abort();await assert.rejects(upload,/interrupted/);
- assert.equal(h.calls[0].signal.aborted,true);assert.deepEqual(progress,[{percent:40}]);
+ assert.equal(h.calls[0].signal.aborted,true);assert.deepEqual(progress,[{phase:'optimizing'},{phase:'preparing'},{phase:'uploading',percent:40}]);
  await nextTurn();
+});
+
+test('cancellation during optimization stops before planning or transport',async t=>{
+ let release,started;
+ const optimizing=new Promise(resolve=>started=resolve);
+ const h=harness(t,{encode:file=>new Promise(resolve=>{
+  release=()=>resolve({body:file,extension:'jpg',contentType:'image/jpeg'});
+  started();
+ })});
+ const controller=new AbortController(),progress=[];
+ const pending=h.uploadPropertyImage(h.db,new File([jpeg],'camera.jpg'),controller.signal,{
+  onProgress:state=>progress.push(state.phase),onPlanned:()=>assert.fail('upload was cancelled')
+ });
+ await optimizing;
+ controller.abort();release();
+ await assert.rejects(pending,{name:'AbortError'});
+ assert.deepEqual(progress,['optimizing']);
+ assert.equal(h.calls.length,0);
 });
 
 test('upload errors distinguish permissions, authentication, size, type and connection timeouts',t=>{
  const h=harness(t);
  for(const [error,pattern] of [
-  [{status:413},/8 MB or smaller/],[{code:'InvalidMimeType'},/not a supported image/],
+  [{status:413},/Storage rejected the optimized photo size/],[{code:'InvalidMimeType'},/not a supported image/],
   [{statusCode:'401'},/sign-in expired/],[{status:403},/permission to upload/],[{code:'42501'},/permission to upload/],
   [{name:'RequestTimeoutError',message:'The request timed out. It may have reached the server.'},/image upload timed out/],
   [new TypeError('Failed to fetch'),/connection failed/],[{name:'AbortError'},/interrupted/],[{},/Couldn’t upload this image/],

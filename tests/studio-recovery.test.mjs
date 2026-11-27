@@ -177,9 +177,14 @@ async function harness(t, options={}){
  };
  const modules=new Map();
  function load(file){
+  if(file.endsWith('/lib/image-optimization.mjs'))return {propertyPhoto:{maxBytes:500_000},imageOptimizationErrorText:()=>'',optimizeImage:async (file,profile,{signal})=>{
+   if(backend.optimizePhoto)await backend.optimizePhoto.promise;
+   signal?.throwIfAborted();
+   return {body:file.slice(0,file.size,'image/jpeg'),contentType:'image/jpeg',extension:'jpg'};
+  }};
   if(file.endsWith('/lib/listing-file-upload.ts'))return {LISTING_UPLOAD_IDLE_MS:120000,uploadListingFile:async input=>{
    backend.imageUploads??=[];backend.imageUploads.push({bucket:input.bucket,path:input.path,file:input.file,options:{metadata:{original_filename:input.originalFilename}}});
-   input.onProgress?.({bytes:0,total:input.file.size,percent:0,startedAt:Date.now(),lastActivityAt:Date.now(),retrying:false});
+   input.onProgress?.({phase:'uploading',bytes:0,total:input.file.size,percent:0,startedAt:Date.now(),lastActivityAt:Date.now(),retrying:false});
    const result=await backend.upload.promise;input.signal?.throwIfAborted();if(result.error)throw result.error;
    return 'https://uploads.example.invalid/'+input.path;
   }};
@@ -2095,13 +2100,18 @@ test('admin image uploads retain originals and metadata through cover changes, r
  const captions=()=>photos().findAllByType('figcaption').map(node=>node.findAllByType('span').at(-1).children.join(''));
  const sources=()=>photos().findAllByProps({className:'editor-photo-preview'}).map(node=>node.findByType('img').props.src);
  for(const name of names){
-  h.backend.upload=deferred();const target={files:[jpegFile(name)],value:'selected'};let pending;
+  h.backend.optimizePhoto=deferred();h.backend.upload=deferred();const target={files:[jpegFile(name)],value:'selected'};let pending;
+  const status=()=>form().findByProps({className:'image-upload-filename'}).children.join('');
   await act(async()=>{pending=picker().props.onChange({target});await delay(5);});assert.equal(target.value,'');
-  assert.ok(form().findAllByProps({role:'status'}).some(node=>node.children.join('').includes(name)));
+  assert.equal(status(),`Optimizing ${name}…`);
+  assert.equal(form().findByType('progress').props.value,undefined);
+  await act(async()=>{h.backend.optimizePhoto.resolve();await delay(5);});
+  assert.equal(status(),`Uploading ${name}`);
+  assert.equal(form().findByType('progress').props.value,0);
   await act(async()=>{h.backend.upload.resolve({data:{path:'image'},error:null});await pending;});
  }
  assert.deepEqual(captions(),names);assert.equal(h.backend.imageUploads.length,3);
- for(const [index,upload] of h.backend.imageUploads.entries()){assert.equal(upload.bucket,'property-media');assert.match(upload.path,/^properties\/[0-9a-f-]+\/[a-z0-9-]+\.jpg$/);assert.equal(upload.file.type,'image/jpeg');assert.equal(upload.options.metadata.original_filename,names[index]);}
+ for(const [index,upload] of h.backend.imageUploads.entries()){assert.equal(upload.bucket,'property-media');assert.match(upload.path,/^properties\/listings\/[0-9a-f-]+\/[0-9a-f-]+\/[a-z0-9-]+\.jpg$/);assert.equal(upload.file.type,'image/jpeg');assert.equal(upload.options.metadata.original_filename,names[index]);}
  const originalSources=sources();
  await act(async()=>photos().findByProps({'aria-label':'Edit photo 3'}).props.onClick());
  const captionFields=()=>form().findByProps({className:'editor-photo-panel'}).findAllByType('textarea');

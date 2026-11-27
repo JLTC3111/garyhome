@@ -31,11 +31,19 @@ export function sameJson(a: unknown, b: unknown): boolean {
     Object.hasOwn(right, key) && sameJson(left[key], right[key]));
 }
 
+// Keep PostgreSQL's sub-millisecond precision when timestamp formats differ.
+const listingVersionMicros = (value: string) => (value.match(/\.(\d+)/)?.[1] ?? "").padEnd(6, "0").slice(0, 6);
+
+export function normalizeListingVersion(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return null;
+  return new Date(time).toISOString().replace(/\.\d{3}Z$/, `.${listingVersionMicros(value)}Z`);
+}
+
 export function sameListingVersion(a: string, b: string): boolean {
   if (a === b) return true;
-  // Keep PostgreSQL's sub-millisecond precision when timestamp formats differ.
-  const micros = (value: string) => (value.match(/\.(\d+)/)?.[1] ?? "").padEnd(6, "0").slice(0, 6);
-  return Date.parse(a) === Date.parse(b) && micros(a) === micros(b);
+  return Date.parse(a) === Date.parse(b) && listingVersionMicros(a) === listingVersionMicros(b);
 }
 
 export function confirmedListingWrite(submitted: Property, saved: Property | null, baseVersion: string | null): boolean {

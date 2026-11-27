@@ -26,7 +26,7 @@ async function authJson(url, options, label, fetcher) {
   try {return await response.json();} catch {throw new Error(label+' returned an invalid response.');}
 }
 
-export async function homeOwnerSession({env,prompt=hiddenPrompt,fetcher=fetch}) {
+export async function homeOwnerSession({env,prompt=hiddenPrompt,fetcher=fetch,connect=liveMigrationTransport}) {
   let key=env.GARY_MEDIA_PUBLISHABLE_KEY;
   if (!key) {
     const config=await authJson('https://staff.garyhome.vn/api/config',{},'Home sign-in configuration',fetcher);
@@ -54,7 +54,7 @@ export async function homeOwnerSession({env,prompt=hiddenPrompt,fetcher=fetch}) 
     if (session && session.expiresAt-Date.now()<60_000) {
       session=await signIn('refresh_token',{refresh_token:session.refresh});
     }
-    return liveMigrationTransport({...env,GARY_MEDIA_PUBLISHABLE_KEY:key,GARY_MEDIA_OWNER_TOKEN:existing||session.access});
+    return connect({...env,GARY_MEDIA_PUBLISHABLE_KEY:key,GARY_MEDIA_OWNER_TOKEN:existing||session.access});
   };
 }
 

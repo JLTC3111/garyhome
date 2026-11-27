@@ -42,20 +42,35 @@ The legacy RPC rebuilt the normalized reference inventory and assembled a file h
 
 ## Current Owner orphan review and cleanup activation
 
-Production manual cleanup is enabled. The deployed worker `media-orphan-cleanup` is active and the verification queue was empty at activation. The dedicated Vault entry exists. Cron still needs its extensions and schedule. All 14 GH-645 recovery objects and both GH-56 objects matched their existing protected listing paths. Keeping these and other unresolved files out of enrollment preserves their custody without disabling cleanup for eligible files.
+Production manual cleanup is enabled. `gary-home-media-expiry` completes its scheduled dispatch at minute 7 UTC. The first recorded worker run completed at 19:07:03 UTC on November 26, 2026, with zero files attempted or removed. All 14 GH-645 recovery objects and both GH-56 objects matched their protected listing paths and exact Storage identities.
 
 ### Release orphan review
 
 The inventory counts unlinked Storage identities. The scan can verify existing queue records with known provenance. Historical objects enter File Trash only after independent custody review and a checksum-verified local backup. This is why 639 inventory candidates and 49 reported protected candidates can coexist with an empty verification queue.
 
-The review RPC and holds table are installed in production. Apply the review migration only to an environment where it is missing, then release the reviewed Staff application. Cron activation is separate.
+The review RPC and holds table are installed in production. The live Vercel deployment `dpl_GnsBfqsX79JZFu7qSfJWhGqhfnBj` serves commit `0761f2a`, which includes Orphan Review. Staff actions call the review RPC through Vercel. The active `media-orphan-cleanup` Edge Function version 3 handles the existing cleanup operations. Apply the review migration only to an environment where it is missing.
 
 ```sh
-psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
-  -f supabase/migrations/20261126175956_home_media_orphan_review.sql
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 -f supabase/migrations/20261126175956_home_media_orphan_review.sql
 ```
 
 Under **Properties → Storage & Media Management → Orphan review**, search by listing code or filename. Inspect the exact Storage identity and protection reason. Select up to eight files for a batch of individual dependency checks. Use **Protect file** for an unresolved file that needs a durable hold. **Release review hold** removes that hold while the existing dependency and backup requirements still apply. The historical procedure below remains the enrollment path. A completed dependency check does not indicate ownership. The application sends no file bytes during review or enrollment. Back up only files whose custody is resolved, using the verified identity and existing egress limits.
+
+### Recover the GH-645 draft and check GH-56 enrollment eligibility
+
+From Gary Home, run the read-only report in the local Terminal. It uses the existing hidden Home Owner prompts and the audited recovery packet. It checks the signed Owner page, verifies the exact stored identities for both drafts and probes the 14 GH-645 photos with HEAD requests. The report shows the packet path and expected version alongside the saved listing's identity, status, raw and normalized timestamps, gallery, filenames and metadata. A failed check exits with status 1 and prints every listing comparison.
+
+```sh
+node scripts/recover-home-draft-gallery.mjs --diagnose
+```
+
+With `--apply`, the command makes one guarded listing update with the audited `updated_at`, preserves the draft status and creation time, and reads back the gallery and filenames.
+
+```sh
+node scripts/recover-home-draft-gallery.mjs --apply
+```
+
+Require `GH645Restored: true` and `GH645IdentitiesVerified: 14`. `GH56Protected: 2` confirms the ordinary historical route protects both saved draft paths while their objects are present. The bulk command below includes the Owner’s separate GH-56 deletion decision.
 
 ### Configure the hourly scheduler from the authenticated local terminal
 
@@ -118,11 +133,13 @@ Files remain at their original Storage paths during the 48-hour recovery window.
 
 ## Historical orphan enrollment
 
-The original audit cohort has 617 files. A read-only follow-up found that all 115 filename-only hits share an alias with a different referenced object. The 29 listing-scoped candidates still sit under published listings. Sixteen other unindexed objects sit under draft paths. A filename, shared alias, missing index hit and saved-listing prefix are clues for the review.
+The original audit cohort has 617 files. The 115 filename-only matches and 29 saved-listing paths overlap by 26. The 118 flagged objects are excluded from bulk intake. The remaining 499 form the audited bulk manifest. The two GH-56 test uploads are outside the 617 and use their own sealed scope.
+
+No exact original key from the cohort matches the 509 existing WebP backups. The one-pass payload ceiling for the sealed 499 is 355,051,170 bytes. The individual review workflow below covers items handled by a separate custody decision in the Owner panel.
 
 1. Use the existing per-object classification report under `work/property-media-audit-20261125.1T3KYQ/`. Reconcile the exact current bucket key, object ID, version, ETag and byte count against its original row and the completed WebP replacement map. Check published and draft listings, gallery and cover fields, captions and other metadata, embedded URLs, editorial and historical records, rename and deletion manifests, pending uploads and the scoped listing ownership. Treat encoded versions of the same path as a single key. Keep ambiguous filename aliases and live listing or unresolved draft ownership in review.
 2. Verify custody using independent evidence such as the original upload or change audit with the complete key and identity, or a documented file release supported by the owning workflow. Record what was checked, the reviewer and the evidence reference. Reference a real record or retained audit artifact. Protect shared, archived, pending, versioned and unproven objects.
-3. Back up the exact object using the Storage API. Verify the local checksum and retain the backup and identity manifest in private operator storage. Confirm that the live identity is unchanged after backup.
+3. In **Orphan review**, verify up to eight selected rows on the current page. Search by filename for an individual worksheet entry. Record results before changing the search or page. Prioritize the smallest approved files for the first batch. Back up only files that pass the dependency check and have custody evidence. Download the exact object using the Storage API, check its byte length and record and verify SHA-256 with `shasum -a 256` and `shasum -a 256 -c`. Keep the original, checksum and identity manifest together in private operator storage. Recheck the live identity after backup.
 4. In the authenticated Home Owner session submit the reviewed identity and checked SHA-256 to the guarded intake RPC. Enroll a verified object as part of completing its review.
 
    ```js
@@ -134,7 +151,33 @@ The original audit cohort has 617 files. A read-only follow-up found that all 11
    console.log(data.id, data.expiresAt)
    ```
 
-   A successful receipt creates a historical review entry directly in File Trash and starts its 48-hour window in the same transaction. A retry with the same identity and review returns the same receipt. A held or changed object remains in review with its evidence. Historical enrollment has its own audit record and uses the existing snapshot lock and media guards.
+   A successful receipt creates a historical review entry directly in File Trash and starts its 48-hour window in the same transaction. Record its ID and expiry in the worksheet before moving to the next batch. A retry with the same identity and review returns the same receipt. A held or changed object remains in review with its evidence. Historical enrollment has its own audit record and uses the existing snapshot lock and media guards.
+
+### Bulk enrollment with Owner authorization
+
+Apply the updated `20261126200632_home_media_historical_bulk_enrollment.sql` manually using the approved database service. The migration records the protected Owner’s confirmation of the exact manifest in a private audit record. Each inspect, enroll and receipt request has to match a file in that Owner’s authorization. The scheduled worker uses the existing cleanup calls and live safeguards.
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 -f supabase/migrations/20261126200632_home_media_historical_bulk_enrollment.sql
+```
+
+From `gary_home_website`, start the utility. It uses the original audit files directly, signs in through the existing hidden Owner prompts, and displays counts, bytes, exclusions, the manifest SHA-256 and the cumulative payload budget. Type `ENROLL` once to record the authorization. The database creates the reference automatically and attaches it to each enrollment receipt. The audit describes a current Owner authorization.
+
+```sh
+node scripts/enroll-historical-property-media.mjs enroll
+node scripts/enroll-historical-property-media.mjs resume
+```
+
+The runner processes eligible files automatically in groups of eight. Each file must pass the live Storage and dependency checks. Existing backup receipts are read where available and their ETag, size and SHA-256 are checked before reuse. The runner reports each skipped file and reason. It reserves one full object size before each GET, including an interrupted GET. The default cap is 355,094,895 payload bytes for both scopes. Use `--egress-budget-bytes` to set an explicit cumulative cap. Resumption uses the stored cap and the same authorization. An optional `--max-batches` caps the number of groups in one invocation.
+
+The two GH-56 test uploads are included using the Owner’s previously stated deletion decision. The database still binds any release to their original draft revision and exact Storage identities. Any changed draft, reference, lease, hold or other dependency blocks the affected file. All successful enrollments enter File Trash for 48 hours.
+
+Keep `work/property-media-audit-20261125.1T3KYQ/historical-orphan-enrollment/` intact. Its `checkpoint.json` records the authorization, reservations, checksums, receipt IDs and expiry dates. `backups/` holds the verified originals. A resumed run reconciles committed authorizations and enrollment receipts before retrying. An abandoned `.enrollment.lock` contains the former process ID. Confirm that process exited before removing the lock. The optional dry-run and verification commands show the sealed scope and read back receipt and backup integrity.
+
+```sh
+node scripts/enroll-historical-property-media.mjs dry-run
+node scripts/enroll-historical-property-media.mjs verify
+```
 
 ## Original WebP cutover procedure
 

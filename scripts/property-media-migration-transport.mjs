@@ -157,6 +157,7 @@ class MediaRequestError extends Error {
     const outcome=status?('returned HTTP '+status+(body?' '+body:'')):'was interrupted or returned an incomplete response';
     super(`Property media ${operation} (${method} ${origin}${path}) ${outcome}.`);
     this.operation=operation;
+    this.status=status;
     this.retryable=!status||retryableStatus.has(status);
     this.retryAfter=retryAfter;
   }
@@ -223,8 +224,8 @@ export function storageStages({key,token,fetcher=fetch,wait=delay,pace=paceReque
     };
     return retry?retryMediaRequest(send,{wait}):send();
   };
-  const readObject=(object,isPublic,headers={})=>request('read',objectEndpoint(object.key,isPublic?'public':'')+
-    '?cacheNonce='+crypto.randomUUID(),{headers:isPublic?headers:auth},true);
+  const readObject=(object,isPublic,headers={},retry=true)=>request('read',objectEndpoint(object.key,isPublic?'public':'')+
+    '?cacheNonce='+crypto.randomUUID(),{headers:isPublic?headers:{...auth,...headers}},retry);
   return {
     async owner(listing) {
       const access=await request('check Owner access',PROPERTY_IMAGE_ORIGIN+'/rest/v1/rpc/home_photo_rename_history',{
@@ -236,6 +237,7 @@ export function storageStages({key,token,fetcher=fetch,wait=delay,pace=paceReque
       return user.id;
     },
     read:(object,isPublic=false)=>readObject(object,isPublic).then(response=>readVerifiedBody(response,object)),
+    readOnce:object=>readObject(object,false,{'if-match':`"${etag(object.etag)}"`},false).then(response=>readVerifiedBody(response,object)),
     async verifyPublic(object,stagedBytes) {
       const prefix=stagedBytes.subarray(0,12);
       const tag=object.etag;

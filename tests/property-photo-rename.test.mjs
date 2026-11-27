@@ -931,6 +931,117 @@ test('Owner orphan review protects draft paths and holds while enrollment still 
  assert.equal((await h.pg.query('select count(*) n from storage.objects where name=$1',[free])).rows[0].n,1);
 });
 
+test('bulk historical intake preserves exact receipts and fences GH-56 through final cleanup', async t => {
+ const h=await setup(t,true);
+ for (const name of ['20261126114500_home_media_inventory_diagnostics.sql','20261126170756_home_media_panel_pagination.sql',
+   '20261126175956_home_media_orphan_review.sql','20261126200632_home_media_historical_bulk_enrollment.sql']) {
+  await h.pg.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
+ const call=(as,actor,sql,args=[])=>h.role(as,actor,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);
+ const authorizationId='e3a34065-c066-4cbb-ae43-3ce02418887a';
+ const intake=(action,payload,actor=owner,as='authenticated')=>call(as,actor,'select public.home_media_historical_intake($1,$2) value',
+   [action,{authorizationId,...payload}]);
+ const gh='198b8547-8614-4a8e-b125-7e6d9846df57', prefix=`properties/listings/${gh}/`;
+ await h.pg.query("insert into public.properties(id,images,updated_at,listing_code) values($1,'{}','2026-11-26T05:45:17.517353+00','GH-56')",[gh]);
+ const add=async (key,objectId,version,bytes,etag,scope='historical')=>{
+  await h.pg.query("insert into storage.objects(bucket_id,name,id,version,metadata) values('property-media',$1,$2,$3,$4)",
+    [key,objectId,version,{size:bytes,eTag:etag,mimetype:'image/webp'}]);
+  return {key,objectId,version,bytes,etag,scope,confirm:true,evidenceRef:'recorded Owner fixture approval',backupSha256:'a'.repeat(64)};
+ };
+ const scoped=await add(prefix+'37e55a65-d019-447b-bb88-99c03a0bca07/jobs-staff-portal-header.webp',
+   '5cdcb39e-b324-418b-a447-71886cac26f2','8e02bfef-0ea4-4b4f-ab34-510a0289f39a',7704,'12c8bd03f06507b71526120002e96df9-1','GH-56');
+ const later=await add(prefix+'fd2c8e2f-4e52-4df3-aa4a-610c946830b2/manual-cleanup-fronend-1.jpg',
+   '16a878a9-f1b2-4c9b-a4cd-966e4c2e82ea','6adbf40f-494e-490c-b553-1967119cca30',36021,'5d67a55b687a2c33fdf29adff2506821-1','GH-56');
+ const other=await add(prefix+'unrelated.webp','bcda8547-8614-4a8e-b125-7e6d9846df57','test-version',8,'b'.repeat(32),'GH-56');
+ const ordinary=await add('properties/bulk-test.webp','bcda8547-8614-4a8e-b125-7e6d9846df58','test-version',8,'c'.repeat(32));
+ const objects=[scoped,later,ordinary];
+ const members=Object.fromEntries(objects.map(o=>[o.objectId,[o.scope,o.version,o.bytes,o.key]]));
+ await h.pg.query('insert into private.home_media_bulk_authorizations(id,actor,manifest_sha256,gh56_sha256,initial_egress_budget,members) values($1,$2,$3,$4,100000,$5)',
+   [authorizationId,owner,'a'.repeat(64),'b'.repeat(64),members]);
+ await assert.rejects(intake('inspect',scoped,admin),error=>error.code==='42501');
+ await assert.rejects(intake('receipt',scoped,null,'anon'),error=>error.code==='42501');
+ await assert.rejects(intake('inspect',{...scoped,authorizationId:other.objectId}),error=>error.code==='42501');
+ assert.equal((await intake('inspect',other)).status,'outside_authorized_manifest');
+ assert.equal((await intake('inspect',{...scoped,scope:'historical'})).status,'outside_authorized_manifest');
+ assert.equal((await intake('inspect',{...scoped,version:'changed'})).status,'outside_authorized_manifest');
+ await h.pg.query("update storage.objects set version='changed' where name=$1",[scoped.key]);
+ assert.equal((await intake('inspect',scoped)).status,'identity');
+ await h.pg.query('update storage.objects set version=$2 where name=$1',[scoped.key,scoped.version]);
+ await assert.rejects(intake('enroll',{...scoped,confirm:false}),error=>error.code==='22023');
+ await h.pg.query("insert into storage.s3_multipart_uploads values('property-media',$1)",[scoped.key]);
+ assert.equal((await intake('inspect',scoped)).status,'dependency');
+ await h.pg.exec('delete from storage.s3_multipart_uploads');
+ await h.pg.query("insert into public.editorial_articles(image_url) values($1)",[propertyPhotoUrl(origin,scoped.key)]);
+ assert.equal((await intake('enroll',scoped)).status,'reference');
+ await h.pg.exec('delete from public.editorial_articles');
+ for (const object of [scoped,later,ordinary]) assert.equal((await intake('inspect',object)).status,'evidence_required');
+ const [one,two,normal]=[await intake('enroll',scoped),await intake('enroll',later),await intake('enroll',ordinary)];
+ for (const receipt of [one,two,normal]) {
+  assert.equal(receipt.state,'trashed');
+  assert.equal(Date.parse(receipt.expiresAt)-Date.parse(receipt.enrolledAt),172800000);
+ }
+ const {rows:[audit]}=await h.pg.query('select historical_review from private.home_media_items where id=$1',[normal.id]);
+ assert.equal(audit.historical_review.evidenceRef,`owner-bulk-authorization:${authorizationId}`);
+ assert.equal(audit.historical_review.intake.authorizationId,authorizationId);
+ assert.deepEqual(await intake('enroll',scoped),one);
+ assert.deepEqual(await intake('receipt',ordinary),normal);
+ assert.equal((await intake('receipt',{...ordinary,backupSha256:'d'.repeat(64)})).status,'tracked');
+ await assert.rejects(h.pg.query("insert into public.editorial_articles(image_url) values($1)",[propertyPhotoUrl(origin,later.key)]),/retired_reference/);
+ await h.pg.query("insert into public.editorial_articles(sources) values($1)",[JSON.stringify([{name:'manual-cleanup-fronend-1.jpg'}])]);
+ assert.equal((await h.pg.query("select private.home_media_referenced('property-media',$1,true) protected",[later.key])).rows[0].protected,true);
+ await h.pg.exec('delete from public.editorial_articles');
+ await h.pg.exec("update private.home_media_control set permanent_enabled=true; update private.home_media_items set unreferenced_since=now()-interval '49 hours', expires_at=now()-interval '1 hour'");
+ const worker=(sql,...args)=>call('service_role',null,sql,args);
+ const job=await worker('select public.home_media_claim() value');
+ const target=id=>worker('select public.home_media_target($1,$2,true) value',job.id,id);
+ assert.equal((await target(one.id)).present,true);
+ await h.pg.query("delete from storage.objects where bucket_id='property-media' and name=$1",[scoped.key]);
+ assert.equal(await worker('select public.home_media_settle($1,$2,true) value',job.id,one.id),true);
+ const settled=await intake('receipt',scoped);
+ assert.equal(settled.id,one.id);
+ assert.equal(settled.state,'removed');
+ assert.equal(settled.storagePresent,false);
+ await call('authenticated',owner,'select public.home_listing_delete_prepare($1,$2) value',[gh,'2026-11-26T05:45:17.517353+00']);
+ assert.equal((await h.pg.query('select count(*) n from public.properties where id=$1',[gh])).rows[0].n,0);
+ assert.equal(await target(two.id),null,'the scoped receipt becomes blocked when the original draft disappears');
+});
+
+test('bulk authorization seals the audited manifest and records only one authenticated confirmation', async t => {
+ const root=new URL('../work/property-media-audit-20261125.1T3KYQ/',import.meta.url);
+ const artifacts=await Promise.all(['production-orphan-classification-20261126.json','gallery-recovery-packet-20261126.json']
+   .map(name=>readFile(new URL(name,root),'utf8').then(JSON.parse))).catch(error=>{ if(error.code!=='ENOENT')throw error; return null; });
+ if (!artifacts) return t.skip('The local operator audit artifacts are required for the exact manifest test.');
+ const { buildBulkManifest }=await import('../scripts/enroll-historical-property-media.mjs');
+ const plan=buildBulkManifest(...artifacts);
+ const h=await setup(t,true);
+ for (const name of ['20261126114500_home_media_inventory_diagnostics.sql','20261126170756_home_media_panel_pagination.sql',
+   '20261126175956_home_media_orphan_review.sql','20261126200632_home_media_historical_bulk_enrollment.sql']) {
+  await h.pg.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
+ const request='e3a34065-c066-4cbb-ae43-3ce02418887a';
+ const authorize=(confirm,actor=owner,manifest=plan.manifest)=>h.role('authenticated',actor,()=>h.pg.query(
+   'select public.home_media_authorize_bulk($1,$2,$3,$4,$5) value',[request,manifest,plan.gh56Manifest,355094895,confirm]))
+   .then(result=>result.rows[0].value);
+ await assert.rejects(authorize(false,admin),error=>error.code==='42501');
+ await assert.rejects(authorize(true,owner,plan.manifest.replace('properties/', 'replacement')),error=>error.code==='22023');
+ const preview=await authorize(false);
+ assert.equal(preview.files,499);
+ assert.equal(preview.excluded,118);
+ assert.equal(preview.bytes,355051170);
+ assert.equal(preview.gh56Files,2);
+ assert.equal((await h.pg.query('select count(*) n from private.home_media_bulk_authorizations')).rows[0].n,0);
+ const receipt=await authorize(true);
+ assert.deepEqual(await authorize(true),receipt);
+ assert.equal(receipt.reference,`owner-bulk-authorization:${request}`);
+ const {rows:[saved]}=await h.pg.query('select actor,gh56_prior_decision,(select count(*) from jsonb_object_keys(members)) as members from private.home_media_bulk_authorizations');
+ assert.equal(saved.actor,owner);
+ assert.equal(saved.members,501);
+ assert.match(saved.gh56_prior_decision,/intentionally deleted/);
+ const differentOwner='97a34065-c066-4cbb-ae43-3ce02418887a';
+ await h.pg.query("insert into auth.users(id,role) values($1,'owner')",[differentOwner]);
+ await assert.rejects(authorize(true,differentOwner),error=>error.code==='42501');
+});
+
 test('confirmed early purge scopes the job to one file and reconciles a lost final acknowledgement',async t=>{
  const h=await setup(t,true);
  const query=(as,user,sql,args=[])=>h.role(as,user,()=>h.pg.query(sql,args)).then(result=>result.rows[0].value);

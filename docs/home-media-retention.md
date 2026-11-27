@@ -6,13 +6,14 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
 
 ### Apply the SQL in preview mode
 
-From the Gary Home repository, apply the pending incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds Owner-only removal. The third brings those same controls into Inventory Files. Use the existing operator database service.
+From the Gary Home repository, apply the pending incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds Owner-only removal. The third brings those controls into Inventory Files. The fourth corrects the Inventory Files timeout. Use the existing operator database service.
 
 ```sh
 /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
   -f supabase/migrations/20261127141812_home_listing_media_inactivity.sql \
   -f supabase/migrations/20261127153844_home_listing_media_manual_removal.sql \
-  -f supabase/migrations/20261127165022_home_media_inventory_controls.sql
+  -f supabase/migrations/20261127165022_home_media_inventory_controls.sql \
+  -f supabase/migrations/20261127173831_home_media_page_first_inventory.sql
 ```
 
 The first migration sets `listing_inactivity_enabled` to `false`. To return to preview later, run the following command.
@@ -23,6 +24,19 @@ The first migration sets `listing_inactivity_enabled` to `false`. To return to p
 ```
 
 Preview mode pauses scheduled removals under the 96-hour policy only. The worker still observes listing-scoped files each hour and processes the existing 48-hour File Trash workflow according to `permanent_enabled`. That gate was enabled and the existing `gary-home-media-expiry` job was active at minute 7 UTC on November 27. The updated Edge worker and staff interface are required for manual removal of unused media. Manual removal uses the existing permanent-removal gate and Owner confirmation during both preview and automatic operation.
+
+### Correct the Inventory Files timeout
+
+When the first three migrations are already installed, apply only [the corrective migration](../supabase/migrations/20261127173831_home_media_page_first_inventory.sql).
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/20261127173831_home_media_page_first_inventory.sql
+```
+
+The query uses catalogue fields for search and pagination, rechecks existing retention observations for selection, and classifies other files only on the displayed page. The worker still rechecks live protections before removal. The existing hourly schedule and statement limits apply.
+
+Open **Inventory Files**, search for a listing title, and check a subsequent page. The updated staff interface shows retrieval errors with a retry action. If the same page was already loaded, the panel retains those rows with deletion disabled until the next successful read.
 
 ### Inspect counts and verify the exclusions
 

@@ -180,6 +180,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const [runClock,setRunClock]=useState<TrashRunClock|null>(null),[stopping,setStopping]=useState(false);
   const [trashFilter,setTrashFilter]=useState("");
   const [retentionInput,setRetentionInput]=useState(""),[retentionQuery,setRetentionQuery]=useState("");
+  const [pageError,setPageError]=useState("");
   const [historyPreview,setHistoryPreview]=useState<MediaPage|null>(null);
   const active=useRef(false),stopRequested=useRef(false);
   const [now,setNow]=useState(Date.now),[seen,setSeen]=useState(latest);
@@ -246,15 +247,25 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       flight.current=false;setBusy(null);
     }
   }
-  const pageRequest=(kind:PageKind,next:number,query=retentionQuery)=>requestMedia<MediaPage>({action:kind,offset:next,...(isMediaFilePage(kind)?{query}:{})});
+  async function pageRequest(kind:PageKind,next:number,query=retentionQuery) {
+    const result=await requestMedia<MediaPage>({action:kind,offset:next,...(isMediaFilePage(kind)?{query}:{})});
+    if(!Array.isArray(result.items)||typeof result.available!=="boolean"||typeof result.hasMore!=="boolean")
+      throw new Error("inventory_unavailable");
+    return result;
+  }
   async function loadPage(kind:PageKind,next=0,query=retentionQuery) {
     if(flight.current||!upgraded)return;
+    if(kind!==selected||offset!==next||(isMediaFilePage(kind)&&query!==retentionQuery))
+      setPage(kind==="removed_page"&&next===0?historyPreview:null);
     if(isMediaFilePage(kind))setRetentionQuery(query);
-    setReviewOpen(false);setSelected(kind);setPage(kind==="removed_page"&&next===0?historyPreview:null);setOffset(next);
-    await work(kind,async()=>{applyPage(kind,await pageRequest(kind,next,query));});
+    setReviewOpen(false);setSelected(kind);setOffset(next);setPageError("");
+    await work(kind,async()=>{
+      try {applyPage(kind,await pageRequest(kind,next,query));}
+      catch(issue) {if(active.current)setPageError(mediaMessage(issue,t));}
+    });
   }
   function applyPage(kind:PageKind,fresh:MediaPage) {
-    setPage(fresh);setNow(Date.now());
+    setPage(fresh);setPageError("");setNow(Date.now());
     if(isMediaFilePage(kind)&&fresh.manualCount!==undefined&&unusedSelection.rows.length){
       const rows=fresh.items as MediaFile[];
       const visibleNames=new Set(rows.map(row=>row.bucket+"/"+row.name));
@@ -272,7 +283,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     if(stale.length)trashSelection.remove(stale.map(row=>row.id));
   }
   async function refreshHistory() {
-    const recent=await requestMedia<MediaPage>({action:"removed_page",offset:0});
+    const recent=await pageRequest("removed_page",0);
     if(active.current)setHistoryPreview(recent);
   }
   async function refreshAfterChange(includeHistory=false) {
@@ -281,13 +292,12 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     const list=selected?pageRequest(selected,offset).then(async fresh=>{
       if(offset>0&&!fresh.items.length){fresh=await pageRequest(selected,0);setOffset(0);}
       if(active.current)applyPage(selected,fresh);
-    }):null;
+    }).catch(issue=>{if(active.current)setPageError(mediaMessage(issue,t));}):null;
     const reads=list?[stats,list]:[stats];
     if(includeHistory&&(selected!=="removed_page"||offset!==0))reads.push(refreshHistory());
     const results=await Promise.allSettled(reads);
-    if(results.some(result=>result.status==="rejected"))setError(t(
-      "The operation finished. Part of the panel couldn’t refresh. Use Refresh inventory or reopen the list.",
-      "Đã kết thúc thao tác. Một phần bảng chưa thể làm mới. Hãy làm mới kho hoặc mở lại danh sách."));
+    const failure=results.find(result=>result.status==="rejected");
+    if(failure&&active.current)setError(mediaMessage(failure.reason,t));
   }
   async function manage(action:MediaAction,item?:MediaItem) {
     if(flight.current)return;
@@ -556,7 +566,8 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const inventoryControls=selected==="inventory_page"&&page&&page.manualCount===undefined?mediaMessage(new Error("inventory_controls_setup"),t):"";
   const resumeReason=removalReason||checkpointReason||(trashRun?.entries[0]?.source?unusedSetup:bulkSetup);
   const manualRemovalReason=removalReason||checkpointReason||bulkSetup||pendingRequestReason||(!report?.earlyEligible?noEarly:"");
-  const unusedRemovalReason=removalReason||checkpointReason||unusedSetup||inventoryControls||pendingRequestReason;
+  const unusedRemovalReason=removalReason||checkpointReason||unusedSetup||inventoryControls||pendingRequestReason||
+    (isMediaFilePage(selected)?pageError:"");
   const bulkEntryReason=removalReason||bulkSetup||(!report?.earlyEligible?noEarly:"");
   const controlReasons=[...new Set([trashReason,runReason,bulkEntryReason].filter(reason=>reason&&reason!==pendingRequestReason))];
   const controlHint=(reason:string)=>!reason?undefined:reason===pendingRequestReason?removalDetailsId:`${id}-operation-${controlReasons.indexOf(reason)}`;
@@ -702,6 +713,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       {upgraded&&reviewOpen&&<StorageOrphanReview request={requestMedia} disabled={!!busy} onStaged={()=>void refreshAfterChange()}/>}
       {selected&&<section id={`${id}-media-list`}>
         <h3>{tabs.find(([kind])=>kind===selected)?.[1]}</h3>
+        {pageError&&<p role="alert">{pageError} {page?.items.length?t("Showing the last loaded files.","Đang hiển thị các tệp đã tải trước đó."):null}</p>}
         {isMediaFilePage(selected)&&<>
           {!inventoryControls&&<form className="storage-media-actions" onSubmit={event=>{event.preventDefault();void loadPage(selected,0,retentionInput.trim());}}>
             <MediaSearchField label={t("Listing code, title or filename","Mã, tiêu đề tin đăng hoặc tên tệp")} placeholder={t("Listing code, title or filename","Mã, tiêu đề tin đăng hoặc tên tệp")}
@@ -739,9 +751,9 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
           </MediaSelectionControls>
           {!!page?.items.length&&!visibleTrash.length&&<p>{t("No filenames on this page match the filter.","Không có tên tệp trên trang này khớp bộ lọc.")}</p>}
         </>}
-        {!page&&!busy&&<button type="button" className="text-link" onClick={()=>void loadPage(selected,offset)}>{t("Refresh this list","Làm mới danh sách này")}</button>}
-        {page&&!page.available&&<p>{t("Run a storage scan to view the inventory files.","Hãy quét kho để xem danh sách tệp.")}</p>}
-        {page?.available&&!page.items.length&&<p>{selected==="trash_page"?t("No files in Trash.","Thùng rác chưa có tệp."):
+        {(!page||pageError)&&!busy&&<button type="button" className="text-link" onClick={()=>void loadPage(selected,offset)}>{t("Refresh this list","Làm mới danh sách này")}</button>}
+        {!pageError&&page&&!page.available&&<p>{t("Run a storage scan to view the inventory files.","Hãy quét kho để xem danh sách tệp.")}</p>}
+        {!pageError&&page?.available&&!page.items.length&&<p>{selected==="trash_page"?t("No files in Trash.","Thùng rác chưa có tệp."):
           selected==="run_page"?t("No cleanup runs recorded.","Chưa ghi nhận lượt dọn tệp."):t("No records on this page.","Trang này không có mục nào.")}</p>}
         {page?.available&&<ul className="storage-media-rows">
           {fileRows.map((row,index)=>{

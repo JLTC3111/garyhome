@@ -32,6 +32,14 @@ test('Inventory Files only falls back to the old scan page when the live invento
   {name:'home_media_management',args:{p_action:'inventory_page',p_id:null,p_offset:30}}]);
 });
 
+test('Inventory Files returns a query timeout as an error with no empty-page fallback',async()=>{
+ const calls=[];
+ const db={rpc(name){calls.push(name);return {abortSignal:async()=>({error:{code:'57014'}})};}};
+ const result=await executeStorageMedia(db,{action:'inventory_page',offset:30},signal,()=>assert.fail('Read cannot dispatch worker'));
+ assert.deepEqual(result,{status:504,data:{error:'inventory_timeout'}});
+ assert.deepEqual(calls,['home_media_inventory_files']);
+});
+
 test('database and worker failures have separate actionable codes without provider details',async()=>{
  const unavailable=()=>assert.fail('Inventory must not call a worker');
  const db=code=>({rpc(){return {abortSignal:async()=>({error:{code,message:'Private fixture details'}})};}});

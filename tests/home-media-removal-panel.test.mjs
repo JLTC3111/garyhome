@@ -454,6 +454,7 @@ test('Inventory Files loads exact previews on demand and shares single and batch
   const alias={name:'fixtures/alias.jpg',bucket:'property-media',reason:'filename_match',listing_code:'GH-ALIAS',
     listing_title_en:'Published courtyard',saved_reference:false,object_id:'alias',bytes:80};
   const calls=[],confirmations=[],store=new Map();
+  let inventoryTimeout=true;
   const context=vm.createContext({
     Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
     localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)},
@@ -468,7 +469,9 @@ test('Inventory Files loads exact previews on demand and shares single and batch
           candidates:0,candidateBytes:0,abandoned:0,activeUploads:0,broken:0,enabled:true,crossAppProtection:true,earlyEligible:0,
           overdue:0,trashed:2,checkedAt:new Date().toISOString()});
         case 'inventory_page':
-        case 'retention_page': return Response.json({items:[held,alias,...items.map(item=>({
+        case 'retention_page':
+          if(args.action==='inventory_page'&&inventoryTimeout)return Response.json({error:'inventory_timeout'},{status:504});
+          return Response.json({items:[held,alias,...items.map(item=>({
           ...item,manual_target:item,reason:'waiting',eligible_at:item.expires_at,listing_code:'GH-FIXTURE',
           listing_title_en:'Lake view fixture',saved_reference:false,object_id:item.id,
         }))],hasMore:false,available:true,manualCount:items.length,automatic:false});
@@ -498,6 +501,17 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
     const button=label=>view.root.findAllByType('button').find(node=>node.children.join('')===label);
     await act(async()=>button('Inventory files').props.onClick());
+    assert.match(view.root.findByProps({role:'alert'}).children.join(''),/request timed out/);
+    assert.equal(view.root.findAllByType('p').some(node=>node.children.join('')==='No records on this page.'),false);
+    inventoryTimeout=false;
+    await act(async()=>button('Refresh this list').props.onClick());
+    assert.equal(view.root.findAllByProps({role:'alert'}).length,0);
+    inventoryTimeout=true;
+    await act(async()=>button('Refresh inventory').props.onClick());
+    assert.match(view.root.findByProps({role:'alert'}).children.join(''),/timed out.*Showing the last loaded files/);
+    assert.equal(view.root.findByProps({'aria-label':'Permanently delete first photo #1.webp'}).props.disabled,true);
+    inventoryTimeout=false;
+    await act(async()=>button('Refresh this list').props.onClick());
     assert.equal(view.root.findByProps({'aria-label':'Select recovery.webp'}).props.disabled,true);
     const cannotDelete=view.root.findByProps({'aria-label':'Permanently delete alias.jpg'});
     assert.equal(cannotDelete.props.disabled,true);

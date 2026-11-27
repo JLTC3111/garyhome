@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { PROPERTY_IMAGE_ORIGIN } from "@/lib/property-photo-files";
-import { isTrashTarget, makeTrashRun, matchingTrashTargets, processTrashRun, readTrashRun, trashRunTotals,
-  type CleanupResult, type TrashReceipt, type TrashRun, type TrashTarget } from "@/lib/home-media-trash";
+import { isTrashTarget, makeTrashRun, matchingTrashTargets, processTrashRun, readTrashRun, trashRunTiming, trashRunTotals,
+  type CleanupResult, type TrashReceipt, type TrashRun, type TrashRunClock, type TrashTarget } from "@/lib/home-media-trash";
 import type { ListingDeletion } from "@/lib/property-deletion-server";
 import { useSite } from "./site-context";
 import { StorageOrphanReview } from "./storage-orphan-review";
 import { MediaSelectionControls, useMediaSelection } from "./media-selection";
+import { MediaRemovalProgress } from "./media-removal-progress";
 
 export function listingDeletionRequest<T>(editorTask: ReturnType<typeof useSite>["editorTask"], payload: Record<string, unknown>) {
   return editorTask(async (db,signal)=>{
@@ -119,7 +120,7 @@ function mediaMessage(issue:unknown,t:ReturnType<typeof useSite>["t"]) {
   }
 }
 
-export function StorageMediaManagement({latest,onListingRestored}: {latest:ListingDeletion|null;onListingRestored:()=>void}) {
+export function StorageMediaManagement({latest,onListingRestored,visible}: {latest:ListingDeletion|null;onListingRestored:()=>void;visible:boolean}) {
   const {editorTask,language,t,notice,user}=useSite();
   const [report,setReport]=useState<MediaReport|null>(null),[open,setOpen]=useState(false);
   const [reviewOpen,setReviewOpen]=useState(false);
@@ -133,7 +134,7 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
   const checkpointKey=`${ownerKey}:trash-run`;
   const [trashRun,setTrashRun]=useState<TrashRun|null>(null),[checkpointReady,setCheckpointReady]=useState(false);
   const [checkpointIssue,setCheckpointIssue]=useState("");
-  const [running,setRunning]=useState(false),[stopping,setStopping]=useState(false),[pauseReason,setPauseReason]=useState("");
+  const [runClock,setRunClock]=useState<TrashRunClock|null>(null),[stopping,setStopping]=useState(false);
   const [trashFilter,setTrashFilter]=useState("");
   const [historyPreview,setHistoryPreview]=useState<MediaPage|null>(null);
   const active=useRef(false),stopRequested=useRef(false);
@@ -172,12 +173,12 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
   },[open,requestMedia,workerAttempt]);
 
   useEffect(()=>{
-    if(!open||selected!=="trash_page"||!page?.items.length)return;
+    if(!visible||!open||selected!=="trash_page"||!page?.items.length)return;
     const expire=(page.items as MediaItem[]).map(row=>Date.parse(row.expires_at||"")).filter(time=>time>Date.now());
     if(!expire.length)return;
     const timer=setTimeout(()=>setNow(Date.now()),Math.min(60_000,Math.max(1,Math.min(...expire)-Date.now()+1)));
     return ()=>clearTimeout(timer);
-  },[open,selected,page,now]);
+  },[visible,open,selected,page,now]);
 
   async function overview() {
     try {return await mediaRequest<MediaReport>(editorTask,{action:"overview"});}
@@ -192,7 +193,10 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
     flight.current=true;setBusy(action);setError("");
     try{await operation();}
     catch(issue){setError(mediaMessage(issue,t));}
-    finally{flight.current=false;setBusy(null);}
+    finally{
+      if(action==="purge"){setRunClock(null);setStopping(false);}
+      flight.current=false;setBusy(null);
+    }
   }
   async function loadPage(kind:PageKind,next=0) {
     if(flight.current||!upgraded)return;
@@ -269,28 +273,28 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
     });
   }
   async function continueRun(run:TrashRun) {
-    stopRequested.current=false;setRunning(true);setStopping(false);setPauseReason("");setRestoredHref("");
+    const clock:TrashRunClock={startedAt:performance.now(),elapsedBefore:run.timing?.elapsedMs??0,
+      measuredBefore:run.timing?.measuredFiles??0,processedBefore:run.entries.length-trashRunTotals(run).pending};
+    stopRequested.current=false;setRunClock(clock);setStopping(false);setResultText("");setRestoredHref("");
     let latestRun=run;
-    try{
-      const result=await processTrashRun(run,{
-        purge:payload=>requestMedia<CleanupResult>(payload),receipt:getReceipt,
-        save:next=>{saveRun(next);latestRun=next;},stopped:()=>stopRequested.current||!active.current,
-        afterBatch:async()=>{
-          if(!active.current)return;
-          trashSelection.remove(latestRun.entries.filter(item=>item.outcome==="removed"||item.reason==="already_removed").map(item=>item.id));
-          await refreshAfterChange();
-        },
-      });
-      if(!active.current)return;
-      setPauseReason(result.paused);
-      const totals=trashRunTotals(result.run);
-      const summary=result.paused?t("Permanent removal paused.","Đã tạm dừng xóa vĩnh viễn."):
-        t(`Removed ${totals.removed} of ${result.run.entries.length} selected files.`,`Đã xóa ${totals.removed}/${result.run.entries.length} tệp đã chọn.`);
-      setResultText(summary);notice(summary);
-      if(selected!=="removed_page"||offset!==0){
-        try{await refreshHistory();}catch{setError(t("Cleanup History couldn’t refresh. Reopen its list to try again.","Chưa làm mới được Lịch sử dọn tệp. Hãy mở lại danh sách."));}
-      }
-    }finally{if(active.current){setRunning(false);setStopping(false);}}
+    function saveProgress(next:TrashRun,pauseReason?:string) {
+      const timing=trashRunTiming(clock,next.entries.length-trashRunTotals(next).pending,performance.now());
+      const checkpoint={...next,timing:{...timing,pauseReason:pauseReason||undefined}};
+      saveRun(checkpoint);latestRun=checkpoint;
+    }
+    const result=await processTrashRun(run,{
+      purge:payload=>requestMedia<CleanupResult>(payload),receipt:getReceipt,
+      save:saveProgress,stopped:()=>stopRequested.current||!active.current,
+      afterBatch:async()=>{
+        if(!active.current)return;
+        trashSelection.remove(latestRun.entries.filter(item=>item.outcome==="removed"||item.reason==="already_removed").map(item=>item.id));
+        await refreshAfterChange();
+      },
+    });
+    if(active.current&&(selected!=="removed_page"||offset!==0)){
+      try{await refreshHistory();}catch{setError(t("Cleanup History couldn’t refresh. Reopen its list to try again.","Chưa làm mới được Lịch sử dọn tệp. Hãy mở lại danh sách."));}
+    }
+    saveProgress(result.run,result.paused);
   }
   async function purgeFiles(items:TrashTarget[]) {
     if(flight.current||!items.length||newRunReason)return;
@@ -337,8 +341,9 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
 
   const paused=t("Permanent cleanup is disabled by the Home retention policy.","Chính sách lưu giữ Home đang tắt chức năng xóa vĩnh viễn.");
   const upgrade=t("Apply the Home media panel pagination migration first.","Áp dụng bản cập nhật phân trang kho Home trước.");
+  const bulkActive=busy==="purge";
   const progress=busy==="inventory_scan"?t("Scanning storage and checking queued files…","Đang quét kho và kiểm tra tệp trong hàng đợi…"):
-    busy==="purge"?t("Removing selected files after verification…","Đang xóa các tệp đã chọn sau khi xác minh…"):
+    bulkActive?t("Permanent removal is in progress.","Đang xóa vĩnh viễn."):
     busy==="run"?t("Checking expired files for cleanup…","Đang kiểm tra tệp hết hạn để dọn…"):
     busy?t("Checking storage…","Đang kiểm tra kho lưu trữ…"):"";
   const inventoryReason=busy?progress:!report?t("Load the storage inventory first.","Hãy tải dữ liệu kho trước."):!upgraded?upgrade:"";
@@ -419,12 +424,17 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
     return t(`${hours}h ${rest}m to restore`, `Còn ${hours} giờ ${rest} phút để khôi phục`);
   }
 
-  return <details className="admin-panel listing-deletion-queue storage-media" onToggle={event=>{
-    const visible=event.currentTarget.open;setOpen(visible);
-    if(visible&&!flight.current)void manage("overview");
+  return <details className="admin-panel listing-deletion-queue storage-media" hidden={!visible} onToggle={event=>{
+    const isOpen=event.currentTarget.open;setOpen(isOpen);
+    if(visible&&isOpen&&!flight.current)void manage("overview");
   }}>
     <summary>{t("Storage & Media Management","Quản lý kho lưu trữ và tệp")}</summary>
     <div className="storage-media-body">
+      <MediaRemovalProgress run={trashRun} clock={runClock} preparing={bulkActive&&!runClock} visible={visible&&open}
+        stopping={stopping} resumeReason={resumeReason} message={bulkActive?error:""} formatBytes={formatBytes}
+        describeReason={code=>mediaMessage(new Error(code),t)} onStop={()=>{stopRequested.current=true;setStopping(true);}}
+        onResume={()=>void resumePurge()}/>
+      <div className="storage-media-controls" hidden={bulkActive}>
       {report&&<>
         <dl className="storage-media-stats">
           <div><dt>{t("Storage objects","Số tệp lưu trữ")}</dt><dd>{number.format(report.objects)}</dd></div>
@@ -462,27 +472,6 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
       {controlReasons.map(reason=><p key={reason} id={controlHint(reason)} role={reason===progress?"status":undefined}>{reason}</p>)}
       {progress&&!controlReasons.includes(progress)&&<p role="status">{progress}</p>}
       {resultText&&<p role="status">{resultText} {restoredHref&&<a className="text-link" href={restoredHref} target="_blank" rel="noopener noreferrer">{t("Open restored file","Mở tệp đã khôi phục")}</a>}</p>}
-      {trashRun&&totals&&<section aria-label={t("Permanent removal progress","Tiến độ xóa vĩnh viễn")}>
-        <progress aria-label={t("Files processed","Tệp đã xử lý")} max={trashRun.entries.length} value={trashRun.entries.length-totals.pending}/>
-        <p role="status">{t(`${trashRun.entries.length-totals.pending}/${trashRun.entries.length} processed · ${totals.removed} removed · ${totals.skipped} skipped · ${totals.failed} failed · ${formatBytes(totals.reclaimedBytes)} reclaimed`,
-          `${trashRun.entries.length-totals.pending}/${trashRun.entries.length} đã xử lý · ${totals.removed} đã xóa · ${totals.skipped} đã bỏ qua · ${totals.failed} lỗi · ${formatBytes(totals.reclaimedBytes)} đã thu hồi`)}
-          {totals.unknownSizes>0&&t(` · ${totals.unknownSizes} removed file sizes unknown`,` · ${totals.unknownSizes} tệp đã xóa chưa rõ dung lượng`)}</p>
-        {running?<button type="button" className="button button-outline button-small" disabled={stopping}
-          title={stopping?t("Waiting for the current file to finish.","Đang chờ tệp hiện tại hoàn tất."):undefined}
-          onClick={()=>{stopRequested.current=true;setStopping(true);}}>{stopping?t("Stopping after the current file…","Sẽ dừng sau tệp hiện tại…"):t("Stop after the current file","Dừng sau tệp hiện tại")}</button>:
-          totals.pending>0&&<>
-            <button type="button" className="button button-outline button-small" disabled={!!resumeReason} title={resumeReason||undefined}
-              aria-describedby={resumeReason?`${id}-resume`:undefined} onClick={()=>void resumePurge()}>{t(`Resume permanent removal (${totals.pending})`,`Tiếp tục xóa vĩnh viễn (${totals.pending})`)}</button>
-            {resumeReason&&<p id={`${id}-resume`}>{resumeReason}</p>}
-          </>}
-        {pauseReason&&pauseReason!=="stopped"&&<p role="status">{mediaMessage(new Error(pauseReason),t)}</p>}
-        {(totals.skipped>0||totals.failed>0)&&<details>
-          <summary>{t("Skipped and failed files","Tệp bỏ qua và lỗi")}</summary>
-          <ul className="storage-media-rows">{trashRun.entries.filter(item=>item.outcome==="skipped"||item.outcome==="failed").map(item=><li key={item.id}>
-            <strong>{item.name.split("/").at(-1)}</strong><span>{mediaMessage(new Error(item.reason),t)}</span>
-          </li>)}</ul>
-        </details>}
-      </section>}
       {error&&<p role="alert">{error}</p>}
       {upgraded&&<nav className="storage-media-actions" aria-label={t("Media lists","Danh sách tệp")}>
         <button type="button" className="button button-outline button-small" aria-pressed={reviewOpen} title={progress||undefined} disabled={!!busy}
@@ -555,6 +544,7 @@ export function StorageMediaManagement({latest,onListingRestored}: {latest:Listi
           <button className="text-link" type="button" title={progress||(!page.hasMore?t("This is the last page.","Đây là trang cuối cùng."):undefined)} disabled={!!busy||!page.hasMore} onClick={()=>void loadPage(selected,offset+pageSize)}>{t("Next","Tiếp")}</button>
         </nav>}
       </section>}
+      </div>
     </div>
   </details>;
 }

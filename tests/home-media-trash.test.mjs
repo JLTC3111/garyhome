@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {makeTrashRun,matchingTrashTargets,processTrashRun,readTrashRun,trashRunTotals} from '../lib/home-media-trash.ts';
+import {makeTrashRun,matchingTrashTargets,processTrashRun,readTrashRun,trashRunEta,trashRunTiming,trashRunTotals} from '../lib/home-media-trash.ts';
 
 const expires=new Date(Date.now()+60*60*1000).toISOString();
 const file=id=>({id,name:`properties/${id}.webp`,bucket:'property-media',expires_at:expires,bytes:120});
@@ -65,4 +65,25 @@ test('selection matching keeps exact entries across pages and rejects changed de
   assert.deepEqual(matchingTrashTargets([one,other],[changed,one]),[one]);
   assert.throws(()=>makeTrashRun([one,one]),/invalid_request/);
   assert.throws(()=>readTrashRun('invalid json'),/trash_checkpoint_invalid/);
+});
+
+test('ETA updates with active time and measures from the latest run start',()=>{
+  const clock={startedAt:1000,elapsedBefore:0,measuredBefore:0,processedBefore:2};
+  assert.equal(trashRunEta(8,trashRunTiming(clock,2,2000)),null);
+  const sample=trashRunTiming(clock,3,5000);
+  assert.deepEqual(sample,{elapsedMs:4000,measuredFiles:1});
+  assert.equal(trashRunEta(7,sample),28000);
+  assert.equal(trashRunEta(7,trashRunTiming(clock,3,7000)),42000);
+  const resumed={startedAt:120000,elapsedBefore:sample.elapsedMs,measuredBefore:sample.measuredFiles,processedBefore:3};
+  assert.equal(trashRunEta(6,trashRunTiming(resumed,4,122000)),18000);
+  assert.equal(trashRunEta(0,trashRunTiming(resumed,10,122000)),0);
+});
+
+test('progress timing survives checkpoint reload and earlier checkpoints remain resumable',()=>{
+  const run=makeTrashRun([file('one')]);
+  const timing={elapsedMs:4120,measuredFiles:0,pauseReason:'removal_unconfirmed'};
+  assert.deepEqual(readTrashRun(JSON.stringify({...run,timing})).timing,timing);
+  delete run.timing;
+  assert.deepEqual(readTrashRun(JSON.stringify(run)),run);
+  assert.deepEqual(readTrashRun(JSON.stringify({...run,timing:{elapsedMs:-1,measuredFiles:0}})),run);
 });

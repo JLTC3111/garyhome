@@ -4,7 +4,9 @@ export type CleanupResult = { status: string; removed?: number; attempted?: numb
 export type TrashReceipt = { status: string; bytes?: number | null };
 type Outcome = "pending" | "sent" | "removed" | "skipped" | "failed";
 type TrashEntry = TrashTarget & { outcome: Outcome; reason?: string };
-export type TrashRun = { version: 1; confirmedAt: string; entries: TrashEntry[] };
+type TrashRunTiming = { elapsedMs: number; measuredFiles: number; pauseReason?: string };
+export type TrashRun = { version: 1; confirmedAt: string; entries: TrashEntry[]; timing?: TrashRunTiming };
+export type TrashRunClock = { startedAt: number; elapsedBefore: number; measuredBefore: number; processedBefore: number };
 
 export function isTrashTarget(row:unknown): row is TrashTarget {
   if (!row || typeof row !== "object") return false;
@@ -24,7 +26,8 @@ export function matchingTrashTargets(selected:TrashTarget[],live:TrashTarget[]) 
 
 export function makeTrashRun(items:TrashTarget[]):TrashRun {
   if(!items.length || new Set(items.map(item=>item.id)).size!==items.length || !items.every(isTrashTarget)) throw new Error("invalid_request");
-  return {version:1,confirmedAt:new Date().toISOString(),entries:items.map(item=>({...item,outcome:"pending"}))};
+  return {version:1,confirmedAt:new Date().toISOString(),entries:items.map(item=>({...item,outcome:"pending"})),
+    timing:{elapsedMs:0,measuredFiles:0}};
 }
 
 export function readTrashRun(source:string|null):TrashRun|null {
@@ -35,6 +38,10 @@ export function readTrashRun(source:string|null):TrashRun|null {
   if(run?.version!==1 || !Number.isFinite(Date.parse(run.confirmedAt)) || !Array.isArray(run.entries) || !run.entries.length ||
     !run.entries.every(item=>isTrashTarget(item) && ["pending","sent","removed","skipped","failed"].includes(item.outcome)) ||
     new Set(run.entries.map(item=>item.id)).size!==run.entries.length)throw new Error("trash_checkpoint_invalid");
+  const timing=run.timing;
+  if(timing&&(!Number.isSafeInteger(timing.elapsedMs)||timing.elapsedMs<0||!Number.isSafeInteger(timing.measuredFiles)||
+    timing.measuredFiles<0||timing.measuredFiles>run.entries.length||
+    (timing.pauseReason!==undefined&&typeof timing.pauseReason!=="string")))delete run.timing;
   return run;
 }
 
@@ -46,6 +53,17 @@ export function trashRunTotals(run:TrashRun) {
     if(item.outcome==="removed"){totals.reclaimedBytes+=item.bytes??0;if(item.bytes===null)totals.unknownSizes++;}
   }
   return totals;
+}
+
+export function trashRunTiming(clock:TrashRunClock,processed:number,now:number):TrashRunTiming {
+  return {elapsedMs:clock.elapsedBefore+Math.max(0,Math.floor(now-clock.startedAt)),
+    measuredFiles:clock.measuredBefore+Math.max(0,processed-clock.processedBefore)};
+}
+
+export function trashRunEta(remaining:number,timing:TrashRunTiming|null|undefined) {
+  if(!remaining)return 0;
+  if(!timing?.measuredFiles||!timing.elapsedMs)return null;
+  return timing.elapsedMs/timing.measuredFiles*remaining;
 }
 
 type PurgePayload = { action:"purge"; id:string; expiresAt:string; confirm:true };

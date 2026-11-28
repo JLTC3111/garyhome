@@ -1,11 +1,12 @@
 "use client";
 
-import { Eye, GripVertical, Star, X } from "lucide-react";
+import { Eye, GripVertical, Star } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { imageFilenameDetails, type ImageFilenames } from "@/lib/image-filenames";
 import { photoMetadata, PHOTO_TEXT_LIMIT, publicPhotoFilename, type ImageMetadata, type PhotoMetadata } from "@/lib/image-metadata";
 import { propertyPhotoPath } from "@/lib/property-photo-files";
 import { PropertyGallery } from "./property-gallery";
+import { PhotoRemoveButton } from "./photo-remove-button";
 import { PropertyPhotoRenameForm, PropertyPhotoRenameTools, type PhotoRenameControls } from "./property-photo-rename";
 import { useSite } from "./site-context";
 import { ContentImage } from "./content-image";
@@ -39,7 +40,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
   metadata?: ImageMetadata; onMetadataChange?: (src: string, patch: PhotoMetadata) => void;
   move?: (from: number, to: number) => void;
   rename?: PhotoRenameControls;
-  remove: (index: number) => void; disabled?: boolean;
+  remove: (index: number, src: string) => void; disabled?: boolean;
 }) {
   const text = useStudioText();
   const { t } = useSite();
@@ -50,7 +51,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
   const [orderMessage, setOrderMessage] = useState("");
   const panelId = useId(), panel = useRef<HTMLElement>(null);
   const grid = useRef<HTMLDivElement>(null);
-  const focusAfterMove = useRef<{ index: number; src: string; control: "preview" | "reorder" } | null>(null);
+  const focusAfterChange = useRef<{ index: number; src: string | undefined; control?: "preview" | "reorder" } | null>(null);
   const dropIndexRef = useRef<number | null>(null);
   const session = useRef<{ pointerId: number; from: number; key: string; x: number; y: number; dragging: boolean } | null>(null);
   const occurrences = new Map<string, number>();
@@ -68,13 +69,17 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
   const originalLabel = t("Original upload filename", "Tên tệp khi tải lên");
   const coverHint = t("Set as cover (move to first position)", "Đặt làm ảnh bìa (chuyển lên vị trí đầu tiên)");
   const reorderHelp = t("Drag or use the Up and Down arrow keys to reorder. Position 1 is the cover photo.", "Kéo hoặc dùng phím mũi tên Lên và Xuống để sắp xếp. Vị trí 1 là ảnh bìa.");
+  const removeHintId = `${panelId}-remove-help`;
   const canReorder = !!move && images.length > 2;
 
   useLayoutEffect(() => {
-    const target = focusAfterMove.current;
-    focusAfterMove.current = null;
+    const target = focusAfterChange.current;
+    focusAfterChange.current = null;
     if (!target || images[target.index] !== target.src) return;
-    grid.current?.querySelector<HTMLButtonElement>(`[data-photo-index="${target.index}"] [data-photo-control="${target.control}"]`)?.focus({preventScroll:true});
+    const card = `[data-photo-index="${target.index}"]`;
+    const node = target.control ? grid.current?.querySelector<HTMLElement>(`${card} [data-photo-control="${target.control}"]`)
+      : target.src === undefined ? grid.current : grid.current?.querySelector<HTMLElement>(card);
+    node?.focus({preventScroll:true});
   }, [images]);
 
   useEffect(() => {
@@ -96,7 +101,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
 
   function reorder(from: number, to: number, keepFocus = false) {
     if (!move || disabled || !Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= images.length || to >= images.length || from === to) return;
-    if (keepFocus) focusAfterMove.current = { index: to, src: images[from], control: "reorder" };
+    if (keepFocus) focusAfterChange.current = { index: to, src: images[from], control: "reorder" };
     move(from, to);
     const moved = t(`Photo moved to position ${to + 1} of ${images.length}.`, `Đã chuyển ảnh đến vị trí ${to + 1} trên ${images.length}.`);
     const cover = to === 0
@@ -175,11 +180,12 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
   }
 
   return <PropertyGallery images={images} metadata={metadata} title={title || t("Listing photos", "Ảnh tin đăng")} renderOpeners={showPhoto => <>
-  <div ref={grid} className="editor-photo-grid" data-photo-reordering={draggingKey ? "true" : undefined}>{namedPhotos.map(({ key, src, filename, source, storageName }, index) => {
+  <div ref={grid} className="editor-photo-grid" role="group" aria-label={t("Listing photos", "Ảnh tin đăng")} tabIndex={-1}
+    data-photo-reordering={draggingKey ? "true" : undefined}>{namedPhotos.map(({ key, src, filename, source, storageName }, index) => {
     const reorderable = canReorder;
     const photo = <ContentImage src={src} alt={onMetadataChange ? "" : text("Property photo {number}", { number: index + 1 })} width={320} height={210}
       sizes="(max-width: 650px) 50vw, 220px" loading="lazy"/>;
-    return <figure className="editor-photo-card" key={key} data-photo-index={index}
+    return <figure className="editor-photo-card" key={key} data-photo-index={index} tabIndex={-1}
       data-photo-selected={onMetadataChange && selectedIndex === index ? "true" : undefined}
       data-photo-dragging={draggingKey === key ? "true" : undefined}
       data-photo-drop-target={dropIndex === index ? "true" : undefined}>
@@ -197,7 +203,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
         {index > 0 && <button type="button" data-button-variant="feature" data-button-size="icon" disabled={disabled}
           aria-label={t(`Set photo ${index + 1} as cover (move to first position)`, `Đặt ảnh ${index + 1} làm ảnh bìa (chuyển lên vị trí đầu tiên)`)}
           title={coverHint} onClick={() => {
-            focusAfterMove.current = { index: 0, src, control: "preview" };
+            focusAfterChange.current = { index: 0, src, control: "preview" };
             setSelectedSrc(selected?.src);
             makeCover(index);
             setOrderMessage(t("Cover photo moved to first position.", "Đã chuyển ảnh bìa lên vị trí đầu tiên."));
@@ -217,10 +223,13 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
           onPointerUp={event => finishReorder(event, true)}
           onPointerCancel={event => finishReorder(event, false)}
           onDragStart={event => event.preventDefault()}><GripVertical size={16} aria-hidden="true"/></button>}
-        <button type="button" data-button-variant="danger" data-button-size="icon" disabled={disabled} onClick={() => {
-          if (src === selected?.src) setSelectedSrc(images[index + 1] ?? images[index - 1]);
-          remove(index);
-        }} aria-label={text("Remove photo {number}", { number: index + 1 })}><X size={16} aria-hidden="true"/></button>
+        <PhotoRemoveButton key={`${index}:${disabled}`} number={index + 1} disabled={disabled} hintId={removeHintId} onRemove={restoreFocus => {
+          const next = images[index + 1] ?? images[index - 1];
+          if (restoreFocus) focusAfterChange.current = { index: index < images.length - 1 ? index : Math.max(0, index - 1), src: next };
+          if (src === selected?.src) setSelectedSrc(next);
+          remove(index, src);
+          setOrderMessage(t(`Photo ${index + 1} removed. Save the listing to apply the change.`, `Đã gỡ ảnh ${index + 1}. Lưu tin đăng để áp dụng thay đổi.`));
+        }}/>
       </div>
       <figcaption className="editor-photo-filename" data-filename-source={storageName ? "stored" : source}>
         <span>{storageName ? storageLabel : filenameLabel(source)}</span><span>{storageName || filename || text("Filename unavailable")}</span>
@@ -231,6 +240,7 @@ export function PropertyPhotoGrid({ images, title, filenames, metadata, onMetada
       </figcaption>
     </figure>;
   })}</div>
+    {images.length > 0 && <p className="sr-only" id={removeHintId}>{t("Hold for 2 seconds to remove. Tap or briefly press Space or Enter for confirmation options.", "Nhấn giữ 2 giây để gỡ ảnh. Chạm hoặc nhấn nhanh phím Cách hoặc Enter để mở tùy chọn xác nhận.")}</p>}
     {canReorder && <p className="sr-only" id={`${panelId}-order-help`}>{reorderHelp}</p>}
     <p className="sr-only editor-photo-order-status" role="status" aria-atomic="true">{orderMessage}</p>
     {selected && onMetadataChange && <section id={panelId} ref={panel} tabIndex={-1} aria-labelledby={`${panelId}-title`} className="editor-photo-panel">

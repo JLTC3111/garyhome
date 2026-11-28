@@ -47,12 +47,23 @@ function loadGrid(){return loadGridExports().PropertyPhotoGrid;}
 
 async function harness(t,props){
  const previous=Object.getOwnPropertyDescriptor(globalThis,'IS_REACT_ACT_ENVIRONMENT');globalThis.IS_REACT_ACT_ENVIRONMENT=true;
- const Grid=loadGrid(),covers=[],removals=[],focused=[];let renderer;
+ const Grid=loadGrid(),covers=[],removals=[],focused=[],removeTargets=new Map();let renderer;
+ const document=new EventTarget();
+ document.defaultView=new EventTarget();
+ const removeBounds={left:20,top:20,right:60,bottom:60};
  const dialog={open:false,showModal(){this.open=true;},close(){this.open=false;}};
  const allProps={images:[sourceA,sourceB],makeCover:index=>covers.push(index),remove:index=>removals.push(index),...props};
  await act(async()=>{renderer=TestRenderer.create(React.createElement(Grid,allProps),{createNodeMock:node=>{
    if(node.type==='dialog')return dialog;
+   if(node.props.className==='editor-photo-remove'){
+    let capture;
+    const target={ownerDocument:document,disabled:node.props.disabled,closest:()=>null,getBoundingClientRect:()=>removeBounds,
+     focus(){document.activeElement=this;},setPointerCapture(id){capture=id;},hasPointerCapture:id=>capture===id,releasePointerCapture(){capture=undefined;}};
+    removeTargets.set(node.props['aria-label'],target);
+    return target;
+   }
    if(node.props.className==='editor-photo-grid')return {
+    focus:()=>focused.push('grid'),
     querySelector:selector=>({focus:()=>focused.push(selector)}),
     querySelectorAll(selector){
      if(selector!=='[data-photo-index]'||!renderer)return [];
@@ -65,7 +76,7 @@ async function harness(t,props){
    return null;
  }});});
  t.after(async()=>{await act(async()=>renderer.unmount());if(previous)Object.defineProperty(globalThis,'IS_REACT_ACT_ENVIRONMENT',previous);else delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
- return {renderer,covers,removals,dialog,focused,async update(next){await act(async()=>renderer.update(React.createElement(Grid,{...allProps,...next})));}};
+ return {renderer,covers,removals,dialog,focused,removeTargets,document,async update(next){await act(async()=>renderer.update(React.createElement(Grid,{...allProps,...next})));}};
 }
 
 test('photo captions contain the complete long, special and Unicode filename with its original extension',async t=>{
@@ -97,16 +108,104 @@ test('legacy URLs show their full decoded stored filename while unnamed inline i
  assert.equal(captions[1].props['data-filename-source'],'unavailable');assert.match(h.renderer.root.findByProps({className:'small muted image-filename-note'}).children.join(''),/Original upload names were not recorded/);
 });
 
-test('cover and removal controls target the correct image and are disabled during a listing save',async t=>{
+test('a click offers inline confirmation without removing the photo, and saving disables the gallery controls',async t=>{
  const h=await harness(t,{}),buttons=()=>h.renderer.root.findAllByType('button');
  assert.equal(buttons().length,5);assert.ok(!buttons().some(button=>button.props['aria-label']?.startsWith('Set photo 1 as cover')));
  const setCover=buttons().find(button=>button.props['aria-label']?.startsWith('Set photo 2 as cover'));
  assert.match(setCover.props.title,/first position/);
  await act(async()=>setCover.props.onClick());
- await act(async()=>buttons().find(button=>button.props['aria-label']==='Remove photo 1').props.onClick());
+ const trash=()=>buttons().find(button=>button.props['aria-label']==='Remove photo 1');
+ assert.equal(trash().props['data-button-size'],'icon');
+ assert.match(trash().findAllByType('svg')[0].props.className,/lucide-trash-2/);
+ const dialogs=h.renderer.root.findAllByType('dialog').length;
+ await act(async()=>trash().props.onClick({detail:1}));
+ await act(async()=>trash().props.onClick({detail:1}));
+ assert.deepEqual(h.removals,[]);
+ assert.equal(trash().props['aria-expanded'],true);
+ assert.equal(h.renderer.root.findAllByType('dialog').length,dialogs);
+ await act(async()=>buttons().find(button=>button.props['aria-label']==='Confirm removal of photo 1').props.onClick());
  assert.deepEqual(h.covers,[1]);assert.deepEqual(h.removals,[0]);
  await h.update({disabled:true});assert.ok(buttons().every(button=>button.props.disabled===true));
  assert.equal(h.renderer.root.findAllByProps({className:'editor-photo-order'})[0].children.join(''),'COVER');
+});
+
+function holdClock(t){
+ let now=0;
+ t.mock.timers.enable({apis:['setTimeout']});
+ t.mock.method(performance,'now',()=>now);
+ return async ms=>{now+=ms;await act(async()=>t.mock.timers.tick(ms));};
+}
+
+test('pointer holds require two full seconds and cancel on early release, drift or loss of capture',async t=>{
+ const advance=holdClock(t),removed=[];
+ const h=await harness(t,{remove:(index,src)=>removed.push([index,src])});
+ const name='Remove photo 2',button=()=>h.renderer.root.findByProps({'aria-label':name});
+ const send=async (handler,values={})=>await act(async()=>button().props[handler]({
+  button:0,buttons:1,isPrimary:true,pointerId:7,pointerType:'mouse',clientX:40,clientY:40,detail:1,currentTarget:h.removeTargets.get(name),...values,
+ }));
+ await send('onPointerDown');
+ assert.equal(button().props['data-holding'],true);
+ await advance(1999);
+ assert.deepEqual(removed,[]);
+ await send('onPointerUp');
+ await send('onClick');
+ await advance(1);
+ assert.deepEqual(removed,[]);
+ assert.equal(button().props['aria-expanded'],false);
+
+ for(const [handler,values] of [['onPointerMove',{clientX:61}],['onLostPointerCapture',{}],['onPointerCancel',{}]]){
+  await send('onPointerDown',{pointerType:'touch'});
+  await advance(1000);
+  await send(handler,values);
+  await advance(1000);
+  assert.deepEqual(removed,[]);
+ }
+
+ await send('onPointerDown',{pointerType:'touch'});
+ await advance(1999);
+ assert.deepEqual(removed,[]);
+ await advance(1);
+ await send('onPointerUp');
+ await send('onClick');
+ assert.deepEqual(removed,[[1,sourceB]]);
+ assert.equal(button().props['aria-expanded'],false);
+});
+
+test('keyboard holds ignore repeat and cancel on blur, Escape or a listing save',async t=>{
+ const advance=holdClock(t),h=await harness(t,{});
+ const name='Remove photo 1',button=()=>h.renderer.root.findByProps({'aria-label':name});
+ const key=(value,repeat=false)=>({key:value,repeat,preventDefault(){},stopPropagation(){}});
+ await act(async()=>button().props.onKeyDown(key(' ')));
+ await advance(1000);
+ await act(async()=>button().props.onKeyDown(key('Escape')));
+ await advance(1000);
+ await act(async()=>button().props.onKeyDown(key('Enter')));
+ await act(async()=>h.document.defaultView.dispatchEvent(new Event('blur')));
+ await advance(2000);
+ await act(async()=>button().props.onKeyDown(key('Enter')));
+ await h.update({disabled:true});
+ await advance(2000);
+ assert.deepEqual(h.removals,[]);
+
+ await h.update({disabled:false});
+ await act(async()=>button().props.onKeyDown(key('Enter')));
+ await act(async()=>button().props.onKeyUp(key('Enter')));
+ assert.equal(button().props['aria-expanded'],true);
+ const cancel=h.renderer.root.findAllByType('button').find(node=>node.children.join('')==='Cancel');
+ await act(async()=>cancel.props.onClick());
+ assert.equal(button().props['aria-expanded'],false);
+ await act(async()=>button().props.onClick({detail:0}));
+ assert.equal(button().props['aria-expanded'],true);
+ const confirmation=h.renderer.root.findByProps({className:'editor-photo-remove-confirmation'});
+ await act(async()=>confirmation.props.onKeyDown(key('Escape')));
+
+ await act(async()=>button().props.onKeyDown(key('Enter')));
+ await advance(1000);
+ await act(async()=>button().props.onKeyDown(key('Enter',true)));
+ await advance(1000);
+ assert.deepEqual(h.removals,[0]);
+ await h.update({images:[sourceB]});
+ assert.deepEqual(h.focused,['[data-photo-index="0"]']);
 });
 
 test('Eye opens the actual clicked image without editing and Escape keeps the drawer open',async t=>{

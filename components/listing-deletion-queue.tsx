@@ -800,14 +800,17 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const statusIcons:Record<FileStatus,LucideIcon>={verified:FileCheck2,protected:Shield,awaiting:FileClock,recovery:ShieldCheck};
   const viewAllowsSelection=fileFilter==="all"||fileFilter==="verified";
   const unusedPageEligible=filteredFiles.map(({row})=>row.manual_target).filter(unusedTarget);
-  const noVerifiedFiles=page?.available&&page.manualCount===0&&!pageError;
+  const eligibleTotal=page?.manualCount;
+  const noVerifiedFiles=page?.available&&eligibleTotal===0&&!pageError;
   const noVerifiedLabel=t("No verified unused files to remove","Không có tệp chưa sử dụng đã xác minh để xóa");
   const noVerifiedHint=retentionQuery?t("No verified unused files match this search.","Không có tệp chưa sử dụng đã xác minh khớp tìm kiếm."):noVerifiedLabel;
-  const viewSelectionHint=fileFilter==="awaiting"?t("Verify these files before selecting them for removal.","Xác minh các tệp này trước khi chọn để xóa."):
-    t("Files in this view are protected from removal.","Các tệp trong chế độ xem này được bảo vệ khỏi bị xóa.");
+  const viewSelectionHint=fileFilter==="awaiting"?t("Run verification to find out which files can be selected.","Chạy xác minh để biết có thể chọn những tệp nào."):
+    fileFilter==="recovery"?t("Files on a recovery hold cannot be selected.","Không thể chọn tệp đang được giữ để khôi phục."):
+      t("Protected files cannot be selected.","Không thể chọn tệp được bảo vệ.");
   const unusedSelectionReason=!unusedSelection.ready?t("Loading saved selection…","Đang tải lựa chọn đã lưu…"):busy?progress:"";
-  const allUnusedReason=unusedSelectionReason||unusedRemovalReason||(!viewAllowsSelection?viewSelectionHint:!page?.manualCount?noVerifiedHint:"");
-  const unusedPageReason=unusedSelectionReason||unusedRemovalReason||(!viewAllowsSelection?viewSelectionHint:!unusedPageEligible.length?
+  const unusedViewReason=unusedSelectionReason||(!viewAllowsSelection?viewSelectionHint:unusedRemovalReason);
+  const allUnusedReason=unusedViewReason||(!eligibleTotal?noVerifiedHint:"");
+  const unusedPageReason=unusedViewReason||(!unusedPageEligible.length?
     noVerifiedFiles?noVerifiedHint:t("No eligible files on this page.","Trang này chưa có tệp đủ điều kiện."):"");
   const unusedBulkReason=unusedRemovalReason||unusedSelectionReason||(!unusedSelection.rows.length?
     unusedPageReason||t("Select verified unused files to remove them.","Chọn các tệp chưa sử dụng đã xác minh để xóa."):"");
@@ -920,6 +923,9 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
               {fileStatusLabels[filter]} <b>{number.format(fileCounts[filter])}</b>
             </button>)}
           </div>}
+          {viewAllowsSelection&&!pageError&&eligibleTotal!==undefined&&eligibleTotal>unusedPageEligible.length&&<p className="storage-media-note">{t(
+            `${number.format(eligibleTotal)} files eligible across all pages for this search.`,
+            `${number.format(eligibleTotal)} tệp đủ điều kiện trên tất cả các trang của tìm kiếm này.`)}</p>}
           {page?.available&&<MediaSelectionControls count={unusedSelection.rows.length} bytes={unusedSelection.rows.reduce((sum,item)=>sum+(item.bytes??0),0)}
             unknownSizes={unusedSelection.rows.filter(item=>item.bytes===null).length} formatBytes={formatBytes}
             pageCount={unusedPageEligible.length} pageSelected={unusedPageEligible.filter(item=>unusedSelection.has(item.id)).length}
@@ -931,7 +937,9 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
             {unusedBulkReason&&<small id={`${id}-unused-bulk`} className={noVerifiedFiles&&viewAllowsSelection&&unusedBulkReason===noVerifiedHint?"sr-only":undefined}>{unusedBulkReason}</small>}
           </MediaSelectionControls>}
           {noVerifiedFiles&&!busy&&viewAllowsSelection&&<p className="storage-media-empty" role="status"><FileCheck2 size={18} aria-hidden="true"/>
-            <strong>{noVerifiedHint}</strong>
+            <span><strong>{noVerifiedHint}</strong>
+              {!retentionQuery&&fileCounts.awaiting>0&&<small>{t("Run verification to check the files that are still awaiting it.","Chạy xác minh để kiểm tra các tệp vẫn đang chờ.")}</small>}
+            </span>
           </p>}
           {!pageError&&page?.available&&!filteredFiles.length&&!(noVerifiedFiles&&viewAllowsSelection)&&<p className="storage-media-empty">
             {t("No files on this page match the current filters.","Không có tệp trên trang này khớp bộ lọc hiện tại.")}
@@ -969,8 +977,9 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
             const removalBlock=target?unusedRemovalReason:inventoryControls||protection;
             const pickReason=unusedSelectionReason||(checked?"":removalBlock);
             const hint=`${id}-${row.object_id??index}-file`;
+            const removalHint=removalBlock&&removalBlock!==protection?`${hint}-block`:hint;
             const StatusIcon=statusIcons[status];
-            return <li key={row.bucket+"/"+row.name} className="storage-file-row" data-file-status={status} data-selected={checked}>
+            return <li key={row.bucket+"/"+row.name} className="storage-file-row" data-file-status={status} data-selected={checked} data-selectable={!pickReason}>
               <div className="storage-file-info"><strong className="storage-file-name">{name}</strong>
                 {listing?<small>{listing}</small>:row.saved_reference!==undefined&&<small>{t("No associated saved listing","Chưa có tin đăng đã lưu liên quan")}</small>}
                 <small className="storage-file-meta">{row.bucket} · {row.bytes===null?"—":formatBytes(row.bytes)}</small>
@@ -993,13 +1002,12 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
               </div>
               <div className="storage-media-actions storage-file-actions">
                 <label className="storage-file-select"><input type="checkbox" checked={checked} disabled={!!pickReason}
-                  aria-describedby={removalBlock&&removalBlock!==protection?`${hint}-block`:hint}
+                  aria-describedby={removalHint}
                   aria-label={t(`Select ${name}`,`Chọn ${name}`)} onChange={event=>{if(target){
                     if(event.target.checked)unusedSelection.add([target]);else unusedSelection.remove([target.id]);
-                  }}}/>{t("Select","Chọn")}</label>
+                  }}}/>{pickReason?t("Unavailable","Không thể chọn"):t("Select","Chọn")}</label>
                 <MediaActionButton icon={Trash2} tone="destructive"
-                  aria-label={t(`Permanently delete ${name}`,`Xóa vĩnh viễn ${name}`)} disabled={!!removalBlock} title={removalBlock||undefined}
-                  aria-describedby={removalBlock&&removalBlock!==protection?`${hint}-block`:hint}
+                  aria-label={t(`Permanently delete ${name}`,`Xóa vĩnh viễn ${name}`)} disabled={!!removalBlock} aria-describedby={removalHint}
                   onClick={()=>{if(target)void purgeFiles([target]);}}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</MediaActionButton>
               </div>
             </li>;
@@ -1022,25 +1030,26 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
               item.id===pendingFile?.id?removalDetailsId:hint;
             const deleteHint=manualRemovalReason?(manualRemovalReason===pendingRequestReason?removalDetailsId:`${id}-bulk`):
               deleteReason===reason?restoreHint:earlyHint;
-            return <li key={item.id} className="storage-file-row" data-selected={checked}>
+            const held=item.purge_block&&["owner_hold","recovery_hold","file_trash_test","editing_session"].includes(item.purge_block);
+            return <li key={item.id} className="storage-file-row" data-selected={checked} data-selectable={!pickReason}>
               <div className="storage-file-info"><strong className="storage-file-name">{name}</strong>
                 <small className="storage-file-meta">{item.bucket} · {item.bytes==null?"—":formatBytes(item.bytes)}</small>
                 <small>{countdown(item.expires_at)} · {formatTime(item.expires_at)}</small>
-                {item.purge_block&&["owner_hold","recovery_hold","file_trash_test","editing_session"].includes(item.purge_block)&&<small>{earlyReason}</small>}
-                {reason&&restoreHint===hint&&<span className="sr-only" id={hint}>{reason}</span>}
-                {earlyReason&&!manualRemovalReason&&earlyReason!==reason&&<span className="sr-only" id={earlyHint}>{earlyReason}</span>}
+                {reason&&restoreHint===hint&&<small id={hint}>{reason}</small>}
+                {earlyReason&&earlyReason!==reason&&(!manualRemovalReason||held)&&<small id={earlyHint}>{earlyReason}</small>}
               </div>
               <div className="storage-media-actions storage-file-actions">
-                <label title={pickReason||undefined} className="storage-file-select">
+                <label className="storage-file-select">
                   <input type="checkbox" checked={checked} disabled={!!pickReason} aria-label={t(`Select ${name}`,`Chọn ${name}`)}
+                    aria-describedby={pickReason&&pickReason===earlyReason?(earlyReason===reason?restoreHint:earlyHint):undefined}
                     onChange={event=>{if(!event.target.checked)trashSelection.remove([item.id]);else if(isTrashTarget(item))trashSelection.add([item]);}}/>
-                  {t("Select","Chọn")}
+                  {pickReason?t("Unavailable","Không thể chọn"):t("Select","Chọn")}
                 </label>
-                <span title={reason||undefined} tabIndex={reason?0:undefined} aria-describedby={reason?restoreHint:undefined}>
+                <span tabIndex={reason?0:undefined} aria-describedby={reason?restoreHint:undefined}>
                   <MediaActionButton icon={ArchiveRestore} disabled={!!reason}
                     aria-describedby={reason?restoreHint:undefined} onClick={()=>void manage("restore",item)}>{item.restore_mode==="file"?t("Keep file","Giữ tệp"):t("Restore","Khôi phục")}</MediaActionButton>
                 </span>
-                <span title={deleteReason||undefined} tabIndex={deleteReason?0:undefined} aria-describedby={deleteReason?deleteHint:undefined}>
+                <span tabIndex={deleteReason?0:undefined} aria-describedby={deleteReason?deleteHint:undefined}>
                   <MediaActionButton icon={Trash2} tone="destructive" disabled={!!deleteReason}
                     onClick={()=>{if(isTrashTarget(item))void purgeFiles([item]);}}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</MediaActionButton>
                 </span>

@@ -194,7 +194,7 @@ for (const theme of ['light', 'dark']) {
       assert.equal(button('Resume').props.disabled,false);
       assert.equal(button('Permanently delete now').props.disabled,false);
       assert.equal(button('Keep file').props.disabled,false);
-      assert.deepEqual(view.root.findAllByProps({role:'menuitem'}).map(textOf),
+      assert.deepEqual(view.root.findAllByProps({role:'menuitem'}).map(item=>item.props['aria-label']),
         ['Select all eligible files','Select current page','Clear selection']);
       const master=()=>view.root.findByProps({'aria-label':'Select eligible files on this page'});
       const checkThree=checked=>view.root.findByProps({'aria-label':'Select three.webp'}).props.onChange({target:{checked}});
@@ -438,7 +438,7 @@ test('Orphan Review resets applied search and selects eligible files across page
     await act(async()=>search().props.onChange({target:{value:'sample'}}));
     await act(async()=>view.root.findByProps({role:'search'}).props.onSubmit({preventDefault(){}}));
     assert.equal(calls.at(-1).query,'sample');
-    const pick=label=>view.root.findAllByProps({role:'menuitem'}).find(item=>textOf(item)===label);
+    const pick=label=>view.root.findByProps({role:'menuitem','aria-label':label});
     await act(async()=>pick('Select all eligible files').props.onSelect());
     assert.deepEqual(calls.slice(-2).map(({query,offset})=>[query,offset]),[['sample',0],['sample',30]]);
     assert.deepEqual(chosen(),['file-0.webp','file-30.webp']);
@@ -566,6 +566,7 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     assert.equal(filter('awaiting').props['aria-pressed'],true);
     assert.equal(view.root.findAllByProps({'aria-label':'Select recovery.webp'}).length,0);
     assert.ok(menuOptions().every(item=>item.props.disabled));
+    assert.match(textOf(menuOptions()[0]),/Run verification to find out which files can be selected/);
     await chooseFilter('all');
     assert.equal(view.root.findByProps({'aria-label':'Select first photo #1.webp'}).props.disabled,true);
     await act(async()=>button('Verify unused files').props.onClick());
@@ -629,27 +630,34 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     assert.deepEqual(['all','verified','protected','awaiting','recovery'].map(visibleCount),['30','28','2','0','1']);
     await chooseFilter('recovery');
     assert.equal(view.root.findAllByProps({'aria-label':'Select alias.jpg'}).length,0);
-    assert.equal(view.root.findByProps({'aria-label':'Select recovery.webp'}).props.disabled,true);
+    const recovery=view.root.findByProps({'aria-label':'Select recovery.webp'});
+    assert.equal(recovery.props.disabled,true);
+    assert.match(textOf(recovery.parent),/Unavailable/);
     assert.deepEqual(menuOptions().map(item=>item.props.disabled),[true,true,false]);
+    assert.match(textOf(menuOptions()[0]),/Files on a recovery hold cannot be selected/);
     assert.equal(view.root.findByProps({'aria-label':'Selection options'}).props.title,undefined);
     assert.equal(view.root.findByProps({className:'storage-media-selection__master'}).props.title,undefined);
     await chooseFilter('protected');
     const cannotDelete=view.root.findByProps({'aria-label':'Permanently delete alias.jpg'});
     assert.equal(cannotDelete.props.disabled,true);
-    assert.match(cannotDelete.props.title,/filename matches/);
+    assert.equal(cannotDelete.props.title,undefined);
+    assert.match(textOf(view.root.findByProps({id:cannotDelete.props['aria-describedby']})),/filename matches/);
+    assert.match(textOf(menuOptions()[0]),/Protected files cannot be selected/);
     const smallLabels=view.root.findAllByType('small').map(node=>node.children.join(''));
     assert.ok(smallLabels.includes('GH-ALIAS · Published courtyard'));
     assert.ok(smallLabels.includes('Exact saved references · none'));
     await chooseFilter('verified');
     assert.equal(view.root.findAllByProps({'aria-label':'Select alias.jpg'}).length,0);
     assert.equal(tour().props.disabled,false);
+    assert.match(textOf(tour().parent),/Select/);
+    assert.ok(view.root.findAllByType('p').some(node=>/70 files eligible across all pages for this search/.test(textOf(node))));
     assert.deepEqual(menuOptions().map(item=>item.props.disabled),[false,false,false]);
     assert.equal(view.root.findAllByType('video').length,0);
     assert.equal(view.root.findAllByType('img').length,0);
     await act(async()=>preview('tour % clip.mp4').props.onToggle(openedDetails()));
     assert.equal(view.root.findByType('video').props.src,'https://fixture.example/storage/v1/object/public/listing-videos/fixtures/tour%20%25%20clip.mp4');
     assert.equal(view.root.findAllByType('img').length,0);
-    const selectAll=view.root.findAllByProps({role:'menuitem'}).find(node=>textOf(node)==='Select all eligible files');
+    const selectAll=view.root.findByProps({role:'menuitem','aria-label':'Select all eligible files'});
     assert.ok(selectAll);
     await act(async()=>selectAll.props.onSelect({preventDefault(){}}));
     await act(async()=>button('Permanently delete selected').props.onClick());

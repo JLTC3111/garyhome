@@ -54,7 +54,7 @@ export function MediaSearchField({label,placeholder,value,onChange,onClear,canCl
     <Search size={16} aria-hidden="true"/>
     <input ref={input} type="search" aria-label={label} placeholder={placeholder} value={value}
       maxLength={maxLength} autoComplete="off" spellCheck={false} disabled={disabled} onChange={event=>onChange(event.target.value)}/>
-    {(value||canClear)&&<button type="button" className="storage-media-search__clear" aria-label={clearLabel} title={clearLabel}
+    {(value||canClear)&&<button type="button" className="storage-media-search__clear" aria-label={clearLabel}
       disabled={disabled} onClick={()=>{onClear();input.current?.focus();}}><X size={16} aria-hidden="true"/></button>}
   </div>;
 }
@@ -78,14 +78,13 @@ export function MediaSelectionControls({
     {key:"page",icon:SquareCheck,label:t("Select current page","Chọn trang hiện tại"),reason:pageReason,action:selectPage},
     {key:"clear",icon:X,label:t("Clear selection","Bỏ tất cả lựa chọn"),reason:clearReason,action:clear},
   ];
-  const reasons=[...new Set(actions.map(action=>action.reason).filter(Boolean))];
-  const reasonId=(reason:string)=>reason?`${id}-${reasons.indexOf(reason)}`:undefined;
+  const masterHintId=pageReason?`${id}-master-hint`:undefined;
   const outsideView=Math.max(0,count-pageSelected);
   return <div className="storage-media-toolbar">
     <div className="storage-media-selection" data-selected={count>0}>
       <div className="storage-media-selection__switch">
         <label className="storage-media-selection__master">
-          <input type="checkbox" aria-label={pageLabel} aria-checked={mixed?"mixed":pageChecked} aria-describedby={reasonId(pageReason)}
+          <input type="checkbox" aria-label={pageLabel} aria-checked={mixed?"mixed":pageChecked} aria-describedby={masterHintId}
             ref={node=>{if(node)node.indeterminate=mixed;}} checked={pageChecked} disabled={!!pageReason}
             onChange={pageChecked?clearPage:selectPage}/>
         </label>
@@ -97,7 +96,10 @@ export function MediaSelectionControls({
           </DropdownMenuTrigger>
           <DropdownMenuContent className="storage-media-selection-menu" align="start" sideOffset={8} collisionPadding={12}>
             {actions.map(({key,icon:Icon,label,reason,action})=><DropdownMenuItem key={key} className="storage-media-selection-menu__item"
-              disabled={!!reason} aria-describedby={reasonId(reason)} onSelect={action}><Icon size={16} aria-hidden="true"/>{label}</DropdownMenuItem>)}
+              disabled={!!reason} aria-label={label} textValue={label} aria-describedby={reason?`${id}-${key}-hint`:undefined} onSelect={action}>
+              <Icon size={16} aria-hidden="true"/>
+              <span>{label}{reason&&<small id={`${id}-${key}-hint`}>{reason}</small>}</span>
+            </DropdownMenuItem>)}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -108,6 +110,6 @@ export function MediaSelectionControls({
       </span>
     </div>
     {children&&<div className="storage-media-toolbar__action">{children}</div>}
-    {reasons.map((reason,index)=><span key={reason} className="sr-only" id={`${id}-${index}`}>{reason}</span>)}
+    {masterHintId&&<span className="sr-only" id={masterHintId}>{pageReason}</span>}
   </div>;
 }

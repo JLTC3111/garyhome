@@ -1,9 +1,10 @@
 "use client";
 
 import {useEffect,useRef,useState} from "react";
+import {ChevronLeft,ChevronRight,FileCheck2,Search,Shield,ShieldOff,Trash2} from "lucide-react";
 import {mediaBatchSize} from "@/lib/home-media-trash";
 import {useSite} from "./site-context";
-import {MediaSearchField,MediaSelectionControls,useMediaSelection} from "./media-selection";
+import {MediaActionButton,MediaSearchField,MediaSelectionControls,useMediaSelection} from "./media-selection";
 
 type ReviewRequest = <T>(payload:Record<string,unknown>)=>Promise<T>;
 type Row = {
@@ -134,13 +135,14 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
   const selectionReason=!selection.ready?t("Loading saved selection…","Đang tải lựa chọn đã lưu…"):
     busy?t("Wait for the current review request.","Hãy chờ yêu cầu rà soát hiện tại."):"";
   const noneSelected=t("Select files to verify.","Chọn tệp để xác minh.");
-  const verifyReason=selectionReason||(!selection.rows.length?noneSelected:"");
+  const noPageEligible=t("No files on this page are eligible for bulk verification.","Không có tệp nào trên trang này đủ điều kiện xác minh hàng loạt.");
+  const verifyReason=selectionReason||(!selection.rows.length?(pageEligible.length?noneSelected:noPageEligible):"");
   const allReason=selectionReason||(!page?.available?reason("scan_required"):offset===0&&!page.hasMore&&!pageEligible.length?
     t("No eligible files match this search.","Không có tệp đủ điều kiện khớp tìm kiếm."):"");
 
-  return <section aria-label={t("Orphan review","Rà soát tệp thừa")}>
+  return <section className="storage-media-list" aria-label={t("Orphan review","Rà soát tệp thừa")}>
     <h3>{t("Orphan review","Rà soát tệp thừa")}</h3>
-    <p>{t("Check selected files before recording custody and backup evidence. A dependency check does not move a file to Trash.",
+    <p className="storage-media-note">{t("Check selected files before recording custody and backup evidence. A dependency check does not move a file to Trash.",
       "Kiểm tra các tệp đã chọn trước khi ghi nhận bằng chứng nguồn và bản sao lưu. Kiểm tra tham chiếu không chuyển tệp vào Thùng rác.")}</p>
     <form className="storage-media-search-form" role="search" aria-label={t("Search orphan candidates","Tìm tệp thừa")} onSubmit={event=>{
       event.preventDefault();if(busy)return;
@@ -152,57 +154,57 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
           setQuery("");
           if(search){setSearch("");setOffset(0);}
         }}/>
-      <button type="submit" className="button button-outline button-small" disabled={busy} title={busy?selectionReason:undefined}>{t("Search","Tìm")}</button>
+      <MediaActionButton type="submit" icon={Search} disabled={busy}>{t("Search","Tìm")}</MediaActionButton>
     </form>
     <MediaSelectionControls count={selection.rows.length} bytes={selection.rows.reduce((sum,row)=>sum+(row.bytes??0),0)} unknownSizes={0}
       pageCount={pageEligible.length} pageSelected={pageEligible.filter(row=>selection.has(rowKey(row))).length}
-      formatBytes={formatBytes} allReason={allReason} pageReason={selectionReason||(!pageEligible.length?t("No eligible files on this page.","Trang này chưa có tệp đủ điều kiện."):"")}
-      clearReason={selectionReason||(!selection.rows.length?noneSelected:"")} selectAll={()=>void selectAll()}
+      formatBytes={formatBytes} allReason={allReason} pageReason={selectionReason||(!pageEligible.length?noPageEligible:"")}
+      clearReason={selectionReason||(!selection.rows.length?t("Selection is empty.","Chưa chọn tệp nào."):"")} selectAll={()=>void selectAll()}
       selectPage={()=>selection.add(pageEligible)} clearPage={()=>selection.remove(pageEligible.map(rowKey))} clear={selection.clear}>
-      <button type="button" className="button button-outline button-small" disabled={!!verifyReason} title={verifyReason||undefined}
-        onClick={()=>void verify(selection.rows)}>{t("Verify selected","Xác minh đã chọn")}</button>
+      <MediaActionButton icon={FileCheck2} tone="primary" pending={working&&!selecting} disabled={!!verifyReason}
+        onClick={()=>void verify(selection.rows)}>{t("Verify selected","Xác minh đã chọn")}</MediaActionButton>
       {verifyReason&&<small>{verifyReason}</small>}
     </MediaSelectionControls>
     {loading&&<p role="status">{t("Loading review candidates…","Đang tải tệp cần kiểm tra…")}</p>}
     {selecting&&<p role="status">{t("Selecting eligible review files across pages…","Đang chọn tệp đủ điều kiện qua các trang…")}</p>}
     {working&&progress.total>0&&<p role="status">{t(`Checked ${progress.done} of ${progress.total} selected files…`,`Đã kiểm tra ${progress.done}/${progress.total} tệp đã chọn…`)}</p>}
-    {!!error&&<p role="alert">{reason(error)}</p>}
+    {!!error&&<p className="storage-media-feedback" data-tone="error" role="alert">{reason(error)}</p>}
     {!loading&&page&&!page.available&&<p>{t("Run a storage scan to load review candidates.","Hãy quét kho để tải tệp cần kiểm tra.")}</p>}
     {!loading&&page?.available&&<>
       <p>{t(`${page.holds} individual Owner holds.`,`Chủ sở hữu đang giữ riêng ${page.holds} tệp.`)}</p>
-      {!page.items.length&&<p>{t("No review candidates match this search.","Không có tệp cần kiểm tra khớp tìm kiếm.")}</p>}
+      {!page.items.length&&<p className="storage-media-empty">{t("No review candidates match this search.","Không có tệp cần kiểm tra khớp tìm kiếm.")}</p>}
       <ul className="storage-media-rows">{page.items.map(row=>{
         const key=rowKey(row),checked=selection.has(key),canCheck=hasIdentity(row),outcome=verified[verificationKey(row)];
         const pickReason=selectionReason||(!checked&&!canCheck?reason("identity"):"");
-        return <li key={key}>
-          <div>
-            <label title={pickReason||undefined}><input type="checkbox" checked={checked} disabled={!!pickReason}
-              onChange={event=>{if(event.target.checked)selection.add([row]);else selection.remove([key]);}}/> <strong>{row.key.split("/").at(-1)}</strong></label>
+        return <li key={key} className="storage-file-row" data-selected={checked}>
+          <div className="storage-file-info">
+            <label title={pickReason||undefined} className="storage-file-select"><input type="checkbox" checked={checked} disabled={!!pickReason}
+              onChange={event=>{if(event.target.checked)selection.add([row]);else selection.remove([key]);}}/> <strong className="storage-file-name">{row.key.split("/").at(-1)}</strong></label>
             <small>{row.bucket} · {row.bytes===null?"—":size.format(row.bytes/1_000_000)}{row.listingCode&&` · ${row.listingCode} · ${listingStatus(row.listingStatus)}`}</small>
             <small>{reason(outcome??(canCheck?row.reason:"identity"))}</small>
-            <details><summary>{t("Storage identity","Định danh kho")}</summary><small>{row.key} · {row.objectId} · {row.version} · {row.etag}</small></details>
-            {outcome==="evidence_required"&&<details>
+            <details className="storage-file-detail"><summary>{t("Storage identity","Định danh kho")}</summary><small>{row.key} · {row.objectId} · {row.version} · {row.etag}</small></details>
+            {outcome==="evidence_required"&&<details className="storage-file-detail">
               <summary>{t("Record evidence and move to Trash","Ghi bằng chứng và chuyển vào Thùng rác")}</summary>
               <form onSubmit={event=>{event.preventDefault();const fields=new FormData(event.currentTarget);
                 void update(row,"enroll",{backupSha256:String(fields.get("backupSha256")).trim().toLowerCase(),evidenceRef:String(fields.get("evidenceRef")).trim()});}}>
                 <p>{t("Use the SHA-256 from a verified local backup of this exact object and an independent custody record.","Dùng SHA-256 của bản sao cục bộ đã xác minh đúng tệp và hồ sơ nguồn độc lập.")}</p>
                 <label>{t("Backup SHA-256","SHA-256 bản sao")} <input name="backupSha256" required pattern="[0-9a-fA-F]{64}" maxLength={64}/></label>{" "}
                 <label>{t("Custody evidence reference","Tham chiếu bằng chứng nguồn")} <input name="evidenceRef" required minLength={3} maxLength={240}/></label>{" "}
-                <button type="submit" className="button button-outline button-small" disabled={busy}>{t("Enroll in File Trash","Ghi vào Thùng rác")}</button>
+                <MediaActionButton type="submit" icon={Trash2} tone="warning" disabled={busy}>{t("Enroll in File Trash","Ghi vào Thùng rác")}</MediaActionButton>
               </form>
             </details>}
           </div>
-          <div className="storage-media-actions">
-            <button type="button" className="text-link" disabled={busy||!canCheck} onClick={()=>void verify([row])}>{t("Verify","Xác minh")}</button>
-            <button type="button" className="text-link" disabled={busy||!canCheck} onClick={()=>void update(row,row.held?"release":"hold")}>
-              {row.held?t("Release review hold","Bỏ giữ tệp"):t("Protect file","Bảo vệ tệp")}</button>
+          <div className="storage-media-actions storage-file-actions">
+            <MediaActionButton icon={FileCheck2} disabled={busy||!canCheck} onClick={()=>void verify([row])}>{t("Verify","Xác minh")}</MediaActionButton>
+            <MediaActionButton icon={row.held?ShieldOff:Shield} tone={row.held?"warning":"secondary"} disabled={busy||!canCheck} onClick={()=>void update(row,row.held?"release":"hold")}>
+              {row.held?t("Release review hold","Bỏ giữ tệp"):t("Protect file","Bảo vệ tệp")}</MediaActionButton>
           </div>
         </li>;
       })}</ul>
-      {(offset>0||page.hasMore)&&<nav className="storage-media-actions" aria-label={t("Orphan review pages","Trang rà soát tệp thừa")}>
-        <button type="button" className="text-link" disabled={busy||offset===0} onClick={()=>setOffset(offset-pageSize)}>{t("Previous","Trước")}</button>
+      {(offset>0||page.hasMore)&&<nav className="storage-media-actions storage-media-pagination" aria-label={t("Orphan review pages","Trang rà soát tệp thừa")}>
+        <MediaActionButton icon={ChevronLeft} disabled={busy||offset===0} onClick={()=>setOffset(offset-pageSize)}>{t("Previous","Trước")}</MediaActionButton>
         <span>{t("Page","Trang")} {Math.floor(offset/pageSize)+1}</span>
-        <button type="button" className="text-link" disabled={busy||!page.hasMore} onClick={()=>setOffset(offset+pageSize)}>{t("Next","Tiếp")}</button>
+        <MediaActionButton icon={ChevronRight} disabled={busy||!page.hasMore} onClick={()=>setOffset(offset+pageSize)}>{t("Next","Tiếp")}</MediaActionButton>
       </nav>}
     </>}
   </section>;

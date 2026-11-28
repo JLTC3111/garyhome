@@ -15,7 +15,8 @@ From the Gary Home repository, apply the pending incremental migrations in order
   -f supabase/migrations/20261127165022_home_media_inventory_controls.sql \
   -f supabase/migrations/20261127173831_home_media_page_first_inventory.sql \
   -f supabase/migrations/20261127203648_home_media_verify_unused.sql \
-  -f supabase/migrations/20261128054200_home_media_bounded_observation.sql
+  -f supabase/migrations/20261128054200_home_media_bounded_observation.sql \
+  -f supabase/migrations/20261128061749_home_media_observation_cycles.sql
 ```
 
 The first migration sets `listing_inactivity_enabled` to `false`. To return to preview later, run the following command.
@@ -74,7 +75,7 @@ Open **Inventory Files** or **Retention preview** and select **Verify unused fil
    ```
 
 3. Release the reviewed Home app through the [existing Vercel deployment](vercel-deployment.md). This ships the staff verification updates, PNG optimizer fix, and Realtime restore fix together. Keep `listing_inactivity_enabled=false` during acceptance checks so the existing 48-hour File Trash worker continues while the 96-hour policy is in preview.
-4. Open **Check cleanup worker** and **Verify unused files** as the Owner. Progress should advance in batches of at most 32. If the pass is still running when the request budget ends, select **Verify unused files** again to resume. Check that the finished pass records a last successful time and exposes verified files for selection. On the next existing hourly dispatch at minute 7 UTC, check logs for both `home_media_claim` and `home_media_observe_hourly`. A partial hourly pass resumes on its next dispatch or through the Owner action.
+4. Open **Check cleanup worker** and **Verify unused files** as the Owner. Progress should advance in batches of at most 32. Check that the finished pass records a last successful time and exposes verified files for selection. On the next existing hourly dispatch at minute 7 UTC, check logs for both `home_media_claim` and `home_media_observe_hourly`. A partial hourly pass resumes on its next dispatch or through the Owner action.
 
    ```sql
    select private.home_media_observation_progress();
@@ -82,6 +83,32 @@ Open **Inventory Files** or **Retention preview** and select **Verify unused fil
    ```
 
 5. Check the original PNG in the listing editor and exercise back/forward navigation with the notifications panel open. Confirm live notifications resume after restore and a subsequent reconnect. Check the GH-645 holds and both original File Trash deadlines using the queries below.
+
+### Roll out resumable verification and bulk deletion
+
+1. With the bounded observer above already installed, apply the cycle migration from the repository root. It preserves the current cursor, verified ledger entries, and retention deadlines.
+
+   ```sh
+   /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+     -f supabase/migrations/20261128061749_home_media_observation_cycles.sql
+   ```
+
+2. Deploy the reviewed worker. It binds further hourly requests to the initial cycle and checkpoint and uses the existing schedule and worker credential.
+
+   ```sh
+   supabase functions deploy media-orphan-cleanup --project-ref duyiihsmaqfgwezmsnjs --no-verify-jwt
+   ```
+
+3. Release the reviewed staff app, then refresh open staff tabs. Select **Verify unused files** once and check that the same cycle reaches completion. **Pause verification** lets the current request settle. **Resume verification** and **Retry verification** use the saved cycle after an interruption. The existing hourly job can advance the shared checkpoint while the Owner's requests are paused. [Home Vercel pipeline](vercel-deployment.md)
+
+   ```sql
+   select private.home_media_observation_progress();
+   select permanent_enabled,listing_inactivity_enabled from private.home_media_control where singleton;
+   ```
+
+4. Use **Select all eligible files** to select across pages using the active search. For an authorized removal, review the count and sizes in the single confirmation. The panel processes the confirmed selection, records each receipt, and refreshes inventory and Cleanup History. A persistent lock or ambiguous receipt keeps the affected file resumable. Leave `listing_inactivity_enabled=false` to keep the 96-hour policy in preview while the 48-hour worker continues on its existing schedule.
+
+The file list refreshes after each completed verification batch. Previously verified files and their selections stay available while their retained tickets remain valid. Navigation, search and selection stay usable during verification. A requested permanent removal waits for the current verification write to settle, rechecks live eligibility and runs before verification continues. This panel change uses the existing cycle migration and worker.
 
 ### Inspect counts and verify the exclusions
 

@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Search, X } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { ChevronDown, ListChecks, LoaderCircle, Search, SquareCheck, X, type LucideIcon } from "lucide-react";
 import { useSite } from "./site-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+
+const mediaButtonVariants = {primary:"confirm",secondary:"view",warning:"archive",destructive:"danger-primary"} as const;
+
+export function MediaActionButton({icon:Icon,tone="secondary",pending=false,children,type="button",...props}:
+  ComponentPropsWithoutRef<"button"> & {icon:LucideIcon;tone?:keyof typeof mediaButtonVariants;pending?:boolean}) {
+  const Glyph=pending?LoaderCircle:Icon;
+  return <button type={type} className="storage-media-button" data-button-variant={mediaButtonVariants[tone]} aria-busy={pending||undefined} {...props}>
+    <Glyph size={16} aria-hidden="true"/>{children}
+  </button>;
+}
 
 export function useMediaSelection<Row>(key:string, idOf:(row:Row)=>string, valid:(row:unknown)=>row is Row) {
   const current=useRef<{key:string;items:Map<string,Row>}|null>(null);
@@ -19,13 +29,18 @@ export function useMediaSelection<Row>(key:string, idOf:(row:Row)=>string, valid
   const update=(change:(items:Map<string,Row>)=>void)=>{
     if(current.current?.key!==key)return;
     const items=new Map(current.current.items);
-    change(items);current.current={key,items};setSnapshot(current.current);
+    change(items);
+    if(items.size===current.current.items.size&&[...items].every(([id,row])=>current.current?.items.get(id)===row))return;
+    current.current={key,items};setSnapshot(current.current);
     try{localStorage.setItem(key,JSON.stringify([...items.values()]));}catch{/* Run checkpoints are validated separately. */}
   };
   const items=snapshot?.key===key?snapshot.items:null;
   return {ready:!!items,rows:items?[...items.values()]:[],has:(id:string)=>items?.has(id)??false,
     add:(rows:Row[])=>update(next=>{for(const row of rows)next.set(idOf(row),row);}),
     remove:(ids:string[])=>update(next=>{for(const id of ids)next.delete(id);}),
+    reconcile:(resolve:(row:Row)=>Row|null)=>update(next=>{
+      for(const [id,row] of next){const live=resolve(row);if(live===null)next.delete(id);else next.set(id,live);}
+    }),
     clear:()=>update(next=>next.clear())};
 }
 
@@ -36,6 +51,7 @@ export function MediaSearchField({label,placeholder,value,onChange,onClear,canCl
   const input=useRef<HTMLInputElement>(null);
   const clearLabel=t("Clear search","Xóa tìm kiếm");
   return <div className="storage-media-search">
+    <Search size={16} aria-hidden="true"/>
     <input ref={input} type="search" aria-label={label} placeholder={placeholder} value={value}
       maxLength={maxLength} autoComplete="off" spellCheck={false} disabled={disabled} onChange={event=>onChange(event.target.value)}/>
     {(value||canClear)&&<button type="button" className="storage-media-search__clear" aria-label={clearLabel} title={clearLabel}
@@ -58,36 +74,37 @@ export function MediaSelectionControls({
   const pageLabel=t("Select eligible files on this page","Chọn tệp đủ điều kiện trên trang này");
   const optionsLabel=t("Selection options","Tùy chọn lựa chọn");
   const actions=[
-    {key:"all",label:t("Select all eligible files","Chọn tất cả tệp đủ điều kiện"),reason:allReason,action:selectAll},
-    {key:"page",label:t("Select current page","Chọn trang hiện tại"),reason:pageReason,action:selectPage},
-    {key:"clear",label:t("Clear selection","Bỏ tất cả lựa chọn"),reason:clearReason,action:clear},
+    {key:"all",icon:ListChecks,label:t("Select all eligible files","Chọn tất cả tệp đủ điều kiện"),reason:allReason,action:selectAll},
+    {key:"page",icon:SquareCheck,label:t("Select current page","Chọn trang hiện tại"),reason:pageReason,action:selectPage},
+    {key:"clear",icon:X,label:t("Clear selection","Bỏ tất cả lựa chọn"),reason:clearReason,action:clear},
   ];
   const reasons=[...new Set(actions.map(action=>action.reason).filter(Boolean))];
   const reasonId=(reason:string)=>reason?`${id}-${reasons.indexOf(reason)}`:undefined;
-  const unavailable=actions.every(action=>!!action.reason);
+  const outsideView=Math.max(0,count-pageSelected);
   return <div className="storage-media-toolbar">
     <div className="storage-media-selection" data-selected={count>0}>
       <div className="storage-media-selection__switch">
-        <label className="storage-media-selection__master" title={pageReason||pageLabel}>
+        <label className="storage-media-selection__master">
           <input type="checkbox" aria-label={pageLabel} aria-checked={mixed?"mixed":pageChecked} aria-describedby={reasonId(pageReason)}
             ref={node=>{if(node)node.indeterminate=mixed;}} checked={pageChecked} disabled={!!pageReason}
             onChange={pageChecked?clearPage:selectPage}/>
         </label>
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="storage-media-selection__trigger" aria-label={optionsLabel}
-              title={unavailable?allReason:optionsLabel} aria-describedby={unavailable?reasonId(allReason):undefined}
-              disabled={unavailable}><ChevronDown size={16} aria-hidden="true"/></button>
+            <button type="button" className="storage-media-selection__trigger" aria-label={optionsLabel}>
+              <ChevronDown size={16} aria-hidden="true"/>
+            </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="storage-media-selection-menu" align="start" collisionPadding={12}>
-            {actions.map(({key,label,reason,action})=><DropdownMenuItem key={key} className="storage-media-selection-menu__item"
-              disabled={!!reason} aria-describedby={reasonId(reason)} onSelect={action}>{label}</DropdownMenuItem>)}
+          <DropdownMenuContent className="storage-media-selection-menu" align="start" sideOffset={8} collisionPadding={12}>
+            {actions.map(({key,icon:Icon,label,reason,action})=><DropdownMenuItem key={key} className="storage-media-selection-menu__item"
+              disabled={!!reason} aria-describedby={reasonId(reason)} onSelect={action}><Icon size={16} aria-hidden="true"/>{label}</DropdownMenuItem>)}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       <span className="storage-media-selection__total" role="status">
         <strong>{t(`${number.format(count)} selected`,`${number.format(count)} tệp đã chọn`)}</strong>
-        {" · "}{formatBytes(bytes)}{unknownSizes>0&&t(` · ${number.format(unknownSizes)} sizes unknown`,` · ${number.format(unknownSizes)} tệp chưa rõ dung lượng`)}
+        {count>0&&<small>{formatBytes(bytes)}{unknownSizes>0&&t(` · ${number.format(unknownSizes)} sizes unknown`,` · ${number.format(unknownSizes)} tệp chưa rõ dung lượng`)}
+          {outsideView>0&&t(` · ${number.format(outsideView)} outside this view`,` · ${number.format(outsideView)} tệp ngoài chế độ xem này`)}</small>}
       </span>
     </div>
     {children&&<div className="storage-media-toolbar__action">{children}</div>}

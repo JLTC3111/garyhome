@@ -27,7 +27,7 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       const code=result?.message?.match(/^(?:listing_cleanup)\.([a-z_]+)$/)?.[1];
       if(action==='claim_unused' && (result?.code==='PGRST202'||result?.code==='42883'))
         throw Object.assign(new Error('retention_cleanup_setup'),{status:503});
-      if(action==='observe_hourly') {
+      if(action==='observe_hourly'||action==='observe_hourly_step') {
         const reason=result?.code==='57014'?'observation_timeout':
           ['PGRST202','42883'].includes(result?.code)?'observation_setup':'observation_failed';
         throw Object.assign(new Error(reason),{status:503});
@@ -92,14 +92,16 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
   }
 
   async function observeHourly(signal) {
-    let progress,checked=-1;
+    let progress;
     const started=Date.now();
     try {
       // Leave room for the existing eight-second deadline on the last request.
       for(let batch=0;batch<32&&!signal.aborted&&Date.now()-started<8_000;batch++) {
-        progress=await internal('observe_hourly',{});
-        if(progress?.status!=='running'||progress.checked<=checked)break;
-        checked=progress.checked;
+        const prior=progress;
+        progress=prior?await internal('observe_hourly_step',{p_cycle:prior.cycle,p_checked:prior.checked}):
+          await internal('observe_hourly',{});
+        if(progress?.status!=='running'||!Number.isSafeInteger(progress.cycle)||
+          prior&&(progress.cycle!==prior.cycle||progress.checked<=prior.checked))break;
       }
     } catch(error) {
       progress={status:'failed',error:error.name==='TimeoutError'?'observation_timeout':

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {executeStorageMedia} from '../lib/home-media-request.ts';
+import {verifyObservationCycle} from '../lib/home-media-observation.ts';
 
 const signal=new AbortController().signal;
 
@@ -47,10 +48,32 @@ test('Owner verification reads and writes only the observation RPC and reports i
   assert.equal(supplied,signal);return calls.length<3?{data:progress}:{error:{code:'57014'}};
  }};}};
  const noWorker=()=>assert.fail('Observation cannot dispatch the deletion worker');
- for(const action of ['observation_status','verify_unused'])
-  assert.deepEqual(await executeStorageMedia(db,{action,id:'ignored',confirm:true},signal,noWorker),{status:200,data:progress});
- assert.deepEqual(await executeStorageMedia(db,{action:'verify_unused'},signal,noWorker),{status:504,data:{error:'observation_timeout'}});
- assert.deepEqual(calls,[['home_media_observation',{p_verify:false}],['home_media_observation',{p_verify:true}],['home_media_observation',{p_verify:true}]]);
+ const step={action:'verify_unused',cycle:2,checked:32,start:false};
+ assert.deepEqual(await executeStorageMedia(db,{action:'observation_status'},signal,noWorker),{status:200,data:progress});
+ assert.deepEqual(await executeStorageMedia(db,{action:'verify_unused'},signal,noWorker),{status:400,data:{error:'invalid_request'}});
+ assert.deepEqual(await executeStorageMedia(db,step,signal,noWorker),{status:200,data:progress});
+ assert.deepEqual(await executeStorageMedia(db,step,signal,noWorker),{status:504,data:{error:'observation_timeout'}});
+ assert.deepEqual(calls,[['home_media_observation',{p_verify:false}],
+  ...Array(2).fill(['home_media_observation_step',{p_cycle:2,p_checked:32,p_start:false}])]);
+});
+
+test('Retry resumes the same cycle after a failed batch and reconciles an uncommitted timeout before sending again',async()=>{
+ const calls=[];
+ let progress={status:'running',cycle:3,checked:32,total:64,recorded:0,reset:0,lastSuccessfulAt:null,error:null};
+ let mode='failed';
+ const request=async step=>{
+  calls.push(step??'read');
+  if(!step)return progress;
+  assert.deepEqual(step,{cycle:3,checked:32,start:false});
+  if(mode==='failed')return progress={...progress,status:'failed',error:'observation_failed'};
+  if(mode==='timeout'){mode='complete';throw new Error('observation_timeout');}
+  return progress={...progress,status:'complete',checked:64,error:null,lastSuccessfulAt:new Date().toISOString()};
+ };
+ const options={request,publish:()=>{},wait:async()=>{calls.push('wait');},signal};
+ await assert.rejects(verifyObservationCycle(3,options),/observation_failed/);
+ mode='timeout';
+ assert.equal(await verifyObservationCycle(3,options),'complete');
+ assert.deepEqual(calls.map(call=>typeof call==='string'?call:'step'),['read','step','read','read','step','read','wait','step']);
 });
 
 test('database and worker failures have separate actionable codes without provider details',async()=>{

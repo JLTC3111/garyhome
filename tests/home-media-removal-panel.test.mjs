@@ -8,11 +8,13 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import ts from 'typescript';
 import * as trash from '../lib/home-media-trash.ts';
+import * as observationWorkflow from '../lib/home-media-observation.ts';
 import * as storageMedia from '../lib/home-media-request.ts';
 import * as requests from '../lib/requests.ts';
 import { createMediaCleanup } from '../supabase/functions/media-orphan-cleanup/worker.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const textOf = node => typeof node==='string'?node:node.children.map(textOf).join('');
 const require = createRequire(import.meta.url);
 const openedDetails = () => {
   const details={open:true};
@@ -26,7 +28,8 @@ const components = new Map(sources.map(([name,path]) => [name, new vm.Script('(f
   }}).outputText + '\n})')]));
 function load(name, mocks, context) {
   const module = { exports: {} };
-  components.get(name).runInContext(context)(module.exports, id => mocks[id] ?? require(id), module);
+  components.get(name).runInContext(context)(module.exports, id =>
+    id==='@/lib/home-media-observation'?observationWorkflow:mocks[id] ?? require(id), module);
   return module.exports;
 }
 
@@ -37,13 +40,13 @@ const dropdown = {
   DropdownMenuItem:({children,...props})=>React.createElement('div',{...props,role:'menuitem'},children),
 };
 const css = name => postcss.parse(read(`app/${name}.css`));
-const globals = css('globals'), publicTheme = css('public-theme'), studio = css('studio-theme'), panelCss = css('listing-management');
-const styles = (tree, selector) => Object.fromEntries(tree.nodes.find(node => node.selector === selector).nodes
+const globals = css('globals'), publicTheme = css('public-theme'), studio = css('studio-theme'), panelCss = css('listing-management'), actions = css('action-buttons');
+const styles = (tree, selector) => Object.fromEntries(tree.nodes.find(node => node.selectors?.includes(selector)).nodes
   .filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
 function palette(theme) {
-  const tokens = {...styles(globals, ':root'), ...styles(publicTheme, ':root'), ...styles(studio, 'html:has(.admin-shell)')};
+  const tokens = {...styles(globals, ':root'), ...styles(publicTheme, ':root'), ...styles(studio, 'html:has(.admin-shell)'), ...styles(actions, ':root')};
   if (theme === 'dark') Object.assign(tokens, styles(studio,
-    'html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .session-gate, .page-loading)'));
+    'html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .session-gate, .page-loading)'),styles(actions,'html[data-home-theme="dark"]'));
   const resolve = value => /^var\((--[\w-]+)\)$/.test(value) ? resolve(tokens[value.slice(4, -1)]) : value;
   return resolve;
 }
@@ -85,6 +88,14 @@ for (const theme of ['light', 'dark']) {
       verify(`Resume button${state}`, 'var(--studio-on-action)', `var(--studio-action${state})`, 4.5);
     }
     verify('Progress fill and track', fill.background, track.background, 3);
+    verify('Warning button', 'var(--action-archive-ink)', 'var(--action-archive-tint)', 4.5);
+    verify('Destructive button', 'var(--action-white)', 'var(--action-red)', 4.5);
+    for(const state of ['loading','paused','failed','disabled']){
+      const stateFill=styles(panelCss, `.storage-media-meter[data-progress-state="${state}"] .storage-removal-progress__fill`);
+      verify(`${state} progress`, stateFill.background, track.background, 3);
+    }
+    const completedSelector='.storage-media-meter[data-progress-state="completed"] .storage-removal-progress__fill';
+    verify('completed progress', styles(panelCss, theme==='dark'?`html[data-home-theme="dark"] ${completedSelector}`:completedSelector).background, track.background, 3);
   });
 
   test(`${theme} File Trash preserves the paused run through individual deletion, restore, resume and cancel`, async () => {
@@ -160,7 +171,7 @@ for (const theme of ['light', 'dark']) {
       React.createElement(StorageMediaManagement, {visible,latest:null,onListingRestored:()=>{}}));
     let view;
     const saved = () => trash.readTrashRun(store.get(key));
-    const button = label => view.root.findAllByType('button').find(node=>node.children.join('')===label);
+    const button = label => view.root.findAllByType('button').find(node=>textOf(node)===label);
     const state = () => view.root.findByProps({className:'storage-removal-progress'}).props['data-state'];
     const click = async label => act(async()=>button(label).props.onClick());
     const filter = async value => act(async()=>view.root.findByProps({type:'search'}).props.onChange({target:{value}}));
@@ -183,7 +194,7 @@ for (const theme of ['light', 'dark']) {
       assert.equal(button('Resume').props.disabled,false);
       assert.equal(button('Permanently delete now').props.disabled,false);
       assert.equal(button('Keep file').props.disabled,false);
-      assert.deepEqual(view.root.findAllByProps({role:'menuitem'}).map(item=>item.children.join('')),
+      assert.deepEqual(view.root.findAllByProps({role:'menuitem'}).map(textOf),
         ['Select all eligible files','Select current page','Clear selection']);
       const master=()=>view.root.findByProps({'aria-label':'Select eligible files on this page'});
       const checkThree=checked=>view.root.findByProps({'aria-label':'Select three.webp'}).props.onChange({target:{checked}});
@@ -345,7 +356,8 @@ test('selected deletion confirms the live manifest and dispatches each eligible 
         const checkpoint=trash.readTrashRun(store.get(key));
         assert.equal(trash.pendingTrashRequest(checkpoint).id,args.id);
         if(args.id===second.id){
-          assert.equal(checkpoint.entries[1].outcome,'removed');
+          assert.equal(checkpoint.entries.find(item=>item.id===first.id).outcome,'removed');
+          assert.equal(checkpoint.returnTo?.confirmedAt,initial.confirmedAt);
           assert.ok(!JSON.parse(store.get(selectionKey)).some(item=>item.id===first.id));
         }
       }
@@ -362,7 +374,7 @@ test('selected deletion confirms the live manifest and dispatches each eligible 
   mocks['./media-removal-progress']=load('media-removal-progress',mocks,context);
   const {StorageMediaManagement}=load('listing-deletion-queue',mocks,context);
   let view;
-  const button=label=>view.root.findAllByType('button').find(node=>node.children.join('')===label);
+  const button=label=>view.root.findAllByType('button').find(node=>textOf(node)===label);
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   try{
     await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
@@ -426,7 +438,7 @@ test('Orphan Review resets applied search and selects eligible files across page
     await act(async()=>search().props.onChange({target:{value:'sample'}}));
     await act(async()=>view.root.findByProps({role:'search'}).props.onSubmit({preventDefault(){}}));
     assert.equal(calls.at(-1).query,'sample');
-    const pick=label=>view.root.findAllByProps({role:'menuitem'}).find(item=>item.children.join('')===label);
+    const pick=label=>view.root.findAllByProps({role:'menuitem'}).find(item=>textOf(item)===label);
     await act(async()=>pick('Select all eligible files').props.onSelect());
     assert.deepEqual(calls.slice(-2).map(({query,offset})=>[query,offset]),[['sample',0],['sample',30]]);
     assert.deepEqual(chosen(),['file-0.webp','file-30.webp']);
@@ -448,18 +460,21 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     {id:'first',bucket:'property-media',name:'fixtures/first photo #1.webp',bytes:100_000},
     {id:'second',bucket:'property-media',name:'fixtures/second.webp',bytes:200_000},
     {id:'tour',bucket:'listing-videos',name:'fixtures/tour % clip.mp4',bytes:300_000},
+    ...Array.from({length:68},(_,index)=>({id:`extra-${index}`,bucket:'property-media',name:`fixtures/extra-${index}.webp`,bytes:100_000})),
   ].map(file=>({...file,expires_at,source}));
   const live=new Map(files.map(file=>[file.id,file]));
+  const verified=new Set(['tour']),total=files.length+2;
   const held={name:'fixtures/recovery.webp',bucket:'property-media',reason:'recovery_hold',listing_code:'GH-645',listing_title_en:'Recovery draft',saved_reference:false,object_id:'held',bytes:120};
   const alias={name:'fixtures/alias.jpg',bucket:'property-media',reason:'filename_match',listing_code:'GH-ALIAS',
     listing_title_en:'Published courtyard',saved_reference:false,object_id:'alias',bytes:80};
   const calls=[],confirmations=[],store=new Map();
   let inventoryTimeout=true;
-  let observation={status:'idle',checked:0,total:0,recorded:0,reset:0,lastSuccessfulAt:null,error:null};
-  let verificationRequests=0;
+  let observation={status:'idle',cycle:0,checked:0,total:0,recorded:0,reset:0,lastSuccessfulAt:null,error:null};
+  let verificationRequests=0,verifyingBatch=false,releaseVerification,releaseRemoval;
+  let delayRetentionRefresh=false,releaseOldPage;
   const context=vm.createContext({
     Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
-    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)},
+    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
     window:{addEventListener(){},removeEventListener(){},confirm:message=>{confirmations.push(message);return true;}},
     async fetch(_, {body}){
       const args=JSON.parse(body);
@@ -469,28 +484,51 @@ test('Inventory Files loads exact previews on demand and shares single and batch
         case 'worker_status': return Response.json({status:'ok',cronConfigured:true,manualUnused:true});
         case 'observation_status': return Response.json(observation);
         case 'verify_unused': {
+          assert.deepEqual({cycle:args.cycle,checked:args.checked,start:args.start},
+            {cycle:observation.cycle,checked:observation.checked,start:observation.status==='idle'});
           verificationRequests++;
+          verifyingBatch=true;
+          if(verificationRequests<3)await new Promise(resolve=>{releaseVerification=resolve;});
+          const checked=Math.min(observation.checked+32,total),complete=checked===total;
+          for(const item of files.slice(0,checked))verified.add(item.id);
+          if(verificationRequests===1)live.set('tour',{...live.get('tour'),bytes:310_000});
+          observation={...observation,cycle:1,status:complete?'complete':'running',checked,total,
+            recorded:verified.size-1,lastSuccessfulAt:complete?'2026-11-27T17:00:00Z':null};
+          verifyingBatch=false;
           if(verificationRequests===2)return Response.json({error:'observation_timeout'},{status:504});
-          observation=verificationRequests===1?{...observation,status:'running',checked:1,total:items.length+2}:
-            {...observation,status:'complete',checked:items.length+2,recorded:items.length,lastSuccessfulAt:'2026-11-27T17:00:00Z'};
           return Response.json(observation);
         }
         case 'overview': return Response.json({panelVersion:2,objects:items.length+3,bytes:items.reduce((sum,item)=>sum+item.bytes,120),
           candidates:0,candidateBytes:0,abandoned:0,activeUploads:0,broken:0,enabled:true,crossAppProtection:true,earlyEligible:0,
           overdue:0,trashed:2,checkedAt:new Date().toISOString()});
         case 'inventory_page':
-        case 'retention_page':
+        case 'retention_page': {
           if(args.action==='inventory_page'&&inventoryTimeout)return Response.json({error:'inventory_timeout'},{status:504});
-          return Response.json({items:[held,alias,...items.map(item=>({
-          ...item,manual_target:observation.status==='complete'?item:null,reason:observation.status==='complete'?'waiting':'awaiting_observation',
-          eligible_at:observation.status==='complete'?item.expires_at:null,listing_code:'GH-FIXTURE',
+          const rows=[held,alias,...items.map(item=>({
+          ...item,manual_target:verified.has(item.id)?item:null,reason:verified.has(item.id)?'waiting':'awaiting_observation',
+          eligible_at:verified.has(item.id)?item.expires_at:null,listing_code:'GH-FIXTURE',
           listing_title_en:'Lake view fixture',saved_reference:false,object_id:item.id,
-        }))],hasMore:false,available:true,manualCount:observation.status==='complete'?items.length:0,automatic:false});
-        case 'retention_receipt':return Response.json({status:live.has(args.id)?'eligible':'already_removed',bytes:live.get(args.id)?.bytes});
-        case 'retention_manifest':return Response.json({items});
+          }))];
+          const offset=args.offset??0;
+          const page={items:rows.slice(offset,offset+30),hasMore:rows.length>offset+30,
+            available:true,manualCount:items.filter(item=>verified.has(item.id)).length,automatic:false};
+          if(args.action==='retention_page'&&delayRetentionRefresh){
+            delayRetentionRefresh=false;
+            await new Promise(resolve=>{releaseOldPage=resolve;});
+            return Response.json({...page,items:page.items.map(row=>row.id==='tour'?
+              {...row,manual_target:null,reason:'awaiting_observation'}:row)});
+          }
+          return Response.json(page);
+        }
+        case 'retention_receipt':
+          assert.equal(verifyingBatch,false,'a requested removal waits for the active observation write');
+          return Response.json({status:live.has(args.id)&&verified.has(args.id)?'eligible':'already_removed',bytes:live.get(args.id)?.bytes});
+        case 'retention_manifest':return Response.json({items:items.filter(item=>verified.has(item.id))});
         case 'purge_unused':
           assert.equal(args.confirm,true);
+          assert.equal(verifyingBatch,false);
           assert.equal(live.get(args.id)?.expires_at,args.expiresAt);
+          if(args.id==='first')await new Promise(resolve=>{releaseRemoval=resolve;});
           live.delete(args.id);
           return Response.json({status:'ok',attempted:1,removed:1});
         case 'removed_page':return Response.json({items:[],hasMore:false,available:true});
@@ -510,7 +548,7 @@ test('Inventory Files loads exact previews on demand and shares single and batch
   try {
     await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
     await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
-    const button=label=>view.root.findAllByType('button').find(node=>node.children.join('')===label);
+    const button=label=>view.root.findAllByType('button').find(node=>textOf(node)===label);
     await act(async()=>button('Inventory files').props.onClick());
     assert.match(view.root.findByProps({role:'alert'}).children.join(''),/request timed out/);
     assert.equal(view.root.findAllByType('p').some(node=>node.children.join('')==='No records on this page.'),false);
@@ -518,53 +556,113 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     await act(async()=>button('Refresh this list').props.onClick());
     assert.equal(view.root.findAllByProps({role:'alert'}).length,0);
     const observationPanel=()=>view.root.findByProps({className:'storage-media-observation'});
+    const filter=name=>view.root.findByProps({'data-file-filter':name});
+    const chooseFilter=async name=>act(async()=>filter(name).props.onClick());
+    const visibleCount=name=>textOf(filter(name).findByType('b'));
+    const menuOptions=()=>view.root.findAllByProps({role:'menuitem'});
+    const tour=()=>view.root.findByProps({'aria-label':'Select tour % clip.mp4'});
+    assert.deepEqual(['all','verified','protected','awaiting','recovery'].map(visibleCount),['30','1','2','27','1']);
+    await chooseFilter('awaiting');
+    assert.equal(filter('awaiting').props['aria-pressed'],true);
+    assert.equal(view.root.findAllByProps({'aria-label':'Select recovery.webp'}).length,0);
+    assert.ok(menuOptions().every(item=>item.props.disabled));
+    await chooseFilter('all');
     assert.equal(view.root.findByProps({'aria-label':'Select first photo #1.webp'}).props.disabled,true);
     await act(async()=>button('Verify unused files').props.onClick());
-    assert.match(observationPanel().findByProps({role:'alert'}).children.join(''),/verification timed out/);
-    assert.equal(observationPanel().findByType('progress').props.value,1);
-    assert.equal(observationPanel().findByType('progress').props.max,5);
-    assert.match(observationPanel().findByProps({role:'status'}).children.join(''),/1 of 5 checked/);
-    await act(async()=>button('Verify unused files').props.onClick());
+    assert.equal(button('Verifying…').props.disabled,true);
+    assert.equal(verificationRequests,1);
+    assert.equal(tour().props.disabled,false);
+    await act(async()=>tour().props.onChange({target:{checked:true}}));
+    await act(async()=>button('Retention preview').props.onClick());
+    assert.equal(tour().props.checked,true);
+    assert.equal(tour().props.disabled,false);
+    await act(async()=>button('Pause verification').props.onClick());
+    assert.equal(button('Pausing…').props.disabled,true);
+    delayRetentionRefresh=true;
+    await act(async()=>releaseVerification());
+    assert.equal(typeof releaseOldPage,'function');
+    await act(async()=>button('Inventory files').props.onClick());
+    await act(async()=>releaseOldPage());
+    assert.equal(button('Inventory files').props['aria-pressed'],true);
+    assert.equal(observationPanel().findByProps({role:'progressbar'}).props['aria-valuenow'],43);
+    assert.equal(observationPanel().props['data-progress-state'],'paused');
+    assert.match(textOf(observationPanel().findByProps({className:'storage-media-meter__summary'})),/43%.*Elapsed.*Remaining files.*41/);
+    assert.match(observationPanel().findByProps({role:'status'}).children.join(''),/32 of 73 checked/);
+    assert.equal(store.get('gary-home:media:owner:observation-cycle'),'1');
+    assert.equal(tour().props.checked,true);
+    assert.equal(JSON.parse(store.get('gary-home:media:owner:unused-selection'))[0].bytes,310_000);
+    assert.equal(view.root.findByProps({'aria-label':'Select first photo #1.webp'}).props.disabled,false);
+    assert.ok(!calls.some(call=>['run','purge_unused','purge','trash'].includes(call.action)));
+    await act(async()=>view.unmount());
+    await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
+    await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
+    await act(async()=>button('Inventory files').props.onClick());
+    assert.equal(tour().props.checked,true);
+    const preview=filename=>view.root.findByProps({'aria-label':'Preview '+filename}).parent;
+    await act(async()=>preview('first photo #1.webp').props.onToggle(openedDetails()));
+    assert.equal(view.root.findByType('img').props.src,'https://fixture.example/storage/v1/object/public/property-media/fixtures/first%20photo%20%231.webp');
+    await act(async()=>button('Resume verification').props.onClick());
+    const removeFirst=()=>view.root.findByProps({'aria-label':'Permanently delete first photo #1.webp'});
+    assert.equal(removeFirst().props.disabled,false);
+    await act(async()=>removeFirst().props.onClick());
+    assert.ok(!calls.some(call=>call.action==='retention_receipt'));
+    await act(async()=>releaseVerification());
+    assert.equal(verificationRequests,2,'verification waits while the confirmed removal runs');
+    assert.equal(typeof releaseRemoval,'function');
+    await act(async()=>releaseRemoval());
+    assert.equal(live.size,70);
+    assert.equal(tour().props.checked,true);
     assert.equal(observationPanel().findAllByProps({role:'alert'}).length,0);
-    assert.match(observationPanel().findByProps({role:'status'}).children.join(''),/5 of 5 checked.*3 newly verified/);
+    assert.match(observationPanel().findByProps({role:'status'}).children.join(''),/73 of 73 checked.*70 newly verified/);
+    assert.equal(observationPanel().props['data-progress-state'],'completed');
+    assert.equal(store.has('gary-home:media:owner:observation-cycle'),false);
     assert.equal(observationPanel().findByType('strong').children.join(''),
       new Intl.DateTimeFormat('en',{dateStyle:'medium',timeStyle:'short'}).format(new Date(observation.lastSuccessfulAt)));
-    assert.equal(view.root.findByProps({'aria-label':'Select first photo #1.webp'}).props.disabled,false);
     assert.equal(calls.filter(call=>call.action==='verify_unused').length,3);
-    assert.ok(!calls.some(call=>['run','purge_unused','purge','trash'].includes(call.action)));
-    assert.equal(confirmations.length,0);
+    assert.equal(confirmations.length,1);
     inventoryTimeout=true;
     await act(async()=>button('Refresh inventory').props.onClick());
     assert.match(view.root.findByProps({role:'alert'}).children.join(''),/timed out.*Showing the last loaded files/);
-    assert.equal(view.root.findByProps({'aria-label':'Permanently delete first photo #1.webp'}).props.disabled,true);
+    assert.equal(view.root.findByProps({'aria-label':'Permanently delete second.webp'}).props.disabled,true);
     inventoryTimeout=false;
     await act(async()=>button('Refresh this list').props.onClick());
+    assert.deepEqual(['all','verified','protected','awaiting','recovery'].map(visibleCount),['30','28','2','0','1']);
+    await chooseFilter('recovery');
+    assert.equal(view.root.findAllByProps({'aria-label':'Select alias.jpg'}).length,0);
     assert.equal(view.root.findByProps({'aria-label':'Select recovery.webp'}).props.disabled,true);
+    assert.deepEqual(menuOptions().map(item=>item.props.disabled),[true,true,false]);
+    assert.equal(view.root.findByProps({'aria-label':'Selection options'}).props.title,undefined);
+    assert.equal(view.root.findByProps({className:'storage-media-selection__master'}).props.title,undefined);
+    await chooseFilter('protected');
     const cannotDelete=view.root.findByProps({'aria-label':'Permanently delete alias.jpg'});
     assert.equal(cannotDelete.props.disabled,true);
     assert.match(cannotDelete.props.title,/filename matches/);
     const smallLabels=view.root.findAllByType('small').map(node=>node.children.join(''));
     assert.ok(smallLabels.includes('GH-ALIAS · Published courtyard'));
     assert.ok(smallLabels.includes('Exact saved references · none'));
+    await chooseFilter('verified');
+    assert.equal(view.root.findAllByProps({'aria-label':'Select alias.jpg'}).length,0);
+    assert.equal(tour().props.disabled,false);
+    assert.deepEqual(menuOptions().map(item=>item.props.disabled),[false,false,false]);
     assert.equal(view.root.findAllByType('video').length,0);
     assert.equal(view.root.findAllByType('img').length,0);
-    const preview=filename=>view.root.findByProps({'aria-label':'Preview '+filename}).parent;
     await act(async()=>preview('tour % clip.mp4').props.onToggle(openedDetails()));
     assert.equal(view.root.findByType('video').props.src,'https://fixture.example/storage/v1/object/public/listing-videos/fixtures/tour%20%25%20clip.mp4');
     assert.equal(view.root.findAllByType('img').length,0);
-    await act(async()=>preview('first photo #1.webp').props.onToggle(openedDetails()));
-    assert.equal(view.root.findByType('img').props.src,'https://fixture.example/storage/v1/object/public/property-media/fixtures/first%20photo%20%231.webp');
-    await act(async()=>view.root.findByProps({'aria-label':'Permanently delete first photo #1.webp'}).props.onClick());
-    assert.equal(live.size,2);
-    await act(async()=>view.root.findByProps({'aria-label':'Select eligible files on this page'}).props.onChange());
+    const selectAll=view.root.findAllByProps({role:'menuitem'}).find(node=>textOf(node)==='Select all eligible files');
+    assert.ok(selectAll);
+    await act(async()=>selectAll.props.onSelect({preventDefault(){}}));
     await act(async()=>button('Permanently delete selected').props.onClick());
     assert.equal(live.size,0);
+    assert.equal(visibleCount('verified'),'0');
+    assert.match(textOf(view.root.findByProps({className:'storage-media-empty'})),/No verified unused files to remove/);
+    assert.ok(menuOptions().every(item=>item.props.disabled));
     const sent=calls.filter(call=>call.action==='purge_unused');
-    assert.deepEqual(sent.map(call=>call.id),files.map(file=>file.id));
+    assert.deepEqual(sent.map(call=>call.id),['first','tour','second',...files.slice(3).map(file=>file.id)]);
     assert.equal(confirmations.length,2);
-    assert.ok(confirmations[1].includes('2 verified unused files'));
+    assert.ok(confirmations[1].includes('70 verified unused files'));
     const firstBatchRemoval=calls.findIndex(call=>call.id==='second'&&call.action==='purge_unused');
-    assert.equal(calls[firstBatchRemoval+1].action,'overview');
+    assert.equal(calls[firstBatchRemoval+1].action,'purge_unused');
     const counters=view.root.findByProps({className:'storage-media-stats'}).findAllByType('dd');
     assert.equal(counters[0].children.join(''),'3');
     assert.ok(calls.filter(call=>call.action==='inventory_page').length>=3);
@@ -572,7 +670,7 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     await act(async()=>button('Retention preview').props.onClick());
     assert.equal(view.root.findByProps({'aria-label':'Permanently delete recovery.webp'}).props.disabled,true);
     const journal=trash.readTrashRun(store.get('gary-home:media:owner:trash-run'));
-    assert.equal(trash.trashRunTotals(journal).reclaimedBytes,500_000);
+    assert.equal(trash.trashRunTotals(journal).reclaimedBytes,7_310_000);
   } finally {
     if(view)await act(async()=>view.unmount());
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;

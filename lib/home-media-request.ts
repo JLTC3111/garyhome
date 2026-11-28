@@ -16,7 +16,13 @@ export async function executeStorageMedia(
   const review = reviewActions.get(input.action);
   const offset = Number.isInteger(input.offset) ? input.offset : 0;
   if (input.action === "observation_status" || input.action === "verify_unused") {
-    const {data,error}=await db.rpc("home_media_observation",{p_verify:input.action==="verify_unused"}).abortSignal(signal);
+    const step=input.action==="verify_unused";
+    const {cycle,checked,start}=input;
+    if(step&&(typeof cycle!=="number"||!Number.isSafeInteger(cycle)||cycle<0||typeof checked!=="number"||
+      !Number.isSafeInteger(checked)||checked<0||checked>2147483647||typeof start!=="boolean"))
+      return {status:400,data:{error:"invalid_request"}};
+    const {data,error}=await (step?db.rpc("home_media_observation_step",{p_cycle:cycle,p_checked:checked,p_start:start}):
+      db.rpc("home_media_observation",{p_verify:false})).abortSignal(signal);
     if (!error && data) return {status:200,data};
     if (error?.code==="42501") return {status:403,data:{error:"forbidden"}};
     if (rpcMissing(error?.code)) return {status:503,data:{error:"observation_setup"}};

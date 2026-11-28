@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { supabasePlatform } from './supabase-platform.fixture.mjs';
+import { verifyObservationCycle } from '../lib/home-media-observation.ts';
 
 async function loadFunctions(db,file,names) {
   const source=await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8');
@@ -85,6 +86,10 @@ async function loadVerificationFunctions(db) {
 
 async function applyBoundedObservationMigration(db) {
   await db.exec(await readFile(new URL('../supabase/migrations/20261128054200_home_media_bounded_observation.sql',import.meta.url),'utf8'));
+}
+
+async function applyObservationCyclesMigration(db) {
+  await db.exec(await readFile(new URL('../supabase/migrations/20261128061749_home_media_observation_cycles.sql',import.meta.url),'utf8'));
 }
 
 test('both Owner inventory views share exact references and unused tickets, and preserve video detachment',async t=>{
@@ -282,7 +287,11 @@ test('production-scale inventory preserves search, pagination and live eligibili
 test('production-scale unused observation uses the optimized classifier and unlocks Owner selection in preview',async t=>{
   const db=await inventoryFixture(t);
   await populateInventory(db);
+  const total=1072;
   await db.exec(`
+    insert into storage.objects(bucket_id,name,metadata)
+    select 'property-media','properties/listings/33333333-3333-4333-8333-333333333333/extra/'||g||'.webp','{"size":120}'
+    from generate_series(1,256) g;
     insert into private.home_media_items(bucket,name,source,state,object_id,object_version,expires_at)
     select bucket_id,name,'detached','trashed',id,version,now()+interval '40 hours' from storage.objects
     where name in ('properties/renamed/fixture-1341.webp','properties/renamed/fixture-1342.webp');
@@ -298,31 +307,52 @@ test('production-scale unused observation uses the optimized classifier and unlo
   await loadVerificationFunctions(db);
   const retained=()=>db.query("select bucket,name,object_id,object_version from private.home_media_items where source='unused_listing' order by bucket,name").then(value=>value.rows);
   const started=performance.now();
-  assert.equal((await query('select public.home_media_observation(true) value')).checked,816);
+  assert.equal((await query('select public.home_media_observation(true) value')).checked,1000);
+  assert.equal((await query('select public.home_media_observation(true) value')).checked,total);
   const baselineMs=performance.now()-started,expected=await retained();
   assert.ok(expected.length>0);
   await db.exec(`delete from private.home_media_items where source='unused_listing';
     update private.home_media_observation set state='failed',checked=0,total=0,recorded=0,reset_count=0,
       cursor_bucket=null,cursor_name=null,last_successful_at=null,error='observation_timeout';`);
   await applyBoundedObservationMigration(db);
+  await applyObservationCyclesMigration(db);
   assert.equal((await query('select public.home_media_inventory_files() value')).manualCount,0);
-  const timings=[];
-  let checked=0;
-  for(let batch=0;batch<26;batch++){
+  const timings=[],sent=[],first=new AbortController();
+  let callsInFlight=0,reads=0;
+  const status=()=>query('select public.home_media_observation() value');
+  const step=(cycle,checked,start)=>query('select public.home_media_observation_step($1,$2,$3) value',[cycle,checked,start]);
+  const request=async expected=>{
+    if(!expected){reads++;return status();}
+    assert.equal(callsInFlight++,0,'one Owner request at a time');
     const tick=performance.now();
-    const result=await query(batch===1?'select public.home_media_observe_hourly() value':'select public.home_media_observation(true) value');
+    sent.push(expected.checked);
+    const result=await step(expected.cycle,expected.checked,expected.start);
     timings.push(performance.now()-tick);
-    checked+=Math.min(32,816-checked);
-    assert.equal(result.checked,checked,result.error);
-    assert.equal(result.status,checked===816?'complete':'running');
-    assert.ok(await query('select cursor_name is not null value from private.home_media_observation'));
-  }
-  t.diagnostic(`816 scoped keys and 401 reference documents: ${baselineMs.toFixed(1)} ms for the old Owner request, ${timings[0].toFixed(1)} ms for the first bounded request, ${Math.max(...timings.slice(1)).toFixed(1)} ms max for 25 cached requests`);
+    callsInFlight--;
+    assert.equal(result.checked,Math.min(expected.checked+32,total),result.error);
+    if(expected.checked===0){
+      const replay=await query('select public.home_media_observe_hourly_step($1,$2) value',[expected.cycle,expected.checked]);
+      assert.deepEqual(replay,result,'an hourly step with the same checkpoint cannot advance it twice');
+    }
+    if(result.checked===96)first.abort();
+    if(result.checked===320||result.status==='complete')throw new Error('observation_timeout');
+    return result;
+  };
+  const options={request,publish:()=>{},wait:()=>assert.fail('a committed timeout should not need backoff')};
+  assert.equal(await verifyObservationCycle(1,{...options,signal:first.signal}),'paused');
+  assert.equal((await status()).checked,96);
+  assert.ok(await query('select cursor_name is not null value from private.home_media_observation'));
+  assert.equal(await verifyObservationCycle(1,{...options,signal:new AbortController().signal}),'complete');
+  assert.deepEqual(sent,Array.from({length:34},(_,index)=>index*32));
+  assert.equal(reads,4,'initial reads plus reconciliation of both lost responses');
+  t.diagnostic(`${total} scoped keys and 401 reference documents: ${baselineMs.toFixed(1)} ms for the old pass; 34 bounded steps, first ${timings[0].toFixed(1)} ms, cached maximum ${Math.max(...timings.slice(1)).toFixed(1)} ms`);
   assert.deepEqual(await retained(),expected);
-  const progress=await query('select public.home_media_observation() value');
+  const progress=await status();
   assert.equal(progress.status,'complete');
-  assert.equal(progress.checked,816);
-  assert.equal(progress.total,816);
+  assert.equal(progress.checked,total);
+  assert.equal(progress.total,total);
+  assert.equal(progress.cycle,1);
+  assert.deepEqual(await step(1,total,false),progress,'a continuation cannot restart a completed cycle');
   assert.equal(progress.recorded,expected.length);
   assert.ok(Date.parse(progress.lastSuccessfulAt));
   assert.equal(await query("select count(*)::int value from private.home_media_items where source='unused_listing' and expires_at-unreferenced_since=interval '96 hours'"),expected.length);
@@ -331,9 +361,70 @@ test('production-scale unused observation uses the optimized classifier and unlo
   assert.equal(inventory.automatic,false);
   assert.equal((await query('select public.home_media_retention_preview() value')).manualCount,expected.length);
   assert.deepEqual(await legacy(),beforeLegacy);
-  assert.equal(await query('select count(*)::int value from storage.objects'),1354);
+  assert.equal(await query('select count(*)::int value from storage.objects'),1610);
   assert.equal(await query("select count(*)::int value from private.home_media_review_holds where reason='recovery_hold'"),14);
-  assert.equal((await query('select private.home_media_observe_batch(1000) value')).checked,32);
+  const next=await query('select public.home_media_observe_hourly() value');
+  assert.equal(next.cycle,2);
+  assert.equal(next.checked,32);
+  assert.deepEqual(await step(1,1056,false),next,'a late step cannot advance a new scheduled cycle');
+});
+
+test('retained deletion tickets survive batches and a new cycle until live protection or identity changes',async t=>{
+  const db=await inventoryFixture(t);
+  await loadPageFirstFunctions(db);
+  await loadVerificationFunctions(db);
+  await applyBoundedObservationMigration(db);
+  await applyObservationCyclesMigration(db);
+  const owner=crypto.randomUUID();
+  const base='properties/listings/11111111-1111-4111-8111-000000000001/fixture/';
+  const file=n=>`${base}file-${String(n).padStart(2,'0')}.webp`;
+  const stable=[file(4),file(67)];
+  const [referenced,replaced,held,editing,upload]=[36,38,42,44,46].map(file);
+  const query=async(sql,args=[]) => (await db.query(sql,args)).rows[0].value;
+  await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'cycle-owner@example.invalid',now())",[owner]);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]);
+  await db.exec("insert into storage.buckets(id) values('property-media')");
+  await db.query(`insert into storage.objects(bucket_id,name,metadata,version)
+    select 'property-media',$1||'file-'||lpad(g::text,2,'0')||'.webp','{"size":64}','original' from generate_series(1,70) g`,[base]);
+  await db.query(`insert into private.home_media_items(bucket,name,source,state,object_id,object_version,bytes,unreferenced_since,expires_at)
+    select bucket_id,name,'unused_listing','retained',id,version,64,now()-interval '69 hours',now()+interval '27 hours'
+    from storage.objects where name=any($1)`,[[...stable,referenced,replaced,held,editing,upload]]);
+  const manifest=async()=>new Map((await query("select public.home_media_retention_manifest('') value")).items.map(item=>[item.name,item]));
+  const before=await manifest();
+  assert.equal(before.size,7);
+  async function assertStable() {
+    const live=await manifest();
+    for(const name of stable){
+      assert.deepEqual(live.get(name),before.get(name));
+      for(const rpc of ['home_media_inventory_files','home_media_retention_preview']){
+        const page=await query(`select public.${rpc}(0,$1) value`,[name]);
+        assert.equal(page.manualCount,1);
+        assert.deepEqual(page.items[0].manual_target,before.get(name));
+      }
+    }
+    return live;
+  }
+  const step=(cycle,checked,start=false)=>query('select public.home_media_observation_step($1,$2,$3) value',[cycle,checked,start]);
+  assert.equal((await step(0,0,true)).checked,32);
+  assert.ok((await assertStable()).has(file(1)),'observed files are selectable during the pass');
+  await db.query("insert into private.fixture_documents values (jsonb_build_object('cover',$1::text))",[referenced]);
+  await db.query("update storage.objects set version='replacement' where name=$1",[replaced]);
+  await db.query("insert into private.home_media_review_holds values ('property-media',$1,'recovery_hold')",[held]);
+  await db.query("insert into private.home_media_edit_checkpoints values (jsonb_build_array('property-media/'||$1))",[editing]);
+  await db.query("insert into storage.s3_multipart_uploads values ('property-media',$1)",[upload]);
+  let live=await assertStable();
+  for(const name of [referenced,replaced,held,editing,upload])assert.equal(live.has(name),false);
+  const resumed=await step(1,32);
+  assert.equal(resumed.checked,64);
+  assert.equal(resumed.reset,4);
+  live=await assertStable();
+  assert.notEqual(live.get(replaced)?.expires_at,before.get(replaced).expires_at,'a new Storage version needs a fresh observation');
+  for(const name of [referenced,held,editing,upload])assert.equal(live.has(name),false);
+  assert.equal((await step(1,64)).status,'complete');
+  await assertStable();
+  const next=await step(1,70,true);
+  assert.deepEqual([next.cycle,next.status,next.checked,next.reset,next.recorded],[2,'running',32,0,0]);
+  await assertStable();
 });
 
 test('observation has an Owner guard, resumes after a failed batch and preserves the last completion time',async t=>{
@@ -341,6 +432,7 @@ test('observation has an Owner guard, resumes after a failed batch and preserves
   await loadPageFirstFunctions(db);
   await loadVerificationFunctions(db);
   await applyBoundedObservationMigration(db);
+  await applyObservationCyclesMigration(db);
   const base='properties/listings/11111111-1111-4111-8111-000000000001/fixture/';
   await db.exec("insert into storage.buckets(id) values('property-media')");
   await db.query("insert into storage.objects(bucket_id,name) select 'property-media',$1||g||'.jpg' from generate_series(1,3) g",[base]);
@@ -350,7 +442,9 @@ test('observation has an Owner guard, resumes after a failed batch and preserves
   assert.equal((await status()).status,'idle');
   await db.exec('set role authenticated');
   await assert.rejects(query('select public.home_media_observation(true) value'),error=>error.code==='42501');
+  await assert.rejects(query('select public.home_media_observation_step(0,0,true) value'),error=>error.code==='42501');
   await assert.rejects(query('select public.home_media_observe_hourly() value'),error=>error.code==='42501');
+  await assert.rejects(query('select public.home_media_observe_hourly_step(0,0) value'),error=>error.code==='42501');
   await db.exec('reset role; set role anon');
   await assert.rejects(query('select public.home_media_observation() value'),error=>error.code==='42501');
   await db.exec('reset role; update private.home_media_control set lease_until=now()+interval \'1 minute\'');
@@ -402,4 +496,9 @@ test('observation has an Owner guard, resumes after a failed batch and preserves
   const repeat=await query('select public.home_media_observation(true) value');
   assert.equal(repeat.status,'complete');
   assert.equal(repeat.recorded,0);
+  const start=()=>query('select public.home_media_observation_step($1,$2,true) value',[repeat.cycle,repeat.checked]);
+  const started=await start();
+  assert.equal(started.cycle,repeat.cycle+1);
+  assert.equal(started.status,'complete');
+  assert.deepEqual(await start(),started,'a replay of a start cannot open a second cycle');
 });

@@ -64,14 +64,27 @@ test('scheduled removal is gated, validates the target, and reconciles an interr
 
 test('the scheduler caps the number of pending observation batches per run',async()=>{
  const calls=[];
+ const handler=createMediaCleanup({...configuration,fetcher:async (url,init)=>{
+  const action=new URL(url).pathname.split('/').at(-1);calls.push(action);
+  if(action==='home_media_claim')return Response.json({status:'disabled'});
+  assert.equal(action,calls.length===2?'home_media_observe_hourly':'home_media_observe_hourly_step');
+  assert.deepEqual(JSON.parse(init.body),calls.length===2?{}:{p_cycle:8,p_checked:32*(calls.length-2)});
+  return Response.json({status:'running',cycle:8,checked:32*(calls.length-1)});
+ }});
+ assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'disabled',observation:{status:'running',cycle:8,checked:1024}});
+ assert.deepEqual(calls,['home_media_claim','home_media_observe_hourly',...Array(31).fill('home_media_observe_hourly_step')]);
+});
+
+test('the scheduler ends its continuation when the Owner has completed the cycle',async()=>{
+ const calls=[];
  const handler=createMediaCleanup({...configuration,fetcher:async url=>{
   const action=new URL(url).pathname.split('/').at(-1);calls.push(action);
   if(action==='home_media_claim')return Response.json({status:'disabled'});
-  assert.equal(action,'home_media_observe_hourly');
-  return Response.json({status:'running',checked:32*(calls.length-1)});
+  if(action==='home_media_observe_hourly')return Response.json({status:'running',cycle:2,checked:32});
+  return Response.json({status:'complete',cycle:2,checked:64});
  }});
- assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'disabled',observation:{status:'running',checked:1024}});
- assert.deepEqual(calls,['home_media_claim',...Array(32).fill('home_media_observe_hourly')]);
+ assert.equal((await (await invoke(handler,cron)).json()).observation.status,'complete');
+ assert.deepEqual(calls,['home_media_claim','home_media_observe_hourly','home_media_observe_hourly_step']);
 });
 
 test('worker health checks require a verified Owner and never claim a cleanup run',async()=>{

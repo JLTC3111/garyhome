@@ -2,6 +2,41 @@
 
 The protected Gary Home Owner can open **Properties → Storage & Media Management**. The inventory covers the listing photo and video buckets, saved listing states, editorial links and the existing media ledgers. A potential orphan is an audit finding. The queue records the evidence that makes a file eligible for cleanup.
 
+## Roll out legacy paths and recovery hold controls
+
+1. Confirm the resumable verification rollout is installed. Set `listing_inactivity_enabled=false` for acceptance using the preview-mode command if needed. Leave `permanent_enabled` and the hourly schedule at their existing settings so File Trash can process its original 48-hour deadlines. [Resumable verification](#roll-out-resumable-verification-and-bulk-deletion) · [Preview mode](#apply-the-sql-in-preview-mode)
+
+   ```sql
+   select permanent_enabled, listing_inactivity_enabled
+   from private.home_media_control where singleton;
+   ```
+
+2. Apply the reviewed migration from the repository root. It starts the next verification pass from the beginning of both media buckets. Existing verified deadlines, holds, and File Trash records retain their dates.
+
+   ```sh
+   /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+     -f supabase/migrations/20261128072734_home_media_retention_gaps.sql
+   ```
+
+3. Publish the updated Edge Function, then release the reviewed staff app and refresh open staff tabs. The worker uses the existing credential and performs removals through the Storage API. [Home Vercel pipeline](vercel-deployment.md) · [Supabase Storage deletion](https://supabase.com/docs/guides/storage/management/delete-objects)
+
+   ```sh
+   supabase functions deploy media-orphan-cleanup --project-ref duyiihsmaqfgwezmsnjs --no-verify-jwt
+   ```
+
+4. As the Owner, open **Retention preview** and run **Verify unused files** through completion. Compare the unfiltered totals in the overview, **Inventory files**, and **Retention preview**. Confirm an unreferenced legacy path gains a countdown and becomes selectable. Check that a filename tied to a live gallery key no longer protects an obsolete copy by itself. Unresolved filename matches remain protected in Inventory. Use the live totals to reconcile the original 90 legacy rows, 31 filename matches, and 14 recovery holds.
+
+   ```sql
+   select private.home_media_observation_progress();
+   select reason, count(*) as files, sum(bytes) as bytes
+   from private.home_media_inactivity_inventory()
+   group by reason order by reason;
+   ```
+
+5. Use the **Recovery holds** filter to review unreferenced held files or select them across pages. Inventory also offers release on a held file with a saved reference. **Release hold** leaves the file in Storage. If later verified unused, it starts a fresh 96-hour window. **Release hold & delete** asks for explicit confirmation and rechecks the saved references, upload state, and exact object. The hold remains until the worker records successful removal. Verify destructive paths with disposable test media in a staging project. Check **File Trash** against the original deadlines and **Cleanup History** for removal receipts.
+
+Keep the 96-hour gate in preview until the expanded set is reviewed. The existing [scheduled activation step](#enable-scheduled-96-hour-removal) is a separate decision.
+
 ## Roll out listing-scoped retention
 
 ### Apply the SQL in preview mode

@@ -97,7 +97,8 @@ test('worker health checks require a verified Owner and never claim a cleanup ru
  }});
  assert.equal((await invoke(handler,cron,'health')).status,403);
  assert.equal((await invoke(handler,{Authorization:'Bearer staff-fixture'},'health')).status,403);
- assert.deepEqual(await (await invoke(handler,{Authorization:'Bearer owner-fixture'},'health')).json(),{status:'ok',cronConfigured:true,manualUnused:true});
+ assert.deepEqual(await (await invoke(handler,{Authorization:'Bearer owner-fixture'},'health')).json(),
+  {status:'ok',cronConfigured:true,manualUnused:true,manualRecovery:true});
  assert.equal(calls.length,4);
 });
 
@@ -133,6 +134,46 @@ test('Owner unused-media removal uses a separate claim and honours the final tar
  protectedNow=false;
  assert.equal((await (await request(signed)).json()).removed,1);
  assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
+});
+
+test('recovery deletion requires explicit Owner confirmation and uses the worker settlement',async()=>{
+ const ticket={bucket:'property-media',name:key,objectId:id,version:'fixture',heldAt:'2026-11-27T12:00:00Z'};
+ const calls=[];
+ let protectedNow=true;
+ const handler=createMediaCleanup({...configuration,fetcher:async(url,init)=>{
+  const path=new URL(url).pathname,args=init.body&&JSON.parse(init.body);
+  calls.push(path.split('/').at(-1));
+  if(path.endsWith('/auth/v1/user'))return Response.json({id:owner});
+  if(path.endsWith('_management'))return Response.json({actor:owner});
+  if(path.endsWith('_claim_recovery')){
+   assert.deepEqual(args,{p_actor:owner,p_target:ticket,p_confirm:true});
+   return Response.json({status:'ok',id:run,items:[{id}]});
+  }
+  if(path.endsWith('_target'))return Response.json(protectedNow?null:{bucket:'property-media',name:key,present:true});
+  if(path.endsWith('/object/property-media')){
+   assert.equal(init.method,'DELETE');
+   assert.deepEqual(args,{prefixes:[key]});
+   return Response.json([{name:key}]);
+  }
+  if(path.endsWith('_settle')){
+   assert.deepEqual(args,{p_run:run,p_id:id,p_ok:true});
+   return Response.json(true);
+  }
+  if(path.endsWith('_finish'))return Response.json(0);
+  throw new Error('Unexpected request');
+ }});
+ const request=(headers,confirm=true)=>handler(new Request('https://edge.example/cleanup',{
+  method:'POST',headers,body:JSON.stringify({action:'purge_recovery',target:ticket,confirm}),
+ }));
+ const signed={Authorization:'Bearer owner-fixture'};
+ assert.equal((await request(signed,false)).status,400);
+ assert.equal((await request(cron)).status,403);
+ assert.equal(calls.length,0);
+ assert.equal((await request(signed)).status,409);
+ assert.ok(!calls.includes('property-media'));
+ protectedNow=false;
+ assert.equal((await (await request(signed)).json()).removed,1);
+ assert.deepEqual(calls.slice(-5),['home_media_claim_recovery','home_media_target','property-media','home_media_settle','home_media_finish']);
 });
 
 test('early purge requires an explicit exact-item confirmation from a signed Owner',async()=>{

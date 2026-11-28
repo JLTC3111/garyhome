@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ArchiveRestore, ChevronDown, ChevronLeft, ChevronRight, Database, Eye, FileCheck2, FileClock, Files, FolderSearch,
-  History, ListChecks, ListTree, RefreshCw, ScanSearch, Search, Shield, ShieldCheck, Trash2, type LucideIcon } from "lucide-react";
+  History, ListChecks, ListTree, RefreshCw, ScanSearch, Search, Shield, ShieldCheck, ShieldOff, Trash2, type LucideIcon } from "lucide-react";
 import { PROPERTY_IMAGE_ORIGIN } from "@/lib/property-photo-files";
 import { observationCycle, observationFinished, verifyObservationCycle, type Observation, type ObservationStep } from "@/lib/home-media-observation";
 import { cancelTrashRun, isTrashTarget, makeTrashRun, matchingTrashTargets, mediaRequestTimeoutMs, pendingTrashRequest, processTrashRun,
@@ -48,11 +48,14 @@ type MediaItem = {
   bytes?:number|null; purge_block?:string|null; retry_after?:string|null;
 };
 type InventoryItem = {bucket:string; name:string; bytes:number|null; reason:string};
+type RecoveryTarget = {bucket:string;name:string;objectId:string;version:string|null;heldAt:string;bytes:number|null};
 type MediaFile = InventoryItem & {listing_code?:string|null; object_id?:string; object_version?:string|null;
   listing_title_en?:string|null; listing_title_vi?:string|null; saved_reference?:boolean;
-  eligible_at?:string|null; legacy_expiry?:string|null; scheduled_eligible?:boolean; manual_target?:TrashTarget|null};
-type FileStatus = "verified"|"protected"|"awaiting"|"recovery";
+  eligible_at?:string|null; legacy_expiry?:string|null; scheduled_eligible?:boolean; manual_target?:TrashTarget|null;
+  status?:FileStatus; recovery_target?:RecoveryTarget|null};
+type FileStatus = "verified"|"protected"|"awaiting"|"recovery"|"removing";
 type FileFilter = "all"|FileStatus;
+type FileCounts = Partial<Record<FileFilter,number>>;
 type RemovedItem = {id:string; bucket:string; name:string; removed_at:string|null; source:string};
 type MediaRun = {id:string; started_at:string; finished_at:string|null; attempted:number; removed:number; failed:number};
 type MediaReport = {
@@ -62,22 +65,34 @@ type MediaReport = {
   broken:number; activeUploads:number; abandoned:number; trashed:number; overdue:number;
   enabled:boolean; lastScanAt:string|null; checkedAt:string; newlyTrashed:number; automaticScheduled?:boolean;
   crossAppProtection?:boolean; inventoryCheckedAt?:string; nextExpiry?:string|null;
-  earlyEligible?:number;
+  earlyEligible?:number; retentionCounts?:FileCounts;
 };
 type PageKind = "inventory_page"|"trash_page"|"removed_page"|"run_page"|"retention_page";
-type PageView = {kind:PageKind|null; offset:number; query:string};
-type MediaPage = {items:(MediaFile|MediaItem|RemovedItem|MediaRun)[]; hasMore:boolean; available:boolean; automatic?:boolean; manualCount?:number};
+type PageView = {kind:PageKind|null; offset:number; query:string; filter?:FileFilter};
+type MediaPage = {items:(MediaFile|MediaItem|RemovedItem|MediaRun)[]; hasMore:boolean; available:boolean; automatic?:boolean; manualCount?:number;
+  counts?:FileCounts;retentionCounts?:FileCounts};
 type MediaAction = "overview"|"inventory_scan"|"trash"|"restore"|"run";
-type PanelAction = MediaAction|PageKind|"purge"|"cancel_purge"|"check_receipt";
-const mediaWrites=new Set<PanelAction>(["inventory_scan","trash","restore","run","purge"]);
+type PanelAction = MediaAction|PageKind|"purge"|"cancel_purge"|"check_receipt"|"recovery";
+const mediaWrites=new Set<PanelAction>(["inventory_scan","trash","restore","run","purge","recovery"]);
 const pageSize=30;
 const trashId=(item:TrashTarget)=>item.id;
 const unusedTarget=(item:unknown):item is TrashTarget=>isTrashTarget(item)&&item.source==="unused_listing";
 const trashTarget=(item:unknown):item is TrashTarget=>isTrashTarget(item)&&item.source===undefined;
 const isMediaFilePage=(page:PageKind|null)=>page==="inventory_page"||page==="retention_page";
+const recoveryId=(item:RecoveryTarget)=>item.objectId;
+
+function isRecoveryTarget(value:unknown):value is RecoveryTarget {
+  if(!value||typeof value!=="object")return false;
+  const row=value as RecoveryTarget;
+  return (row.bucket==="property-media"||row.bucket==="listing-videos")&&typeof row.name==="string"&&
+    typeof row.objectId==="string"&&typeof row.heldAt==="string"&&Number.isFinite(Date.parse(row.heldAt))&&
+    (typeof row.version==="string"||row.version===null)&&(Number.isSafeInteger(row.bytes)||row.bytes===null);
+}
 
 function fileStatus(row:MediaFile):FileStatus {
+  if(row.status)return row.status;
   if(row.reason==="recovery_hold")return "recovery";
+  if(row.reason==="removing")return "removing";
   if(unusedTarget(row.manual_target)||row.reason==="waiting"||row.reason==="eligible")return "verified";
   if(["awaiting_observation","listing","scope_retention","potential","unreviewed"].includes(row.reason))return "awaiting";
   return "protected";
@@ -173,7 +188,11 @@ function mediaMessage(issue:unknown,t:ReturnType<typeof useSite>["t"]) {
     case "identity_changed": return t("The Storage object changed or is missing.","Đối tượng trong kho đã thay đổi hoặc không còn.");
     case "expired": return t("The restore window ended. This file goes through expired cleanup.","Đã hết hạn khôi phục. Tệp này được xử lý qua dọn tệp hết hạn.");
     case "owner_hold": return t("An Owner hold protects this file.","Chủ sở hữu đang bảo vệ tệp này.");
-    case "recovery_hold": return t("Protected for GH-645 recovery.","Được giữ để khôi phục GH-645.");
+    case "recovery_hold": return t("Protected for recovery.","Được giữ để khôi phục.");
+    case "recovery_protected": return t("A live reference, upload, edit, or cleanup record prevented deletion. Review the hold and try again if the file is no longer needed.","Tham chiếu, lượt tải lên, phiên chỉnh sửa hoặc hồ sơ dọn tệp đang bảo vệ tệp này. Hãy kiểm tra lại trước khi thử xóa.");
+    case "recovery_setup": return t("Apply the Home retention update to use these controls.","Áp dụng bản cập nhật lưu giữ Home để dùng các thao tác này.");
+    case "recovery_worker_setup": return t("Update the cleanup worker to delete files on recovery hold.","Cập nhật tác vụ dọn tệp để xóa tệp đang giữ để khôi phục.");
+    case "manifest_changed": return t("The selected Storage object or hold changed. Refresh the list before trying again.","Tệp trong kho hoặc trạng thái giữ đã thay đổi. Hãy làm mới danh sách trước khi thử lại.");
     case "file_trash_test": return t("Protected File Trash test file.","Tệp thử trong Thùng rác được bảo vệ.");
     case "editing_session": return t("A recoverable edit protects this file.","Tệp này còn trong phiên chỉnh sửa có thể khôi phục.");
     case "retention_setup": return t("Apply the Home media retention migration to open the preview.","Áp dụng bản cập nhật lưu giữ tệp Home để mở bản xem trước.");
@@ -205,11 +224,12 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const [busy,setBusy]=useState<PanelAction|null>(null),[error,setError]=useState(""),[resultText,setResultText]=useState("");
   const [removalError,setRemovalError]=useState("");
   const [restoredHref,setRestoredHref]=useState("");
-  const [worker,setWorker]=useState<{status:"checking"|"ready"|"unavailable";cronConfigured?:boolean;manualUnused?:boolean;issue?:unknown}|null>(null);
+  const [worker,setWorker]=useState<{status:"checking"|"ready"|"unavailable";cronConfigured?:boolean;manualUnused?:boolean;manualRecovery?:boolean;issue?:unknown}|null>(null);
   const [workerAttempt,setWorkerAttempt]=useState(0);
   const ownerKey=`gary-home:media:${user?.id??""}`;
   const trashSelection=useMediaSelection(`${ownerKey}:trash-selection`,trashId,trashTarget);
   const unusedSelection=useMediaSelection(`${ownerKey}:unused-selection`,trashId,unusedTarget);
+  const recoverySelection=useMediaSelection(`${ownerKey}:recovery-selection`,recoveryId,isRecoveryTarget);
   const selectionFor=(source:TrashTarget["source"])=>source?unusedSelection:trashSelection;
   const checkpointKey=`${ownerKey}:trash-run`;
   const observationKey=`${ownerKey}:observation-cycle`;
@@ -219,6 +239,8 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const [runClock,setRunClock]=useState<TrashRunClock|null>(null),[stopping,setStopping]=useState(false);
   const [trashFilter,setTrashFilter]=useState("");
   const [fileFilter,setFileFilter]=useState<FileFilter>("all");
+  const [retentionCounts,setRetentionCounts]=useState<FileCounts|null>(null);
+  const [recoveryProgress,setRecoveryProgress]=useState<{done:number;total:number}|null>(null);
   const [retentionInput,setRetentionInput]=useState(""),[retentionQuery,setRetentionQuery]=useState("");
   const [pageError,setPageError]=useState("");
   const [observation,setObservation]=useState<Observation|null>(null),[observationError,setObservationError]=useState<unknown>(null);
@@ -278,9 +300,9 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     if(!open)return;
     let current=true;
     setWorker({status:"checking"});
-    void requestMedia<{status:string;cronConfigured:boolean;manualUnused?:boolean}>({action:"worker_status"}).then(health=>{
+    void requestMedia<{status:string;cronConfigured:boolean;manualUnused?:boolean;manualRecovery?:boolean}>({action:"worker_status"}).then(health=>{
       if(health.status!=="ok")throw new Error("cleanup_worker_unavailable");
-      if(current)setWorker({status:"ready",cronConfigured:health.cronConfigured,manualUnused:health.manualUnused});
+      if(current)setWorker({status:"ready",cronConfigured:health.cronConfigured,manualUnused:health.manualUnused,manualRecovery:health.manualRecovery});
     }).catch(issue=>{if(current)setWorker({status:"unavailable",issue});});
     return ()=>{current=false;};
   },[open,requestMedia,workerAttempt]);
@@ -308,7 +330,10 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       return mediaRequest<MediaReport>(editorTask,{action:"status"});
     }
   }
-  function reportResult(fresh:MediaReport) {setReport(fresh);setSeen(latest);setNow(Date.now());}
+  function reportResult(fresh:MediaReport) {
+    setReport(fresh);setSeen(latest);setNow(Date.now());
+    if(fresh.retentionCounts)setRetentionCounts(fresh.retentionCounts);
+  }
   async function work(action:PanelAction,operation:()=>Promise<void>) {
     if(flight.current)return;
     flight.current=true;setBusy(action);setError("");
@@ -327,26 +352,28 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       foregroundWork.current=null;done();
     }
   }
-  async function pageRequest(kind:PageKind,next:number,query=retentionQuery) {
-    const result=await requestMedia<MediaPage>({action:kind,offset:next,...(isMediaFilePage(kind)?{query}:{})});
+  async function pageRequest(kind:PageKind,next:number,query=retentionQuery,filter?:FileFilter) {
+    const result=await requestMedia<MediaPage>({action:kind,offset:next,...(isMediaFilePage(kind)?{query}:{}),
+      ...(filter&&filter!=="all"?{filter}:{})});
     if(!Array.isArray(result.items)||typeof result.available!=="boolean"||typeof result.hasMore!=="boolean")
       throw new Error("inventory_unavailable");
     return result;
   }
-  async function loadPage(kind:PageKind,next=0,query=retentionQuery) {
+  async function loadPage(kind:PageKind,next=0,query=retentionQuery,filter=kind===selected?fileFilter:"all") {
     if(flight.current||!upgraded)return;
-    if(kind!==selected)setFileFilter("all");
-    if(kind!==selected||offset!==next||(isMediaFilePage(kind)&&query!==retentionQuery))
+    setFileFilter(filter);
+    if(kind!==selected||offset!==next||(isMediaFilePage(kind)&&(query!==retentionQuery||filter!==fileFilter)))
       setPage(kind==="removed_page"&&next===0?historyPreview:null);
     if(isMediaFilePage(kind))setRetentionQuery(query);
     setReviewOpen(false);setSelected(kind);setOffset(next);setPageError("");
-    const view={kind,offset:next,query};
+    const view={kind,offset:next,query,filter:page?.counts||pageView.current.filter!==undefined?filter:undefined};
     pageView.current=view;
     await work(kind,()=>refreshPage(view));
   }
   function applyPage(kind:PageKind,fresh:MediaPage) {
     setPage(fresh);setPageError("");setNow(Date.now());
     if(!fresh.available)return;
+    if(isMediaFilePage(kind)&&fresh.retentionCounts)setRetentionCounts(fresh.retentionCounts);
     if(isMediaFilePage(kind)&&fresh.manualCount!==undefined){
       const visibleFiles=new Map((fresh.items as MediaFile[]).map(row=>[row.bucket+"/"+row.name,row]));
       unusedSelection.reconcile(saved=>{
@@ -355,6 +382,13 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
         const live=row.manual_target;
         if(!unusedTarget(live))return row.reason==="waiting"||row.reason==="eligible"?saved:null;
         if(!sameTrashTarget(saved,live))return null;
+        return live.bytes===saved.bytes?saved:live;
+      });
+      recoverySelection.reconcile(saved=>{
+        const row=visibleFiles.get(saved.bucket+"/"+saved.name);
+        if(!row)return saved;
+        const live=row.recovery_target;
+        if(!isRecoveryTarget(live)||live.objectId!==saved.objectId||live.version!==saved.version||live.heldAt!==saved.heldAt)return null;
         return live.bytes===saved.bytes?saved:live;
       });
     }
@@ -368,13 +402,13 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   }
   async function refreshPage(view:PageView,resetEmpty=false) {
     if(!view.kind||!active.current)return;
-    const {kind,offset,query}=view, read=++pageRead.current;
+    const {kind,offset,query,filter}=view, read=++pageRead.current;
     const current=()=>active.current&&pageView.current===view&&pageRead.current===read;
     try{
-      let fresh=await pageRequest(kind,offset,query);
+      let fresh=await pageRequest(kind,offset,query,filter);
       if(!current())return;
       if(resetEmpty&&offset>0&&fresh.available&&!fresh.items.length){
-        fresh=await pageRequest(kind,0,query);
+        fresh=await pageRequest(kind,0,query,filter);
         if(!current())return;
         pageView.current={...view,offset:0};setOffset(0);
       }
@@ -692,6 +726,59 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     });
   }
 
+  async function selectAllRecovery() {
+    if(flight.current||!recoverySelection.ready)return;
+    await work(selected??"retention_page",async()=>{
+      const {recoveryItems}=await requestMedia<{recoveryItems:RecoveryTarget[]}>({action:"retention_manifest",query:retentionQuery});
+      if(!Array.isArray(recoveryItems)||!recoveryItems.every(isRecoveryTarget))throw new Error("recovery_setup");
+      if(active.current)recoverySelection.add(recoveryItems);
+    });
+  }
+
+  async function updateRecovery(items:RecoveryTarget[],remove:boolean) {
+    if(flight.current||!items.length||(remove?recoveryDeleteReason:recoveryReason))return;
+    const confirmation=remove?t(`Release the recovery hold and permanently delete ${items.length} selected files (${formatSelection(items)})? Each file will be checked again.`,
+      `Bỏ giữ và xóa vĩnh viễn ${items.length} tệp đã chọn (${formatSelection(items)})? Từng tệp sẽ được kiểm tra lại.`):
+      t(`Release ${items.length} selected recovery holds? Unused files will enter the 96-hour window after verification.`,
+        `Bỏ giữ ${items.length} tệp đã chọn? Tệp chưa sử dụng sẽ bắt đầu thời hạn 96 giờ sau khi xác minh.`);
+    if(!window.confirm(confirmation))return;
+    await work("recovery",async()=>{
+      async function update() {
+        if(remove&&savedPendingFile())throw new Error("removal_unconfirmed");
+        let done=0,changed=0,issue:unknown;
+        setResultText("");setRestoredHref("");setRecoveryProgress({done,total:items.length});
+        try{
+          for(const target of items){
+            if(!active.current)break;
+            try{
+              const result=await requestMedia<CleanupResult>({action:remove?"purge_recovery":"release_recovery",target,confirm:true});
+              if(result.status==="disabled")throw new Error("cleanup_disabled");
+              if(result.status==="busy")throw new Error("media_busy");
+              if(remove?(result.status!=="ok"||result.removed!==1):result.status!=="released")
+                throw new Error("cleanup_unconfirmed");
+              changed++;
+              if(active.current)recoverySelection.remove([recoveryId(target)]);
+            }catch(error){
+              issue??=error;
+              if(!(error instanceof Error)||!["manifest_changed","recovery_protected","purge_unconfirmed"].includes(error.message))break;
+              if(error.message==="manifest_changed"&&active.current)recoverySelection.remove([recoveryId(target)]);
+            }finally{
+              done++;
+              if(active.current)setRecoveryProgress({done,total:items.length});
+            }
+          }
+          if(active.current){
+            if(changed)setResultText(remove?t(`Deleted ${changed} of ${items.length} selected recovery files.`,`Đã xóa ${changed}/${items.length} tệp được giữ đã chọn.`):
+              t(`Released ${changed} of ${items.length} selected recovery holds.`,`Đã bỏ giữ ${changed}/${items.length} tệp đã chọn.`));
+            await refreshAfterChange(remove);
+          }
+          if(issue)throw issue;
+        }finally{if(active.current)setRecoveryProgress(null);}
+      }
+      await (remove?withCheckpointLock(update):update());
+    });
+  }
+
   const paused=t("Permanent cleanup is disabled by the Home retention policy.","Chính sách lưu giữ Home đang tắt chức năng xóa vĩnh viễn.");
   const upgrade=t("Apply the Home media panel pagination migration first.","Áp dụng bản cập nhật phân trang kho Home trước.");
   const bulkActive=busy==="purge"||busy==="cancel_purge";
@@ -708,6 +795,8 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     new Error(observation.status==="busy"?"observation_busy":observation.error||"observation_failed"):null);
   const progress=busy==="inventory_scan"?t("Scanning storage and checking queued files…","Đang quét kho và kiểm tra tệp trong hàng đợi…"):
     busy==="run"?t("Checking expired files for cleanup…","Đang kiểm tra tệp hết hạn để dọn…"):
+    busy==="recovery"&&recoveryProgress?t(`Checked ${recoveryProgress.done} of ${recoveryProgress.total} recovery holds…`,
+      `Đã kiểm tra ${recoveryProgress.done}/${recoveryProgress.total} tệp đang giữ…`):
     busy?t("Checking storage…","Đang kiểm tra kho lưu trữ…"):"";
   const inventoryReason=busy?progress:!report?t("Load the storage inventory first.","Hãy tải dữ liệu kho trước."):!upgraded?upgrade:"";
   const trashReason=inventoryReason||(!report?.lastScanAt?t("Run a storage scan first.","Hãy quét kho trước."):
@@ -731,6 +820,9 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
   const manualRemovalReason=removalReason||checkpointReason||bulkSetup||pendingRequestReason||(!report?.earlyEligible?noEarly:"");
   const unusedRemovalReason=removalReason||checkpointReason||unusedSetup||inventoryControls||pendingRequestReason||
     (isMediaFilePage(selected)?pageError:"");
+  const recoveryReason=inventoryReason||pageError;
+  const recoveryDeleteReason=recoveryReason||removalReason||checkpointReason||pendingRequestReason||
+    (worker?.status==="ready"&&!worker.manualRecovery?mediaMessage(new Error("recovery_worker_setup"),t):"");
   const bulkEntryReason=removalReason||bulkSetup||(!report?.earlyEligible?noEarly:"");
   const controlReasons=[...new Set([trashReason,runReason,bulkEntryReason].filter(reason=>reason&&reason!==pendingRequestReason))];
   const controlHint=(reason:string)=>!reason?undefined:reason===pendingRequestReason?removalDetailsId:`${id}-operation-${controlReasons.indexOf(reason)}`;
@@ -746,7 +838,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
       case "outside_listing_scope":return t("Outside the listing-scoped cleanup policy","Ngoài phạm vi dọn tệp theo tin đăng");
       case "owner_hold": case "recovery_hold": case "file_trash_test": case "editing_session":return mediaMessage(new Error(reason),t);
       case "active_upload":return t("Protected · active upload","Được bảo vệ · đang tải lên");
-      case "filename_match":return t("Protected · saved filename matches, exact object unverified","Được bảo vệ · tên tệp khớp nội dung đã lưu, chưa xác minh đúng đối tượng");
+      case "filename_match":return t("Protected · saved filename could refer to this file","Được bảo vệ · tên đã lưu có thể trỏ tới tệp này");
       case "identity":return t("Protected · Storage identity needs verification","Được bảo vệ · cần xác minh định danh kho");
       case "legacy_lifecycle":return t("Existing cleanup or recovery record","Đã có hồ sơ dọn tệp hoặc khôi phục");
       case "awaiting_observation":return t("Awaiting first unused observation","Chờ lần đầu xác nhận chưa sử dụng");
@@ -792,20 +884,28 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     t("No files on this page can be selected. Eligible files may be on other pages.","Không thể chọn tệp nào trên trang này. Tệp đủ điều kiện có thể ở trang khác.");
   const bulkReason=manualRemovalReason||selectionReason||(!trashSelection.rows.length?trashSelectionHint:"");
   const fileRows=isMediaFilePage(selected)?((page?.items as MediaFile[]|undefined)??[]).map(row=>({row,status:fileStatus(row)})):[];
-  const fileCounts={all:fileRows.length,verified:0,protected:0,awaiting:0,recovery:0};
-  for(const {status} of fileRows){fileCounts[status]++;if(status==="recovery")fileCounts.protected++;}
-  const filteredFiles=fileRows.filter(({status})=>fileFilter==="all"||fileFilter===status||fileFilter==="protected"&&status==="recovery");
+  const pageCounts={all:fileRows.length,verified:0,protected:0,awaiting:0,recovery:0,removing:0};
+  for(const {status} of fileRows){
+    pageCounts[status]++;
+    if(status==="recovery")pageCounts.protected++;
+  }
+  const fileCounts=page?.counts??pageCounts;
+  const filteredFiles=page?.counts?fileRows:fileRows.filter(({status})=>fileFilter==="all"||fileFilter===status||fileFilter==="protected"&&status==="recovery");
   const fileStatusLabels:Record<FileFilter,string>={all:t("All files","Tất cả tệp"),verified:t("Verified unused","Đã xác minh chưa sử dụng"),
-    protected:t("Protected","Được bảo vệ"),awaiting:t("Awaiting verification","Chờ xác minh"),recovery:t("Recovery holds","Tệp giữ để khôi phục")};
-  const statusIcons:Record<FileStatus,LucideIcon>={verified:FileCheck2,protected:Shield,awaiting:FileClock,recovery:ShieldCheck};
+    protected:t("Protected","Được bảo vệ"),awaiting:t("Awaiting verification","Chờ xác minh"),recovery:t("Recovery holds","Tệp giữ để khôi phục"),
+    removing:t("Cleanup in progress","Đang dọn tệp")};
+  const statusIcons:Record<FileStatus,LucideIcon>={verified:FileCheck2,protected:Shield,awaiting:FileClock,recovery:ShieldCheck,removing:FileClock};
   const viewAllowsSelection=fileFilter==="all"||fileFilter==="verified";
   const unusedPageEligible=filteredFiles.map(({row})=>row.manual_target).filter(unusedTarget);
+  const recoveryPageTargets=filteredFiles.map(({row})=>row.recovery_target).filter(isRecoveryTarget);
+  const recoverySelectionReason=recoveryReason||(!recoverySelection.ready?t("Loading saved selection…","Đang tải lựa chọn đã lưu…"):"");
+  const noRecoverySelection=t("Select recovery holds to release.","Chọn tệp đang giữ để bỏ giữ.");
   const eligibleTotal=page?.manualCount;
   const noVerifiedFiles=page?.available&&eligibleTotal===0&&!pageError;
   const noVerifiedLabel=t("No verified unused files to remove","Không có tệp chưa sử dụng đã xác minh để xóa");
   const noVerifiedHint=retentionQuery?t("No verified unused files match this search.","Không có tệp chưa sử dụng đã xác minh khớp tìm kiếm."):noVerifiedLabel;
   const viewSelectionHint=fileFilter==="awaiting"?t("Run verification to find out which files can be selected.","Chạy xác minh để biết có thể chọn những tệp nào."):
-    fileFilter==="recovery"?t("Files on a recovery hold cannot be selected.","Không thể chọn tệp đang được giữ để khôi phục."):
+    fileFilter==="recovery"?t("Release a recovery hold before verifying the file as unused.","Bỏ giữ tệp trước khi xác minh tệp chưa sử dụng."):
       t("Protected files cannot be selected.","Không thể chọn tệp được bảo vệ.");
   const unusedSelectionReason=!unusedSelection.ready?t("Loading saved selection…","Đang tải lựa chọn đã lưu…"):busy?progress:"";
   const unusedViewReason=unusedSelectionReason||(!viewAllowsSelection?viewSelectionHint:unusedRemovalReason);
@@ -814,7 +914,7 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     noVerifiedFiles?noVerifiedHint:t("No eligible files on this page.","Trang này chưa có tệp đủ điều kiện."):"");
   const unusedBulkReason=unusedRemovalReason||unusedSelectionReason||(!unusedSelection.rows.length?
     unusedPageReason||t("Select verified unused files to remove them.","Chọn các tệp chưa sử dụng đã xác minh để xóa."):"");
-  function formatSelection(items:TrashTarget[]) {
+  function formatSelection(items:{bytes:number|null}[]) {
     const unknown=items.filter(item=>item.bytes===null).length;
     return formatBytes(items.reduce((sum,item)=>sum+(item.bytes??0),0))+(unknown?
       t(` plus ${unknown} unknown sizes`,` và ${unknown} tệp chưa rõ dung lượng`):"");
@@ -852,6 +952,11 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
         <dl className="storage-media-stats">
           <div><dt>{t("Storage objects","Số tệp lưu trữ")}</dt><dd>{number.format(report.objects)}</dd></div>
           <div><dt>{t("Listing media storage","Dung lượng tệp tin đăng")}</dt><dd>{formatBytes(report.bytes)}</dd></div>
+          {retentionCounts&&<>
+            <div><dt>{fileStatusLabels.awaiting}</dt><dd>{number.format(retentionCounts.awaiting??0)}</dd></div>
+            <div><dt>{fileStatusLabels.verified}</dt><dd>{number.format(retentionCounts.verified??0)}</dd></div>
+            <div><dt>{t("Unreferenced recovery holds","Tệp giữ để khôi phục chưa có tham chiếu")}</dt><dd>{number.format(retentionCounts.recovery??0)}</dd></div>
+          </>}
           <div><dt>{report.lastScanAt?t("Potential orphans at last scan","Tệp thừa tiềm năng ở lần quét gần nhất"):t("Potential orphans","Tệp có thể bị bỏ lại")}</dt><dd>{number.format(report.candidates)} · {formatBytes(report.candidateBytes)}</dd></div>
           {upgraded&&<>
             <div><dt>{t("Protected files","Tệp được bảo vệ")}</dt><dd>{number.format(report.protected??0)}</dd></div>
@@ -916,17 +1021,21 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
             issue={observationIssue?mediaMessage(observationIssue,t):""} resumable={resumeObservation} pausing={observationPausing}
             pauseDisabled={observationPausing||!observationPause.current} formatTime={formatTime} onVerify={verifyUnused}
             onPause={()=>{setObservationPausing(true);observationPause.current?.abort();}}/>
-          {page?.available&&<div className="storage-media-filters" role="group" aria-label={t("File status on this page","Trạng thái tệp trên trang này")}>
-            <span>{t("This page","Trang này")}</span>
-            {(Object.keys(fileStatusLabels) as FileFilter[]).map(filter=><button type="button" key={filter} className="storage-media-filter"
-              data-file-filter={filter} disabled={!!busy} aria-pressed={fileFilter===filter} onClick={()=>setFileFilter(filter)}>
-              {fileStatusLabels[filter]} <b>{number.format(fileCounts[filter])}</b>
+          {page?.available&&<div className="storage-media-filters" role="group" aria-label={t("File status","Trạng thái tệp")}>
+            <span>{page.counts?t("All pages","Tất cả trang"):t("This page","Trang này")}</span>
+            {(Object.keys(fileStatusLabels) as FileFilter[]).filter(filter=>
+              (filter!=="protected"||selected!=="retention_page"||!page.counts)&&(filter!=="removing"||!!fileCounts.removing||fileFilter==="removing")
+            ).map(filter=><button type="button" key={filter} className="storage-media-filter"
+              data-file-filter={filter} disabled={!!busy} aria-pressed={fileFilter===filter} onClick={()=>{
+                if(page.counts)void loadPage(selected,0,retentionQuery,filter);else setFileFilter(filter);
+              }}>
+              {fileStatusLabels[filter]} <b>{number.format(fileCounts[filter]??0)}</b>
             </button>)}
           </div>}
           {viewAllowsSelection&&!pageError&&eligibleTotal!==undefined&&eligibleTotal>unusedPageEligible.length&&<p className="storage-media-note">{t(
             `${number.format(eligibleTotal)} files eligible across all pages for this search.`,
             `${number.format(eligibleTotal)} tệp đủ điều kiện trên tất cả các trang của tìm kiếm này.`)}</p>}
-          {page?.available&&<MediaSelectionControls count={unusedSelection.rows.length} bytes={unusedSelection.rows.reduce((sum,item)=>sum+(item.bytes??0),0)}
+          {page?.available&&(!page.counts||viewAllowsSelection||unusedSelection.rows.length>0)&&<MediaSelectionControls count={unusedSelection.rows.length} bytes={unusedSelection.rows.reduce((sum,item)=>sum+(item.bytes??0),0)}
             unknownSizes={unusedSelection.rows.filter(item=>item.bytes===null).length} formatBytes={formatBytes}
             pageCount={unusedPageEligible.length} pageSelected={unusedPageEligible.filter(item=>unusedSelection.has(item.id)).length}
             allReason={allUnusedReason} pageReason={unusedPageReason} clearReason={unusedSelectionReason||(!unusedSelection.rows.length?t("Selection is empty.","Chưa chọn tệp nào."):"")}
@@ -936,13 +1045,31 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
               aria-describedby={unusedBulkReason?`${id}-unused-bulk`:undefined} onClick={()=>void purgeFiles(unusedSelection.rows)}>{t("Permanently delete selected","Xóa vĩnh viễn mục đã chọn")}</MediaActionButton>
             {unusedBulkReason&&<small id={`${id}-unused-bulk`} className={noVerifiedFiles&&viewAllowsSelection&&unusedBulkReason===noVerifiedHint?"sr-only":undefined}>{unusedBulkReason}</small>}
           </MediaSelectionControls>}
+          {page?.available&&page.counts&&(fileFilter==="recovery"||recoverySelection.rows.length>0)&&
+            <MediaSelectionControls count={recoverySelection.rows.length}
+              bytes={recoverySelection.rows.reduce((sum,item)=>sum+(item.bytes??0),0)}
+              unknownSizes={recoverySelection.rows.filter(item=>item.bytes===null).length} formatBytes={formatBytes}
+              pageCount={recoveryPageTargets.length} pageSelected={recoveryPageTargets.filter(item=>recoverySelection.has(recoveryId(item))).length}
+              allReason={recoverySelectionReason||(!fileCounts.recovery||fileFilter!=="all"&&fileFilter!=="recovery"?
+                t("No recovery holds match this view.","Không có tệp đang giữ khớp chế độ xem này."):"")}
+              pageReason={recoverySelectionReason||(!recoveryPageTargets.length?t("No recovery holds on this page.","Trang này không có tệp đang giữ."):"")}
+              clearReason={recoverySelectionReason||(!recoverySelection.rows.length?noRecoverySelection:"")}
+              selectAll={()=>void selectAllRecovery()} selectPage={()=>recoverySelection.add(recoveryPageTargets)}
+              clearPage={()=>recoverySelection.remove(recoveryPageTargets.map(recoveryId))} clear={recoverySelection.clear}>
+              <MediaActionButton icon={ShieldOff} tone="warning" disabled={!!recoverySelectionReason||!recoverySelection.rows.length}
+                onClick={()=>void updateRecovery(recoverySelection.rows,false)}>{t("Release selected holds","Bỏ giữ mục đã chọn")}</MediaActionButton>
+              <MediaActionButton icon={Trash2} tone="destructive" disabled={!!recoveryDeleteReason||!recoverySelection.rows.length}
+                aria-describedby={recoveryDeleteReason?`${id}-recovery-delete`:undefined}
+                onClick={()=>void updateRecovery(recoverySelection.rows,true)}>{t("Release holds & delete selected","Bỏ giữ và xóa mục đã chọn")}</MediaActionButton>
+              {(recoveryDeleteReason||!recoverySelection.rows.length)&&<small id={`${id}-recovery-delete`}>{recoveryDeleteReason||noRecoverySelection}</small>}
+            </MediaSelectionControls>}
           {noVerifiedFiles&&!busy&&viewAllowsSelection&&<p className="storage-media-empty" role="status"><FileCheck2 size={18} aria-hidden="true"/>
             <span><strong>{noVerifiedHint}</strong>
-              {!retentionQuery&&fileCounts.awaiting>0&&<small>{t("Run verification to check the files that are still awaiting it.","Chạy xác minh để kiểm tra các tệp vẫn đang chờ.")}</small>}
+              {!retentionQuery&&(fileCounts.awaiting??0)>0&&<small>{t("Run verification to check the files that are still awaiting it.","Chạy xác minh để kiểm tra các tệp vẫn đang chờ.")}</small>}
             </span>
           </p>}
           {!pageError&&page?.available&&!filteredFiles.length&&!(noVerifiedFiles&&viewAllowsSelection)&&<p className="storage-media-empty">
-            {t("No files on this page match the current filters.","Không có tệp trên trang này khớp bộ lọc hiện tại.")}
+            {t("No files match this view.","Không có tệp khớp chế độ xem này.")}
           </p>}
         </>}
         {selected==="trash_page"&&<>
@@ -968,14 +1095,16 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
         {page?.available&&<ul className="storage-media-rows">
           {filteredFiles.map(({row,status},index)=>{
             const target=unusedTarget(row.manual_target)?row.manual_target:null;
-            const checked=!!target&&unusedSelection.has(target.id);
+            const recovery=isRecoveryTarget(row.recovery_target)?row.recovery_target:null;
+            const checked=recovery?recoverySelection.has(recoveryId(recovery)):!!target&&unusedSelection.has(target.id);
             const name=row.name.split("/").at(-1)||row.name;
             const title=language==="vi"?row.listing_title_vi||row.listing_title_en:row.listing_title_en||row.listing_title_vi;
             const listing=[row.listing_code,title].filter(Boolean).join(" · ");
             const protection=row.reason==="legacy_lifecycle"&&row.legacy_expiry?
               t("Managed by the File Trash lifecycle","Đang theo quy trình Thùng rác tệp"):reasonLabel(row.reason);
-            const removalBlock=target?unusedRemovalReason:inventoryControls||protection;
-            const pickReason=unusedSelectionReason||(checked?"":removalBlock);
+            const removalBlock=recovery?recoveryDeleteReason||(row.saved_reference?reasonLabel("reference"):""):
+              target?unusedRemovalReason:inventoryControls||protection;
+            const pickReason=recovery?recoverySelectionReason:unusedSelectionReason||(checked?"":removalBlock);
             const hint=`${id}-${row.object_id??index}-file`;
             const removalHint=removalBlock&&removalBlock!==protection?`${hint}-block`:hint;
             const StatusIcon=statusIcons[status];
@@ -1002,13 +1131,21 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
               </div>
               <div className="storage-media-actions storage-file-actions">
                 <label className="storage-file-select"><input type="checkbox" checked={checked} disabled={!!pickReason}
-                  aria-describedby={removalHint}
-                  aria-label={t(`Select ${name}`,`Chọn ${name}`)} onChange={event=>{if(target){
+                  aria-describedby={recovery?hint:removalHint}
+                  aria-label={t(`Select ${name}`,`Chọn ${name}`)} onChange={event=>{if(recovery){
+                    if(event.target.checked)recoverySelection.add([recovery]);else recoverySelection.remove([recoveryId(recovery)]);
+                  }else if(target){
                     if(event.target.checked)unusedSelection.add([target]);else unusedSelection.remove([target.id]);
                   }}}/>{pickReason?t("Unavailable","Không thể chọn"):t("Select","Chọn")}</label>
-                <MediaActionButton icon={Trash2} tone="destructive"
+                {recovery?<><MediaActionButton icon={ShieldOff} tone="warning" disabled={!!recoveryReason}
+                  aria-label={t(`Release hold for ${name}`,`Bỏ giữ ${name}`)}
+                  onClick={()=>void updateRecovery([recovery],false)}>{t("Release hold","Bỏ giữ")}</MediaActionButton>
+                  <MediaActionButton icon={Trash2} tone="destructive" disabled={!!removalBlock} aria-describedby={removalHint}
+                    aria-label={t(`Release hold and delete ${name}`,`Bỏ giữ và xóa ${name}`)}
+                    onClick={()=>void updateRecovery([recovery],true)}>{t("Release hold & delete","Bỏ giữ và xóa")}</MediaActionButton>
+                </>:<MediaActionButton icon={Trash2} tone="destructive"
                   aria-label={t(`Permanently delete ${name}`,`Xóa vĩnh viễn ${name}`)} disabled={!!removalBlock} aria-describedby={removalHint}
-                  onClick={()=>{if(target)void purgeFiles([target]);}}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</MediaActionButton>
+                  onClick={()=>{if(target)void purgeFiles([target]);}}>{t("Permanently delete now","Xóa vĩnh viễn ngay")}</MediaActionButton>}
               </div>
             </li>;
           })}

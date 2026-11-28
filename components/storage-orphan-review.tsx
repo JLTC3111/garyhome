@@ -43,7 +43,7 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
     switch(code){
       case "listing": case "scope_retention":return t("Listing-scoped file · see Retention preview","Tệp theo tin đăng · xem Dự kiến lưu giữ");
       case "owner_hold":return t("Protected · Owner hold","Được bảo vệ · Chủ sở hữu đang giữ");
-      case "recovery_hold":return t("Protected · pending GH-645 recovery","Được bảo vệ · chờ khôi phục GH-645");
+      case "recovery_hold":return t("Protected · recovery hold","Được bảo vệ · giữ để khôi phục");
       case "file_trash_test":return t("Protected · File Trash test","Được bảo vệ · tệp thử trong Thùng rác");
       case "upload":return t("Protected · upload in progress","Được bảo vệ · đang tải lên");
       case "rename":return t("Protected · rename record","Được bảo vệ · có hồ sơ đổi tên");
@@ -114,7 +114,7 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
     const message=action==="enroll"?t("Confirm this exact object has a verified local backup and independent custody evidence. Move it to File Trash for 48 hours?",
       "Xác nhận tệp này có bản sao đã xác minh và bằng chứng nguồn độc lập. Chuyển vào Thùng rác trong 48 giờ?"):
       action==="hold"?t("Keep this exact file on a cleanup hold?","Giữ tệp này ngoài diện dọn dẹp?"):
-        t("Release this review hold? The file still needs verification and evidence before cleanup.","Bỏ giữ tệp này? Vẫn cần xác minh và bằng chứng trước khi dọn.");
+        t("Release this review hold? Cleanup still requires verification.","Bỏ giữ tệp này? Vẫn cần xác minh trước khi dọn.");
     if(!window.confirm(message))return;
     flight.current=true;setWorking(true);setError("");setProgress({done:0,total:0});
     try{
@@ -171,7 +171,7 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
     {!!error&&<p className="storage-media-feedback" data-tone="error" role="alert">{reason(error)}</p>}
     {!loading&&page&&!page.available&&<p>{t("Run a storage scan to load review candidates.","Hãy quét kho để tải tệp cần kiểm tra.")}</p>}
     {!loading&&page?.available&&<>
-      <p>{t(`${page.holds} individual Owner holds.`,`Chủ sở hữu đang giữ riêng ${page.holds} tệp.`)}</p>
+      <p>{t(`${page.holds} files on review hold across Storage.`,`${page.holds} tệp đang được giữ để kiểm tra trong kho.`)}</p>
       {!page.items.length&&<p className="storage-media-empty">{t("No review candidates match this search.","Không có tệp cần kiểm tra khớp tìm kiếm.")}</p>}
       <ul className="storage-media-rows">{page.items.map(row=>{
         const key=rowKey(row),checked=selection.has(key),canCheck=hasIdentity(row),outcome=verified[verificationKey(row)];

@@ -1,10 +1,17 @@
 const mediaBuckets = new Set(['property-media','listing-videos']);
-const actions = new Set(['status','scan','trash','restore','run','purge','purge_unused','health']);
+const actions = new Set(['status','scan','trash','restore','run','purge','purge_unused','purge_recovery','health']);
 const json = (body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const encode=new TextEncoder();
 const sha=async data=>new Uint8Array(await crypto.subtle.digest('SHA-256',data));
 const hex=data=>Array.from(data,b=>b.toString(16).padStart(2,'0')).join('');
 const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+const validTimestamp=value=>typeof value==='string'&&value.length<=48&&Number.isFinite(Date.parse(value));
+
+function validRecoveryTarget(target) {
+  return target&&mediaBuckets.has(target.bucket)&&typeof target.name==='string'&&target.name.length>0&&target.name.length<=1024&&
+    typeof target.objectId==='string'&&uuid.test(target.objectId)&&validTimestamp(target.heldAt)&&
+    (target.version===null||typeof target.version==='string'&&target.version.length<=100);
+}
 
 async function matchesSecret(supplied,expected) {
   if (!supplied || !expected || supplied.length>256) return false;
@@ -27,6 +34,8 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       const code=result?.message?.match(/^(?:listing_cleanup)\.([a-z_]+)$/)?.[1];
       if(action==='claim_unused' && (result?.code==='PGRST202'||result?.code==='42883'))
         throw Object.assign(new Error('retention_cleanup_setup'),{status:503});
+      if(action==='claim_recovery' && (result?.code==='PGRST202'||result?.code==='42883'))
+        throw Object.assign(new Error('recovery_setup'),{status:503});
       if(action==='observe_hourly'||action==='observe_hourly_step') {
         const reason=result?.code==='57014'?'observation_timeout':
           ['PGRST202','42883'].includes(result?.code)?'observation_setup':'observation_failed';
@@ -60,8 +69,10 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
   }
 
   async function run(actor,signal,early) {
-    const claim=await internal(early?.action==='purge_unused'?'claim_unused':'claim',
-      {p_actor:actor,...(early?{p_item:early.id,p_expiry:early.expiresAt}:{})});
+    const claim=early?.action==='purge_recovery'
+      ?await internal('claim_recovery',{p_actor:actor,p_target:early.target,p_confirm:true})
+      :await internal(early?.action==='purge_unused'?'claim_unused':'claim',
+        {p_actor:actor,...(early?{p_item:early.id,p_expiry:early.expiresAt}:{})});
     if(claim?.status!=='ok')return claim;
     let attempted=0,removed=0,overdue=0;
     const start=Date.now();
@@ -118,8 +129,8 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       const body=await req.json().catch(()=>null);
       if(!body||!actions.has(body.action)||(['restore','purge','purge_unused'].includes(body.action)&&!uuid.test(body.id||'')))
         return json({error:'invalid_request'},400);
-      const early=body.action==='purge'||body.action==='purge_unused'?body:null;
-      if(early&&(early.confirm!==true||typeof early.expiresAt!=='string'||early.expiresAt.length>48||!Number.isFinite(Date.parse(early.expiresAt))))
+      const early=['purge','purge_unused','purge_recovery'].includes(body.action)?body:null;
+      if(early&&(early.confirm!==true||!(early.action==='purge_recovery'?validRecoveryTarget(early.target):validTimestamp(early.expiresAt))))
         return json({error:'invalid_request'},400);
       const cron=req.headers.get('x-gary-home-cleanup');
       if(cron!==null) {
@@ -138,7 +149,7 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
       if(body.action==='run'||early||body.action==='health') {
         const owner=await rpc('management',token,{p_action:'authorize'});
         if(owner?.actor!==id) return json({error:'forbidden'},403);
-        if(body.action==='health')return json({status:'ok',cronConfigured:Boolean(cronSecret),manualUnused:true});
+        if(body.action==='health')return json({status:'ok',cronConfigured:Boolean(cronSecret),manualUnused:true,manualRecovery:true});
         const result=await run(id,req.signal,early);
         if(early&&result.status==='ok'&&result.removed!==1) return json({error:'purge_unconfirmed'},409);
         return json(result);

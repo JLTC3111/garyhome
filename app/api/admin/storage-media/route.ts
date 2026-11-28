@@ -22,7 +22,8 @@ export async function POST(req:Request) {
       const response=await executeStorageMedia(db,{...input,action:input.action},signal,()=>fetch(PROPERTY_IMAGE_ORIGIN+"/functions/v1/media-orphan-cleanup",{
         method:"POST",signal,redirect:"error",cache:"no-store",headers:{
           Authorization:req.headers.get("authorization")!,apikey:key,"Content-Type":"application/json",
-        },body:JSON.stringify({action:input.action==="worker_status"?"health":input.action,id:input.id,offset:input.offset,expiresAt:input.expiresAt,confirm:input.confirm}),
+        },body:JSON.stringify({action:input.action==="worker_status"?"health":input.action,id:input.id,offset:input.offset,
+          expiresAt:input.expiresAt,confirm:input.confirm,...(input.action==="purge_recovery"?{target:input.target}:{})}),
       }));
       return json(response.data,response.status);
     },55000);

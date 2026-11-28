@@ -159,3 +159,25 @@ test('unused-media manifests and receipts use their own Owner reads',async()=>{
  const denied={rpc(){return {abortSignal:async()=>({error:{code:'42501'}})};}};
  assert.equal((await executeStorageMedia(denied,{action:'purge_unused'},signal,noWorker)).status,403);
 });
+
+test('recovery actions route confirmed hold release and guarded deletion through their Owner entry points',async()=>{
+ const target={bucket:'property-media',name:'archive/photo.jpg',objectId:'fixture',version:'fixture',heldAt:'2026-11-28T08:00:00Z'};
+ const calls=[];
+ let crossAppProtection=false;
+ const db={rpc(name,args){
+  calls.push({name,args});
+  const data=name==='home_media_dashboard'?{crossAppProtection}:{status:'released'};
+  return {abortSignal:async supplied=>{assert.equal(supplied,signal);return {data};}};
+ }};
+ const noWorker=()=>assert.fail('This request cannot invoke the worker');
+ assert.equal((await executeStorageMedia(db,{action:'purge_recovery',target},signal,noWorker)).status,400);
+ assert.deepEqual(calls,[]);
+ assert.equal((await executeStorageMedia(db,{action:'release_recovery',target,confirm:true},signal,noWorker)).status,200);
+ assert.deepEqual(calls.at(-1),{name:'home_media_release_recovery',args:{p_target:target,p_confirm:true}});
+ assert.equal((await executeStorageMedia(db,{action:'purge_recovery',target,confirm:true},signal,noWorker)).status,503);
+ crossAppProtection=true;
+ assert.deepEqual(await executeStorageMedia(db,{action:'purge_recovery',target,confirm:true},signal,async()=>Response.json({status:'ok',removed:1})),
+  {status:200,data:{status:'ok',removed:1}});
+ await executeStorageMedia(db,{action:'retention_page',filter:'recovery',offset:30},signal,noWorker);
+ assert.deepEqual(calls.at(-1),{name:'home_media_filtered_files',args:{p_offset:30,p_query:'',p_preview:true,p_filter:'recovery'}});
+});

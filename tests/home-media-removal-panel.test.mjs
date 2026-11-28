@@ -39,6 +39,83 @@ const dropdown = {
   DropdownMenuContent:({children})=>children,
   DropdownMenuItem:({children,...props})=>React.createElement('div',{...props,role:'menuitem'},children),
 };
+
+test('Owners can release one hold or confirm a bulk release and deletion from the live preview',async()=>{
+  const rows=new Map(['release','first','second'].map((name,index)=>{
+    const ticket={bucket:'property-media',name:`archive/${name}.webp`,objectId:`file-${index}`,
+      version:'fixture',heldAt:'2026-11-28T08:00:00Z',bytes:100};
+    return [name,{...ticket,status:'recovery',reason:'recovery_hold',object_id:ticket.objectId,recovery_target:ticket}];
+  }));
+  let confirmed=false;
+  const mutations=[],confirmations=[],store=new Map();
+  const context=vm.createContext({
+    Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
+    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
+    window:{addEventListener(){},removeEventListener(){},confirm:message=>{confirmations.push(message);return confirmed;}},
+    async fetch(_, {body}){
+      const args=JSON.parse(body),retentionCounts={recovery:rows.size};
+      switch(args.action){
+        case 'worker_status':return Response.json({status:'ok',manualUnused:true,manualRecovery:true});
+        case 'observation_status':return Response.json({status:'idle',cycle:1,checked:0,total:0,recorded:0,reset:0});
+        case 'overview':return Response.json({panelVersion:2,objects:rows.size,candidates:0,candidateBytes:0,bytes:300,
+          activeUploads:0,broken:0,enabled:true,crossAppProtection:true,earlyEligible:0,overdue:0,trashed:0,retentionCounts});
+        case 'inventory_page':
+        case 'retention_page':
+          return Response.json({items:[...rows.values()],available:true,hasMore:false,manualCount:0,
+            counts:{all:rows.size,...retentionCounts},retentionCounts,automatic:false});
+        case 'retention_manifest':return Response.json({items:[],recoveryItems:[...rows.values()].map(row=>row.recovery_target)});
+        case 'release_recovery':
+        case 'purge_recovery': {
+          assert.equal(args.confirm,true);
+          const name=args.target.name.split('/').at(-1).replace('.webp','');
+          assert.deepEqual(args.target,rows.get(name).recovery_target);
+          mutations.push([args.action,name]);
+          rows.delete(name);
+          return Response.json(args.action==='release_recovery'?{status:'released'}:{status:'ok',removed:1});
+        }
+        case 'removed_page':return Response.json({items:[],hasMore:false,available:true});
+        default:assert.fail('Unexpected action '+args.action);
+      }
+    },
+  });
+  const site={t:en=>en,language:'en',user:{id:'owner'},notice:()=>{},
+    editorTask:operation=>operation({auth:{getSession:async()=>({data:{session:{access_token:'fixture'}}})}},new AbortController().signal)};
+  const mocks={'@/lib/home-media-trash':trash,'./site-context':{useSite:()=>site},'./ui/dropdown-menu':dropdown,
+    '@/lib/property-photo-files':{PROPERTY_IMAGE_ORIGIN:'https://fixture.example'},'./storage-orphan-review':{StorageOrphanReview:()=>null}};
+  mocks['./media-selection']=load('media-selection',mocks,context);
+  mocks['./media-removal-progress']=load('media-removal-progress',mocks,context);
+  const {StorageMediaManagement}=load('listing-deletion-queue',mocks,context);
+  let view;
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+  try {
+    await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
+    await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
+    const button=label=>view.root.findAllByType('button').find(node=>textOf(node)===label);
+    const filter=()=>view.root.findByProps({'data-file-filter':'recovery'});
+    await act(async()=>button('Retention preview').props.onClick());
+    assert.equal(textOf(filter().findByType('b')),'3');
+    await act(async()=>view.root.findByProps({'aria-label':'Release hold for release.webp'}).props.onClick());
+    assert.deepEqual(mutations,[]);
+    confirmed=true;
+    await act(async()=>view.root.findByProps({'aria-label':'Release hold for release.webp'}).props.onClick());
+    assert.equal(textOf(filter().findByType('b')),'2');
+    await act(async()=>filter().props.onClick());
+    await act(async()=>view.root.findByProps({role:'menuitem','aria-label':'Select all eligible files'}).props.onSelect());
+    confirmed=false;
+    await act(async()=>button('Release holds & delete selected').props.onClick());
+    assert.deepEqual(mutations,[['release_recovery','release']]);
+    assert.match(confirmations.at(-1),/permanently delete 2 selected files/);
+    confirmed=true;
+    await act(async()=>button('Release holds & delete selected').props.onClick());
+    assert.deepEqual(mutations,[['release_recovery','release'],['purge_recovery','first'],['purge_recovery','second']]);
+    assert.equal(textOf(filter().findByType('b')),'0');
+    await act(async()=>button('Inventory files').props.onClick());
+    assert.equal(textOf(filter().findByType('b')),'0');
+  }finally{
+    if(view)await act(async()=>view.unmount());
+    globalThis.IS_REACT_ACT_ENVIRONMENT=false;
+  }
+});
 const css = name => postcss.parse(read(`app/${name}.css`));
 const globals = css('globals'), publicTheme = css('public-theme'), studio = css('studio-theme'), panelCss = css('listing-management'), actions = css('action-buttons');
 const styles = (tree, selector) => Object.fromEntries(tree.nodes.find(node => node.selectors?.includes(selector)).nodes
@@ -181,7 +258,7 @@ for (const theme of ['light', 'dark']) {
       await act(async()=>{view.root.findByType('details').props.onToggle(openedDetails());});
       await click('Retention preview');
       const retentionLabels=view.root.findAllByType('small').map(node=>node.children.join(''));
-      assert.ok(retentionLabels.some(label=>label.includes('Protected for GH-645 recovery.')));
+      assert.ok(retentionLabels.some(label=>label.includes('Protected for recovery.')));
       assert.ok(retentionLabels.some(label=>label.includes('remaining')&&label.includes('Eligible from')));
       assert.ok(retentionLabels.includes('Eligible for scheduled cleanup'));
       assert.equal(button('Retention preview').props['aria-pressed'],true);
@@ -634,14 +711,14 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     assert.equal(recovery.props.disabled,true);
     assert.match(textOf(recovery.parent),/Unavailable/);
     assert.deepEqual(menuOptions().map(item=>item.props.disabled),[true,true,false]);
-    assert.match(textOf(menuOptions()[0]),/Files on a recovery hold cannot be selected/);
+    assert.match(textOf(menuOptions()[0]),/Release a recovery hold before verifying/);
     assert.equal(view.root.findByProps({'aria-label':'Selection options'}).props.title,undefined);
     assert.equal(view.root.findByProps({className:'storage-media-selection__master'}).props.title,undefined);
     await chooseFilter('protected');
     const cannotDelete=view.root.findByProps({'aria-label':'Permanently delete alias.jpg'});
     assert.equal(cannotDelete.props.disabled,true);
     assert.equal(cannotDelete.props.title,undefined);
-    assert.match(textOf(view.root.findByProps({id:cannotDelete.props['aria-describedby']})),/filename matches/);
+    assert.match(textOf(view.root.findByProps({id:cannotDelete.props['aria-describedby']})),/saved filename could refer to this file/);
     assert.match(textOf(menuOptions()[0]),/Protected files cannot be selected/);
     const smallLabels=view.root.findAllByType('small').map(node=>node.children.join(''));
     assert.ok(smallLabels.includes('GH-ALIAS · Published courtyard'));

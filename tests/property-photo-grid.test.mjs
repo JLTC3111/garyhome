@@ -402,6 +402,9 @@ test('photo action variants keep their own hover ink and do not inherit the Stud
  assert.match(studio,/\.editor-photo-grid button:not\(\[data-button-variant\]\)/);
  assert.match(studio,/\.editor-photo-grid button:not\(\[data-button-variant\]\):hover/);
  assert.match(drawer,/\.editor-photo-grid button:not\(\[data-button-variant\]\):focus-visible/);
+ assert.match(drawer,/\.editor-photo-remove\[data-button-variant="danger"\]\s*\{[^}]*--action-hover:\s*var\(--action-red\)/);
+ assert.match(drawer,/\.editor-photo-remove\[data-button-variant="danger"\]\s*\{[^}]*--action-hover-ink:\s*var\(--action-white\)/);
+ assert.match(drawer,/\.editor-photo-remove\[data-holding\]\s*\{[^}]*--action-state-ink:\s*var\(--action-white\)/);
  assert.match(globals,/\.editor-photo-grid button:not\(\[data-button-variant\]\)\{/);
  assert.doesNotMatch(globals,/\.editor-photo-grid button\{display:flex/);
  assert.doesNotMatch(drawer,/\.editor-photo-rename-trigger\s*\{[^}]*(?:background|border|padding)\s*:/);

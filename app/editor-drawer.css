@@ -22,13 +22,16 @@
 .editor-photo-card[data-photo-selected="true"] { border-color:var(--studio-focus,var(--olive)); }
 .editor-photo-remove {
   --photo-remove-fill:color-mix(in srgb,var(--action-red) 65%,var(--action-danger-border));
-  --action-hover:color-mix(in srgb,var(--action-danger-tint) 92%,var(--action-danger-border));
-  --action-hover-ink:var(--action-danger-ink);
   position:relative;
   isolation:isolate;
   user-select:none;
   -webkit-user-select:none;
   -webkit-touch-callout:none;
+}
+/* Beat the shared danger rule, which loads later at the same specificity and only replaces the fill. */
+.editor-photo-remove[data-button-variant="danger"] {
+  --action-hover:var(--action-red);
+  --action-hover-ink:var(--action-white);
 }
 .editor-photo-remove::before {
   content:"";
@@ -92,7 +95,7 @@
 @media (prefers-reduced-motion:reduce) {
   .editor-photo-remove::before { transition:none; }
   .editor-photo-remove-fill,.editor-photo-remove-crest { display:none; }
-  .editor-photo-remove[data-holding] { --action-state-fill:var(--action-hover); --action-state-ink:var(--action-danger-ink); }
+  .editor-photo-remove[data-holding] { --action-state-fill:var(--action-hover); --action-state-ink:var(--action-white); }
 }
 .editor-photo-panel {
   container:listing-photo / inline-size;

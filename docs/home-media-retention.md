@@ -16,7 +16,8 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
    ```sh
    /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
      -f supabase/migrations/20261128072734_home_media_retention_gaps.sql \
-     -f supabase/migrations/20261128081144_home_media_inventory_read_performance.sql
+     -f supabase/migrations/20261128081144_home_media_inventory_read_performance.sql \
+     -f supabase/migrations/20261128082541_home_media_dashboard_persisted_counts.sql
    ```
 
 3. Publish the updated Edge Function, then release the reviewed staff app and refresh open staff tabs. The worker uses the existing credential and performs removals through the Storage API. [Home Vercel pipeline](vercel-deployment.md) · [Supabase Storage deletion](https://supabase.com/docs/guides/storage/management/delete-objects)
@@ -38,16 +39,47 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
 
 Keep the 96-hour gate in preview until the expanded set is reviewed. The existing [scheduled activation step](#enable-scheduled-96-hour-removal) is a separate decision.
 
-### Correct the dashboard read timeout
+### Repair the dashboard 503 after the legacy retention rollout
 
-For a project that already has the legacy-path and recovery-hold migration, apply the corrective SQL by itself. The dashboard and file lists reuse the observer's reference maps when the saved documents match. Each read still checks live Storage identities for mapped filenames.
+The production classifier inspected on November 28, 2026 had body hash `8332de88adccd51e94aef945292454ed`, which matches the initial retention migration. The complete authenticated dashboard RPC exceeded the eight-second PostgreSQL limit inside live filename classification.
 
-```sh
-/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
-  -f supabase/migrations/20261128081144_home_media_inventory_read_performance.sql
-```
+1. From the repository root, apply both corrective migrations in order.
 
-Reopen **Storage & Media Management**. Check the overview and open **Inventory files** and **Retention preview**. Compare the unfiltered retention counts. The SQL takes effect for the app and worker that are already running.
+   ```sh
+   /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+     -f supabase/migrations/20261128081144_home_media_inventory_read_performance.sql \
+     -f supabase/migrations/20261128082541_home_media_dashboard_persisted_counts.sql
+   ```
+
+   For the Supabase SQL Editor on macOS, copy the raw files with the command below. Paste into a new Gary Home query and check that the first line is `begin;`.
+
+   ```sh
+   cat supabase/migrations/20261128081144_home_media_inventory_read_performance.sql \
+       supabase/migrations/20261128082541_home_media_dashboard_persisted_counts.sql | pbcopy
+   ```
+
+2. Verify that all three function bodies match the migration source. Run this read-only query in the Gary Home project. Each row should show `matches_source = true`.
+
+   ```sql
+   with expected(signature, body_md5) as (
+     values
+       ('private.home_media_classify_files(text,text,boolean,uuid[],jsonb,timestamptz)', 'cf75eba16bae1a55dbcea9dad948cada'),
+       ('public.home_media_management(text,uuid,integer)', '9af9dfe2ffb09bc80a029a5d9959ba29'),
+       ('public.home_media_dashboard(text,integer)', 'ae400787d518fc6e35bcae2ed6b887ba')
+   )
+   select e.signature, md5(p.prosrc) as installed_body_md5,
+     coalesce(md5(p.prosrc) = e.body_md5, false) as matches_source
+   from expected e
+   left join pg_proc p on p.oid = to_regprocedure(e.signature);
+   ```
+
+3. Release the reviewed app revision to ship independent panel loading. Use the existing Gary Home pipeline, or run this from a clean checkout of the reviewed revision already linked to the `garyhome` Vercel project. [Home Vercel pipeline](vercel-deployment.md)
+
+   ```sh
+   vercel deploy --prod
+   ```
+
+4. As the Owner, reopen **Storage & Media Management** and open **Inventory files**, **Retention preview**, and **Orphan review**. The overview shows live Storage totals and recorded verification results. The file lists show current eligibility. Orphan Review uses the last storage scan and offers the scan prompt when the project has none.
 
 ## Roll out listing-scoped retention
 

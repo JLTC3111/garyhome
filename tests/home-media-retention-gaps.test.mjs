@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
 import { PGlite } from '@electric-sql/pglite';
+import ts from 'typescript';
+import * as requests from '../lib/requests.ts';
+import * as storageMedia from '../lib/home-media-request.ts';
 import { supabasePlatform } from './supabase-platform.fixture.mjs';
 
 const migration='20261128072734_home_media_retention_gaps.sql';
 const readPerformanceMigration='20261128081144_home_media_inventory_read_performance.sql';
+const overviewMigration='20261128082541_home_media_dashboard_persisted_counts.sql';
 const owner='00000000-0000-4000-8000-000000000001',staff='00000000-0000-4000-8000-000000000002';
 const bucket='property-media';
 const photoUrl=key=>'https://fixture.example/storage/v1/object/public/property-media/'+key.split('/').map(encodeURIComponent).join('/');
@@ -19,6 +24,7 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   const setup=await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8');
   const migrationSql=await readFile(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8');
   const readPerformanceSql=await readFile(new URL('../supabase/migrations/'+readPerformanceMigration,import.meta.url),'utf8');
+  const overviewSql=await readFile(new URL('../supabase/migrations/'+overviewMigration,import.meta.url),'utf8');
   await db.exec(setup.split('-- Migration: '+migration)[0]);
   await db.exec(`
     insert into auth.users(id,email,email_confirmed_at) values
@@ -77,6 +83,7 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   await hold(canonical);
   await db.exec(migrationSql);
   await db.exec(readPerformanceSql);
+  await db.exec(overviewSql);
   assert.deepEqual(await legacy(),original48);
   const state=name=>value("select reason value from private.home_media_inactivity_inventory(null,$1)",[name]);
   assert.equal(await state('archive/old.jpg'),'awaiting_observation');
@@ -107,7 +114,7 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   assert.equal(initial.counts.protected,undefined);
   assert.ok(initial.items.every(row=>!row.saved_reference&&['awaiting','recovery'].includes(row.status)));
   assert.ok(initial.hasMore);
-  assert.deepEqual((await overview()).retentionCounts,initial.retentionCounts);
+  assert.deepEqual((await overview()).retentionCounts,{verified:0});
   assert.deepEqual((await inventory('')).retentionCounts,initial.retentionCounts);
   const activeHeld=(await inventory(canonical)).items[0];
   assert.equal(activeHeld.status,'protected');
@@ -133,7 +140,9 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   const after=await preview();
   assert.equal(after.manualCount,verified.length);
   assert.equal(after.counts.verified,(await inventory('')).counts.verified);
-  assert.deepEqual((await overview()).retentionCounts,after.retentionCounts);
+  const overviewAfter=await overview();
+  assert.deepEqual(overviewAfter.retentionCounts,{verified:after.counts.verified,recovery:after.counts.recovery});
+  assert.equal(overviewAfter.retentionVerifiedAt,end.lastSuccessfulAt);
   assert.ok(after.items.filter(row=>row.manual_target).every(row=>row.eligible_at));
   assert.equal((await release(activeHeld.recovery_target)).status,'released');
   assert.equal((await release(tickets['archive/recovery-release.webp'])).status,'released');
@@ -227,7 +236,9 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   await as('authenticated',owner);
   assert.equal((await preview()).counts.recovery,1,'the newly referenced hold is available in Inventory only');
   assert.ok((await inventory(late.name)).items[0].recovery_target);
-  assert.deepEqual((await overview()).retentionCounts,(await inventory('')).retentionCounts);
+  const recorded=(await overview()).retentionCounts;
+  assert.equal(recorded.verified,(await inventory('')).retentionCounts.verified);
+  assert.equal(recorded.recovery,2,'the overview uses the saved verification evidence');
   assert.equal((await value("select public.home_media_dashboard('trash_page') value")).items[0].expires_at,original48.expires_at);
 
   const video=verified.find(ticket=>ticket.name==='legacy-tours/archive.mp4');
@@ -247,4 +258,124 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   const due=await value('select public.home_media_claim() value');
   assert.deepEqual(due.items.map(item=>item.id),[video.id]);
   assert.equal((await target(due)).name,video.name);
+});
+
+test('authenticated media HTTP reads meet the eight-second database deadline on 1,465 objects',async t=>{
+  const db=new PGlite();
+  t.after(()=>db.close());
+  await db.exec(supabasePlatform);
+  await db.exec('create table public.jobs_cms_entries(body jsonb not null)');
+  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
+  await db.exec(`
+    insert into auth.users(id,email,email_confirmed_at) values ('${owner}','owner@protonmail.com',now());
+    insert into public.team_members(user_id,role,email,display_name,bootstrap_owner)
+      values ('${owner}','owner','owner@protonmail.com','Fixture owner',true);
+    insert into storage.objects(bucket_id,name,metadata,user_metadata)
+      select 'property-media','archive/fixture-'||lpad(g::text,4,'0')||'.webp',
+        '{"size":100}',jsonb_build_object('original_filename','photo-'||g||'.jpg')
+      from generate_series(1,1465) g;
+    insert into public.jobs_cms_entries
+      select jsonb_build_object('images',jsonb_build_array(src),'image_filenames',jsonb_build_object(src,'photo-'||g||'.jpg'),
+        'image_metadata',jsonb_build_object(src,jsonb_build_object('public_filename','public-'||g||'.jpg','caption',
+          (select string_agg(md5(g||'/'||n),' ') from generate_series(1,160) n))))
+      from generate_series(1,400) g cross join lateral (
+        select 'https://fixture.example/storage/v1/object/public/property-media/archive/fixture-'||lpad(g::text,4,'0')||'.webp' src
+      ) f;
+    insert into private.home_media_items(bucket,name,source,state,object_id,object_version,expires_at,bytes)
+      select bucket_id,name,'unused_listing','retained',id,version,now()+interval '96 hours',100
+      from storage.objects where name between 'archive/fixture-1376.webp' and 'archive/fixture-1465.webp';
+    set statement_timeout='8s';
+    select set_config('request.jwt.claim.sub','${owner}',false);
+  `);
+
+  const signature={
+    home_media_dashboard:['p_action','p_offset'],home_media_inventory_files:['p_offset','p_query'],
+    home_media_retention_preview:['p_offset','p_query'],home_media_filtered_files:['p_offset','p_query','p_preview','p_filter'],
+    home_media_review:['p_action','p_payload'],
+  };
+  const transport={rpc(name,args){
+    return {async abortSignal(signal){
+      signal.throwIfAborted();
+      assert.ok(Object.hasOwn(signature,name),name);
+      const params=signature[name];
+      try{
+        const {rows}=await db.query('select public.'+name+'('+params.map((_,index)=>'$'+(index+1)).join(',')+') value',
+          params.map(key=>args[key]));
+        return {data:rows[0].value};
+      }catch(error){return {error};}
+    }};
+  }};
+  class StaffRequestError extends Error {constructor(status){super();this.status=status;}}
+  const origin='https://fixture.example';
+  const services={
+    '@/lib/server':{backendConfig:()=>({url:origin,key:'fixture-publishable'})},
+    '@/lib/property-photo-files':{PROPERTY_IMAGE_ORIGIN:origin},
+    '@/lib/staff-server':{StaffRequestError,staffRequest:async req=>{
+      if(req.headers.get('authorization')!=='Bearer fixture-owner')throw new StaffRequestError(401);
+      return {db:transport,role:'owner'};
+    }},
+    '@/lib/requests':requests,'@/lib/home-media-request':storageMedia,
+  };
+  const source=await readFile(new URL('../app/api/admin/storage-media/route.ts',import.meta.url),'utf8');
+  const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const exports={};
+  vm.runInNewContext(compiled,{exports,require:id=>services[id],Response,URL,
+    fetch:()=>assert.fail('Read requests must not invoke the cleanup worker')});
+  const request=input=>exports.POST(new Request(origin+'/api/admin/storage-media',{
+    method:'POST',headers:{Authorization:'Bearer fixture-owner'},body:JSON.stringify(input),
+  }));
+  async function read(input){
+    const started=performance.now();
+    const response=await request(input);
+    const data=await response.json(),elapsed=performance.now()-started;
+    assert.equal(response.status,200,JSON.stringify(data));
+    assert.ok(elapsed<8000,`${input.action} took ${elapsed.toFixed(1)} ms`);
+    t.diagnostic(`${input.filter??input.action} ${elapsed.toFixed(1)} ms (authenticated route and database RPC)`);
+    return data;
+  }
+
+  // Exercise the complete overview with both live evidence and implicit scan
+  // deliberately unavailable. These function replacements are local fixtures.
+  await db.exec(`begin;
+    create or replace function private.home_media_live_reference_lookup() returns jsonb
+      language plpgsql stable as $$ begin raise exception 'overview attempted live evidence'; end; $$;
+    create or replace function private.home_media_take_inventory(p_scan boolean,p_after uuid default null) returns jsonb
+      language plpgsql stable as $$ begin raise exception 'overview attempted an inventory scan'; end; $$;
+    set local role authenticated;
+  `);
+  try{
+    const overview=await read({action:'overview'});
+    assert.equal(overview.objects,1465);
+    assert.equal(overview.lastScanAt,null);
+    assert.equal(overview.candidates,undefined);
+    assert.deepEqual(overview.retentionCounts,{verified:90});
+  }finally{await db.exec('rollback');}
+
+  await db.exec('set role authenticated');
+  const settings=(await db.query("select current_user as role,current_setting('statement_timeout') as timeout")).rows[0];
+  assert.deepEqual(settings,{role:'authenticated',timeout:'8s'});
+  const inventory=await read({action:'inventory_page'});
+  assert.equal(inventory.counts.all,1465);
+  assert.equal(inventory.items.length,30);
+  const preview=await read({action:'retention_page'});
+  assert.equal(preview.counts.protected,undefined);
+  assert.equal(preview.manualCount,90);
+  assert.equal(preview.counts.verified,inventory.counts.verified);
+  assert.equal((await read({action:'orphan_page'})).available,false);
+  await db.exec(`reset role;
+    update private.home_media_control set last_scan_at=now(), inventory_sample=jsonb_build_object(
+      'checkedAt',now(),'candidates',1,'candidateBytes',100,'entries',
+      jsonb_build_array(jsonb_build_object('bucket','property-media','name','archive/fixture-1000.webp','reason','potential')))
+    where singleton;
+    update private.home_media_observation set reference_digest=private.home_media_reference_digest(),
+      reference_lookup=private.home_media_live_reference_lookup(),last_successful_at=now() where singleton;
+    set role authenticated;
+  `);
+  const scanned=await read({action:'overview'});
+  assert.equal(scanned.candidates,1);
+  assert.ok(Date.parse(scanned.retentionVerifiedAt));
+  assert.equal((await read({action:'retention_page',filter:'verified'})).manualCount,90);
+  assert.equal((await read({action:'orphan_page'})).items[0].key,'archive/fixture-1000.webp');
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[staff]);
+  assert.equal((await request({action:'overview'})).status,403);
 });

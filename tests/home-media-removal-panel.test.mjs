@@ -40,6 +40,63 @@ const dropdown = {
   DropdownMenuItem:({children,...props})=>React.createElement('div',{...props,role:'menuitem'},children),
 };
 
+test('overview and list failures stay local while other media panels continue to load',async()=>{
+  const calls=[];
+  let finishOverview,finishInventory;
+  const overview=new Promise(resolve=>{finishOverview=resolve;});
+  const inventory=new Promise(resolve=>{finishInventory=resolve;});
+  const context=vm.createContext({
+    Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
+    localStorage:{getItem:()=>null,setItem(){},removeItem(){}},
+    window:{addEventListener(){},removeEventListener(){}},
+    async fetch(_, {body}){
+      const {action}=JSON.parse(body);
+      calls.push(action);
+      switch(action){
+        case 'overview':return overview;
+        case 'inventory_page':return inventory;
+        case 'retention_page':return Response.json({items:[],counts:{all:0},hasMore:false,available:true,manualCount:0,automatic:false});
+        case 'orphan_page':return Response.json({items:[],hasMore:false,available:true,holds:0});
+        case 'worker_status':return Response.json({status:'ok',manualUnused:true,manualRecovery:true,cronConfigured:true});
+        case 'observation_status':return Response.json({status:'idle',cycle:1,checked:0,total:0,recorded:0,reset:0});
+        default:assert.fail('Unexpected action '+action);
+      }
+    },
+  });
+  const site={t:en=>en,language:'en',user:{id:'owner'},notice:()=>{},
+    editorTask:operation=>operation({auth:{getSession:async()=>({data:{session:{access_token:'fixture'}}})}},new AbortController().signal)};
+  const mocks={'@/lib/home-media-trash':trash,'./site-context':{useSite:()=>site},'./ui/dropdown-menu':dropdown,
+    '@/lib/property-photo-files':{PROPERTY_IMAGE_ORIGIN:'https://fixture.example'}};
+  for(const component of ['media-selection','media-removal-progress','storage-orphan-review'])mocks['./'+component]=load(component,mocks,context);
+  const {StorageMediaManagement}=load('listing-deletion-queue',mocks,context);
+  let view;
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+  try {
+    await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
+    await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
+    const button=label=>view.root.findAllByType('button').find(node=>textOf(node)===label);
+    assert.equal(button('Refresh inventory').props['aria-busy'],true);
+    assert.equal(button('Inventory files').props.disabled,false);
+    await act(async()=>button('Inventory files').props.onClick());
+    assert.ok(calls.includes('inventory_page'));
+    assert.equal(button('Retention preview').props.disabled,false);
+    await act(async()=>button('Retention preview').props.onClick());
+    assert.equal(button('Retention preview').props['aria-pressed'],true);
+    assert.ok(button('Verify unused files'));
+    await act(async()=>finishInventory(Response.json({error:'inventory_timeout'},{status:504})));
+    assert.equal(view.root.findAllByProps({role:'alert'}).length,0,'a response from a previous tab is ignored');
+    await act(async()=>finishOverview(Response.json({error:'inventory_unavailable'},{status:503})));
+    assert.match(textOf(view.root.findByProps({role:'alert'})),/Inventory overview/);
+    assert.equal(button('Run storage scan').props.disabled,false);
+    await act(async()=>button('Orphan review').props.onClick());
+    assert.ok(calls.includes('orphan_page'));
+    assert.match(textOf(view.root.findByProps({className:'storage-media-empty'})),/No review candidates/);
+  }finally{
+    if(view)await act(async()=>view.unmount());
+    globalThis.IS_REACT_ACT_ENVIRONMENT=false;
+  }
+});
+
 test('Owners can release one hold or confirm a bulk release and deletion from the live preview',async()=>{
   const rows=new Map(['release','first','second'].map((name,index)=>{
     const ticket={bucket:'property-media',name:`archive/${name}.webp`,objectId:`file-${index}`,

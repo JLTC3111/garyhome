@@ -169,7 +169,7 @@ export function MediaRemovalProgress({
       {state==="running"&&clock&&remaining>0&&<MediaActionButton icon={Pause} tone="warning" onClick={onStop}>
         {t("Stop after the current file","Dừng sau tệp hiện tại")}
       </MediaActionButton>}
-      {resumable&&!reconciling&&!refreshing&&<div className="storage-media-actions">
+      {resumable&&<div className="storage-media-actions">
         {current&&<MediaActionButton icon={RotateCw} disabled={actionsBusy} onClick={onCheckReceipt}>
           {t("Check last request","Kiểm tra yêu cầu cuối")}
         </MediaActionButton>}

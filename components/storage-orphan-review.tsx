@@ -25,7 +25,9 @@ function validSelection(value:unknown):value is Row {
     typeof row.etag==="string"&&Number.isSafeInteger(row.bytes)&&(row.bytes??-1)>=0;
 }
 
-export function StorageOrphanReview({request,disabled,onStaged}: {request:ReviewRequest;disabled:boolean;onStaged:()=>void}) {
+export function StorageOrphanReview({request,disabled,onStaged,onVerificationChange}: {
+  request:ReviewRequest;disabled:boolean;onStaged:()=>void;onVerificationChange?:(verifying:boolean)=>void;
+}) {
   const {t,language,notice,user}=useSite();
   const [query,setQuery]=useState(""),[search,setSearch]=useState(""),[offset,setOffset]=useState(0),[revision,setRevision]=useState(0);
   const [page,setPage]=useState<Page|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
@@ -94,6 +96,7 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
   async function verify(rows:Row[]) {
     if(busy||flight.current||!rows.length)return;
     flight.current=true;setWorking(true);setError("");setProgress({done:0,total:rows.length});
+    onVerificationChange?.(true);
     try{
       let done=0,continueChecking=true;
       for(let start=0;start<rows.length&&active.current&&continueChecking;start+=mediaBatchSize){
@@ -107,7 +110,10 @@ export function StorageOrphanReview({request,disabled,onStaged}: {request:Review
           if(result==="forbidden"||result==="session_expired"){continueChecking=false;setError(result);break;}
         }
       }
-    }finally{flight.current=false;if(active.current)setWorking(false);}
+    }finally{
+      flight.current=false;
+      if(active.current){setWorking(false);onVerificationChange?.(false);}
+    }
   }
   async function update(row:Row,action:"hold"|"release"|"enroll",evidence?:{backupSha256:string;evidenceRef:string}) {
     if(busy||flight.current)return;

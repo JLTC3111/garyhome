@@ -20,6 +20,18 @@ const openedDetails = () => {
   const details={open:true};
   return {target:details,currentTarget:details};
 };
+const panelHeading = view => view.root.findByProps({className:'storage-media-heading'});
+function assertPanelLocked(view, classNames) {
+  const summary=panelHeading(view);
+  assert.equal(summary.props['aria-disabled'],true);
+  let prevented=false;
+  summary.props.onClick({preventDefault(){prevented=true;}});
+  assert.ok(prevented,'closing the panel is blocked during processing');
+  for(const className of classNames){
+    for(let node=view.root.findByProps({className});node;node=node.parent)
+      assert.ok(!node.props.hidden,`${className} stays visible during processing`);
+  }
+}
 const names = ['media-removal-progress', 'media-selection', 'listing-deletion-queue', 'storage-orphan-review'];
 const sources = [...names.map(name => [name,`components/${name}.tsx`]), ['storage-media-route','app/api/admin/storage-media/route.ts']];
 const components = new Map(sources.map(([name,path]) => [name, new vm.Script('(function(exports,require,module){' +
@@ -42,21 +54,24 @@ const dropdown = {
 
 test('overview and list failures stay local while other media panels continue to load',async()=>{
   const calls=[];
-  let finishOverview,finishInventory;
+  let finishOverview,finishInventory,finishReview;
   const overview=new Promise(resolve=>{finishOverview=resolve;});
   const inventory=new Promise(resolve=>{finishInventory=resolve;});
+  const review=new Promise(resolve=>{finishReview=resolve;});
+  const orphan={bucket:'property-media',key:'orphan.webp',objectId:'orphan',version:'1',etag:'etag',bytes:100,held:false,reason:'potential'};
   const context=vm.createContext({
     Date,Error,AbortController,performance,setTimeout,clearTimeout,setInterval,clearInterval,navigator:{},
     localStorage:{getItem:()=>null,setItem(){},removeItem(){}},
     window:{addEventListener(){},removeEventListener(){}},
     async fetch(_, {body}){
-      const {action}=JSON.parse(body);
+      const {action,query}=JSON.parse(body);
       calls.push(action);
       switch(action){
         case 'overview':return overview;
         case 'inventory_page':return inventory;
         case 'retention_page':return Response.json({items:[],counts:{all:0},hasMore:false,available:true,manualCount:0,automatic:false});
-        case 'orphan_page':return Response.json({items:[],hasMore:false,available:true,holds:0});
+        case 'orphan_page':return Response.json({items:query?[orphan]:[],hasMore:false,available:true,holds:0});
+        case 'orphan_verify':return review;
         case 'worker_status':return Response.json({status:'ok',manualUnused:true,manualRecovery:true,cronConfigured:true});
         case 'observation_status':return Response.json({status:'idle',cycle:1,checked:0,total:0,recorded:0,reset:0});
         default:assert.fail('Unexpected action '+action);
@@ -75,9 +90,17 @@ test('overview and list failures stay local while other media panels continue to
     await act(async()=>{view=TestRenderer.create(React.createElement(StorageMediaManagement,{visible:true,latest:null,onListingRestored:()=>{}}));});
     await act(async()=>view.root.findByType('details').props.onToggle(openedDetails()));
     const button=label=>view.root.findAllByType('button').find(node=>textOf(node)===label);
+    assert.deepEqual(view.root.findByProps({className:'storage-media-actions'}).findAllByType('button').map(textOf),[
+      'Run storage scan','Orphan review','Move verified orphans to Trash (—)','Run expired-file cleanup (—)','Bulk deletion from File Trash (—)',
+    ]);
+    assert.deepEqual(view.root.findByProps({'aria-label':'Media lists'}).findAllByType('button').map(textOf),[
+      'Refresh inventory','Inventory files','Retention preview','File Trash','Cleanup History','Cleanup runs',
+    ]);
     assert.equal(button('Refresh inventory').props['aria-busy'],true);
     assert.equal(button('Inventory files').props.disabled,false);
     await act(async()=>button('Inventory files').props.onClick());
+    assert.equal(button('Run storage scan').props['data-button-variant'],'scan');
+    assert.equal(button('Inventory files').props['data-button-variant'],'confirm');
     assert.ok(calls.includes('inventory_page'));
     assert.equal(button('Retention preview').props.disabled,false);
     await act(async()=>button('Retention preview').props.onClick());
@@ -91,6 +114,18 @@ test('overview and list failures stay local while other media panels continue to
     await act(async()=>button('Orphan review').props.onClick());
     assert.ok(calls.includes('orphan_page'));
     assert.match(textOf(view.root.findByProps({className:'storage-media-empty'})),/No review candidates/);
+    const search=()=>view.root.findByProps({type:'search'});
+    await act(async()=>search().props.onChange({target:{value:'orphan'}}));
+    await act(async()=>view.root.findByProps({role:'search'}).props.onSubmit({preventDefault(){}}));
+    await act(async()=>button('Verify').props.onClick());
+    assert.ok(calls.includes('orphan_verify'));
+    assertPanelLocked(view,['storage-media-actions storage-media-navigation','storage-media-rows']);
+    assert.equal(search().props.disabled,true);
+    for(const name of ['Run storage scan','Orphan review','Refresh inventory','Inventory files'])
+      assert.equal(button(name).props.disabled,true);
+    await act(async()=>finishReview(Response.json({result:'evidence_required'})));
+    assert.equal(button('Inventory files').props.disabled,false);
+    assert.equal(panelHeading(view).props['aria-disabled'],undefined);
   }finally{
     if(view)await act(async()=>view.unmount());
     globalThis.IS_REACT_ACT_ENVIRONMENT=false;
@@ -221,6 +256,11 @@ for (const theme of ['light', 'dark']) {
     for (const state of ['', '-hover', '-active']) {
       verify(`Resume button${state}`, 'var(--studio-on-action)', `var(--studio-action${state})`, 4.5);
     }
+    const scan=styles(panelCss,'.storage-media-button[data-button-variant="scan"]');
+    const activeTab=styles(panelCss,'.storage-media-button[data-button-variant="confirm"]');
+    assert.notEqual(resolve(scan['--action-fill']),resolve(activeTab['--action-fill']));
+    verify('Storage scan button','var(--action-white)',scan['--action-fill'],4.5);
+    verify('Storage scan hover','var(--action-white)',scan['--action-hover'],4.5);
     verify('Progress fill and track', fill.background, track.background, 3);
     verify('Warning button', 'var(--action-archive-ink)', 'var(--action-archive-tint)', 4.5);
     verify('Destructive button', 'var(--action-white)', 'var(--action-red)', 4.5);
@@ -356,7 +396,13 @@ for (const theme of ['light', 'dark']) {
       assert.equal(view.root.findByProps({type:'search'}).props.value,'');
       await click('Resume');
       assert.equal(state(),'running');
-      assert.equal(view.root.findByProps({className:'storage-media-controls'}).props.hidden,true);
+      assertPanelLocked(view,['storage-media-stats','storage-media-actions storage-media-navigation','storage-media-rows']);
+      assert.equal(button('File Trash').props['aria-pressed'],true);
+      for(const name of ['Run storage scan','Orphan review','Refresh inventory','Inventory files','File Trash','Keep file','Permanently delete selected'])
+        assert.equal(button(name).props.disabled,true);
+      assert.equal(view.root.findByProps({type:'search'}).props.disabled,true);
+      assert.equal(master().props.disabled,true);
+      assert.match(textOf(view.root.findByProps({className:'storage-media-rows'})),/two\.webp/);
       await act(async()=>{view.update(page(false));});
       await act(async()=>{view.update(page(true));});
       assert.equal(state(),'running');
@@ -371,7 +417,8 @@ for (const theme of ['light', 'dark']) {
       await click('Cancel remaining');
       assert.equal(calls.length,requestsBeforeCancel,'cancelling without a sent item needs no inventory request');
       assert.equal(state(),'cancelled');
-      assert.equal(view.root.findByProps({className:'storage-media-controls'}).props.hidden,false);
+      assert.equal(panelHeading(view).props['aria-disabled'],undefined);
+      assert.equal(view.root.findByProps({type:'search'}).props.disabled,false);
       assert.equal(button('Permanently delete now').props.disabled,false);
       assert.equal(button('Permanently delete selected').props.disabled,true);
       assert.equal(button('Resume'),undefined);
@@ -706,6 +753,9 @@ test('Inventory Files loads exact previews on demand and shares single and batch
     await act(async()=>button('Verify unused files').props.onClick());
     assert.equal(button('Verifying…').props.disabled,true);
     assert.equal(verificationRequests,1);
+    assertPanelLocked(view,['storage-media-stats','storage-media-actions storage-media-navigation','storage-media-filters','storage-media-rows']);
+    for(const name of ['Run storage scan','Orphan review','Refresh inventory','File Trash','Cleanup History','Cleanup runs'])
+      assert.equal(button(name).props.disabled,true);
     assert.equal(tour().props.disabled,false);
     await act(async()=>tour().props.onChange({target:{checked:true}}));
     await act(async()=>button('Retention preview').props.onClick());

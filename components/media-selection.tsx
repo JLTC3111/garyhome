@@ -5,7 +5,7 @@ import { ChevronDown, ListChecks, LoaderCircle, Search, SquareCheck, X, type Luc
 import { useSite } from "./site-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
-const mediaButtonVariants = {primary:"confirm",secondary:"view",warning:"archive",destructive:"danger-primary"} as const;
+const mediaButtonVariants = {primary:"confirm",secondary:"view",scan:"scan",warning:"archive",destructive:"danger-primary"} as const;
 
 export function MediaActionButton({icon:Icon,tone="secondary",pending=false,children,type="button",...props}:
   ComponentPropsWithoutRef<"button"> & {icon:LucideIcon;tone?:keyof typeof mediaButtonVariants;pending?:boolean}) {

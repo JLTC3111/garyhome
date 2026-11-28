@@ -334,11 +334,14 @@ export function StorageMediaManagement({latest,onListingRestored,visible}: {late
     setObservationError(null);
     await work("verify_unused",async()=>{
       try {
-        for(let batch=0;batch<8&&active.current;batch++){
+        const started=performance.now();
+        let checked=-1;
+        for(let batch=0;batch<32&&active.current&&performance.now()-started<30_000;batch++){
           const result=await observationRequest(true);
           if(!active.current)return;
           setObservation(result);
-          if(result.status!=="running")break;
+          if(result.status!=="running"||result.checked<=checked)break;
+          checked=result.checked;
         }
       }catch(issue){if(active.current)setObservationError(issue);}
       if(active.current)await refreshAfterChange();

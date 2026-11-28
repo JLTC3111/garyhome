@@ -83,6 +83,10 @@ async function loadVerificationFunctions(db) {
   await db.exec(source.slice(source.indexOf('revoke all on function private.home_media_observation_progress'),source.indexOf('notify pgrst')));
 }
 
+async function applyBoundedObservationMigration(db) {
+  await db.exec(await readFile(new URL('../supabase/migrations/20261128054200_home_media_bounded_observation.sql',import.meta.url),'utf8'));
+}
+
 test('both Owner inventory views share exact references and unused tickets, and preserve video detachment',async t=>{
   const db=await inventoryFixture(t);
   const listingPath='properties/listings/11111111-1111-4111-8111-000000000001/revision/';
@@ -278,39 +282,42 @@ test('production-scale inventory preserves search, pagination and live eligibili
 test('production-scale unused observation uses the optimized classifier and unlocks Owner selection in preview',async t=>{
   const db=await inventoryFixture(t);
   await populateInventory(db);
-  await loadFunctions(db,'20261127141812_home_listing_media_inactivity.sql',['private.home_media_observe_listing_inactivity']);
   await db.exec(`
     insert into private.home_media_items(bucket,name,source,state,object_id,object_version,expires_at)
     select bucket_id,name,'detached','trashed',id,version,now()+interval '40 hours' from storage.objects
     where name in ('properties/renamed/fixture-1341.webp','properties/renamed/fixture-1342.webp');
-    create function pg_temp.measure_observation(p_manual boolean) returns double precision language plpgsql as $$
-    declare started timestamptz:=clock_timestamp();
-    begin
-      if p_manual then perform public.home_media_observation(true);
-      else perform private.home_media_observe_listing_inactivity(); end if;
-      return extract(epoch from clock_timestamp()-started)*1000;
-    end;
-    $$;
+    create index fixture_storage_order on storage.objects(bucket_id,name);
   `);
   const query=async(sql,args=[]) => (await db.query(sql,args)).rows[0].value;
   const actor=crypto.randomUUID();
   await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'owner@example.invalid',now())",[actor]);
   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);
-  const measure=manual=>query('select pg_temp.measure_observation($1) value',[manual]);
-  const retained=()=>db.query("select bucket,name,object_id,object_version from private.home_media_items where source='unused_listing' order by bucket,name").then(value=>value.rows);
   const legacy=()=>db.query("select * from private.home_media_items where source='detached' order by name").then(value=>value.rows);
-  const clear=()=>db.exec("delete from private.home_media_items where source='unused_listing'");
-  const beforeLegacy=await legacy(),baselineMs=await measure(false),expected=await retained();
-  assert.ok(expected.length>0);
-  await clear();
+  const beforeLegacy=await legacy();
   await loadPageFirstFunctions(db);
-  const optimizedMs=await measure(false);
-  assert.deepEqual(await retained(),expected);
-  await clear();
   await loadVerificationFunctions(db);
+  const retained=()=>db.query("select bucket,name,object_id,object_version from private.home_media_items where source='unused_listing' order by bucket,name").then(value=>value.rows);
+  const started=performance.now();
+  assert.equal((await query('select public.home_media_observation(true) value')).checked,816);
+  const baselineMs=performance.now()-started,expected=await retained();
+  assert.ok(expected.length>0);
+  await db.exec(`delete from private.home_media_items where source='unused_listing';
+    update private.home_media_observation set state='failed',checked=0,total=0,recorded=0,reset_count=0,
+      cursor_bucket=null,cursor_name=null,last_successful_at=null,error='observation_timeout';`);
+  await applyBoundedObservationMigration(db);
   assert.equal((await query('select public.home_media_inventory_files() value')).manualCount,0);
-  const manualMs=await measure(true);
-  t.diagnostic(`Observation for 816 scoped objects and 401 reference documents: ${baselineMs.toFixed(1)} ms before inventory optimization, ${optimizedMs.toFixed(1)} ms with it, ${manualMs.toFixed(1)} ms through the bounded Owner action`);
+  const timings=[];
+  let checked=0;
+  for(let batch=0;batch<26;batch++){
+    const tick=performance.now();
+    const result=await query(batch===1?'select public.home_media_observe_hourly() value':'select public.home_media_observation(true) value');
+    timings.push(performance.now()-tick);
+    checked+=Math.min(32,816-checked);
+    assert.equal(result.checked,checked,result.error);
+    assert.equal(result.status,checked===816?'complete':'running');
+    assert.ok(await query('select cursor_name is not null value from private.home_media_observation'));
+  }
+  t.diagnostic(`816 scoped keys and 401 reference documents: ${baselineMs.toFixed(1)} ms for the old Owner request, ${timings[0].toFixed(1)} ms for the first bounded request, ${Math.max(...timings.slice(1)).toFixed(1)} ms max for 25 cached requests`);
   assert.deepEqual(await retained(),expected);
   const progress=await query('select public.home_media_observation() value');
   assert.equal(progress.status,'complete');
@@ -326,12 +333,14 @@ test('production-scale unused observation uses the optimized classifier and unlo
   assert.deepEqual(await legacy(),beforeLegacy);
   assert.equal(await query('select count(*)::int value from storage.objects'),1354);
   assert.equal(await query("select count(*)::int value from private.home_media_review_holds where reason='recovery_hold'"),14);
+  assert.equal((await query('select private.home_media_observe_batch(1000) value')).checked,32);
 });
 
 test('observation has an Owner guard, resumes after a failed batch and preserves the last completion time',async t=>{
   const db=await inventoryFixture(t);
   await loadPageFirstFunctions(db);
   await loadVerificationFunctions(db);
+  await applyBoundedObservationMigration(db);
   const base='properties/listings/11111111-1111-4111-8111-000000000001/fixture/';
   await db.exec("insert into storage.buckets(id) values('property-media')");
   await db.query("insert into storage.objects(bucket_id,name) select 'property-media',$1||g||'.jpg' from generate_series(1,3) g",[base]);

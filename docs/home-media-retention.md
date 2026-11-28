@@ -6,7 +6,7 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
 
 ### Apply the SQL in preview mode
 
-From the Gary Home repository, apply the pending incremental migrations in order. The first installs the 96-hour policy and the GH-645 recovery holds. The second adds Owner-only removal. The third brings those controls into Inventory Files. The fourth corrects the Inventory Files timeout. The fifth adds on-demand verification and separates scheduled observation from the cleanup claim. Use the existing operator database service.
+From the Gary Home repository, apply the pending incremental migrations in order. They install the 96-hour policy and GH-645 recovery holds, add Owner-only removal in both inventory views, and correct the inventory and verification queries. Use the existing operator database service.
 
 ```sh
 /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
@@ -14,7 +14,8 @@ From the Gary Home repository, apply the pending incremental migrations in order
   -f supabase/migrations/20261127153844_home_listing_media_manual_removal.sql \
   -f supabase/migrations/20261127165022_home_media_inventory_controls.sql \
   -f supabase/migrations/20261127173831_home_media_page_first_inventory.sql \
-  -f supabase/migrations/20261127203648_home_media_verify_unused.sql
+  -f supabase/migrations/20261127203648_home_media_verify_unused.sql \
+  -f supabase/migrations/20261128054200_home_media_bounded_observation.sql
 ```
 
 The first migration sets `listing_inactivity_enabled` to `false`. To return to preview later, run the following command.
@@ -49,6 +50,38 @@ With the previous four migrations installed, apply the verification migration fr
 ```
 
 Open **Inventory Files** or **Retention preview** and select **Verify unused files**. The panel reports checked files, newly verified files, cleared timers, and the last completed observation. Retry a failed or incomplete pass to continue from its saved position. The action uses the existing saved-reference, upload, editing-session and hold checks. It records the 96-hour window and refreshes manual selection. Storage removal still requires the existing cleanup workflow and its final live check. The action leaves the automatic policy gate and 48-hour Trash schedules as configured.
+
+### Roll out bounded verification and the staff fixes
+
+1. Check the installed observer before applying SQL. The production body matched the value below at 05:51 UTC on November 28, 2026. The change can already be present after a manual SQL install even when the CLI migration ledger has no entry.
+
+   ```sql
+   select md5(prosrc) as observer_body, pg_get_function_arguments(oid) as arguments
+   from pg_proc where oid='private.home_media_observe_batch(integer)'::regprocedure;
+   ```
+
+   A matching body is `36d82fb025156b7f363347a1840e5cfc` with `p_limit integer DEFAULT 32`. For an environment still on the previous 1,000-file observer, apply the corrective migration from the repository root.
+
+   ```sh
+   /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+     -f supabase/migrations/20261128054200_home_media_bounded_observation.sql
+   ```
+
+2. Publish the reviewed Edge Function. The existing Cron job and its credential are reused. The deployed version 4 could claim cleanup and handle confirmed manual removals but never called the hourly observation RPC.
+
+   ```sh
+   supabase functions deploy media-orphan-cleanup --project-ref duyiihsmaqfgwezmsnjs --no-verify-jwt
+   ```
+
+3. Release the reviewed Home app through the [existing Vercel deployment](vercel-deployment.md). This ships the staff verification updates, PNG optimizer fix, and Realtime restore fix together. Keep `listing_inactivity_enabled=false` during acceptance checks so the existing 48-hour File Trash worker continues while the 96-hour policy is in preview.
+4. Open **Check cleanup worker** and **Verify unused files** as the Owner. Progress should advance in batches of at most 32. If the pass is still running when the request budget ends, select **Verify unused files** again to resume. Check that the finished pass records a last successful time and exposes verified files for selection. On the next existing hourly dispatch at minute 7 UTC, check logs for both `home_media_claim` and `home_media_observe_hourly`. A partial hourly pass resumes on its next dispatch or through the Owner action.
+
+   ```sql
+   select private.home_media_observation_progress();
+   select permanent_enabled,listing_inactivity_enabled from private.home_media_control where singleton;
+   ```
+
+5. Check the original PNG in the listing editor and exercise back/forward navigation with the notifications panel open. Confirm live notifications resume after restore and a subsequent reconnect. Check the GH-645 holds and both original File Trash deadlines using the queries below.
 
 ### Inspect counts and verify the exclusions
 

@@ -36,7 +36,6 @@ export function MediaSearchField({label,placeholder,value,onChange,onClear,canCl
   const input=useRef<HTMLInputElement>(null);
   const clearLabel=t("Clear search","Xóa tìm kiếm");
   return <div className="storage-media-search">
-    <Search size={16} aria-hidden="true"/>
     <input ref={input} type="search" aria-label={label} placeholder={placeholder} value={value}
       maxLength={maxLength} autoComplete="off" spellCheck={false} disabled={disabled} onChange={event=>onChange(event.target.value)}/>
     {(value||canClear)&&<button type="button" className="storage-media-search__clear" aria-label={clearLabel} title={clearLabel}

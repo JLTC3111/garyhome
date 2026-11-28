@@ -68,10 +68,10 @@ test('the scheduler caps the number of pending observation batches per run',asyn
   const action=new URL(url).pathname.split('/').at(-1);calls.push(action);
   if(action==='home_media_claim')return Response.json({status:'disabled'});
   assert.equal(action,'home_media_observe_hourly');
-  return Response.json({status:'running',checked:1000*(calls.length-1)});
+  return Response.json({status:'running',checked:32*(calls.length-1)});
  }});
- assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'disabled',observation:{status:'running',checked:2000}});
- assert.deepEqual(calls,['home_media_claim','home_media_observe_hourly','home_media_observe_hourly']);
+ assert.deepEqual(await (await invoke(handler,cron)).json(),{status:'disabled',observation:{status:'running',checked:1024}});
+ assert.deepEqual(calls,['home_media_claim',...Array(32).fill('home_media_observe_hourly')]);
 });
 
 test('worker health checks require a verified Owner and never claim a cleanup run',async()=>{

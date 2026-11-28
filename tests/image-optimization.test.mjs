@@ -207,6 +207,32 @@ test('an ICC-tagged image under the byte cap still fits the 1920 px bound',async
   assert.deepEqual([result.width,result.height],[1920,785]);
 });
 
+test('listing PNGs that need their embedded metadata can retain larger dimensions within the byte cap',async()=>{
+  const bytes=await sharp({create:{width:2200,height:900,channels:4,background:'#745c46'}}).withIccProfile('p3').png().toBuffer();
+  const file=new File([bytes],'listing.png',{type:'image/png'});
+  assert.ok(imageDetails(bytes).protectedMetadata);
+  const win=rasterEnvironment({onEncode:()=>assert.fail('protected PNG was re-encoded')});
+  const result=await optimizeImage(file,propertyPhoto,{win});
+  assert.deepEqual([result.contentType,result.width,result.height],['image/png',2200,900]);
+  assert.deepEqual(Buffer.from(await result.body.arrayBuffer()),bytes);
+  await assert.rejects(optimizeImage(file,{...propertyPhoto,maxBytes:bytes.length-1},{win}),{code:'IMAGE_METADATA'});
+});
+
+const regressionPng=process.env.GARY_HOME_REGRESSION_PNG;
+test('the original reported PNG retains its bytes and color metadata',{
+  skip: !regressionPng && 'Set GARY_HOME_REGRESSION_PNG to the original reported PNG'
+},async()=>{
+  const bytes=await readFile(regressionPng);
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),
+    'c829daf873f70a5dbbb71507460acd5069eb137cfec986a1eb8247402c9245eb');
+  const result=await optimizeImage(new File([bytes],'reported.png',{type:'image/png'}),propertyPhoto,{
+    win:rasterEnvironment({onEncode:()=>assert.fail('protected PNG was re-encoded')})
+  });
+  assert.deepEqual([result.contentType,result.width,result.height],['image/png',2334,1884]);
+  assert.ok(result.body.size<=500_000);
+  assert.deepEqual(Buffer.from(await result.body.arrayBuffer()),bytes);
+});
+
 test('IPTC attribution uses JPEG compatibility and excludes optional Photoshop data',async()=>{
   const copyright=Buffer.from('Gary Home IPTC copyright');
   const dataset=Buffer.concat([Buffer.from([0x1c,2,116,0,copyright.length]),copyright]);

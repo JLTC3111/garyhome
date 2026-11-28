@@ -92,11 +92,14 @@ export function createMediaCleanup({url,publishable,service,cronSecret,fetcher=f
   }
 
   async function observeHourly(signal) {
-    let progress;
+    let progress,checked=-1;
+    const started=Date.now();
     try {
-      for(let batch=0;batch<2&&!signal.aborted;batch++) {
+      // Leave room for the existing eight-second deadline on the last request.
+      for(let batch=0;batch<32&&!signal.aborted&&Date.now()-started<8_000;batch++) {
         progress=await internal('observe_hourly',{});
-        if(progress?.status!=='running')break;
+        if(progress?.status!=='running'||progress.checked<=checked)break;
+        checked=progress.checked;
       }
     } catch(error) {
       progress={status:'failed',error:error.name==='TimeoutError'?'observation_timeout':

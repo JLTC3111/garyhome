@@ -83,11 +83,23 @@
 @media(max-width:680px){
  html:has(.admin-shell[data-navigation-open]){overflow:hidden}
  .admin-main{width:100%;margin-left:0;isolation:isolate}
- .admin-topbar{gap:4px;padding-inline:max(8px,env(safe-area-inset-left,0px)) max(8px,env(safe-area-inset-right,0px))}
- .admin-topbar>.admin-topbar-actions{gap:4px}
+ .admin-topbar{gap:8px;padding-inline:max(10px,env(safe-area-inset-left,0px)) max(10px,env(safe-area-inset-right,0px))}
+ .admin-topbar>.admin-topbar-actions{gap:8px}
  .admin-topbar>.admin-breadcrumb{flex:1}
- .admin-topbar>.back-navigation{width:44px;min-height:44px;justify-content:center;margin:0}
- .admin-topbar :is(.studio-notification-trigger,.gary-apps-menu--studio>summary){min-width:44px;min-height:44px;justify-content:center}
+ .admin-topbar>.back-navigation,.admin-topbar-actions>.studio-notifications{display:none}
+ .admin-topbar :is(.gary-apps-menu--studio>summary,.site-preferences-trigger){display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0}
+ .admin-topbar .site-preferences-trigger{position:relative}
+ .site-preferences-unread{position:absolute;inset-block-start:7px;inset-inline-end:7px;width:7px;height:7px;border-radius:50%;background:var(--studio-focus,var(--olive));pointer-events:none}
+ .admin-topbar .studio-preferences .site-preferences-panel{max-height:calc(100dvh - 70px - env(safe-area-inset-bottom,0px))}
+ .studio-notifications--embedded{margin-top:16px;padding-top:8px;border-top:1px solid var(--line)}
+ .studio-notifications--embedded .studio-notification-trigger{display:flex;justify-content:flex-start;gap:8px;width:100%;min-height:44px;padding:0 8px;border-radius:8px;color:var(--ink);font-size:13px;font-weight:550}
+ .studio-notifications--embedded .notification-count{position:static;margin-inline-start:auto}
+ .studio-notifications--embedded .studio-notification-panel{position:static;width:100%;max-height:none;overflow:visible;border:0;border-radius:0;box-shadow:none;background:transparent}
+ .studio-notifications--embedded .studio-notification-panel>header{gap:6px;padding:10px 4px}
+ .studio-notifications--embedded .studio-notification-panel h2{font-size:16px}
+ .studio-notifications--embedded :is(.studio-notification-panel>header button,.notification-toolbar button){min-height:44px}
+ .studio-notifications--embedded .notification-toolbar{gap:4px 8px;padding-inline:4px;flex-wrap:wrap}
+ .studio-notifications--embedded .studio-notification-panel li>button{padding:10px 8px}
  .admin-navigation-toggle,.admin-navigation-close{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:0;border:1px solid var(--studio-control-border,var(--line));border-radius:8px;background:var(--paper);color:var(--ink)}
  .admin-navigation-close{position:absolute;top:max(12px,env(safe-area-inset-top,0px));right:12px}
  .admin-navigation-toggle:hover,.admin-navigation-close:hover{background:var(--studio-quiet-hover,var(--warm))}
@@ -102,7 +114,7 @@
  .admin-sidebar nav.branched-menu{margin-top:12px;padding-bottom:8px}
  .admin-sidebar .branched-menu button{font-size:13px;justify-content:flex-start}
  .admin-sidebar .branched-menu .branched-menu__icon>svg{width:18px;height:18px}
- .admin-sidebar-bottom{padding-top:8px}
+ .admin-sidebar-bottom{flex-shrink:0;padding-top:8px}
  .admin-sidebar-bottom>div{flex-direction:row;padding-top:8px;margin-top:0}
  .admin-sidebar-bottom>div>.admin-sidebar-identity{display:block}
  .admin-sidebar-bottom .admin-sidebar-signout{width:44px;height:44px}

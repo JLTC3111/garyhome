@@ -118,14 +118,15 @@ test('the listing editor follows keyboard resize and viewport pan while keeping 
 
 test('phone and tablet breakpoint rules keep navigation, editor controls and themes usable at the requested widths',()=>{
  const read=name=>postcss.parse(fs.readFileSync(root+'/app/'+name+'.css','utf8'));
- const editor=read('editor-drawer'),nav=read('studio-navigation'),light=read('globals'),palette=read('public-theme');
+ const editor=read('editor-drawer'),nav=read('studio-navigation'),light=read('globals'),palette=read('public-theme'),accounts=read('header-account');
  function rules(sheet,selector,width){
   const values={};
   sheet.walkRules(rule=>{
    if(!rule.selectors.includes(selector))return;
    if(rule.parent.name==='media'){
     const limit=/^\(max-width:\s*(\d+)px\)$/.exec(rule.parent.params);
-    if(!limit||width>Number(limit[1]))return;
+    const above=/^\(width > (\d+)px\)$/.exec(rule.parent.params);
+    if(!(limit&&width<=Number(limit[1]))&&!(above&&width>Number(above[1])))return;
    }
    for(const choice of rule.nodes)if(choice.type==='decl')values[choice.prop]=choice.value;
   });
@@ -141,6 +142,13 @@ test('phone and tablet breakpoint rules keep navigation, editor controls and the
   const phone=width<=680;
   assert.equal(rules(nav,'.admin-main',width).width,phone?'100%':'calc(100% - var(--studio-sidebar-width))');
   assert.equal(rules(nav,'.admin-navigation-toggle',width).display,phone?'grid':'none');
+  assert.equal(rules(nav,'.admin-topbar>.back-navigation',width).display,phone?'none':undefined);
+  assert.equal(rules(nav,'.admin-topbar-actions>.studio-notifications',width).display,phone?'none':undefined);
+  assert.equal(rules(nav,'.studio-notifications--embedded .studio-notification-panel',width).position,phone?'static':undefined);
+  assert.equal(rules(nav,'.admin-sidebar nav.branched-menu',width)['overflow-y'],'auto');
+  assert.equal(rules(nav,'.admin-sidebar-bottom',width)['flex-shrink'],'0');
+  assert.equal(rules(accounts,'.staff-account-menu .header-account-trigger > svg',width).display,phone?'block':undefined);
+  assert.equal(rules(accounts,'.admin-shell[data-sidebar="collapsed"] .staff-account-menu .header-account-trigger > :not(.header-account-avatar)',width).display,phone?undefined:'none');
   assert.equal(rules(nav,'.admin-sidebar>.studio-label',width).display,phone?'none':undefined);
   assert.equal(rules(nav,'.admin-sidebar>.brand .brand-tagline',width).display,phone?'none':undefined);
   assert.equal(rules(editor,'[data-listing-drawer] .gw-editor-toggle',width).display,phone?'none':undefined);
@@ -160,4 +168,9 @@ test('phone and tablet breakpoint rules keep navigation, editor controls and the
  const lightTokens=rules(light,':root',320),darkTokens=rules(palette,':root',320);
  assert.ok(contrast(lightTokens['--ink'],lightTokens['--paper'])>=4.5);
  assert.ok(contrast(darkTokens['--home-text'],darkTokens['--home-surface'])>=4.5);
+ assert.equal(rules(accounts,'.staff-account-summary',320)['white-space'],'normal');
+ assert.equal(rules(accounts,'.staff-account-email',320)['overflow-wrap'],'anywhere');
+ assert.equal(rules(accounts,'.staff-account-role',320).color,'var(--account-secondary)');
+ assert.ok(contrast(lightTokens['--ink'],rules(nav,'.admin-sidebar',320).background)>=4.5);
+ assert.ok(contrast(darkTokens['--home-secondary'],darkTokens['--home-surface'])>=4.5);
 });

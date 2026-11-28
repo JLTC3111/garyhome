@@ -33,8 +33,8 @@ function readSidebar() {
 }
 
 export function StudioShell({ children, sidebar, text }: {
-  children: (navigation: { trigger: ReactNode; open: boolean }) => ReactNode;
-  sidebar: (closeNavigation: () => void, compact: boolean) => ReactNode;
+  children: (navigation: { trigger: ReactNode; open: boolean; mobile: boolean }) => ReactNode;
+  sidebar: (navigation: { closeNavigation: () => void; compact: boolean; mobile: boolean }) => ReactNode;
   text: Text;
 }) {
   const dock = useRef<HTMLElement>(null);
@@ -199,9 +199,9 @@ export function StudioShell({ children, sidebar, text }: {
     <aside ref={dock} className="admin-sidebar" id="staff-sidebar" inert={narrow && !navigationOpen} role={narrow ? "dialog" : undefined}
       aria-label={narrow ? text("Staff navigation") : undefined} aria-modal={navigationOpen || undefined} onKeyDown={onNavigationKey}>
       <button ref={navigationClose} type="button" className="admin-navigation-close" aria-label={text("Close staff navigation")} onClick={closeNavigation}><X size={21} aria-hidden="true"/></button>
-      {sidebar(closeNavigation, compact)}
+      {sidebar({ closeNavigation, compact, mobile: narrow })}
       {!narrow && controls}
     </aside>
-    {children({ trigger, open: navigationOpen })}
+    {children({ trigger, open: navigationOpen, mobile: narrow })}
   </div>;
 }

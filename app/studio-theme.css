@@ -203,6 +203,7 @@ html[data-home-theme="dark"]:not([data-home-public="true"]):has(.admin-shell, .s
   & .landlord-records button { color: var(--ink); }
   & .landlord-records button[aria-pressed="true"] { border-color: var(--studio-control-border); }
   & .studio-notification-panel { box-shadow: var(--home-shadow); }
+  & .studio-notifications--embedded .studio-notification-panel { background-color: transparent; box-shadow: none; }
   & :is(.admin-stats > div > span, .team-existing-login-callout > p, .admin-empty) { color: var(--green); }
   & :is(.avatar, .team-avatar, .staff-profile-photo, .notification-avatar, .form-success > span, .team-state.active) { background-color: var(--warm); color: var(--green); }
   & .getting-started > button > span { background-color: var(--paper); color: var(--green); }

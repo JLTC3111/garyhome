@@ -28,8 +28,8 @@ const photoCopy: Record<string, [string,string]> = {
  avatarSaveError: ["Couldn’t confirm the photo update. Reconnect and try again.", "Chưa xác nhận được ảnh mới. Hãy kết nối lại rồi thử lại."],
 };
 
-export function StaffAccountMenu({ onDashboard, onSignedOut, profileHost }: {
- onDashboard: () => void; onSignedOut: () => void; profileHost: HTMLDivElement | null;
+export function StaffAccountMenu({ onDashboard, onSignedOut, profileHost, mobile }: {
+ onDashboard: () => void; onSignedOut: () => void; profileHost: HTMLDivElement | null; mobile: boolean;
 }){
  const {editor,sessionResolved,sessionPhase,user}=useSite(),[open,setOpen]=useState(false);
  const button=useRef<HTMLButtonElement>(null);
@@ -42,7 +42,7 @@ export function StaffAccountMenu({ onDashboard, onSignedOut, profileHost }: {
  // A closed drawer is inert, including when the top bar opens a profile.
  const profile=<AnimatePresence initial={false} onExitComplete={()=>button.current?.focus({preventScroll:true})}>{open&&editor&&<StaffProfileDialog key={user?.id} close={()=>setOpen(false)}/>}</AnimatePresence>;
  return <>
-  <HeaderAccountMenu staffActions={{ dashboard: onDashboard, profile: () => { if(canOpenProfile)setOpen(true); }, signedOut: onSignedOut, trigger: button }}/>
+  <HeaderAccountMenu staffActions={{ dashboard: onDashboard, profile: () => { if(canOpenProfile)setOpen(true); }, signedOut: onSignedOut, trigger: button, mobile }}/>
   {profileHost ? createPortal(profile,profileHost) : profile}
  </>;
 }

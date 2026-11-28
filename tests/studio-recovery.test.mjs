@@ -200,6 +200,7 @@ async function harness(t, options={}){
    if(id==='next/image')return {__esModule:true,default:props=>React.createElement('img',props)};
    if(id==='next/link')return {__esModule:true,default:({href,children,...props})=>React.createElement('a',{...props,href},children)};
    if(id==='next/navigation')return {usePathname:()=>pathname,useSearchParams:()=>browser.location.searchParams,useRouter:()=>({back(){},push(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);},replace(target){backend.navigation.push(target);browser.location=new URL(target,browser.location);}})};
+   if(id==='next-themes'&&options.appearance)return {useTheme:()=>({theme:options.appearance.value})};
    if(id==='@supabase/supabase-js')return {createClient:(_url,_key,options)=>({storage:{from:bucket=>({upload:async(path,file,uploadOptions)=>{backend.imageUploads??=[];backend.imageUploads.push({bucket,path,file,options:uploadOptions,clientOptions:options});return backend.upload.promise;},getPublicUrl:path=>({data:{publicUrl:'https://uploads.example.invalid/'+path}}),uploadToSignedUrl:async(path,token,file)=>{backend.privateUploads??=[];backend.privateUploads.push({path,token,name:file.name});return {error:backend.privateUploadError===file.name?{statusCode:'503'}:null};}})}})};
    if(id==='@/lib/browser-client'||id==='./browser-client')return {browserClient:()=>{if(options.clearHashOnClient)browser.location.hash='';return client;},publicBrowserClient:()=>publicClient,browserBackendConfig:()=>({url:'https://unit-test.invalid',publishableKey:'sb_publishable_fake'})};
    if(id.startsWith('.')||id.startsWith('@/')){
@@ -959,6 +960,77 @@ test('staff phone navigation overlays the page and keeps the saved desktop sideb
  await act(async()=>sidebar().findByProps({role:'separator'}).props.onKeyDown({key:'ArrowRight',preventDefault(){}}));
  assert.equal(shell().props.style['--studio-sidebar-width'],'332px');
  assert.equal(JSON.parse(h.stored.get(key)).width,332);
+});
+
+test('mobile preferences contain activity and unread state, and the drawer exposes the signed-in account in both languages',async t=>{
+ const appearance={value:'light'};
+ const h=await harness(t,{page:'staff',role:'admin',path:'/admin',width:390,appearance,
+  storage:{'gary-home-studio-sidebar':JSON.stringify({width:316,collapsed:true})}});
+ const root=h.renderer.root,header=()=>root.findByProps({className:'admin-topbar'});
+ const prefs=()=>header().findByProps({className:'site-preferences studio-preferences'});
+ const prefsTrigger=()=>prefs().findByProps({className:'site-preferences-trigger'});
+ const prefsPanel=()=>prefs().findByProps({className:'site-preferences-panel'});
+ const activity=()=>prefsPanel().findByProps({className:'studio-notifications studio-notifications--embedded'});
+ const activityTrigger=()=>activity().findByProps({className:'icon-button studio-notification-trigger'});
+ const title=()=>header().findByProps({className:'admin-breadcrumb'}).findByType('strong').children.join('');
+ const account=()=>root.findByProps({className:'admin-sidebar-bottom'}).findByProps({className:'header-account-trigger'});
+ const reads=()=>h.backend.rpcCalls.filter(call=>call.name==='get_studio_notifications').length;
+ h.backend.notifications=[{id:'mobile-notice',category:'enquiry',action:'enquiry.new',actor_name:'Fixture sender',
+  details:{},created_at:'2026-11-27T10:00:00Z',unread:true}];
+ await act(async()=>{h.browser.dispatchEvent(new Event('gary-team-access-changed'));await delay(5);});
+ assert.equal(header().findAllByProps({className:'back-navigation'}).length,0);
+ assert.ok(header().findByProps({className:'admin-navigation-toggle'}));
+ assert.ok(header().findByProps({className:'gary-apps-menu gary-apps-menu--studio'}));
+ assert.equal(title(),'Listings');
+ assert.match(prefsTrigger().props['aria-label'],/1 unread notification/);
+ assert.ok(prefsTrigger().findByProps({className:'site-preferences-unread'}));
+ assert.equal(prefsPanel().props.inert,true);
+ const beforeOpen=reads();
+ await act(async()=>prefsTrigger().props.onClick());
+ assert.equal(reads(),beforeOpen);
+ assert.equal(activityTrigger().props['aria-expanded'],false);
+ assert.equal(activityTrigger().findByProps({className:'notification-count'}).children.join(''),'1');
+ await act(async()=>{activityTrigger().props.onClick();await delay(5);});
+ assert.equal(reads(),beforeOpen+1);
+ assert.equal(activity().findByProps({className:'studio-notification-panel'}).props.role,'region');
+ let stopped=false;
+ await act(async()=>activity().props.onKeyDown({key:'Escape',preventDefault(){},stopPropagation(){stopped=true;}}));
+ assert.equal(stopped,true);
+ assert.equal(activityTrigger().props['aria-expanded'],false);
+ assert.equal(prefsPanel().props.inert,false);
+
+ for(const [locale,theme,checked,role] of [
+  ['en','light','Light','Admin'],['vi','light','Sáng','Quản trị viên'],['en','dark','Dark','Admin'],['vi','dark','Tối','Quản trị viên'],
+ ]){
+  appearance.value=theme;
+  await act(async()=>h.site.setLanguage(locale));
+  const selectedLabels=prefsPanel().findAllByProps({role:'radio','aria-checked':true}).flatMap(button=>button.children.filter(child=>typeof child==='string'));
+  assert.ok(selectedLabels.includes(checked),`${locale} ${theme}`);
+  assert.equal(activityTrigger().findByProps({className:'notification-trigger-label'}).children.join(''),locale==='vi'?'Thông báo':'Notifications');
+  assert.equal(account().findByProps({className:'staff-account-email'}).children.join(''),h.site.user.email);
+  assert.equal(account().findByProps({className:'staff-account-role'}).children.join(''),role);
+  assert.ok(account().findByProps({className:'header-account-avatar'}));
+  assert.ok(account().findAllByType('svg').some(icon=>icon.props.className?.includes('chevron-right')));
+ }
+ assert.equal(title(),'Tin đăng');
+ await act(async()=>{activityTrigger().props.onClick();await delay(5);});
+ const mark=activity().findAllByType('button').find(button=>button.children.includes('Đánh dấu đã đọc'));
+ await act(async()=>{mark.props.onClick();await delay(5);});
+ assert.equal(prefsTrigger().findAllByProps({className:'site-preferences-unread'}).length,0);
+ assert.equal(activityTrigger().findAllByProps({className:'notification-count'}).length,0);
+ await act(async()=>activity().findByProps({'data-unread':false}).props.onClick());
+ assert.equal(title(),'Yêu cầu liên hệ');
+ assert.equal(prefsPanel().props.inert,true);
+ await act(async()=>header().findByProps({className:'admin-navigation-toggle'}).props.onClick());
+ assert.equal(root.findByProps({id:'staff-sidebar'}).props.inert,false);
+ await act(async()=>{account().props.onClick();await delay(5);});
+ assert.equal(account().props['aria-expanded'],true);
+ const beforeResize=reads();
+ await act(async()=>{h.browser.innerWidth=900;h.browser.dispatchEvent(new Event('resize'));});
+ assert.ok(header().findByProps({className:'back-navigation'}));
+ assert.ok(header().findByProps({className:'studio-notifications'}));
+ assert.equal(prefsPanel().findAllByProps({className:'icon-button studio-notification-trigger'}).length,0);
+ assert.equal(reads(),beforeResize,'moving activity between layouts keeps its existing data subscription');
 });
 
 test('listing header shows the saved code and exposes both full titles without altering the draft',async t=>{

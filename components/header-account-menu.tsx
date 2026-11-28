@@ -52,7 +52,7 @@ const roleNames: Record<StaffRole, [string, string]> = {
 
 type CustomerAccess = { profile: boolean; saved: boolean; name: string; unavailable: boolean };
 type StaffMenuActions = {
-  dashboard: () => void; profile: () => void; signedOut: () => void; trigger: RefObject<HTMLButtonElement | null>;
+  dashboard: () => void; profile: () => void; signedOut: () => void; trigger: RefObject<HTMLButtonElement | null>; mobile: boolean;
 };
 
 function AccountAvatar({ photo, name = "" }: { photo?: string; name?: string }) {
@@ -175,6 +175,7 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
   const showSaved = verified && customer.saved;
   const canRetry = sessionPhase !== "ready" || customer?.unavailable;
   const label = staffActions ? t("Staff account", "Tài khoản nhân viên") : user ? t("My account", "Tài khoản của tôi") : t("Sign in", "Đăng nhập");
+  const showStaffIdentity = staffActions?.mobile && !!user;
   return <div className={staffActions ? "header-account-menu staff-account-menu" : "header-account-menu"} ref={root} onBlur={event => {
     if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) close();
   }} onKeyDown={event => {
@@ -185,13 +186,19 @@ export function HeaderAccountMenu({ onOpen, customerAvatar = false, staffActions
     trigger.current?.focus();
   }}>
     <button type="button" className="header-account-trigger" ref={trigger} aria-label={label} aria-controls={id} aria-expanded={open}
+      aria-describedby={showStaffIdentity ? `${id}-identity` : undefined}
       onClick={() => {
         if (open) { close(); return; }
         onOpen?.();
         setDisclosure({ identity, open: true });
         if (user) void checkAccess();
       }}>
-      <AccountAvatar photo={photo} name={avatarName}/><span className="header-account-trigger-label">{staffActions && name ? name : label}</span>{staffActions ? <ChevronRight size={14} aria-hidden="true"/> : <ChevronDown size={14} aria-hidden="true"/>}
+      <AccountAvatar photo={photo} name={avatarName}/>
+      {showStaffIdentity ? <span id={`${id}-identity`} className="staff-account-summary">
+        <span className="staff-account-email" dir={email ? "ltr" : undefined}>{email || name || label}</span>
+        {role && <span className="staff-account-role">{t(...roleNames[role])}</span>}
+      </span> : <span className="header-account-trigger-label">{staffActions && name ? name : label}</span>}
+      {staffActions ? <ChevronRight size={14} aria-hidden="true"/> : <ChevronDown size={14} aria-hidden="true"/>}
     </button>
     <div className="header-account-panel" id={id} hidden={!open} inert={!open}>
       {open && (user ? <>

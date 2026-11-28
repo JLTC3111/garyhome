@@ -469,15 +469,34 @@ export function AdminPage() {
   const live=content.properties.filter(p=>p.status==="published").length;const draft=content.properties.filter(p=>p.status==="draft").length;const newLeads=enquiries.filter(e=>!e.read_at).length;
   const connectionLabel=demo?"Browser preview":sessionPhase==="offline"?"Offline":sessionPhase==="recovering"?"Reconnecting…":sessionPhase==="error"?"Connection needs attention":"Connected to Supabase";
   const listingTitle=editing&&(language==="vi"?[editing.title_vi,editing.title_en]:[editing.title_en,editing.title_vi]).find(title=>title.trim());
-  return <StudioShell text={text} sidebar={(closeNavigation,compact)=><>
+  const connection=<span className={`admin-connection ${demo||sessionPhase!=="ready"?"demo":""}`} title={text(connectionLabel)}>
+    <span className="live-dot"/><span className="connection-label">{text(connectionLabel)}</span>
+  </span>;
+  return <StudioShell text={text} sidebar={({closeNavigation,compact,mobile})=><>
     <Brand href={publicHome} compact={compact}/><span className="studio-label">{text("STAFF PORTAL")}</span>
     <BranchedMenu items={sidebarItems} active={tab==="media"?"properties":tab} label={text("CMS navigation")} onSelect={value=>{if(visibleTabs.some(([id])=>id===value)){setTab(value as Tab);setError("");closeNavigation();}}}/>
     <div className="admin-sidebar-bottom">
       {demo ? <div><span className="avatar">G</span><span className="admin-sidebar-identity"><strong>{text("Preview workspace")}</strong><small>{text("Saved on this device")}</small></span><button className="icon-button admin-sidebar-signout" type="button" aria-label={text("Exit preview")} data-tooltip={text("Exit preview")} onClick={exitDemo}><LogOut size={20}/></button></div>
-        : <StaffAccountMenu key={user?.id} onDashboard={()=>{setTab("overview");setError("");closeNavigation();}} onSignedOut={discardStaffDrafts} profileHost={staffProfileHost}/>}
+        : <StaffAccountMenu key={user?.id} onDashboard={()=>{setTab("overview");setError("");closeNavigation();}} onSignedOut={discardStaffDrafts} profileHost={staffProfileHost} mobile={mobile}/>}
     </div>
-  </>}>{({trigger,open})=><>
-    <div className="admin-main" inert={open}><header className="admin-topbar">{trigger}<BackNavigation/><div className="admin-breadcrumb"><span>{text("Staff workspace")}</span><ChevronRight size={13}/><strong>{text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</strong></div><div className="admin-topbar-actions"><ServiceAppsMenu className="gary-apps-menu--studio"/>{!demo&&<StudioNotifications key={user?.id+"-"+site.staffRole} navigate={category=>{if(category==="profile"){window.dispatchEvent(new Event("gary-open-staff-profile"));return;}setTab(category==="landlord"?"landlords":category==="enquiry"?"enquiries":category==="feedback"?"feedback":category==="commission"?"assistance":canViewTeam(site.staffRole)?"team":"overview");}}/>}<span className={`admin-connection ${demo||sessionPhase!=="ready"?"demo":""}`} title={text(connectionLabel)}><span className="live-dot"/><span className="connection-label">{text(connectionLabel)}</span></span><SitePreferences studio/></div></header><div className="admin-content">{!demo&&<StaffPasswordReminder/>}<div className="admin-page-heading"><div><div className="eyebrow">{tab==="overview"?text("A LITTLE OVERVIEW"): "GARY HOME STUDIO"}</div><h1>{tab==="overview"?text("Good homes. Well looked after."):text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</h1><p>{tab==="overview"?text("Here’s what’s happening in your corner of Hanoi."):tab==="properties"?text("From a first draft to someone’s next chapter."):tab==="enquiries"?text("Every good move starts with a conversation."):tab==="customers"?text("Every customer deserves a little care."):tab==="media"?text("Original photos. An honest first impression."):tab==="neighbourhoods"?text("Help people find their kind of Hanoi."):text("The details that make this website yours.")}</p></div>{(tab==="properties"||tab==="media"||tab==="overview")&&<button className="button" disabled={!workspaceReady} onClick={newListing}><Plus size={17}/>{text("Add a property")}</button>}{tab==="neighbourhoods"&&<button className="button" disabled={!workspaceReady} onClick={()=>{setNewArea(true);setArea({slug:"",name:"",tagline_en:"",tagline_vi:"",description_en:"",description_vi:"",image:"",sort_order:content.neighbourhoods.length});setError("");}}><Plus size={17}/>{text("Add neighbourhood")}</button>}</div>{error&&workspaceReady&&<div className="form-error admin-error" role="alert">{text(error)}<button onClick={()=>setError("")} aria-label={text("Dismiss error")}><X size={15}/></button></div>}
+  </>}>{({trigger,open,mobile})=><>
+    <div className="admin-main" inert={open}>
+      <header className="admin-topbar">
+        {trigger}{!mobile&&<BackNavigation/>}
+        <div className="admin-breadcrumb"><span>{text("Staff workspace")}</span><ChevronRight size={13}/><strong>{text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</strong></div>
+        <div className="admin-topbar-actions">
+          <ServiceAppsMenu className="gary-apps-menu--studio"/>
+          {demo?<>{connection}<SitePreferences studio/></>:<StudioNotifications key={user?.id+"-"+site.staffRole} embedded={mobile} navigate={category=>{
+            if(category==="profile"){window.dispatchEvent(new Event("gary-open-staff-profile"));return;}
+            setTab(category==="landlord"?"landlords":category==="enquiry"?"enquiries":category==="feedback"?"feedback":category==="commission"?"assistance":canViewTeam(site.staffRole)?"team":"overview");
+          }}>{notifications=><>
+            {!mobile&&notifications.render()}
+            {connection}
+            <SitePreferences studio notifications={mobile?notifications:undefined}/>
+          </>}</StudioNotifications>}
+        </div>
+      </header>
+      <div className="admin-content">{!demo&&<StaffPasswordReminder/>}<div className="admin-page-heading"><div><div className="eyebrow">{tab==="overview"?text("A LITTLE OVERVIEW"): "GARY HOME STUDIO"}</div><h1>{tab==="overview"?text("Good homes. Well looked after."):text(tabs.find(([id])=>id===(tab==="media"?"properties":tab))?.[1]||"")}</h1><p>{tab==="overview"?text("Here’s what’s happening in your corner of Hanoi."):tab==="properties"?text("From a first draft to someone’s next chapter."):tab==="enquiries"?text("Every good move starts with a conversation."):tab==="customers"?text("Every customer deserves a little care."):tab==="media"?text("Original photos. An honest first impression."):tab==="neighbourhoods"?text("Help people find their kind of Hanoi."):text("The details that make this website yours.")}</p></div>{(tab==="properties"||tab==="media"||tab==="overview")&&<button className="button" disabled={!workspaceReady} onClick={newListing}><Plus size={17}/>{text("Add a property")}</button>}{tab==="neighbourhoods"&&<button className="button" disabled={!workspaceReady} onClick={()=>{setNewArea(true);setArea({slug:"",name:"",tagline_en:"",tagline_vi:"",description_en:"",description_vi:"",image:"",sort_order:content.neighbourhoods.length});setError("");}}><Plus size={17}/>{text("Add neighbourhood")}</button>}</div>{error&&workspaceReady&&<div className="form-error admin-error" role="alert">{text(error)}<button onClick={()=>setError("")} aria-label={text("Dismiss error")}><X size={15}/></button></div>}
   {!workspaceReady ? (
     sessionPhase!=="ready" ? null : workspaceLoadFailed ? <>
       <div className="form-error" role="alert">{site.t("Couldn’t load the staff workspace. Check your connection and try again.", "Chưa thể tải không gian làm việc của nhân viên. Hãy kiểm tra kết nối rồi thử lại.")}</div>

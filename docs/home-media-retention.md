@@ -11,11 +11,12 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
    from private.home_media_control where singleton;
    ```
 
-2. Apply the reviewed migration from the repository root. It starts the next verification pass from the beginning of both media buckets. Existing verified deadlines, holds, and File Trash records retain their dates.
+2. Apply the reviewed migrations from the repository root. The next verification pass starts from the beginning of both media buckets. Existing verified deadlines, holds, and File Trash records retain their dates.
 
    ```sh
    /opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
-     -f supabase/migrations/20261128072734_home_media_retention_gaps.sql
+     -f supabase/migrations/20261128072734_home_media_retention_gaps.sql \
+     -f supabase/migrations/20261128081144_home_media_inventory_read_performance.sql
    ```
 
 3. Publish the updated Edge Function, then release the reviewed staff app and refresh open staff tabs. The worker uses the existing credential and performs removals through the Storage API. [Home Vercel pipeline](vercel-deployment.md) · [Supabase Storage deletion](https://supabase.com/docs/guides/storage/management/delete-objects)
@@ -36,6 +37,17 @@ The protected Gary Home Owner can open **Properties → Storage & Media Manageme
 5. Use the **Recovery holds** filter to review unreferenced held files or select them across pages. Inventory also offers release on a held file with a saved reference. **Release hold** leaves the file in Storage. If later verified unused, it starts a fresh 96-hour window. **Release hold & delete** asks for explicit confirmation and rechecks the saved references, upload state, and exact object. The hold remains until the worker records successful removal. Verify destructive paths with disposable test media in a staging project. Check **File Trash** against the original deadlines and **Cleanup History** for removal receipts.
 
 Keep the 96-hour gate in preview until the expanded set is reviewed. The existing [scheduled activation step](#enable-scheduled-96-hour-removal) is a separate decision.
+
+### Correct the dashboard read timeout
+
+For a project that already has the legacy-path and recovery-hold migration, apply the corrective SQL by itself. The dashboard and file lists reuse the observer's reference maps when the saved documents match. Each read still checks live Storage identities for mapped filenames.
+
+```sh
+/opt/homebrew/opt/libpq/bin/psql -X -w -d 'service=gary-home-media sslmode=verify-full' -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/20261128081144_home_media_inventory_read_performance.sql
+```
+
+Reopen **Storage & Media Management**. Check the overview and open **Inventory files** and **Retention preview**. Compare the unfiltered retention counts. The SQL takes effect for the app and worker that are already running.
 
 ## Roll out listing-scoped retention
 

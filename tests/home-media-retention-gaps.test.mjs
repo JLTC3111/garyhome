@@ -5,6 +5,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { supabasePlatform } from './supabase-platform.fixture.mjs';
 
 const migration='20261128072734_home_media_retention_gaps.sql';
+const readPerformanceMigration='20261128081144_home_media_inventory_read_performance.sql';
 const owner='00000000-0000-4000-8000-000000000001',staff='00000000-0000-4000-8000-000000000002';
 const bucket='property-media';
 const photoUrl=key=>'https://fixture.example/storage/v1/object/public/property-media/'+key.split('/').map(encodeURIComponent).join('/');
@@ -17,6 +18,7 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
     create table public.gary_cms_entries(body jsonb not null);`);
   const setup=await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8');
   const migrationSql=await readFile(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8');
+  const readPerformanceSql=await readFile(new URL('../supabase/migrations/'+readPerformanceMigration,import.meta.url),'utf8');
   await db.exec(setup.split('-- Migration: '+migration)[0]);
   await db.exec(`
     insert into auth.users(id,email,email_confirmed_at) values
@@ -74,6 +76,7 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   await hold('archive/ordinary-hold.webp','owner_hold');
   await hold(canonical);
   await db.exec(migrationSql);
+  await db.exec(readPerformanceSql);
   assert.deepEqual(await legacy(),original48);
   const state=name=>value("select reason value from private.home_media_inactivity_inventory(null,$1)",[name]);
   assert.equal(await state('archive/old.jpg'),'awaiting_observation');
@@ -140,7 +143,16 @@ test('expanded Home retention stays bounded and shares live evidence across Owne
   assert.equal(await state(canonical),'reference');
   assert.equal(await state('archive/recovery-release.webp'),'awaiting_observation');
   assert.equal(await value("select count(*)::int value from private.home_media_items where source='unused_listing' and expires_at-unreferenced_since=interval '96 hours'"),verified.length);
+  assert.equal(await value("select reference_digest=private.home_media_reference_digest() value from private.home_media_observation"),true);
+  await db.exec('begin');
+  try {
+    await execute('delete from storage.objects where bucket_id=$1 and name=$2',[bucket,canonical]);
+    assert.equal(await state('archive/old.jpg'),'filename_match','cached evidence still checks whether the exact gallery object exists');
+  } finally {
+    await db.exec('rollback');
+  }
   await execute("insert into public.jobs_cms_entries values ($1)",[{filename:'old.jpg'}]);
+  assert.equal(await value("select reference_digest=private.home_media_reference_digest() value from private.home_media_observation"),false);
   assert.equal(await state('archive/old.jpg'),'filename_match','an extra unbound occurrence keeps the duplicate protected');
   const old=verified.find(ticket=>ticket.name==='archive/old.jpg');
   await as('service_role');
